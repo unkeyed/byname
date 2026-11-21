@@ -453,7 +453,7 @@ export interface Mention {
   position: number | null;
 }
 
-export interface Answer {
+export interface AnswerSummary {
   id: number;
   run_id: number;
   question: QuestionRef;
@@ -467,11 +467,37 @@ export interface Answer {
   cited: boolean;
   position: number | null;
   cost_usd: number | null;
+  citation_count: number;
   mentions: Mention[];
   answered_at: Timestamp;
+}
+
+/** What Byname found on a cited page the last time it read it. */
+export interface PageCheck {
+  /** disallowed: robots.txt said no; refused: not http(s), or a private address. */
+  status: "ok" | "failed" | "disallowed" | "refused";
+  fetched_at: Timestamp;
+  /** Null unless status is ok. Read from the served HTML, so a page built in the browser can read as absent. */
+  self_present: boolean | null;
+  brands: string[];
+  competitors: string[];
+  error: string;
+}
+
+export interface Answer extends AnswerSummary {
   text: string;
   fan_out: string[] | null;
-  citations: { url: string; domain: string; is_self: boolean }[];
+  /** page is null until Byname has fetched the cited page. */
+  citations: { url: string; domain: string; is_self: boolean; page: PageCheck | null }[];
+}
+
+export interface GapPair extends Series {
+  answer_id: number;
+  status: AnswerStatus;
+  named: boolean;
+  position: number | null;
+  /** The web searches the engine ran; empty where the endpoint does not expose them. */
+  fan_out: string[] | null;
 }
 
 export interface Gap {
@@ -481,7 +507,101 @@ export interface Gap {
   named: number;
   competitors: number;
   opportunity: number;
+  /** Monthly searches; null while no demand source is set up. */
+  demand: number | null;
   named_on_miss: string[];
+  pairs: GapPair[];
+}
+
+export interface RunRef {
+  id: number;
+  started_at: Timestamp;
+}
+
+export type DotState = "named" | "cited" | "not_named" | "failed";
+
+export interface Dot {
+  run_id: number;
+  state: DotState;
+  named: number;
+  answered: number;
+}
+
+export interface PromptRow {
+  question: QuestionRef;
+  answered: number;
+  named_by: Series[];
+  best_position: number | null;
+  instead: string[];
+  /** Lines up with Prompts.runs; null where the question was not asked. */
+  dots: (Dot | null)[];
+}
+
+export interface Prompts {
+  runs: RunRef[];
+  latest_run_id: number;
+  rows: PromptRow[];
+}
+
+export interface SourcePage {
+  url: string;
+  domain: string;
+  is_self: boolean;
+  citations: number;
+  answers: number;
+  check: PageCheck | null;
+  outreach: boolean;
+}
+
+export interface SourceDomain {
+  domain: string;
+  is_self: boolean;
+  citations: number;
+  answers: number;
+  pages: number;
+  outreach: number;
+}
+
+export interface Sources {
+  answered: number;
+  citing: number;
+  citations: number;
+  domain_count: number;
+  page_count: number;
+  domains: SourceDomain[];
+  pages: SourcePage[];
+}
+
+/** One chart line: a surface (pair id 0) or one of its pairs, on one endpoint at one fidelity. */
+export interface Line {
+  surface: SurfaceKey;
+  pair: number;
+  endpoint: string;
+  fidelity: Fidelity;
+}
+
+export interface EnginePrompt {
+  question: QuestionRef;
+  answer_id: number;
+  position: number | null;
+  cited: boolean;
+  instead: string[];
+}
+
+export interface Engine extends Series {
+  models: string[];
+  runs: number;
+  latest_run_id: number;
+  answered: number;
+  named: number;
+  visibility: number | null;
+  prompts: number;
+  visible_prompts: number;
+  average_position: number | null;
+  points: RatePoint[];
+  ranking: BrandStanding[];
+  not_mentioned: EnginePrompt[];
+  visible: EnginePrompt[];
 }
 
 /** Which pairs a results read covers, and since when. */
@@ -630,12 +750,17 @@ export const api = {
     /** 201 with a new run, or 200 with the run already queued or running. Poll get() for progress. */
     runNow: () => request<Run>("POST", "/v1/runs"),
     questions: (id: number, f: ResultsFilter) => request<QuestionTable>("GET", `/v1/runs/${id}/questions${qs({ surface: f.surface, model: f.model })}`),
+    answers: (id: number) => request<AnswerSummary[]>("GET", `/v1/runs/${id}/answers`),
   },
   jobs: (limit = 20) => request<Job[]>("GET", `/v1/jobs${qs({ limit })}`),
   answer: (id: number) => request<Answer>("GET", `/v1/answers/${id}`),
   compare: (before: number, after: number) => request<Comparison>("GET", `/v1/compare${qs({ before, after })}`),
   history: (question: number, since?: Timestamp) => request<History>("GET", `/v1/questions/${question}/history${qs({ since })}`),
-  gaps: (run?: number) => request<{ run_id: number; gaps: Gap[] }>("GET", `/v1/gaps${qs({ run })}`),
+  gaps: (run?: number, f: ResultsFilter = {}) => request<{ run_id: number; gaps: Gap[] }>("GET", `/v1/gaps${qs({ run, surface: f.surface, model: f.model })}`),
+  prompts: (f: ResultsFilter) => request<Prompts>("GET", `/v1/prompts${qs({ ...f })}`),
+  sources: (f: ResultsFilter) => request<Sources>("GET", `/v1/sources${qs({ ...f })}`),
+  engine: (l: Line, since?: Timestamp) =>
+    request<Engine>("GET", `/v1/metrics/engine${qs({ since, surface: l.surface, pair: l.pair || undefined, endpoint: l.endpoint, fidelity: l.fidelity })}`),
 
   metrics: {
     rates: (f: ResultsFilter, by: Grouping) => request<RateSeries[]>("GET", `/v1/metrics/rates${qs({ ...f, by })}`),

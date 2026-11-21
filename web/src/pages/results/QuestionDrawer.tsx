@@ -6,13 +6,15 @@ import { keys, useBrands, useSettings, useSurfaces } from "../../queries";
 import { Markdown } from "../../markdown";
 import { Badge, Button, cx, ErrorNote, Icon, PageSpinner, ScrollX, selectClass, useModal } from "../../ui";
 import { useFilter, useView } from "../../view";
+import { PageMark } from "./Gaps";
+import { Segmented } from "./Header";
 
 /** The question view: open wherever ?q= names a question, with ?qa= naming the answer shown. */
 export function QuestionDrawer() {
   const view = useView();
   const q = Number(view.get("q")) || 0;
   const ref = useModal(q > 0);
-  const close = () => view.set({ q: null, qa: null });
+  const close = () => view.set({ q: null, qa: null, qv: null });
   return (
     <dialog
       ref={ref}
@@ -72,9 +74,10 @@ function Body({ question, onClose }: { question: number; onClose: () => void }) 
   const series = history.data.series.filter((s) => (!filter.surface || s.pair.surface === filter.surface) && (!filter.model || s.pair.model === filter.model));
   const runs = [...new Map(series.flatMap((s) => s.points.map((p) => [p.run_id, p.run_started_at] as const))).entries()].sort((a, b) => a[0] - b[0]);
   const qa = Number(view.get("qa")) || 0;
+  const raw = view.get("qv") === "raw";
   const selSeries = series.find((s) => s.points.some((p) => p.answer_id === qa)) ?? series[0];
   const selPoint = selSeries?.points.find((p) => p.answer_id === qa) ?? selSeries?.points[selSeries.points.length - 1];
-  const pick = (answer: number) => view.set({ qa: answer });
+  const pick = (answer: number, patch: { qv?: string | null } = {}) => view.set({ qa: answer, ...patch });
   const newest = history.data.series.flatMap((s) => s.points).sort((a, b) => b.run_id - a.run_id)[0];
 
   return (
@@ -87,11 +90,71 @@ function Body({ question, onClose }: { question: number; onClose: () => void }) 
           <Icon name="x" />
         </Button>
       </div>
+      {selSeries && selPoint && (
+        <div className="flex shrink-0 flex-col gap-2 border-b border-line px-4 py-2.5 sm:flex-row sm:items-center">
+          <select
+            aria-label="Surface and model"
+            className={cx(selectClass, "h-8 w-full min-w-0 text-xs sm:w-auto sm:flex-1")}
+            value={lineKey(selSeries)}
+            onChange={(e) => {
+              const s = series.find((x) => lineKey(x) === e.target.value)!;
+              pick((s.points.find((p) => p.run_id === selPoint.run_id) ?? s.points[s.points.length - 1]).answer_id);
+            }}
+          >
+            {series.map((s) => (
+              <option key={lineKey(s)} value={lineKey(s)}>
+                {labels.line(s.pair)} ({fidelityInfo[s.fidelity].label})
+              </option>
+            ))}
+          </select>
+          <Segmented className="self-start sm:self-auto" label="View" value={raw ? "raw" : "analysis"} options={[{ id: "analysis", label: "Analysis" }, { id: "raw", label: "Raw answer" }]} onChange={(v) => view.set({ qv: v === "raw" ? "raw" : null })} />
+        </div>
+      )}
       <div className="min-h-0 flex-1 space-y-6 overflow-auto px-4 py-4">
-        {series.length === 0 ? (
+        {!selSeries || !selPoint ? (
           <p className="text-sm text-muted">No answers to this question in this range.</p>
+        ) : raw ? (
+          <section>
+            <div className="mb-2 flex flex-wrap items-center gap-2">
+              <h3 className="flex-1 text-sm font-semibold">
+                {labels.line(selSeries.pair)}, check #{selPoint.run_id}
+              </h3>
+              <select aria-label="Check" className={cx(selectClass, "text-xs")} value={selPoint.answer_id} onChange={(e) => pick(Number(e.target.value))}>
+                {[...selSeries.points].reverse().map((p) => (
+                  <option key={p.answer_id} value={p.answer_id}>
+                    Check #{p.run_id}, {shortDay(p.run_started_at)}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <AnswerView id={selPoint.answer_id} />
+          </section>
         ) : (
           <>
+            <Analysis series={selSeries} point={selPoint} label={labels.line(selSeries.pair)} onRaw={() => view.set({ qv: "raw" })} />
+
+            <section>
+              <h3 className="mb-2 text-sm font-semibold">Run history · {labels.line(selSeries.pair)}</h3>
+              <ol className="divide-y divide-line rounded-surface border border-line bg-surface">
+                {[...selSeries.points].reverse().map((p) => (
+                  <li key={p.answer_id}>
+                    <button
+                      type="button"
+                      onClick={() => pick(p.answer_id, { qv: "raw" })}
+                      title="Read this check's full answer"
+                      className={cx("flex w-full items-start gap-3 px-3 py-2 text-left hover:bg-subtle", p.answer_id === selPoint.answer_id && "bg-subtle")}
+                    >
+                      <span className="w-24 shrink-0 text-xs text-muted">
+                        #{p.run_id} · {shortDay(p.run_started_at)}
+                      </span>
+                      <span className="min-w-0 flex-1 text-xs">{p.summary || "No change"}</span>
+                      <Mark point={p} />
+                    </button>
+                  </li>
+                ))}
+              </ol>
+            </section>
+
             <section>
               <h3 className="mb-2 text-sm font-semibold">Your position per check</h3>
               <div className="overflow-hidden rounded-surface border border-line bg-surface">
@@ -125,7 +188,7 @@ function Body({ question, onClose }: { question: number; onClose: () => void }) 
                             const p = s.points.find((x) => x.run_id === id);
                             return (
                               <td key={id} className="px-0.5 py-1">
-                                <Mark point={p} selected={p?.answer_id === selPoint?.answer_id} onClick={p && (() => pick(p.answer_id))} />
+                                <Mark point={p} selected={p?.answer_id === selPoint.answer_id} onClick={p && (() => pick(p.answer_id))} />
                               </td>
                             );
                           })}
@@ -136,7 +199,7 @@ function Body({ question, onClose }: { question: number; onClose: () => void }) 
                 </ScrollX>
               </div>
               <p className="mt-1.5 text-xs text-faint">
-                <span className="font-semibold text-success">#2</span> named you at that position. <span className="text-info">Cited</span> cited you without naming you. — did not name you. · not asked. Pick a mark to read
+                <span className="font-semibold text-success">#2</span> named you at that position. <span className="text-info">Cited</span> cited you without naming you. — did not name you. · not asked. Pick a mark to analyse
                 that answer.
               </p>
             </section>
@@ -149,60 +212,100 @@ function Body({ question, onClose }: { question: number; onClose: () => void }) 
                 ))}
               </ul>
             </section>
-
-            {selSeries && selPoint && (
-              <>
-                <section>
-                  <div className="mb-2 flex flex-wrap items-center gap-2">
-                    <h3 className="flex-1 text-sm font-semibold">Answer</h3>
-                    <select
-                      aria-label="Model"
-                      className={cx(selectClass, "max-w-full text-xs")}
-                      value={lineKey(selSeries)}
-                      onChange={(e) => {
-                        const s = series.find((x) => lineKey(x) === e.target.value)!;
-                        pick((s.points.find((p) => p.run_id === selPoint.run_id) ?? s.points[s.points.length - 1]).answer_id);
-                      }}
-                    >
-                      {series.map((s) => (
-                        <option key={lineKey(s)} value={lineKey(s)}>
-                          {labels.line(s.pair)} ({fidelityInfo[s.fidelity].label})
-                        </option>
-                      ))}
-                    </select>
-                    <select aria-label="Check" className={cx(selectClass, "text-xs")} value={selPoint.answer_id} onChange={(e) => pick(Number(e.target.value))}>
-                      {[...selSeries.points].reverse().map((p) => (
-                        <option key={p.answer_id} value={p.answer_id}>
-                          Check #{p.run_id}, {shortDay(p.run_started_at)}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <AnswerView id={selPoint.answer_id} />
-                </section>
-
-                <section>
-                  <h3 className="mb-2 text-sm font-semibold">Run history · {labels.line(selSeries.pair)}</h3>
-                  <ol className="divide-y divide-line rounded-surface border border-line bg-surface">
-                    {[...selSeries.points].reverse().map((p) => (
-                      <li key={p.answer_id}>
-                        <button type="button" onClick={() => pick(p.answer_id)} className={cx("flex w-full items-start gap-3 px-3 py-2 text-left hover:bg-subtle", p.answer_id === selPoint.answer_id && "bg-subtle")}>
-                          <span className="w-24 shrink-0 text-xs text-muted">
-                            #{p.run_id} · {shortDay(p.run_started_at)}
-                          </span>
-                          <span className="min-w-0 flex-1 text-xs">{p.summary || "No change"}</span>
-                          <Mark point={p} />
-                        </button>
-                      </li>
-                    ))}
-                  </ol>
-                </section>
-              </>
-            )}
           </>
         )}
       </div>
     </div>
+  );
+}
+
+/** The selected pair's answer in one check: where you stood, who was named instead, and what it cited. */
+function Analysis({ series: s, point, label, onRaw }: { series: HistorySeries; point: HistoryPoint; label: string; onRaw: () => void }) {
+  const answer = useQuery({ queryKey: keys.answer(point.answer_id), queryFn: () => api.answer(point.answer_id) });
+  const competitors = answer.data?.mentions.filter((m) => m.kind === "competitor") ?? [];
+  return (
+    <section className="space-y-4">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+        <div className="rounded-surface border border-line bg-surface px-3 py-2">
+          <div className="text-xs text-muted">Visibility</div>
+          <div className="text-lg font-semibold tabular-nums">
+            {s.named} <span className="text-sm font-normal text-muted">of {s.answered} checks</span>
+          </div>
+        </div>
+        <div className="rounded-surface border border-line bg-surface px-3 py-2">
+          <div className="text-xs text-muted">Position in check #{point.run_id}</div>
+          <div className="text-lg font-semibold tabular-nums">{point.position ? `#${point.position}` : point.status === "ok" && point.cited ? "Cited" : "–"}</div>
+        </div>
+        <div className="col-span-2 rounded-surface border border-line bg-surface px-3 py-2 sm:col-span-1">
+          <div className="text-xs text-muted">Best position</div>
+          <div className="text-lg font-semibold tabular-nums">{s.best_position ? `#${s.best_position}` : "–"}</div>
+        </div>
+      </div>
+      <p className="flex flex-wrap items-center gap-2 text-xs text-muted">
+        <Badge tone={s.fidelity === "approximation" ? "warn" : "outline"} title={fidelityInfo[s.fidelity].detail}>
+          {fidelityInfo[s.fidelity].label}
+        </Badge>
+        {label}, check #{point.run_id}, {shortDay(point.run_started_at)}.
+        <button type="button" onClick={onRaw} className="font-medium text-fg hover:underline">
+          Read the answer
+        </button>
+      </p>
+      {answer.isPending ? (
+        <PageSpinner />
+      ) : answer.isError ? (
+        <ErrorNote error={answer.error} />
+      ) : answer.data.status !== "ok" ? (
+        <p className="text-sm text-muted">{answer.data.status === "failed" ? `The call failed: ${answer.data.error || "no reason given"}.` : "The surface showed no AI answer for this question."}</p>
+      ) : (
+        <>
+          <div>
+            <h3 className="mb-2 text-sm font-semibold">{answer.data.mentioned ? "Brands named alongside you" : "Brands mentioned instead"}</h3>
+            {competitors.length === 0 ? (
+              <p className="text-sm text-muted">No competitor was named.</p>
+            ) : (
+              <ul className="flex flex-wrap gap-1.5">
+                {competitors.map((m) => (
+                  <li key={m.brand_id}>
+                    <Badge tone="outline">
+                      {m.position && <span className="text-faint tabular-nums">#{m.position}</span>}
+                      {m.name}
+                    </Badge>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          <div>
+            <h3 className="mb-2 text-sm font-semibold">Sources cited</h3>
+            {answer.data.citations.length === 0 ? (
+              <p className="text-sm text-muted">This answer cited no pages.</p>
+            ) : (
+              <ol className="divide-y divide-line rounded-surface border border-line bg-surface text-xs">
+                {answer.data.citations.map((c, i) => (
+                  <li key={i} className="flex flex-col gap-1 px-3 py-2 sm:flex-row sm:items-center sm:gap-3">
+                    <span className="flex min-w-0 flex-1 items-center gap-2">
+                      <span className="text-faint tabular-nums">{i + 1}</span>
+                      <a href={c.url} target="_blank" rel="noreferrer noopener" className={cx("min-w-0 truncate hover:underline", c.is_self && "font-semibold")} title={c.url}>
+                        {c.url.replace(/^https?:\/\/(www\.)?/, "")}
+                      </a>
+                      {c.is_self && <Badge tone="info">Yours</Badge>}
+                    </span>
+                    <span className="flex shrink-0 flex-wrap items-center gap-1 pl-5 sm:pl-0">
+                      <PageMark check={c.page} />
+                      {c.page?.competitors.map((b) => (
+                        <Badge key={b} tone="outline">
+                          {b}
+                        </Badge>
+                      ))}
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </div>
+        </>
+      )}
+    </section>
   );
 }
 

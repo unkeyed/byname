@@ -6,6 +6,7 @@ import { fidelityInfo, lineKey, pct, useLabels } from "../../lines";
 import { keys, useAnsweredRuns, useBrands, useSettings, useSurfaces } from "../../queries";
 import { Badge, Card, CardHeader, cx, EmptyState, ErrorNote, PageSpinner, ScrollX } from "../../ui";
 import { useFilter, useView } from "../../view";
+import { useOpenEngine } from "./EngineDrawer";
 import { ViewHeader } from "./Header";
 
 export function Competitors() {
@@ -117,6 +118,7 @@ function ShareOfVoice({ data }: { data: Data }) {
 const heatStep = (rate: number) => Math.min(12, Math.max(0, Math.round(rate * 12)));
 
 function Heatmap({ data }: { data: Data }) {
+  const openEngine = useOpenEngine();
   const surfaces = useSurfaces();
   const labels = useLabels(surfaces.data);
   const [hover, setHover] = useState<string | null>(null);
@@ -124,7 +126,7 @@ function Heatmap({ data }: { data: Data }) {
   if (data.columns.length === 0) return null;
   return (
     <Card>
-      <CardHeader title="Named by surface" description="Each cell is the share of that line's answers naming the brand, on the scale below. Hover or focus a cell for the count." />
+      <CardHeader title="Named by surface" description="Each cell is the share of that line's answers naming the brand, on the scale below. Hover or focus a cell for the count, or open a column for that line's detail." />
       <div className="px-4 pb-4">
         <ScrollX label="brands by surface">
           <table className="w-full table-fixed border-separate border-spacing-0.5 text-xs" style={{ minWidth: `calc(7.5rem + ${data.columns.length} * 5.5rem)` }}>
@@ -138,11 +140,13 @@ function Heatmap({ data }: { data: Data }) {
               <tr>
                 <th className="sticky left-0 z-[1] bg-surface" />
                 {data.columns.map((c) => (
-                  <th key={lineKey(c)} scope="col" className="px-1.5 pb-1 text-left align-bottom font-medium text-muted" title={c.models.join(", ") || undefined}>
-                    <span className="block text-fg">{labels.surfaceTitle(c.pair.surface)}</span>
-                    {(c.pair.model || c.models.length > 1) && <span className="block font-normal [overflow-wrap:anywhere]">{c.pair.model || `${c.models.length} models`}</span>}
-                    <span className={cx("block", c.fidelity === "approximation" ? "text-warn" : "font-normal")}>{fidelityInfo[c.fidelity].label}</span>
-                    <span className="block font-normal text-faint">{c.answered} answers</span>
+                  <th key={lineKey(c)} scope="col" className="px-0.5 pb-1 text-left align-bottom font-medium text-muted">
+                    <button type="button" onClick={() => openEngine(c)} title={`${c.models.length ? `${c.models.join(", ")}. ` : ""}Open ${labels.line(c.pair, c.models)}`} className="block w-full rounded-control px-1 py-0.5 text-left hover:bg-subtle">
+                      <span className="block text-fg underline decoration-line-hover underline-offset-2">{labels.surfaceTitle(c.pair.surface)}</span>
+                      {(c.pair.model || c.models.length > 1) && <span className="block font-normal [overflow-wrap:anywhere]">{c.pair.model || `${c.models.length} models`}</span>}
+                      <span className={cx("block", c.fidelity === "approximation" ? "text-warn" : "font-normal")}>{fidelityInfo[c.fidelity].label}</span>
+                      <span className="block font-normal text-faint">{c.answered} answers</span>
+                    </button>
                   </th>
                 ))}
               </tr>

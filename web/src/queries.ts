@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { api, type Grouping, type ResultsFilter, type Run } from "./api";
+import { api, type Grouping, type Line, type ResultsFilter, type Run } from "./api";
 
 /** Query keys in one place, so a mutation can invalidate exactly what it touched. */
 export const keys = {
@@ -28,7 +28,11 @@ export const keys = {
   history: (question: number, since?: string) => ["results", "history", question, since] as const,
   answer: (id: number) => ["answer", id] as const,
   compare: (before: number, after: number) => ["results", "compare", before, after] as const,
-  gaps: (run: number) => ["results", "gaps", run] as const,
+  gaps: (run: number, f: ResultsFilter = {}) => ["results", "gaps", run, f.surface, f.model] as const,
+  prompts: (f: ResultsFilter) => ["results", "prompts", f] as const,
+  sources: (f: ResultsFilter) => ["results", "sources", f] as const,
+  answers: (run: number) => ["results", "answers", run] as const,
+  engine: (l: Line, since?: string) => ["results", "engine", l, since] as const,
 };
 
 export const useMe = () => useQuery({ queryKey: keys.me, queryFn: api.me.get, staleTime: Infinity });

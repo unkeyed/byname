@@ -11,6 +11,8 @@ import { Consent } from "./pages/Consent";
 import { ComingSoon } from "./pages/ComingSoon";
 import { Overview } from "./pages/results/Overview";
 import { Competitors } from "./pages/results/Competitors";
+import { Prompts } from "./pages/results/Prompts";
+import { Gaps } from "./pages/results/Gaps";
 import { Compare } from "./pages/results/Compare";
 import { Runs } from "./pages/results/Runs";
 import { Settings, settingsRoutes } from "./pages/settings/Settings";
@@ -27,7 +29,9 @@ const router = createBrowserRouter([
     element: <Layout />,
     children: [
       { index: true, element: <Overview /> },
+      { path: "prompts", element: <Prompts /> },
       { path: "competitors", element: <Competitors /> },
+      { path: "gaps", element: <Gaps /> },
       { path: "compare", element: <Compare /> },
       { path: "runs", element: <Runs /> },
       ...nav.flatMap((n) => (n.soon ? [{ path: n.to === "/" ? undefined : n.to, index: n.to === "/", element: <ComingSoon title={n.label} body={n.soon} /> }] : [])),

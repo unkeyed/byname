@@ -5,6 +5,7 @@ import { api, ApiError } from "./api";
 import { useMe } from "./queries";
 import { Toaster } from "./components/Toaster";
 import { QuestionDrawer } from "./pages/results/QuestionDrawer";
+import { EngineDrawer } from "./pages/results/EngineDrawer";
 import { useView } from "./view";
 import { useTheme, type ThemeMode } from "./theme";
 import { Avatar, Button, buttonClass, Crumbs, cx, EmptyState, ErrorNote, Icon, Logo, NavMenu, PageHeader, Spinner, useModal, useWide, type IconName } from "./ui";
@@ -12,9 +13,9 @@ import { Avatar, Button, buttonClass, Crumbs, cx, EmptyState, ErrorNote, Icon, L
 /** The app's pages. soon is what a page will show, for those not built yet. */
 export const nav: { to: string; label: string; icon: IconName; soon?: string }[] = [
   { to: "/", label: "Overview", icon: "chart" },
-  { to: "/prompts", label: "Prompts", icon: "message", soon: "Every question Byname asks, in its groups, with whether each surface and model named or cited you." },
+  { to: "/prompts", label: "Prompts", icon: "message" },
   { to: "/competitors", label: "Competitors", icon: "users" },
-  { to: "/gaps", label: "Gaps", icon: "alert", soon: "The questions where competitors are named and you are not." },
+  { to: "/gaps", label: "Gaps", icon: "alert" },
   { to: "/compare", label: "Compare", icon: "layers" },
   { to: "/search", label: "Search", icon: "globe", soon: "Google Search Console clicks, impressions and position, with your goals." },
   { to: "/changes", label: "Changes", icon: "pencil", soon: "Changes to your site, when Google recrawled them, and what moved after." },
@@ -71,6 +72,7 @@ export function Layout() {
           <Outlet />
         </main>
       </div>
+      <EngineDrawer />
       <QuestionDrawer />
       </Toaster>
     </NavMenu.Provider>

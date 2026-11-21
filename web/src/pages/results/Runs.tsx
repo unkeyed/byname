@@ -193,7 +193,7 @@ function Jobs() {
             const st = jobStatus(j.status);
             return (
               <li key={j.id} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 px-4 py-2 md:grid-cols-[7rem_10rem_6rem_6rem_5rem_minmax(0,1fr)]">
-                <span className="font-medium">{j.job === "ai_check" ? "AI check" : j.job === "model_refresh" ? "Model lists" : j.job}</span>
+                <span className="font-medium">{j.job === "ai_check" ? "AI check" : j.job === "model_refresh" ? "Model lists" : j.job === "source_fetch" ? "Cited pages" : j.job}</span>
                 <span className="justify-self-end md:justify-self-start">
                   <Badge tone={st.tone}>{st.label}</Badge>
                 </span>

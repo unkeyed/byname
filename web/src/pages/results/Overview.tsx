@@ -1,11 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router";
-import { api, type Grouping, type ResultsFilter, type Run, type RunSummary } from "../../api";
+import { api, type Grouping, type ResultsFilter, type Run, type RunSummary, type Series } from "../../api";
 import { LineChart, LineKey, Sparkline, type ChartLine } from "../../charts";
 import { fidelityInfo, lineKey, palette, pct, shortDay, usd, useLabels } from "../../lines";
 import { keys, useAnsweredRuns, useRuns, useSettings, useSurfaces } from "../../queries";
 import { Badge, Card, CardHeader, cx, EmptyState, ErrorNote, Icon, PageSpinner, RelativeTime, ScrollX } from "../../ui";
 import { runTime, useFilter, useView } from "../../view";
+import { useOpenEngine } from "./EngineDrawer";
 import { Segmented, ViewHeader } from "./Header";
 import { QuestionsTable } from "./QuestionsTable";
 import { RunNowButton, RunStatusBadge, useCanRun } from "./RunNow";
@@ -164,6 +165,7 @@ function Tiles({ filter }: { filter: ResultsFilter }) {
 
 function RatesCard({ filter, by }: { filter: ResultsFilter; by: Grouping }) {
   const view = useView();
+  const openEngine = useOpenEngine();
   const surfaces = useSurfaces();
   const labels = useLabels(surfaces.data);
   const color = palette(surfaces.data);
@@ -177,7 +179,7 @@ function RatesCard({ filter, by }: { filter: ResultsFilter; by: Grouping }) {
     const runIDs = [...new Set(rates.data.flatMap((s) => s.points.map((p) => p.run_id)))].sort((a, b) => a - b);
     const at = new Map(rates.data.flatMap((s) => s.points.map((p) => [p.run_id, p.run_started_at] as const)));
     const xs = runIDs.map((id) => ({ key: String(id), label: `#${id}`, title: `Check #${id}, ${shortDay(at.get(id)!)}` }));
-    const lines: (ChartLine & { fidelity: keyof typeof fidelityInfo; latest: number | null; models: string[] })[] = rates.data.map((s) => {
+    const lines: (ChartLine & { fidelity: keyof typeof fidelityInfo; latest: number | null; models: string[]; series: Series })[] = rates.data.map((s) => {
       const byRun = new Map(s.points.map((p) => [p.run_id, metric === "mention" ? p.mention_rate : p.citation_rate]));
       const values = runIDs.map((id) => byRun.get(id) ?? null);
       return {
@@ -189,6 +191,7 @@ function RatesCard({ filter, by }: { filter: ResultsFilter; by: Grouping }) {
         fidelity: s.fidelity,
         latest: values.reduce<number | null>((l, v) => (v == null ? l : v), null),
         models: s.models,
+        series: s,
       };
     });
     body =
@@ -197,17 +200,18 @@ function RatesCard({ filter, by }: { filter: ResultsFilter; by: Grouping }) {
       ) : (
         <div className={cx("grid grid-cols-[minmax(0,1fr)] gap-4 px-4 pb-4 lg:grid-cols-[minmax(0,1fr)_16rem]", rates.isPlaceholderData && "opacity-60")}>
           <LineChart xs={xs} lines={lines} format={(v) => pct(v)} label={`${metric === "mention" ? "Mention" : "Citation"} rate per check, one line per ${by === "surface" ? "surface" : "surface and model"}`} />
-          <ul aria-label="Lines, with each line's latest value" className="space-y-2 self-start text-xs">
+          <ul aria-label="Lines, with each line's latest value. Open one for its detail." className="-mx-1.5 space-y-0.5 self-start text-xs">
             {lines.map((l) => (
-              <li key={l.key} className="flex items-start gap-2" title={l.models.join(", ") || undefined}>
-                <LineKey color={l.color} dashed={l.approx} className="mt-1.5" />
-                <span className="min-w-0 flex-1">
-                  <span className="block font-medium [overflow-wrap:anywhere]">{l.label}</span>
-                  <span className={cx("block", l.approx ? "text-warn" : "text-faint")} title={fidelityInfo[l.fidelity].detail}>
-                    {fidelityInfo[l.fidelity].label}
+              <li key={l.key}>
+                <button type="button" onClick={() => openEngine(l.series)} title={`${l.models.length ? `${l.models.join(", ")}. ` : ""}Open ${l.label}`} className="flex w-full items-start gap-2 rounded-control px-1.5 py-1 text-left hover:bg-subtle">
+                  <LineKey color={l.color} dashed={l.approx} className="mt-1.5" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block font-medium [overflow-wrap:anywhere]">{l.label}</span>
+                    <span className={cx("block", l.approx ? "text-warn" : "text-faint")}>{fidelityInfo[l.fidelity].label}</span>
                   </span>
-                </span>
-                <span className="text-sm font-semibold tabular-nums">{pct(l.latest)}</span>
+                  <span className="text-sm font-semibold tabular-nums">{pct(l.latest)}</span>
+                  <Icon name="right" className="mt-0.5 size-3.5 text-faint" />
+                </button>
               </li>
             ))}
           </ul>
@@ -250,7 +254,7 @@ function RatesCard({ filter, by }: { filter: ResultsFilter; by: Grouping }) {
 
   return (
     <Card>
-      <CardHeader title={`${metric === "mention" ? "Mention rate" : "Citation rate"} by check`} description="Lines of different fidelity are never combined. Approximations are dashed.">
+      <CardHeader title={`${metric === "mention" ? "Mention rate" : "Citation rate"} by check`} description="Lines of different fidelity are never combined. Approximations are dashed. Open a line for its detail.">
         <Segmented size="sm" label="Lines" value={by === "surface" ? "surface" : "model"} options={[{ id: "surface", label: "By surface" }, { id: "model", label: "By model" }]} onChange={(v) => view.set(v === "model" ? { by: "model" } : { by: null, model: null })} />
         <Segmented size="sm" label="Metric" value={metric} options={[{ id: "mention", label: "Mentions" }, { id: "citation", label: "Citations" }]} onChange={(v) => view.set({ metric: v })} />
       </CardHeader>

@@ -25,9 +25,15 @@ const params = {
   by: "",
   model: "",
   metric: "mention",
-  /** The question drawer, and the answer it shows. */
+  /** The question drawer, the answer it shows, and "raw" for the answer's text over the analysis. */
   q: "",
   qa: "",
+  qv: "",
+  /** The engine drawer's line, as engineParam writes it. */
+  eng: "",
+  /** A page's tab, and "outreach" to list only outreach targets among cited pages. */
+  tab: "",
+  only: "",
   search: "",
   group: "",
   result: "",
