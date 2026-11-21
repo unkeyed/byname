@@ -3,6 +3,7 @@
 package app
 
 import (
+	"github.com/unkeyed/byname/internal/changes"
 	"github.com/unkeyed/byname/internal/checks"
 	"github.com/unkeyed/byname/internal/config"
 	"github.com/unkeyed/byname/internal/gsc"
@@ -18,4 +19,5 @@ type Services struct {
 	Results  *results.Service
 	Notify   *notify.Service
 	GSC      *gsc.Service
+	Changes  *changes.Service
 }

@@ -2,6 +2,8 @@ package scheduler_test
 
 import (
 	"context"
+	"errors"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -233,5 +235,48 @@ func TestSearchSyncDoesNotHoldUpChecks(t *testing.T) {
 	defer search.mu.Unlock()
 	if search.calls != 1 {
 		t.Fatalf("syncs started = %d, want 1 while one was running", search.calls)
+	}
+}
+
+// followed records the order the Search Console sync and site changes run.
+type followed struct {
+	mu    sync.Mutex
+	steps []string
+	done  chan struct{}
+}
+
+func (f *followed) add(s string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.steps = append(f.steps, s)
+}
+
+func (f *followed) SyncIfDue(context.Context) error {
+	f.add("sync")
+	return errors.New("Search Console answered 503")
+}
+
+func (f *followed) Tick(context.Context) error {
+	f.add("changes")
+	f.done <- struct{}{}
+	return nil
+}
+
+// TestSiteChangesFollowTheSearchSync: each tick runs site changes after
+// the Search Console sync, even one that failed.
+func TestSiteChangesFollowTheSearchSync(t *testing.T) {
+	e := setup(t)
+	p := e.process(nil)
+	f := &followed{done: make(chan struct{}, 1)}
+	scheduler.New(p.checks, p.cfg, scheduler.Options{Now: func() time.Time { return now }, Search: f, Changes: f}).Tick(context.Background())
+	select {
+	case <-f.done:
+	case <-time.After(30 * time.Second):
+		t.Fatal("site changes never ran")
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if strings.Join(f.steps, ",") != "sync,changes" {
+		t.Fatalf("steps = %v, want the sync then site changes", f.steps)
 	}
 }
