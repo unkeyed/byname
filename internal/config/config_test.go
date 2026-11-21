@@ -282,7 +282,7 @@ func TestSurfacesCheckModelsAgainstTheLiveList(t *testing.T) {
 	if len(active) != 2 {
 		t.Fatalf("active pairs = %+v, want ChatGPT app and Claude Code", active)
 	}
-	if err := svc.Ready(ctx); !errors.Is(err, core.ErrInvalid) || !strings.Contains(err.Error(), "brand") || !strings.Contains(err.Error(), "questions") {
+	if err := svc.Ready(ctx); !errors.Is(err, core.ErrInvalid) || !strings.Contains(err.Error(), "brand") || !strings.Contains(err.Error(), "question") {
 		t.Fatalf("ready = %v, want the brand and questions missing", err)
 	}
 

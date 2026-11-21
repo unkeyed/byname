@@ -109,7 +109,7 @@ func TestNothingRunsBeforeOnboardingIsFinished(t *testing.T) {
 	if s, _ := svc.Settings(ctx); s.NextCheckAt != nil {
 		t.Fatalf("next check = %v with onboarding unfinished, want none so the scheduler never claims one", s.NextCheckAt)
 	}
-	if err := svc.Ready(ctx); !errors.Is(err, core.ErrInvalid) || !strings.Contains(err.Error(), "finish onboarding") {
+	if err := svc.Ready(ctx); !errors.Is(err, core.ErrInvalid) || !strings.Contains(err.Error(), "finished onboarding") {
 		t.Fatalf("ready = %v, want onboarding named as missing, so Run now refuses", err)
 	}
 	state, _ = svc.Onboarding(ctx)

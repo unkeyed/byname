@@ -78,10 +78,10 @@ func (s *Service) Ready(ctx context.Context) error {
 		return err
 	}
 	if !onboarded {
-		missing = append(missing, "finish onboarding (POST /v1/onboarding/finish)")
+		missing = append(missing, "a finished onboarding")
 	}
 	if len(missing) > 0 {
-		return fmt.Errorf("%w: set %s before a check can run", core.ErrInvalid, strings.Join(missing, ", "))
+		return fmt.Errorf("%w: a check needs %s", core.ErrInvalid, strings.Join(missing, "; "))
 	}
 	return nil
 }
@@ -108,10 +108,10 @@ func (s *Service) readiness(ctx context.Context) ([]string, error) {
 		ok   bool
 		what string
 	}{
-		{brand, "your brand (PUT /v1/settings)"},
-		{questions, "questions (PUT /v1/questions)"},
-		{pairs, "an enabled surface (PUT /v1/surfaces/{key})"},
-		{token, "the Treg token, or move every surface off the Treg route (an admin sets the token under Settings > Credentials)"},
+		{brand, "your brand and domain"},
+		{questions, "at least one question"},
+		{pairs, "at least one surface where people ask, turned on with its models"},
+		{token, "the Treg token, which an admin sets under Settings > Credentials, or every surface on its own key or a gateway"},
 	} {
 		if !m.ok {
 			missing = append(missing, m.what)
