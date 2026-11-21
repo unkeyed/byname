@@ -17,20 +17,28 @@ const kindInfo = { domain: "Domain property", url_prefix: "URL-prefix property" 
 
 export function SearchConsole() {
   const gsc = useGsc();
-  const [params, setParams] = useSearchParams();
-  const returned = params.get("connected") === "google";
-  const failed = params.get("error");
-  const dismiss = () => setParams({}, { replace: true });
-
   return (
     <>
       <SettingsHeader title="Search Console">
         Byname reads clicks, impressions and position for one property, read-only, once a day. Connect with a Google account that can see the property,
         or with a service account if this instance has no Google OAuth client. The numbers stay when you disconnect.
       </SettingsHeader>
-      {returned && (
+      <GoogleReturn s={gsc.data} />
+      {gsc.isPending ? <PageSpinner /> : gsc.isError ? <ErrorNote error={gsc.error} /> : gsc.data.connected ? <Connected s={gsc.data} /> : <Connect s={gsc.data} />}
+    </>
+  );
+}
+
+/** What Google's callback said, from ?connected=google or ?error= on the page it returned to. */
+export function GoogleReturn({ s }: { s: GscStatus | undefined }) {
+  const [params, setParams] = useSearchParams();
+  const failed = params.get("error");
+  const dismiss = () => setParams({}, { replace: true });
+  return (
+    <>
+      {params.get("connected") === "google" && (
         <Banner tone="success" onDismiss={dismiss}>
-          Connected with Google.{gsc.data && !gsc.data.property ? " Pick the property to sync below." : ""}
+          Connected with Google.{s && !s.property ? " Pick the property to sync below." : ""}
         </Banner>
       )}
       {failed && (
@@ -38,7 +46,6 @@ export function SearchConsole() {
           Connecting with Google failed: {failed}
         </Banner>
       )}
-      {gsc.isPending ? <PageSpinner /> : gsc.isError ? <ErrorNote error={gsc.error} /> : gsc.data.connected ? <Connected s={gsc.data} /> : <Connect s={gsc.data} />}
     </>
   );
 }
@@ -77,10 +84,20 @@ function Connect({ s }: { s: GscStatus }) {
   );
 }
 
-/** Starts Google's consent page. Google sends the browser back here with ?connected=google or ?error=. */
-function GoogleButton({ available, primary, label = "Sign in with Google" }: { available: boolean; primary?: boolean; label?: string }) {
+/** Starts Google's consent page. Google sends the browser back to returnTo's page with ?connected=google or ?error=. */
+export function GoogleButton({
+  available,
+  primary,
+  label = "Sign in with Google",
+  returnTo = "settings",
+}: {
+  available: boolean;
+  primary?: boolean;
+  label?: string;
+  returnTo?: "settings" | "onboarding";
+}) {
   const google = useReauthMutation({
-    mutationFn: api.gsc.oauthStart,
+    mutationFn: () => api.gsc.oauthStart(returnTo),
     onSuccess: ({ url }) => {
       window.location.href = url;
     },
@@ -102,7 +119,7 @@ function GoogleButton({ available, primary, label = "Sign in with Google" }: { a
   );
 }
 
-function ServiceAccountForm({ label = "Connect service account" }: { label?: string }) {
+export function ServiceAccountForm({ label = "Connect service account" }: { label?: string }) {
   const qc = useQueryClient();
   const [key, setKey] = useState("");
   const account = useReauthMutation({
@@ -252,7 +269,7 @@ function Connected({ s }: { s: GscStatus }) {
   );
 }
 
-function PropertyPicker({ s, onDone, onCancel }: { s: GscStatus; onDone: () => void; onCancel?: () => void }) {
+export function PropertyPicker({ s, onDone, onCancel, submitLabel }: { s: GscStatus; onDone: () => void; onCancel?: () => void; submitLabel?: string }) {
   const qc = useQueryClient();
   const props = useQuery({ queryKey: keys.gscProperties, queryFn: api.gsc.properties });
   const [chosen, setChosen] = useState<string | null>(null);
@@ -298,7 +315,7 @@ function PropertyPicker({ s, onDone, onCancel }: { s: GscStatus; onDone: () => v
       <ErrorNote error={save.error} />
       <div className="flex gap-2">
         <Button type="submit" variant="primary" disabled={save.isPending}>
-          {s.property ? "Sync this property" : "Start syncing"}
+          {submitLabel ?? (s.property ? "Sync this property" : "Start syncing")}
         </Button>
         {onCancel && <Button onClick={onCancel}>Cancel</Button>}
       </div>

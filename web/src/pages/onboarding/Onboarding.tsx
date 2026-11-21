@@ -92,7 +92,20 @@ const views: Record<StepKey, { intro: string; render: (nav: StepNav) => ReactNod
   },
   search_console: {
     intro: "Google Search Console data next to your AI results. Optional, and it can be connected later.",
-    render: (nav) => <SearchConsoleStep footer={<StepFooter nav={nav} skip />} />,
+    render: (nav) => (
+      <SearchConsoleStep
+        onPicked={nav.done}
+        footer={(picked) => (
+          <StepFooter nav={nav} skip={!picked}>
+            {picked && (
+              <Button variant="primary" onClick={nav.done} disabled={nav.pending}>
+                Continue
+              </Button>
+            )}
+          </StepFooter>
+        )}
+      />
+    ),
   },
   schedule: {
     intro: "How often Byname checks, and what a check may spend. Nothing runs until you start the first check on the next step.",
