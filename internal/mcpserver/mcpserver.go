@@ -183,4 +183,5 @@ func addTools(srv *mcp.Server, svc app.Services) {
 	addConfigTools(srv, svc)
 	addResultTools(srv, svc)
 	addPageTools(srv, svc)
+	addNotifyTools(srv, svc)
 }

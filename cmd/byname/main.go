@@ -30,6 +30,7 @@ import (
 	"github.com/unkeyed/byname/internal/httpapi"
 	"github.com/unkeyed/byname/internal/instance"
 	"github.com/unkeyed/byname/internal/mcpserver"
+	"github.com/unkeyed/byname/internal/notify"
 	"github.com/unkeyed/byname/internal/results"
 	"github.com/unkeyed/byname/internal/scheduler"
 	"github.com/unkeyed/byname/internal/secretbox"
@@ -57,6 +58,10 @@ type config struct {
 	// development only: lets cited-source fetching reach private and
 	// loopback addresses, such as a fake site on localhost.
 	SourcesAllowPrivate bool
+	// RESEND_BASE_URL, optional and for tests and local development only:
+	// sends email API channels to a fake Resend at this URL instead of
+	// https://api.resend.com.
+	ResendBaseURL string
 }
 
 // loadSecrets reads ENCRYPTION_KEY and the optional ENCRYPTION_KEY_PREVIOUS.
@@ -127,6 +132,13 @@ func loadConfig() (config, error) {
 		if c.SourcesAllowPrivate, err = strconv.ParseBool(v); err != nil {
 			return c, fmt.Errorf("SOURCES_ALLOW_PRIVATE_IPS must be true or false, got %q", v)
 		}
+	}
+	if raw := os.Getenv("RESEND_BASE_URL"); raw != "" {
+		u, err := url.Parse(raw)
+		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+			return c, fmt.Errorf("RESEND_BASE_URL must be an http(s) URL such as http://localhost:9998, got %q", raw)
+		}
+		c.ResendBaseURL = raw
 	}
 	c.Auth, err = loadAuthConfig(c.Port)
 	c.Auth.Secrets = c.Secrets
@@ -304,12 +316,17 @@ func run(log *slog.Logger) error {
 	if err != nil {
 		return err
 	}
+	res := results.New(pool)
+	alerts := notify.New(pool, res, notify.Options{
+		Secrets: cfg.Secrets, PublicURL: cfg.Auth.PublicURL, HTTPClient: &http.Client{}, ResendBaseURL: cfg.ResendBaseURL, Log: log,
+	})
 	settings := instconfig.New(pool, instconfig.Options{
 		Secrets: cfg.Secrets, TregBaseURL: cfg.TregBaseURL,
 		HTTPClient: &http.Client{}, Resolve: engines.HeadResolver(&http.Client{Timeout: 10 * time.Second}),
+		Alerts: alerts,
 	})
-	runs := checks.New(pool, settings, checks.Options{Log: log})
-	if err := sealSecrets(ctx, log, users, settings); err != nil {
+	runs := checks.New(pool, settings, checks.Options{Log: log, Alerts: alerts})
+	if err := sealSecrets(ctx, log, users, settings, alerts); err != nil {
 		return err
 	}
 	if err := announceSetup(ctx, log, users, cfg.SetupToken); err != nil {
@@ -317,7 +334,7 @@ func run(log *slog.Logger) error {
 	}
 	authn := &auth.Authenticator{Keys: auth.NewKeyStore(pool, cfg.Unkey), Users: users, OAuth: auth.NewOAuthServer(pool, cfg.Auth.PublicURL)}
 
-	services := app.Services{Instance: svc, Config: settings, Checks: runs, Results: results.New(pool)}
+	services := app.Services{Instance: svc, Config: settings, Checks: runs, Results: res, Notify: alerts}
 	mux := httpapi.NewMux(services, authn, log)
 	mux.Handle("/mcp", mcpserver.Handler(services, authn.OAuth, version))
 	mux.Handle("/", web.Handler())
@@ -328,12 +345,16 @@ func run(log *slog.Logger) error {
 	if cfg.TregBaseURL != "" {
 		log.Warn("TREG_BASE_URL is set: Treg calls go to it, not to Treg. Use it only in tests and local development", "treg_base_url", cfg.TregBaseURL)
 	}
+	if cfg.ResendBaseURL != "" {
+		log.Warn("RESEND_BASE_URL is set: email API channels send to it, not to Resend. Use it only in tests and local development", "resend_base_url", cfg.ResendBaseURL)
+	}
 	var jobs sync.WaitGroup
 	if cfg.SourcesAllowPrivate {
 		log.Warn("SOURCES_ALLOW_PRIVATE_IPS is set: cited-source fetching may reach private and loopback addresses. Use it only in tests and local development")
 	}
 	cited := sources.New(pool, settings, sources.Options{AllowPrivate: cfg.SourcesAllowPrivate, UserAgent: "Byname/" + version, Log: log})
 	jobs.Go(func() { scheduler.New(runs, settings, scheduler.Options{Log: log, Sources: cited}).Run(ctx) })
+	jobs.Go(func() { alerts.Run(ctx) })
 	log.Info("Byname listening", "port", cfg.Port, "version", version, "keys", authn.Keys.Mode(),
 		"public_url", cfg.Auth.PublicURL.String(), "password_login", cfg.Auth.PasswordLogin, "providers", len(cfg.Auth.Providers))
 
@@ -366,7 +387,7 @@ func run(log *slog.Logger) error {
 // sealSecrets reseals TOTP seeds and credentials sealed under
 // ENCRYPTION_KEY_PREVIOUS with ENCRYPTION_KEY, so a rotation finishes with
 // one restart.
-func sealSecrets(ctx context.Context, log *slog.Logger, users *auth.Users, settings *instconfig.Service) error {
+func sealSecrets(ctx context.Context, log *slog.Logger, users *auth.Users, settings *instconfig.Service, alerts *notify.Service) error {
 	totp, err := users.SealTOTPSecrets(ctx)
 	if err != nil {
 		return fmt.Errorf("encrypt TOTP seeds with ENCRYPTION_KEY: %w", err)
@@ -375,8 +396,12 @@ func sealSecrets(ctx context.Context, log *slog.Logger, users *auth.Users, setti
 	if err != nil {
 		return fmt.Errorf("encrypt credentials with ENCRYPTION_KEY: %w", err)
 	}
-	if totp+creds > 0 {
-		log.Info("encrypted stored secrets with the current ENCRYPTION_KEY", "totp_seeds", totp, "credentials", creds)
+	channels, err := alerts.SealChannels(ctx)
+	if err != nil {
+		return fmt.Errorf("encrypt notification channel secrets with ENCRYPTION_KEY: %w", err)
+	}
+	if totp+creds+channels > 0 {
+		log.Info("encrypted stored secrets with the current ENCRYPTION_KEY", "totp_seeds", totp, "credentials", creds, "notification_channels", channels)
 	}
 	return nil
 }

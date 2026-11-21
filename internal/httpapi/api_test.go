@@ -27,6 +27,8 @@ import (
 	"github.com/unkeyed/byname/internal/engines/tregtest"
 	"github.com/unkeyed/byname/internal/instance"
 	"github.com/unkeyed/byname/internal/mcpserver"
+	"github.com/unkeyed/byname/internal/notify"
+	"github.com/unkeyed/byname/internal/notify/notifytest"
 	"github.com/unkeyed/byname/internal/results"
 	"github.com/unkeyed/byname/internal/testdb"
 )
@@ -50,6 +52,7 @@ type client struct {
 	db         *pgxpool.Pool
 	svc        app.Services
 	treg       *tregtest.Server
+	resend     *notifytest.Resend
 }
 
 type reply struct {
@@ -173,13 +176,16 @@ func serve(t *testing.T, srv *httptest.Server, publicURL string, mod ...func(*au
 	authn := &auth.Authenticator{Keys: auth.NewKeyStore(pool, auth.UnkeyConfig{}), Users: users, OAuth: auth.NewOAuthServer(pool, u)}
 	treg := tregtest.New(t)
 	settings := config.New(pool, config.Options{Secrets: cfg.Secrets, TregBaseURL: treg.URL})
-	svc := app.Services{Instance: instance.New("test"), Config: settings, Checks: checks.New(pool, settings, checks.Options{}), Results: results.New(pool)}
+	res := results.New(pool)
+	resend, resendSrv := notifytest.NewResend(t, resendKey)
+	alerts := notify.New(pool, res, notify.Options{Secrets: cfg.Secrets, PublicURL: u, ResendBaseURL: resendSrv.URL})
+	svc := app.Services{Instance: instance.New("test"), Config: settings, Checks: checks.New(pool, settings, checks.Options{Alerts: alerts}), Results: res, Notify: alerts}
 	mux := NewMux(svc, authn, slog.New(slog.DiscardHandler))
 	mux.Handle("/mcp", mcpserver.Handler(svc, authn.OAuth, "test"))
 	srv.Config.Handler = mux
 	srv.Start()
 	t.Cleanup(srv.Close)
-	return client{t: t, base: srv.URL, origin: publicURL, setupToken: token, db: pool, svc: svc, treg: treg}
+	return client{t: t, base: srv.URL, origin: publicURL, setupToken: token, db: pool, svc: svc, treg: treg, resend: resend}
 }
 
 func cookieValue(r reply, name string) string {

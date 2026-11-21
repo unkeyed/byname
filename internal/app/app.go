@@ -6,6 +6,7 @@ import (
 	"github.com/unkeyed/byname/internal/checks"
 	"github.com/unkeyed/byname/internal/config"
 	"github.com/unkeyed/byname/internal/instance"
+	"github.com/unkeyed/byname/internal/notify"
 	"github.com/unkeyed/byname/internal/results"
 )
 
@@ -14,4 +15,5 @@ type Services struct {
 	Config   *config.Service
 	Checks   *checks.Service
 	Results  *results.Service
+	Notify   *notify.Service
 }

@@ -92,6 +92,9 @@ var routes = []route{
 	{"GET /v1/prompts", needs(core.ResultsRead), (*server).prompts},
 	{"GET /v1/sources", needs(core.ResultsRead), (*server).citedSources},
 	{"GET /v1/metrics/engine", needs(core.ResultsRead), (*server).engineView},
+	// Notifications: in-app alerts.
+	{"GET /v1/alerts", needs(core.ResultsRead), (*server).listAlerts},
+	{"POST /v1/alerts/read", needs(core.ResultsRead), (*server).markAlertsRead},
 
 	{"GET /v1/keys", admin, (*server).listKeys},
 	{"POST /v1/keys", admin, (*server).createKey},
@@ -106,6 +109,13 @@ var routes = []route{
 	{"GET /v1/credentials", admin, (*server).listCredentials},
 	{"PUT /v1/credentials/treg", admin, (*server).setTregToken},
 	{"POST /v1/credentials/treg/test", admin, (*server).testTregToken},
+	// Notifications: channels and the delivery log.
+	{"GET /v1/notification-channels", admin, (*server).listChannels},
+	{"POST /v1/notification-channels", admin, (*server).createChannel},
+	{"PUT /v1/notification-channels/{id}", admin, (*server).updateChannel},
+	{"DELETE /v1/notification-channels/{id}", admin, (*server).deleteChannel},
+	{"POST /v1/notification-channels/{id}/test", admin, (*server).testChannel},
+	{"GET /v1/notification-deliveries", admin, (*server).listDeliveries},
 
 	{"GET /v1/oauth/requests/{id}", session, (*server).consentRequest},
 	{"POST /v1/oauth/requests/{id}", session, (*server).decideConsent},
