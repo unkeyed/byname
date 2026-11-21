@@ -379,7 +379,7 @@ func run(log *slog.Logger) error {
 	runs := checks.New(pool, settings, checks.Options{Log: log, Alerts: alerts})
 	search := gsc.New(pool, gsc.Options{
 		Secrets: cfg.Secrets, Endpoints: gsc.GoogleEndpoints(cfg.GSCBaseURL), Client: cfg.GSCClient,
-		PublicURL: cfg.Auth.PublicURL, Terms: settings,
+		PublicURL: cfg.Auth.PublicURL, Terms: settings, Alerts: alerts,
 	})
 	site := changes.New(pool, search, changes.Options{Secrets: cfg.Secrets, Alerts: alerts, GitHubBaseURL: cfg.GitHubBaseURL})
 	if err := sealSecrets(ctx, log, users, settings, alerts, search, site); err != nil {

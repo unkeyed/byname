@@ -121,6 +121,11 @@ func (s *Service) sync(ctx context.Context) error {
 	if err == nil {
 		err = ferr
 	}
+	if err == nil {
+		if err := s.searchAlerts(ctx); err != nil {
+			return fmt.Errorf("search alerts after the sync: %w", err)
+		}
+	}
 	return err
 }
 

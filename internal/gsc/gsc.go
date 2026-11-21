@@ -24,6 +24,7 @@ type Service struct {
 	publicURL *url.URL
 	http      *http.Client
 	terms     Terms
+	alerts    Alerts
 	now       func() time.Time
 }
 
@@ -49,7 +50,10 @@ type Options struct {
 	HTTPClient *http.Client
 	// Terms decides brand against non-brand: config's branded search terms.
 	Terms Terms
-	Now   func() time.Time
+	// Alerts, when set, hears about goals reached and search moving after
+	// each sync.
+	Alerts Alerts
+	Now    func() time.Time
 }
 
 func New(db *pgxpool.Pool, o Options) *Service {
@@ -65,7 +69,7 @@ func New(db *pgxpool.Pool, o Options) *Service {
 	if o.PublicURL == nil {
 		o.PublicURL = &url.URL{Scheme: "http", Host: "localhost:8080"}
 	}
-	return &Service{db: db, secrets: o.Secrets, endpoints: o.Endpoints, client: o.Client, publicURL: o.PublicURL, http: o.HTTPClient, terms: o.Terms, now: o.Now}
+	return &Service{db: db, secrets: o.Secrets, endpoints: o.Endpoints, client: o.Client, publicURL: o.PublicURL, http: o.HTTPClient, terms: o.Terms, alerts: o.Alerts, now: o.Now}
 }
 
 // pacific is Search Console's day: every date Google reports is a Pacific
