@@ -4,7 +4,7 @@ import { api, type Grouping, type ResultsFilter, type Run, type RunSummary } fro
 import { LineChart, LineKey, Sparkline, type ChartLine } from "../../charts";
 import { fidelityInfo, lineKey, palette, pct, shortDay, usd, useLabels } from "../../lines";
 import { keys, useAnsweredRuns, useRuns, useSettings, useSurfaces } from "../../queries";
-import { Badge, Card, CardHeader, cx, EmptyState, ErrorNote, Icon, PageSpinner, RelativeTime } from "../../ui";
+import { Badge, Card, CardHeader, cx, EmptyState, ErrorNote, Icon, PageSpinner, RelativeTime, ScrollX } from "../../ui";
 import { runTime, useFilter, useView } from "../../view";
 import { Segmented, ViewHeader } from "./Header";
 import { QuestionsTable } from "./QuestionsTable";
@@ -195,7 +195,7 @@ function RatesCard({ filter, by }: { filter: ResultsFilter; by: Grouping }) {
       lines.length === 0 ? (
         <p className="px-4 py-10 text-center text-sm text-muted">No answers in this range.</p>
       ) : (
-        <div className={cx("grid gap-4 px-4 pb-4 lg:grid-cols-[minmax(0,1fr)_16rem]", rates.isPlaceholderData && "opacity-60")}>
+        <div className={cx("grid grid-cols-[minmax(0,1fr)] gap-4 px-4 pb-4 lg:grid-cols-[minmax(0,1fr)_16rem]", rates.isPlaceholderData && "opacity-60")}>
           <LineChart xs={xs} lines={lines} format={(v) => pct(v)} label={`${metric === "mention" ? "Mention" : "Citation"} rate per check, one line per ${by === "surface" ? "surface" : "surface and model"}`} />
           <ul aria-label="Lines, with each line's latest value" className="space-y-2 self-start text-xs">
             {lines.map((l) => (
@@ -213,33 +213,35 @@ function RatesCard({ filter, by }: { filter: ResultsFilter; by: Grouping }) {
           </ul>
           <details className="text-xs lg:col-span-2">
             <summary className="cursor-pointer text-muted hover:text-fg">Show as a table</summary>
-            <div className="mt-2 overflow-x-auto">
-              <table className="w-full min-w-max text-left tabular-nums">
-                <thead className="text-muted">
-                  <tr>
-                    <th className="py-1 pr-4 font-medium">Line</th>
-                    {xs.map((x) => (
-                      <th key={x.key} className="py-1 pr-4 font-medium" title={x.title}>
-                        {x.label}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-line">
-                  {lines.map((l) => (
-                    <tr key={l.key}>
-                      <td className="py-1 pr-4">
-                        {l.label} <span className="text-faint">({fidelityInfo[l.fidelity].label})</span>
-                      </td>
-                      {l.values.map((v, i) => (
-                        <td key={i} className="py-1 pr-4">
-                          {pct(v)}
-                        </td>
+            <div className="mt-2">
+              <ScrollX label="rates table">
+                <table className="w-full min-w-max text-left tabular-nums">
+                  <thead className="text-muted">
+                    <tr>
+                      <th className="sticky left-0 bg-surface py-1 pr-4 font-medium">Line</th>
+                      {xs.map((x) => (
+                        <th key={x.key} className="py-1 pr-4 font-medium" title={x.title}>
+                          {x.label}
+                        </th>
                       ))}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-line">
+                    {lines.map((l) => (
+                      <tr key={l.key}>
+                        <td data-sticky className="sticky left-0 max-w-48 bg-surface py-1 pr-4">
+                          {l.label} <span className="text-faint">({fidelityInfo[l.fidelity].label})</span>
+                        </td>
+                        {l.values.map((v, i) => (
+                          <td key={i} className="py-1 pr-4">
+                            {pct(v)}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </ScrollX>
             </div>
           </details>
         </div>

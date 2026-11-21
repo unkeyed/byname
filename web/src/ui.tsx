@@ -436,7 +436,7 @@ export function ScrollX({ children, startAtEnd, label }: { children: ReactNode; 
   const nudge = "pointer-events-auto absolute top-1.5 grid size-7 place-items-center rounded-full bg-surface text-muted shadow-floating transition-colors hover:text-fg";
   return (
     <div className="relative" data-scrolled={edge.left || undefined}>
-      <div ref={ref} role="region" aria-label={label} tabIndex={0} className="overflow-x-auto overscroll-x-contain">
+      <div ref={ref} role="region" aria-label={label} tabIndex={0} className="relative overflow-x-auto overscroll-x-contain">
         {children}
       </div>
       <div aria-hidden={!edge.left} className={cx("pointer-events-none absolute inset-y-0 w-8 bg-gradient-to-r from-surface transition-opacity", edge.left ? "opacity-100" : "opacity-0")} style={{ left: edge.sticky }}>
