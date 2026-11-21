@@ -233,21 +233,18 @@ func (s *Service) Get(ctx context.Context, id int64) (Detail, error) {
 	if err != nil {
 		return Detail{}, err
 	}
-	return Detail{Change: c, Timeline: timeline(c, ins, s.now()), Inspections: ins}, nil
+	return Detail{Change: c, Timeline: timeline(c, ins), Inspections: ins}, nil
 }
 
 // timeline orders a change's events: the merge, each inspection, the
 // first crawl, then the interim and verdict days with their reads.
-func timeline(c Change, ins []Inspection, now time.Time) []Step {
+func timeline(c Change, ins []Inspection) []Step {
 	steps := []Step{{Kind: "merged", At: c.MergedAt.Format(time.RFC3339), Done: true, Detail: mergedDetail(c)}}
 	for i := len(ins) - 1; i >= 0; i-- {
 		in := ins[i]
 		d := in.CoverageState
-		switch {
-		case in.Error != "":
+		if in.Error != "" {
 			d = "Google refused: " + in.Error
-		case in.LastCrawlAt != nil:
-			d += ", last crawled " + in.LastCrawlAt.UTC().Format(time.RFC3339)
 		}
 		steps = append(steps, Step{Kind: "inspected", At: in.CheckedAt.Format(time.RFC3339), Done: true, Detail: d})
 	}
