@@ -5,6 +5,7 @@ import { cx, PageHeader } from "../../ui";
 import { Account } from "./Account";
 import { Apps } from "./Apps";
 import { ApiKeys } from "./ApiKeys";
+import { Notifications } from "./Notifications";
 import { ReauthProvider } from "./Reauth";
 import { Team } from "./Team";
 
@@ -14,6 +15,7 @@ const tabs: { path: string; label: string; element: ReactNode; admin?: boolean }
   { path: "keys", label: "API keys", element: <ApiKeys />, admin: true },
   { path: "apps", label: "Apps", element: <Apps />, admin: true },
   { path: "team", label: "Team", element: <Team />, admin: true },
+  { path: "notifications", label: "Notifications", element: <Notifications />, admin: true },
 ];
 
 export const settingsRoutes: RouteObject[] = [

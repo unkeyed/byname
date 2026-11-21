@@ -613,6 +613,104 @@ export interface ResultsFilter {
 
 export type Grouping = "pair" | "surface";
 
+/** internal/notify's registry of event kinds. */
+export type EventKindName =
+  | "check_completed"
+  | "check_refused"
+  | "check_failed"
+  | "spend_cap_reached"
+  | "pair_paused"
+  | "goal_reached"
+  | "search_moved"
+  | "change_verdict"
+  | "token_expiring";
+
+export interface EventKind {
+  kind: EventKindName;
+  title: string;
+  description: string;
+  /** Who sees its alerts in the app: anyone who reads results, or admins only. */
+  audience: "results:read" | "admin";
+}
+
+/** One event as the app shows it. path is the page it links to. */
+export interface Alert {
+  id: number;
+  kind: EventKindName;
+  title: string;
+  lines: string[];
+  path: string;
+  payload: unknown;
+  created_at: Timestamp;
+  read: boolean;
+}
+
+export interface AlertList {
+  alerts: Alert[];
+  unread: number;
+}
+
+/** email_api is Resend's HTTP API, the one email API Byname speaks. */
+export type ChannelKind = "smtp" | "email_api" | "slack_webhook" | "webhook";
+
+export type SMTPTLS = "starttls" | "tls" | "none";
+
+/** What a channel shows in the clear, per kind. Secrets never come back. */
+export interface ChannelSettings {
+  host?: string;
+  port?: number;
+  tls?: SMTPTLS;
+  username?: string;
+  from?: string;
+  to?: string[];
+  url?: string;
+}
+
+export interface NotificationChannel {
+  id: number;
+  name: string;
+  kind: ChannelKind;
+  settings: ChannelSettings;
+  events: EventKindName[];
+  enabled: boolean;
+  last_test_at: Timestamp | null;
+  /** "ok", or why the last test failed. Empty until tested. */
+  last_test_status: string;
+  created_at: Timestamp;
+  updated_at: Timestamp;
+}
+
+/** On an edit, secrets names only those to change. kind cannot change. */
+export interface ChannelInput {
+  name: string;
+  kind: ChannelKind;
+  settings: ChannelSettings;
+  secrets?: { password?: string; api_key?: string; webhook_url?: string };
+  events: EventKindName[];
+  enabled?: boolean;
+}
+
+/** POST /v1/notification-channels: a webhook's signing secret, shown this once. */
+export interface CreatedChannel extends NotificationChannel {
+  signing_secret?: string;
+}
+
+export interface Delivery {
+  id: number;
+  alert_id: number;
+  kind: EventKindName;
+  title: string;
+  channel_id: number;
+  channel_name: string;
+  channel_kind: ChannelKind;
+  status: "pending" | "sent" | "failed";
+  attempts: number;
+  error: string;
+  sent_at: Timestamp | null;
+  next_attempt_at: Timestamp | null;
+  created_at: Timestamp;
+}
+
 /**
  * Error body for every non-2xx: {"error": "<message>"}, plus request_id on a
  * 5xx and code on a 403 that wants a fresh sign-in.
@@ -771,6 +869,23 @@ export const api = {
   invites: {
     /** Returns a one-time token valid for 7 days; the UI builds the link. */
     create: (email: Email, role: Role) => request<{ token: string }>("POST", "/v1/invites", { body: { email, role } }),
+  },
+
+  alerts: {
+    /** Newest first, with the caller's read state and unread count. */
+    list: (opts: { unread?: boolean; limit?: number } = {}) => request<AlertList>("GET", `/v1/alerts${qs({ unread: opts.unread ? "true" : undefined, limit: opts.limit })}`),
+    read: (body: { ids: number[] } | { all: true }) => request<{ unread: number }>("POST", "/v1/alerts/read", { body }),
+  },
+
+  /** Admin only. Creating and editing need a recent sign-in (see needsReauth). */
+  channels: {
+    list: () => request<{ channels: NotificationChannel[]; events: EventKind[] }>("GET", "/v1/notification-channels"),
+    create: (body: ChannelInput) => request<CreatedChannel>("POST", "/v1/notification-channels", { body }),
+    update: (id: number, body: ChannelInput) => request<NotificationChannel>("PUT", `/v1/notification-channels/${id}`, { body }),
+    remove: (id: number) => request<void>("DELETE", `/v1/notification-channels/${id}`),
+    /** A failed test is a result: last_test_status says why. */
+    test: (id: number) => request<NotificationChannel>("POST", `/v1/notification-channels/${id}/test`),
+    deliveries: (channel?: number) => request<Delivery[]>("GET", `/v1/notification-deliveries${qs({ channel, limit: 50 })}`),
   },
 };
 

@@ -33,6 +33,10 @@ export const keys = {
   sources: (f: ResultsFilter) => ["results", "sources", f] as const,
   answers: (run: number) => ["results", "answers", run] as const,
   engine: (l: Line, since?: string) => ["results", "engine", l, since] as const,
+  /** Under results, so a finished check refreshes the alert count too. */
+  alerts: ["results", "alerts"] as const,
+  channels: ["channels"] as const,
+  deliveries: ["channels", "deliveries"] as const,
 };
 
 export const useMe = () => useQuery({ queryKey: keys.me, queryFn: api.me.get, staleTime: Infinity });
@@ -44,6 +48,9 @@ export const useAccount = () => useQuery({ queryKey: keys.account, queryFn: api.
 export const useSettings = () => useQuery({ queryKey: keys.settings, queryFn: api.settings });
 export const useBrands = () => useQuery({ queryKey: keys.brands, queryFn: api.brands, staleTime: 60_000 });
 export const useSurfaces = () => useQuery({ queryKey: keys.surfaces, queryFn: api.surfaces, staleTime: 60_000 });
+
+/** The alerts list and unread count, checked every minute. */
+export const useAlerts = () => useQuery({ queryKey: keys.alerts, queryFn: () => api.alerts.list({ limit: 100 }), refetchInterval: 60_000 });
 
 export const isOpen = (r: Run) => r.status === "queued" || r.status === "running";
 

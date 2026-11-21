@@ -15,6 +15,7 @@ import { Prompts } from "./pages/results/Prompts";
 import { Gaps } from "./pages/results/Gaps";
 import { Compare } from "./pages/results/Compare";
 import { Runs } from "./pages/results/Runs";
+import { Alerts } from "./pages/Alerts";
 import { Settings, settingsRoutes } from "./pages/settings/Settings";
 import "@fontsource-variable/geist";
 import "@fontsource-variable/geist-mono";
@@ -34,6 +35,7 @@ const router = createBrowserRouter([
       { path: "gaps", element: <Gaps /> },
       { path: "compare", element: <Compare /> },
       { path: "runs", element: <Runs /> },
+      { path: "alerts", element: <Alerts /> },
       ...nav.flatMap((n) => (n.soon ? [{ path: n.to === "/" ? undefined : n.to, index: n.to === "/", element: <ComingSoon title={n.label} body={n.soon} /> }] : [])),
       { path: "settings", element: <Settings />, children: settingsRoutes },
       { path: "*", element: <NotFound /> },

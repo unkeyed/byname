@@ -6,6 +6,7 @@ import { useMe } from "./queries";
 import { Toaster } from "./components/Toaster";
 import { QuestionDrawer } from "./pages/results/QuestionDrawer";
 import { EngineDrawer } from "./pages/results/EngineDrawer";
+import { AlertsBell } from "./pages/Alerts";
 import { useView } from "./view";
 import { useTheme, type ThemeMode } from "./theme";
 import { Avatar, Button, buttonClass, Crumbs, cx, EmptyState, ErrorNote, Icon, Logo, NavMenu, PageHeader, Spinner, useModal, useWide, type IconName } from "./ui";
@@ -123,8 +124,16 @@ function NavBody({ label, theme: [theme, setTheme], rail, onNavigate, close }: {
       <div className={cx("flex h-12 shrink-0 items-center gap-2", rail ? "justify-center lg:justify-start lg:px-4" : "pr-2 pl-4")}>
         <Logo />
         <span className={cx(wideOnly, "text-sm font-semibold")}>Byname</span>
-        {close}
+        <span className={cx("ml-auto flex items-center gap-1", rail && "hidden lg:flex")}>
+          <AlertsBell onNavigate={onNavigate} />
+          {close}
+        </span>
       </div>
+      {rail && (
+        <div className="flex justify-center lg:hidden">
+          <AlertsBell />
+        </div>
+      )}
       <nav aria-label="Main" className="flex flex-col gap-0.5 px-2 py-2">
         {nav.map((n) => (
           <NavLink
