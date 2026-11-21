@@ -1,0 +1,28 @@
+const rtf = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
+const steps: [Intl.RelativeTimeFormatUnit, number][] = [
+  ["second", 60],
+  ["minute", 60],
+  ["hour", 24],
+  ["day", 7],
+  ["week", 4.35],
+  ["month", 12],
+  ["year", Infinity],
+];
+
+export function relativeTime(iso: string, now = Date.now()): string {
+  let delta = (new Date(iso).getTime() - now) / 1000;
+  if (Math.abs(delta) < 45) return "just now";
+  for (const [unit, size] of steps) {
+    if (Math.abs(delta) < size) return rtf.format(Math.round(delta), unit);
+    delta /= size;
+  }
+  return rtf.format(Math.round(delta), "year");
+}
+
+const dateTime = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" });
+export const absoluteTime = (iso: string) => dateTime.format(new Date(iso));
+
+export function initials(label: string): string {
+  const words = label.replace(/@.*/, "").split(/[\s._-]+/).filter(Boolean);
+  return ((words[0]?.[0] ?? "?") + (words[1]?.[0] ?? "")).toUpperCase();
+}

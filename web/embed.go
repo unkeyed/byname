@@ -1,0 +1,66 @@
+// Package web serves the built React app (web/dist, produced by `npm run build`
+// in the Docker build stage) from the Go binary.
+package web
+
+import (
+	"embed"
+	"io/fs"
+	"net/http"
+	"path"
+	"strings"
+)
+
+//go:embed all:dist
+var dist embed.FS
+
+// Handler serves files from dist and falls back to index.html for any other
+// GET, so client-side routes like /settings/team load the app. A binary built
+// without `npm run build` (dist holds only .gitkeep) answers with how to fix
+// that instead of a blank page.
+func Handler() http.Handler {
+	files, err := fs.Sub(dist, "dist")
+	if err != nil {
+		panic(err)
+	}
+	return handler(files)
+}
+
+func handler(files fs.FS) http.Handler {
+	index, err := fs.ReadFile(files, "index.html")
+	if err != nil {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			http.Error(w, "The web UI is not built into this binary. Run `make build`, or use the Docker image.", http.StatusNotFound)
+		})
+	}
+	static := http.FileServerFS(files)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet && r.Method != http.MethodHead {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		name := strings.TrimPrefix(path.Clean(r.URL.Path), "/")
+		if name != "" && name != "index.html" {
+			if f, err := fs.Stat(files, name); err == nil && !f.IsDir() {
+				w.Header().Del("Vary")
+				if strings.HasPrefix(name, "assets/") {
+					w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+				} else {
+					w.Header().Set("Cache-Control", "no-cache")
+				}
+				static.ServeHTTP(w, r)
+				return
+			}
+			// A missing file is a 404, never the app: a stale hashed chunk
+			// must fail instead of being parsed as HTML, and a cache must not
+			// pin index.html to a file's URL. Client-side routes have no
+			// file extension.
+			if strings.HasPrefix(name, "assets/") || path.Ext(name) != "" {
+				http.Error(w, "not found", http.StatusNotFound)
+				return
+			}
+		}
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Header().Set("Cache-Control", "no-cache")
+		_, _ = w.Write(index)
+	})
+}
