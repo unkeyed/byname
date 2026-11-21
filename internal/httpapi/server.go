@@ -121,6 +121,23 @@ var routes = []route{
 	{"GET /auth/gsc/callback", public, (*server).gscOAuthCallback},
 	{"DELETE /v1/gsc", admin, (*server).gscDisconnect},
 
+	// Site changes (internal/changes).
+	{"GET /v1/changes", needs(core.ResultsRead), (*server).listChanges},
+	{"POST /v1/changes", needs(core.ConfigWrite), (*server).logChange},
+	{"GET /v1/changes/markers", needs(core.ResultsRead), (*server).changeMarkers},
+	{"GET /v1/changes/settings", needs(core.ResultsRead), (*server).changeSettings},
+	{"PUT /v1/changes/settings", needs(core.ConfigWrite), (*server).putChangeSettings},
+	{"GET /v1/changes/{id}", needs(core.ResultsRead), (*server).getChange},
+	{"DELETE /v1/changes/{id}", needs(core.ConfigWrite), (*server).deleteChange},
+	{"GET /v1/control-pages", needs(core.ResultsRead), (*server).listControlPages},
+	{"POST /v1/control-pages", needs(core.ConfigWrite), (*server).upsertControlPage},
+	{"DELETE /v1/control-pages/{id}", needs(core.ConfigWrite), (*server).deleteControlPage},
+	{"GET /v1/repo", needs(core.ResultsRead), (*server).repoStatus},
+	{"PUT /v1/repo/rules", needs(core.ConfigWrite), (*server).putRepoRules},
+	{"PUT /v1/repo", admin, (*server).connectRepo},
+	{"POST /v1/repo/test", admin, (*server).testRepo},
+	{"DELETE /v1/repo", admin, (*server).disconnectRepo},
+
 	{"GET /v1/keys", admin, (*server).listKeys},
 	{"POST /v1/keys", admin, (*server).createKey},
 	{"DELETE /v1/keys/{id}", admin, (*server).revokeKey},

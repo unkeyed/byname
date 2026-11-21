@@ -21,6 +21,8 @@ import (
 	"github.com/unkeyed/byname/internal/app"
 	"github.com/unkeyed/byname/internal/auth"
 	"github.com/unkeyed/byname/internal/authtest"
+	"github.com/unkeyed/byname/internal/changes"
+	"github.com/unkeyed/byname/internal/changes/githubtest"
 	"github.com/unkeyed/byname/internal/checks"
 	"github.com/unkeyed/byname/internal/config"
 	"github.com/unkeyed/byname/internal/core"
@@ -56,6 +58,7 @@ type client struct {
 	treg       *tregtest.Server
 	resend     *notifytest.Resend
 	google     *gsctest.Server
+	github     *githubtest.Server
 }
 
 type reply struct {
@@ -185,13 +188,15 @@ func serve(t *testing.T, srv *httptest.Server, publicURL string, mod ...func(*au
 	google := gsctest.New(t)
 	search := gsc.New(pool, gsc.Options{Secrets: cfg.Secrets, Endpoints: gsc.GoogleEndpoints(google.URL),
 		Client: gsc.OAuthClient{ID: "test-client", Secret: "test-secret"}, PublicURL: u, Terms: settings})
-	svc := app.Services{Instance: instance.New("test", settings), Config: settings, Checks: checks.New(pool, settings, checks.Options{Alerts: alerts}), Results: res, Notify: alerts, GSC: search}
+	github := githubtest.New(t, "northwind", "site", githubToken)
+	site := changes.New(pool, search, changes.Options{Secrets: cfg.Secrets, Alerts: alerts, GitHubBaseURL: github.URL})
+	svc := app.Services{Instance: instance.New("test", settings), Config: settings, Checks: checks.New(pool, settings, checks.Options{Alerts: alerts}), Results: res, Notify: alerts, GSC: search, Changes: site}
 	mux := NewMux(svc, authn, slog.New(slog.DiscardHandler))
 	mux.Handle("/mcp", mcpserver.Handler(svc, authn.OAuth, "test"))
 	srv.Config.Handler = mux
 	srv.Start()
 	t.Cleanup(srv.Close)
-	return client{t: t, base: srv.URL, origin: publicURL, setupToken: token, db: pool, svc: svc, treg: treg, resend: resend, google: google}
+	return client{t: t, base: srv.URL, origin: publicURL, setupToken: token, db: pool, svc: svc, treg: treg, resend: resend, google: google, github: github}
 }
 
 func cookieValue(r reply, name string) string {
