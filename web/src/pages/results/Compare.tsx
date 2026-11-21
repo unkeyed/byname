@@ -1,8 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
-import { api, type Outcome, type Standing } from "../../api";
+import { api, type Outcome, type PairChange, type Standing } from "../../api";
 import { shortDay, useLabels } from "../../lines";
 import { keys, useAnsweredRuns, useSurfaces } from "../../queries";
-import { Card, cx, EmptyState, ErrorNote, Icon, PageSpinner, selectClass } from "../../ui";
+import { Card, CardHeader, cx, EmptyState, ErrorNote, Icon, PageSpinner, selectClass } from "../../ui";
 import { runTime, useView } from "../../view";
 import { Segmented, ViewHeader } from "./Header";
 import { outcomeMark } from "./QuestionsTable";
@@ -24,6 +24,33 @@ function StandingMark({ s }: { s: Standing | null }) {
   if (s.mentioned) return <span className="font-semibold text-success tabular-nums">#{s.position}</span>;
   return <span className="text-muted">{s.cited ? "Cited, not named" : "Not named"}</span>;
 }
+
+/** Places climbed: positive is up the list (#3 to #1), negative is down it. */
+function climbed(p: PairChange): number {
+  const [b, a] = [p.before?.position, p.after?.position];
+  return p.outcome === "moved" && b != null && a != null ? b - a : 0;
+}
+
+/** Gained and lost read as they are; a move says which way it went, since #1 to #2 is a drop. */
+function ChangeMark({ p }: { p: PairChange }) {
+  const by = climbed(p);
+  if (by !== 0)
+    return (
+      <span className={cx("inline-flex items-center gap-1 text-xs font-medium whitespace-nowrap", by > 0 ? "text-success" : "text-danger")}>
+        <Icon name={by > 0 ? "up" : "down"} className="size-3" />
+        {by > 0 ? "Up" : "Down"} {Math.abs(by)}
+      </span>
+    );
+  const o = outcomeMark[p.outcome];
+  return (
+    <span className={cx("inline-flex items-center gap-1 text-xs font-medium whitespace-nowrap", o.className)}>
+      {o.icon && <Icon name={o.icon} className="size-3" />}
+      {p.outcome === "not_comparable" ? "Not comparable" : o.label}
+    </span>
+  );
+}
+
+const rowGrid = "grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-0.5 md:grid-cols-[minmax(0,1fr)_8rem_8rem_8rem] md:items-center";
 
 export function Compare() {
   const view = useView();
@@ -51,6 +78,10 @@ export function Compare() {
       return r ? `Check #${r.id}, ${shortDay(runTime(r))}` : `Check #${id}`;
     };
     const pairs = cmp.data?.pairs.filter((p) => (show === "all" ? true : show === "changed" ? ["gained", "lost", "moved"].includes(p.outcome) : p.outcome === show)) ?? [];
+    const byQuestion = new Map<number, PairChange[]>();
+    for (const p of pairs) byQuestion.set(p.question_id, [...(byQuestion.get(p.question_id) ?? []), p]);
+    const moves = (cmp.data?.pairs ?? []).map(climbed);
+    const openPair = (p: PairChange) => view.set({ q: p.question_id, qa: p.after?.answer_id ?? p.before?.answer_id ?? null }, { push: true });
     body = (
       <div className="space-y-4">
         <div className="flex flex-wrap items-center gap-2">
@@ -88,6 +119,11 @@ export function Compare() {
                   <div className="text-2xl font-semibold tabular-nums" data-count={o}>
                     {cmp.data.counts[o]}
                   </div>
+                  {o === "moved" && cmp.data.counts.moved > 0 && (
+                    <div className="text-xs text-muted tabular-nums">
+                      {moves.filter((m) => m > 0).length} up, {moves.filter((m) => m < 0).length} down
+                    </div>
+                  )}
                 </Card>
               ))}
               <Card className="px-4 py-3">
@@ -98,54 +134,66 @@ export function Compare() {
               </Card>
             </div>
             <Card>
-              <div className="flex flex-wrap items-center gap-2 px-4 py-3">
-                <h2 className="flex-1 text-sm font-semibold">
-                  Questions and pairs{" "}
-                  <span className="font-normal text-muted">
-                    ({pairs.length} of {cmp.data.pairs.length})
-                  </span>
-                </h2>
+              <CardHeader
+                title={
+                  <>
+                    Questions and pairs{" "}
+                    <span className="font-normal text-muted">
+                      ({pairs.length} of {cmp.data.pairs.length})
+                    </span>
+                  </>
+                }
+              >
                 <Segmented size="sm" label="Show" value={show} options={shows.map((s) => ({ id: s.id, label: s.label }))} onChange={(v) => view.set({ show: v })} />
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-max text-sm">
-                  <thead className="border-y border-line text-xs text-muted">
-                    <tr>
-                      <th className="px-4 py-2 text-left font-medium">Question</th>
-                      <th className="px-3 py-2 text-left font-medium">Surface and model</th>
-                      <th className="px-3 py-2 text-left font-medium">#{cmp.data.before}</th>
-                      <th className="px-3 py-2 text-left font-medium">#{cmp.data.after}</th>
-                      <th className="px-3 py-2 text-left font-medium">Change</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-line">
-                    {pairs.map((p) => (
-                      <tr key={`${p.question_id}-${p.pair_id}`} className="cursor-pointer hover:bg-subtle" onClick={() => view.set({ q: p.question_id, qa: p.after?.answer_id ?? p.before?.answer_id ?? null }, { push: true })}>
-                        <td className="max-w-md px-4 py-2">
-                          <div className="truncate font-medium" title={p.question.text}>
-                            {p.question.text}
-                          </div>
-                          <div className="text-xs text-faint">{p.question.group}</div>
-                        </td>
-                        <td className="px-3 py-2 text-xs whitespace-nowrap">{labels.line(p.pair)}</td>
-                        <td className="px-3 py-2 text-xs whitespace-nowrap">
-                          <StandingMark s={p.before} />
-                        </td>
-                        <td className="px-3 py-2 text-xs whitespace-nowrap">
-                          <StandingMark s={p.after} />
-                        </td>
-                        <td className={cx("px-3 py-2 text-xs font-medium whitespace-nowrap", outcomeMark[p.outcome].className)}>
-                          <span className="inline-flex items-center gap-1">
-                            {outcomeMark[p.outcome].icon && <Icon name={outcomeMark[p.outcome].icon!} className="size-3" />}
-                            {p.outcome === "not_comparable" ? "Not comparable" : outcomeMark[p.outcome].label}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                {pairs.length === 0 && <p className="px-4 py-8 text-center text-sm text-muted">Nothing {show === "all" ? "" : show} between these checks.</p>}
-              </div>
+              </CardHeader>
+              {pairs.length > 0 && (
+                <p className="border-t border-line px-4 py-2 text-xs text-muted md:hidden">
+                  Each pair shows where you stood in check #{cmp.data.before}, then in check #{cmp.data.after}.
+                </p>
+              )}
+              {pairs.length > 0 && (
+                <div className={cx(rowGrid, "hidden border-y border-line px-4 py-2 text-xs font-medium text-muted md:grid")} aria-hidden="true">
+                  <span>Question, then each surface and model</span>
+                  <span>Check #{cmp.data.before}</span>
+                  <span>Check #{cmp.data.after}</span>
+                  <span>Change</span>
+                </div>
+              )}
+              <ul className="divide-y divide-line border-t border-line md:border-t-0">
+                {[...byQuestion.values()].map((group) => {
+                  const q = group[0];
+                  return (
+                    <li key={q.question_id} className="py-2">
+                      <button type="button" onClick={() => openPair(q)} className="block w-full px-4 py-1 text-left hover:underline">
+                        <span className="block font-medium">{q.question.text}</span>
+                        <span className="block text-xs text-faint">{q.question.group}</span>
+                      </button>
+                      <ul aria-label={`Pairs for ${q.question.text}`}>
+                        {group.map((p) => (
+                          <li key={p.pair_id}>
+                            <button type="button" onClick={() => openPair(p)} className={cx(rowGrid, "w-full px-4 py-1.5 text-left text-xs hover:bg-subtle")}>
+                              <span className="min-w-0 text-muted md:col-start-1 md:row-start-1">{labels.line(p.pair)}</span>
+                              <span className="col-span-2 row-start-2 flex items-center gap-1.5 md:contents">
+                                <span className="md:col-start-2 md:row-start-1">
+                                  <StandingMark s={p.before} />
+                                </span>
+                                <Icon name="right" className="size-3 text-faint md:hidden" />
+                                <span className="md:col-start-3 md:row-start-1">
+                                  <StandingMark s={p.after} />
+                                </span>
+                              </span>
+                              <span className="col-start-2 row-start-1 text-right md:col-start-4 md:text-left">
+                                <ChangeMark p={p} />
+                              </span>
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    </li>
+                  );
+                })}
+              </ul>
+              {pairs.length === 0 && <p className="px-4 py-8 text-center text-sm text-muted">Nothing {show === "all" ? "" : show} between these checks.</p>}
             </Card>
           </>
         )}
