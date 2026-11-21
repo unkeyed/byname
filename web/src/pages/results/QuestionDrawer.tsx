@@ -3,7 +3,8 @@ import type { ReactNode } from "react";
 import { api, type Answer, type BrandEntry, type HistoryPoint, type HistorySeries } from "../../api";
 import { fidelityInfo, lineKey, shortDay, usd, useLabels } from "../../lines";
 import { keys, useBrands, useSettings, useSurfaces } from "../../queries";
-import { Badge, Button, cx, ErrorNote, Icon, PageSpinner, selectClass, useModal } from "../../ui";
+import { Markdown } from "../../markdown";
+import { Badge, Button, cx, ErrorNote, Icon, PageSpinner, ScrollX, selectClass, useModal } from "../../ui";
 import { useFilter, useView } from "../../view";
 
 /** The question view: open wherever ?q= names a question, with ?qa= naming the answer shown. */
@@ -29,14 +30,25 @@ export function QuestionDrawer() {
 function Mark({ point, onClick, selected }: { point: HistoryPoint | undefined; onClick?: () => void; selected?: boolean }) {
   let body: ReactNode;
   let title: string;
-  if (!point) return <span className="text-faint">–</span>;
+  if (!point)
+    return (
+      <span className="block px-1.5 text-center text-xs text-faint" title="Not asked in this check">
+        ·
+      </span>
+    );
   if (point.status === "failed") [body, title] = [<span className="text-faint">Failed</span>, "The call failed"];
   else if (point.status === "no_answer") [body, title] = [<span className="text-faint">No answer</span>, "The surface showed no AI answer"];
   else if (point.mentioned) [body, title] = [<span className="font-semibold text-success">#{point.position ?? "?"}</span>, `Named you at #${point.position}`];
   else if (point.cited) [body, title] = [<span className="text-info">Cited</span>, "Cited you without naming you"];
-  else [body, title] = [<span className="text-faint">Not named</span>, "Did not name you"];
+  else [body, title] = [<span className="text-faint">—</span>, "Did not name you"];
+  if (!onClick)
+    return (
+      <span title={title} className="rounded-inner px-1.5 py-0.5 text-xs tabular-nums">
+        {body}
+      </span>
+    );
   return (
-    <button type="button" onClick={onClick} title={`${title}. Show this answer.`} className={cx("rounded-inner px-1.5 py-0.5 text-xs tabular-nums hover:bg-subtle-strong", selected && "bg-subtle-strong ring-1 ring-line-hover")}>
+    <button type="button" onClick={onClick} title={`${title}. Show this answer.`} className={cx("w-full rounded-inner px-1.5 py-0.5 text-center text-xs whitespace-nowrap tabular-nums hover:bg-subtle-strong", selected && "bg-subtle-strong ring-1 ring-line-hover")}>
       {body}
     </button>
   );
@@ -82,45 +94,56 @@ function Body({ question, onClose }: { question: number; onClose: () => void }) 
           <>
             <section>
               <h3 className="mb-2 text-sm font-semibold">Your position per check</h3>
-              <div className="overflow-x-auto rounded-surface border border-line bg-surface">
-                <table className="w-full min-w-max text-sm">
-                  <thead className="border-b border-line text-xs text-muted">
-                    <tr>
-                      <th scope="col" className="px-3 py-2 text-left font-medium">
-                        Surface and model
-                      </th>
-                      {runs.map(([id, at]) => (
-                        <th key={id} scope="col" className="px-2 py-2 text-left font-medium" title={shortDay(at)}>
-                          #{id}
+              <div className="overflow-hidden rounded-surface border border-line bg-surface">
+                <ScrollX label="positions per check" startAtEnd>
+                  <table className="w-full min-w-max text-sm">
+                    <thead className="border-b border-line text-xs text-muted">
+                      <tr>
+                        <th scope="col" className="sticky left-0 z-[1] bg-surface px-3 py-2 text-left font-medium shadow-[inset_-1px_0_0_var(--line)]">
+                          Surface and model
                         </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-line">
-                    {series.map((s) => (
-                      <tr key={lineKey(s)}>
-                        <th scope="row" className="px-3 py-1.5 text-left text-xs font-medium whitespace-nowrap">
-                          {labels.line(s.pair)}
-                          {s.fidelity === "approximation" && <span className="font-normal text-warn"> · approx.</span>}
-                        </th>
-                        {runs.map(([id]) => {
-                          const p = s.points.find((x) => x.run_id === id);
-                          return (
-                            <td key={id} className="px-1 py-1">
-                              <Mark point={p} selected={p?.answer_id === selPoint?.answer_id} onClick={p && (() => pick(p.answer_id))} />
-                            </td>
-                          );
-                        })}
+                        {runs.map(([id, at]) => (
+                          <th key={id} scope="col" className="w-12 min-w-12 px-1 py-2 text-center font-medium" title={`Check #${id}, ${shortDay(at)}`}>
+                            #{id}
+                          </th>
+                        ))}
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-line">
+                      {series.map((s) => (
+                        <tr key={lineKey(s)}>
+                          <th data-sticky scope="row" className="sticky left-0 z-[1] w-40 max-w-40 bg-surface px-3 py-1.5 text-left text-xs leading-tight font-medium shadow-[inset_-1px_0_0_var(--line)] sm:w-56 sm:max-w-56">
+                            <span className="block">{labels.surfaceTitle(s.pair.surface)}</span>
+                            {(s.pair.model || s.fidelity === "approximation") && (
+                              <span className="block font-normal text-muted [overflow-wrap:anywhere]">
+                                {s.pair.model}
+                                {s.fidelity === "approximation" && <span className="text-warn">{s.pair.model && " · "}approx.</span>}
+                              </span>
+                            )}
+                          </th>
+                          {runs.map(([id]) => {
+                            const p = s.points.find((x) => x.run_id === id);
+                            return (
+                              <td key={id} className="px-0.5 py-1">
+                                <Mark point={p} selected={p?.answer_id === selPoint?.answer_id} onClick={p && (() => pick(p.answer_id))} />
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </ScrollX>
               </div>
+              <p className="mt-1.5 text-xs text-faint">
+                <span className="font-semibold text-success">#2</span> named you at that position. <span className="text-info">Cited</span> cited you without naming you. — did not name you. · not asked. Pick a mark to read
+                that answer.
+              </p>
             </section>
 
             <section>
               <h3 className="mb-2 text-sm font-semibold">Per model</h3>
-              <ul className="grid gap-2 sm:grid-cols-2">
+              <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 {series.map((s) => (
                   <SeriesSummary key={lineKey(s)} s={s} label={labels.line(s.pair)} />
                 ))}
@@ -134,7 +157,7 @@ function Body({ question, onClose }: { question: number; onClose: () => void }) 
                     <h3 className="flex-1 text-sm font-semibold">Answer</h3>
                     <select
                       aria-label="Model"
-                      className={cx(selectClass, "text-xs")}
+                      className={cx(selectClass, "max-w-full text-xs")}
                       value={lineKey(selSeries)}
                       onChange={(e) => {
                         const s = series.find((x) => lineKey(x) === e.target.value)!;
@@ -197,9 +220,9 @@ function QuestionTitle({ answer }: { answer: number | undefined }) {
 function SeriesSummary({ s, label }: { s: HistorySeries; label: string }) {
   const latest = s.points[s.points.length - 1];
   return (
-    <li className="rounded-surface border border-line bg-surface px-3 py-2">
-      <div className="flex items-center gap-2">
-        <span className="min-w-0 flex-1 truncate text-sm font-medium">{label}</span>
+    <li className="min-w-0 rounded-surface border border-line bg-surface px-3 py-2">
+      <div className="flex flex-wrap items-start justify-between gap-x-2 gap-y-1">
+        <span className="min-w-0 text-sm font-medium [overflow-wrap:anywhere]">{label}</span>
         <Badge tone={s.fidelity === "approximation" ? "warn" : "outline"} title={fidelityInfo[s.fidelity].detail}>
           {fidelityInfo[s.fidelity].label}
         </Badge>
@@ -228,7 +251,19 @@ function AnswerView({ id }: { id: number }) {
   for (const b of brands.data ?? []) if (b.kind === "self") add(b, "self");
   if (settings.data) add(settings.data.brand, "self");
   const pattern = [...names.keys()].sort((x, y) => y.length - x.length).map(escape).join("|");
-  const parts = pattern ? a.text.split(new RegExp(`\\b(${pattern})\\b`, "g")) : [a.text];
+  const brandRe = pattern ? new RegExp(`\\b(${pattern})\\b`, "g") : null;
+  const mark = (text: string) =>
+    brandRe
+      ? text.split(brandRe).map((p, i) =>
+          i % 2 === 1 ? (
+            <mark key={i} className={cx("rounded-inner px-0.5", names.get(p) === "self" ? "bg-you font-semibold text-you-fg" : "bg-subtle-strong text-fg")}>
+              {p}
+            </mark>
+          ) : (
+            p
+          ),
+        )
+      : text;
 
   return (
     <div className="rounded-surface border border-line bg-surface">
@@ -238,7 +273,7 @@ function AnswerView({ id }: { id: number }) {
         {a.reported_model && <span>Model {a.reported_model}</span>}
         <span>{a.cost_usd == null ? <span className="text-warn">No cost reported</span> : usd(a.cost_usd)}</span>
         <span className="ml-auto flex items-center gap-2">
-          <mark className="rounded-inner bg-[color-mix(in_oklab,var(--series-1)_24%,transparent)] px-1 text-fg">You</mark>
+          <mark className="rounded-inner bg-you px-1 font-semibold text-you-fg">You</mark>
           <mark className="rounded-inner bg-subtle-strong px-1 text-fg">Competitor</mark>
         </span>
       </div>
@@ -247,16 +282,8 @@ function AnswerView({ id }: { id: number }) {
       ) : a.status === "no_answer" ? (
         <p className="px-3 py-3 text-sm text-muted">The surface showed no AI answer for this question.</p>
       ) : (
-        <div className="max-h-[28rem] overflow-auto px-3 py-3 text-sm leading-relaxed whitespace-pre-wrap [overflow-wrap:anywhere]">
-          {parts.map((p, i) =>
-            i % 2 === 1 ? (
-              <mark key={i} className={cx("rounded-inner px-0.5 text-fg", names.get(p) === "self" ? "bg-[color-mix(in_oklab,var(--series-1)_24%,transparent)] font-semibold" : "bg-subtle-strong")}>
-                {p}
-              </mark>
-            ) : (
-              p
-            ),
-          )}
+        <div className="max-h-[28rem] overflow-auto px-3 py-3 text-sm leading-relaxed [overflow-wrap:anywhere]">
+          <Markdown text={a.text} mark={mark} />
         </div>
       )}
       {a.citations.length > 0 && (
