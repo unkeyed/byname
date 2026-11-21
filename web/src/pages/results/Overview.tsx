@@ -3,9 +3,12 @@ import { Link } from "react-router";
 import { api, type Grouping, type ResultsFilter, type Run, type RunSummary } from "../../api";
 import { LineChart, LineKey, Sparkline, type ChartLine } from "../../charts";
 import { fidelityInfo, lineKey, palette, pct, shortDay, usd, useLabels } from "../../lines";
-import { keys, useAnsweredRuns, useRuns, useSettings, useSurfaces } from "../../queries";
-import { Badge, Card, CardHeader, cx, EmptyState, ErrorNote, Icon, PageSpinner, RelativeTime, ScrollX } from "../../ui";
-import { runTime, useFilter, useView } from "../../view";
+import { keys, useAnsweredRuns, useGsc, useMe, useRuns, useSettings, useSurfaces } from "../../queries";
+import { Badge, Card, CardHeader, cx, EmptyState, ErrorNote, Icon, PageSpinner, RelativeTime, ScrollX, Spinner } from "../../ui";
+import { runTime, useFilter, useView, type RangeID } from "../../view";
+import { DailyChart } from "../search/DailyChart";
+import { change, count, day, dayRange, searchState, spanFrom, useSearchBrand, useSearchDaily, useSearchSummary, type SearchState } from "../search/model";
+import { NotReady, settingsPath } from "../search/Search";
 import { Segmented, ViewHeader } from "./Header";
 import { QuestionsTable } from "./QuestionsTable";
 import { RunNowButton, RunStatusBadge, useCanRun } from "./RunNow";
@@ -37,7 +40,10 @@ export function Overview() {
         <StatusStrip runs={runs.data} />
         <Tiles filter={filter} />
         <RatesCard filter={filter} by={by} />
-        <ShareCard filter={filter} />
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <ShareCard filter={filter} />
+          <SearchConsoleCard />
+        </div>
         <Card>
           <CardHeader title="Questions" description="Each question on each surface and model in the latest check. Open one to see its history and answers." />
           <QuestionsTable run={answered.data[0]} filter={filter} />
@@ -150,15 +156,99 @@ function Tiles({ filter }: { filter: ResultsFilter }) {
       ) : (
         <Card className="col-span-2 px-4 py-3 text-sm text-muted xl:col-span-3">No check in this range. Widen the date range to see results.</Card>
       )}
-      <Card className="flex flex-col gap-1 px-3 py-3 sm:px-4">
-        <h3 className="text-xs font-medium text-muted">Search Console clicks, 28 days</h3>
-        <p className="text-sm text-muted">Not connected</p>
-        <Link to="/search" className="mt-auto inline-flex items-center gap-1 pt-1 text-xs font-medium text-fg hover:underline">
-          <Icon name="plug" className="size-3.5" />
-          Connect
-        </Link>
-      </Card>
+      <SearchTile />
     </div>
+  );
+}
+
+/** Search Console's 28-day clicks with the trailing-window trend, or the way to connect it. */
+function SearchTile() {
+  const gsc = useGsc();
+  const summary = useSearchSummary(gsc.data);
+  const brand = useSearchBrand(gsc.data, undefined);
+  const me = useMe();
+  const cur = summary.data?.current;
+  if (!gsc.data?.first_day || !cur) {
+    const waiting = gsc.isPending || (gsc.data?.first_day && summary.isPending);
+    return (
+      <Card className="flex flex-col gap-1 px-3 py-3 sm:px-4">
+        <h3 className="text-xs font-medium text-muted">Search Console clicks</h3>
+        {waiting ? (
+          <Spinner className="mt-1 size-4" />
+        ) : (
+          <>
+            <p className="text-sm text-muted">{gsc.data?.connected ? "Not synced yet" : "Not connected"}</p>
+            <Link to={me.data?.role === "admin" ? settingsPath : "/search"} className="mt-auto inline-flex items-center gap-1 pt-1 text-xs font-medium text-fg hover:underline">
+              <Icon name="plug" className="size-3.5" />
+              {gsc.data?.connected ? "Search Console" : "Connect Search Console"}
+            </Link>
+          </>
+        )}
+      </Card>
+    );
+  }
+  const prev = summary.data?.previous;
+  const c = change(cur.clicks, prev?.clicks, "relative");
+  return (
+    <Tile
+      label="Search Console clicks"
+      value={count(cur.clicks)}
+      detail={`28 days, ${dayRange(cur.from, cur.to)}`}
+      trend={brand.data?.points.map((p) => p.clicks)}
+      delta={
+        c &&
+        (c.flat ? (
+          <span className="text-xs text-faint">No change on the previous 28 days</span>
+        ) : (
+          <span className="text-xs text-muted">
+            <span className={cx("inline-flex items-center gap-0.5 font-medium", c.good ? "text-success" : "text-danger")}>
+              <Icon name={c.good ? "up" : "down"} className="size-3" />
+              {c.text} {c.good ? "up" : "down"}
+            </span>
+            <span className="sr-only sm:not-sr-only"> on the previous 28 days</span>
+          </span>
+        ))
+      }
+    />
+  );
+}
+
+/** Spans for the Overview's date range presets; the newest run alone maps to the 28-day headline window. */
+const searchSpan: Record<RangeID, number> = { latest: 28, "7d": 7, "14d": 14, "30d": 30, "90d": 90, all: 480 };
+
+function SearchConsoleCard() {
+  const gsc = useGsc();
+  const me = useMe();
+  const { range } = useFilter();
+  const s = gsc.data;
+  const from = s?.first_day ? spanFrom(s, searchSpan[range]) : undefined;
+  const daily = useSearchDaily(s, from);
+  let body;
+  if (gsc.isPending) body = <PageSpinner />;
+  else if (gsc.isError) body = <div className="px-4 pb-4"><ErrorNote error={gsc.error} /></div>;
+  else if (searchState(gsc.data) !== "ready")
+    body = (
+      <div className="px-4 pb-4">
+        <NotReady state={searchState(gsc.data) as Exclude<SearchState, "ready">} status={gsc.data} admin={me.data?.role === "admin"} />
+      </div>
+    );
+  else if (daily.isPending) body = <PageSpinner />;
+  else if (daily.isError) body = <div className="px-4 pb-4"><ErrorNote error={daily.error} /></div>;
+  else
+    body = (
+      <div className={cx(daily.isPlaceholderData && "opacity-60")}>
+        <DailyChart days={daily.data.days} from={from!} latestFinal={daily.data.latest_final_day} show={["clicks"]} height={200} />
+      </div>
+    );
+  return (
+    <Card className="min-w-0">
+      <CardHeader title="Search Console" description={s?.latest_final_day ? `Google clicks per day. Days after ${day(s.latest_final_day)} are partial and still revised.` : "Google clicks per day."}>
+        <Link to="/search" className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-muted hover:text-fg">
+          Search <Icon name="right" className="size-3" />
+        </Link>
+      </CardHeader>
+      {body}
+    </Card>
   );
 }
 
