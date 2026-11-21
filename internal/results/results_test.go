@@ -132,7 +132,7 @@ func TestRunsAnswersAndCompare(t *testing.T) {
 		t.Fatalf("compare counts %v net %d over %d pairs, want Claude lost on both questions and the rest unchanged", c.Counts, c.Net, len(c.Pairs))
 	}
 
-	gaps, err := e.results.Gaps(ctx, 0)
+	gaps, err := e.results.Gaps(ctx, 0, results.Scope{})
 	if err != nil || gaps.RunID != second || len(gaps.Gaps) != 2 {
 		t.Fatalf("gaps = %+v %v, want both questions of the latest run", gaps, err)
 	}

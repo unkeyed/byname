@@ -285,7 +285,7 @@ func (s *server) listGaps(w http.ResponseWriter, r *http.Request, _ core.Actor) 
 	if err != nil {
 		return err
 	}
-	v, err := s.svc.Results.Gaps(r.Context(), int64(run))
+	v, err := s.svc.Results.Gaps(r.Context(), int64(run), queryScope(r))
 	return respond(w, http.StatusOK, v, err)
 }
 

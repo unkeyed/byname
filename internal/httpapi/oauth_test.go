@@ -583,6 +583,10 @@ var mcpTools = map[string]string{
 	"GET /v1/metrics/competitors":    "competitors",
 	"GET /v1/gaps":                   "gaps",
 	"GET /v1/jobs":                   "list_jobs",
+
+	"GET /v1/prompts":        "prompts",
+	"GET /v1/sources":        "cited_sources",
+	"GET /v1/metrics/engine": "engine_view",
 }
 
 // TestEveryAPIKeyRouteHasAnMCPTool fails when a route an API key can call

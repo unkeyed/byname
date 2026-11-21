@@ -122,6 +122,8 @@ func TestConfigureAndReadAChecksResults(t *testing.T) {
 		"/v1/metrics/rates", "/v1/metrics/share?since=2026-01-01T00:00:00Z", "/v1/gaps", "/v1/jobs?limit=5",
 		"/v1/metrics/rates?by=surface&surface=claude_code", "/v1/metrics/summary?model=claude-sonnet-5-5",
 		"/v1/metrics/competitors?by=surface", fmt.Sprintf("/v1/runs/%d/questions?surface=claude_code", run.ID),
+		"/v1/prompts?since=2026-01-01", "/v1/sources?surface=claude_code", "/v1/gaps?surface=claude_code",
+		"/v1/metrics/engine?surface=claude_code&endpoint=dataforseo.x.ai-optimization-claude-llm-responses-live&fidelity=model_match",
 	} {
 		get(path, nil)
 	}
@@ -142,6 +144,7 @@ func TestConfigureAndReadAChecksResults(t *testing.T) {
 		{"GET", "/v1/metrics/rates?since=yesterday", "since"},
 		{"GET", "/v1/metrics/rates?by=engine", "by"},
 		{"GET", "/v1/metrics/competitors?surface=myspace", "surface"},
+		{"GET", "/v1/metrics/engine?surface=claude_code", "endpoint"},
 		{"GET", "/v1/runs?limit=500", "limit"},
 		{"PUT", "/v1/surfaces/claude_code", "model list"},
 	} {
@@ -213,6 +216,8 @@ func TestMCPToolsServeTheSameResults(t *testing.T) {
 		"compare_runs": {"before": run.ID, "after": run.ID}, "question_history": {"question_id": questions.Questions[0].ID},
 		"mention_rates": {"since": "2026-01-01T00:00:00Z", "by": "surface"}, "share_of_mentions": {"surface": "claude_code"}, "gaps": nil, "list_jobs": {"limit": 5},
 		"run_questions": {"id": run.ID}, "results_summary": nil, "competitors": {"by": "surface"},
+		"prompts": nil, "cited_sources": {"surface": "claude_code"},
+		"engine_view": {"surface": "claude_code", "endpoint": "dataforseo.x.ai-optimization-claude-llm-responses-live", "fidelity": "model_match"},
 	} {
 		res, err := cs.CallTool(context.Background(), &mcp.CallToolParams{Name: name, Arguments: args})
 		if err != nil || res.IsError {

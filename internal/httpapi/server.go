@@ -88,6 +88,10 @@ var routes = []route{
 	{"GET /v1/metrics/competitors", needs(core.ResultsRead), (*server).competitors},
 	{"GET /v1/gaps", needs(core.ResultsRead), (*server).listGaps},
 	{"GET /v1/jobs", needs(core.ResultsRead), (*server).listJobs},
+	// Prompts, cited sources and the engine drawer.
+	{"GET /v1/prompts", needs(core.ResultsRead), (*server).prompts},
+	{"GET /v1/sources", needs(core.ResultsRead), (*server).citedSources},
+	{"GET /v1/metrics/engine", needs(core.ResultsRead), (*server).engineView},
 
 	{"GET /v1/keys", admin, (*server).listKeys},
 	{"POST /v1/keys", admin, (*server).createKey},

@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"maps"
 	"slices"
 	"time"
 
@@ -215,29 +214,46 @@ func (s *Service) Summary(ctx context.Context, since *time.Time, sc Scope) ([]Ru
 // Gap is a question where at least one pair did not name you on a run.
 type Gap struct {
 	Question QuestionRef `json:"question"`
-	// Engines is how many pairs answered; Named how many named you.
+	// Engines is how many pairs answered; Named how many named you, the N
+	// of "visible on N of M".
 	Engines     int `json:"engines"`
 	Named       int `json:"named"`
 	Competitors int `json:"competitors" jsonschema:"distinct competitors the answers named"`
 	// Opportunity is 0 to 5: the share of pairs that did not name you
 	// times 3, plus up to 2 for search demand, which no source provides yet.
-	Opportunity int      `json:"opportunity"`
-	Demand      *int     `json:"demand" jsonschema:"monthly searches; null until a demand source is configured"`
-	NamedOnMiss []string `json:"named_on_miss" jsonschema:"competitors named by the answers that did not name you, most often first"`
-	FanOut      []string `json:"fan_out" jsonschema:"the web searches the engines ran for the question, where exposed"`
+	Opportunity int       `json:"opportunity"`
+	Demand      *int      `json:"demand" jsonschema:"monthly searches; null until a demand source is configured"`
+	NamedOnMiss []string  `json:"named_on_miss" jsonschema:"competitors named by the answers that did not name you, most often first"`
+	Pairs       []GapPair `json:"pairs" jsonschema:"each pair's answer, in pair order"`
+}
+
+// GapPair is one pair's answer to a gap's question.
+type GapPair struct {
+	Series
+	AnswerID int64          `json:"answer_id"`
+	Status   engines.Status `json:"status"`
+	Named    bool           `json:"named"`
+	Position *int           `json:"position"`
+	// FanOut is the web searches the engine ran for the question, empty
+	// where the endpoint does not expose them.
+	FanOut []string `json:"fan_out"`
 }
 
 type Gaps struct {
-	RunID int64 `json:"run_id" jsonschema:"the run ranked; 0 when no run has answers yet"`
+	RunID int64 `json:"run_id" jsonschema:"the run ranked; 0 when no run has answers on the pairs in scope"`
 	Gaps  []Gap `json:"gaps"`
 }
 
-// Gaps ranks the questions some pair did not name you on, highest
-// opportunity first, for one run, or the latest run with answers when
-// runID is 0.
-func (s *Service) Gaps(ctx context.Context, runID int64) (Gaps, error) {
+// Gaps ranks the questions some pair in scope did not name you on, highest
+// opportunity first, for one run, or the latest run with answers in scope
+// when runID is 0.
+func (s *Service) Gaps(ctx context.Context, runID int64, sc Scope) (Gaps, error) {
+	if err := sc.check(); err != nil {
+		return Gaps{}, err
+	}
 	if runID == 0 {
-		err := s.db.QueryRow(ctx, `SELECT coalesce(max(run_id), 0) FROM answer`).Scan(&runID)
+		err := s.db.QueryRow(ctx, `SELECT coalesce(max(a.run_id), 0) FROM answer a JOIN surface_model m ON m.id = a.surface_model_id
+			WHERE ($1::text = '' OR m.surface_key = $1) AND ($2::text = '' OR m.model = $2)`, sc.Surface, sc.Model).Scan(&runID)
 		if err != nil || runID == 0 {
 			return Gaps{Gaps: []Gap{}}, err
 		}
@@ -248,14 +264,11 @@ func (s *Service) Gaps(ctx context.Context, runID int64) (Gaps, error) {
 	if err != nil {
 		return Gaps{}, err
 	}
-	kinds := map[panel.BrandID]panel.Brand{}
-	for _, b := range brands {
-		kinds[b.ID] = b
-	}
 	answers, err := s.scoredAnswers(ctx, `a.run_id = $1`, runID)
 	if err != nil {
 		return Gaps{}, err
 	}
+	answers = slices.DeleteFunc(answers, func(a scoredAnswer) bool { return !sc.holds(a.series.Pair) })
 	byQuestion := map[panel.QuestionID][]scoredAnswer{}
 	var order []panel.QuestionID
 	for _, a := range answers {
@@ -279,30 +292,12 @@ func (s *Service) Gaps(ctx context.Context, runID int64) (Gaps, error) {
 	out := Gaps{RunID: runID, Gaps: []Gap{}}
 	for _, g := range panel.RankGaps(gaps) {
 		row := Gap{Question: questions[g.Question], Engines: g.Engines, Named: g.Named, Competitors: g.Competitors,
-			Opportunity: g.Opportunity(), Demand: g.Demand, NamedOnMiss: []string{}, FanOut: []string{}}
-		seen := map[panel.BrandID]int{}
+			Opportunity: g.Opportunity(), Demand: g.Demand, NamedOnMiss: namedInstead(byQuestion[g.Question], brands), Pairs: []GapPair{}}
 		for _, a := range byQuestion[g.Question] {
-			for _, f := range a.fanOut {
-				if !slices.Contains(row.FanOut, f) {
-					row.FanOut = append(row.FanOut, f)
-				}
-			}
-			if a.scored.Mentioned || a.scored.Status == engines.StatusFailed {
-				continue
-			}
-			for _, m := range a.scored.Mentions {
-				if kinds[m.Brand].Kind == panel.KindCompetitor {
-					seen[m.Brand]++
-				}
-			}
+			row.Pairs = append(row.Pairs, GapPair{Series: a.series, AnswerID: a.id, Status: a.scored.Status, Named: a.scored.Mentioned,
+				Position: nullPosition(a.scored.Position), FanOut: a.fanOut})
 		}
-		named := slices.Collect(maps.Keys(seen))
-		slices.SortFunc(named, func(a, b panel.BrandID) int {
-			return cmp.Or(cmp.Compare(seen[b], seen[a]), cmp.Compare(kinds[a].Name, kinds[b].Name))
-		})
-		for _, id := range named {
-			row.NamedOnMiss = append(row.NamedOnMiss, kinds[id].Name)
-		}
+		slices.SortStableFunc(row.Pairs, func(a, b GapPair) int { return cmp.Compare(a.Pair.ID, b.Pair.ID) })
 		out.Gaps = append(out.Gaps, row)
 	}
 	return out, nil

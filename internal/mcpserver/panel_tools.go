@@ -96,7 +96,8 @@ type historyInput struct {
 }
 
 type gapsInput struct {
-	RunID int64 `json:"run_id,omitempty" jsonschema:"omit for the latest run with answers"`
+	RunID int64 `json:"run_id,omitempty" jsonschema:"omit for the latest run with answers on the pairs in scope"`
+	results.Scope
 }
 
 type limitInput struct {
@@ -260,9 +261,9 @@ func addResultTools(srv *mcp.Server, svc app.Services) {
 			return r.Competitors(ctx, in.Since, in.Scope, in.By)
 		})
 	addTool(srv, core.ResultsRead, &mcp.Tool{Name: "gaps", Annotations: readOnly(),
-		Description: "Questions where at least one pair did not name you on a run, ranked by opportunity, with the competitors named instead and the searches the engines ran. GET /v1/gaps."},
+		Description: "Questions where at least one pair did not name you on a run, ranked by opportunity, with the competitors named instead and each pair's answer with the web searches its engine ran, where the endpoint exposes them. Filter by surface and model. GET /v1/gaps."},
 		func(ctx context.Context, _ core.Actor, in gapsInput) (results.Gaps, error) {
-			return r.Gaps(ctx, in.RunID)
+			return r.Gaps(ctx, in.RunID, in.Scope)
 		})
 	addTool(srv, core.ResultsRead, &mcp.Tool{Name: "list_jobs", Annotations: readOnly(),
 		Description: "The jobs log newest first: each AI check and model list refresh with its status, error and spend. GET /v1/jobs."},

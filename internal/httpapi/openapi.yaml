@@ -905,10 +905,12 @@ paths:
       parameters:
         - name: run
           in: query
-          description: The run to rank. Omit for the latest run with answers.
+          description: The run to rank. Omit for the latest run with answers on the pairs in scope.
           schema:
             type: integer
             minimum: 1
+        - $ref: "#/components/parameters/surface"
+        - $ref: "#/components/parameters/model"
       responses:
         "200":
           description: The gaps.
@@ -945,6 +947,109 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/Job"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /v1/prompts:
+    get:
+      tags: [results]
+      operationId: listPrompts
+      summary: Every question of the latest run in range, with its standing there and a dot per run.
+      description: Earlier runs' questions follow the question map onto the latest run's versions. A dot counts pairs; it is not an average.
+      security:
+        - apiKey: [results:read]
+        - session: [results:read]
+      parameters:
+        - $ref: "#/components/parameters/since"
+        - $ref: "#/components/parameters/surface"
+        - $ref: "#/components/parameters/model"
+      responses:
+        "200":
+          description: The questions.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Prompts"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /v1/sources:
+    get:
+      tags: [results]
+      operationId: listCitedSources
+      summary: The most cited domains and pages over the runs in range, with what each page says about you and your competitors.
+      description: Pages are fetched after each check and again once their last fetch is a week old. Whether a page names you comes from its served HTML, so a page built in the browser can read as absent.
+      security:
+        - apiKey: [results:read]
+        - session: [results:read]
+      parameters:
+        - $ref: "#/components/parameters/since"
+        - $ref: "#/components/parameters/surface"
+        - $ref: "#/components/parameters/model"
+      responses:
+        "200":
+          description: The cited sources.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Sources"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /v1/metrics/engine:
+    get:
+      tags: [results]
+      operationId: getEngine
+      summary: One chart line's standing, visibility per run, brand ranking and questions.
+      description: A line is a surface, or one of its pairs, on one endpoint at one fidelity, as a series reports it. Every figure is over that line alone, so fidelity labels are never mixed.
+      security:
+        - apiKey: [results:read]
+        - session: [results:read]
+      parameters:
+        - $ref: "#/components/parameters/since"
+        - name: surface
+          in: query
+          required: true
+          schema:
+            $ref: "#/components/schemas/SurfaceKey"
+        - name: pair
+          in: query
+          description: One pair of the surface. Omit for the surface line, which combines its models.
+          schema:
+            type: integer
+            minimum: 1
+        - name: endpoint
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: fidelity
+          in: query
+          required: true
+          schema:
+            $ref: "#/components/schemas/Fidelity"
+      responses:
+        "200":
+          description: The line.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Engine"
         "400":
           $ref: "#/components/responses/BadRequest"
         "401":
@@ -3087,7 +3192,7 @@ components:
           description: The order of first mention among brands that are not technologies, 1 first. Null for a technology.
     Citation:
       type: object
-      required: [url, domain, is_self]
+      required: [url, domain, is_self, page]
       properties:
         url:
           type: string
@@ -3096,6 +3201,11 @@ components:
         is_self:
           type: boolean
           description: The link is on one of your domains or their subdomains.
+        page:
+          oneOf:
+            - $ref: "#/components/schemas/PageCheck"
+            - type: "null"
+          description: What the cited page said the last time Byname read it. Null until it has been fetched.
     AnswerSummary:
       type: object
       description: One answer as the answers list shows it.
@@ -3617,7 +3727,7 @@ components:
     Gap:
       type: object
       description: A question where at least one pair did not name you in the run.
-      required: [question, engines, named, competitors, opportunity, demand, named_on_miss, fan_out]
+      required: [question, engines, named, competitors, opportunity, demand, named_on_miss, pairs]
       properties:
         question:
           $ref: "#/components/schemas/QuestionRef"
@@ -3643,11 +3753,11 @@ components:
           items:
             type: string
           description: Competitors named by the answers that did not name you, most often first.
-        fan_out:
+        pairs:
           type: array
           items:
-            type: string
-          description: The web searches the engines ran for the question, where exposed.
+            $ref: "#/components/schemas/GapPair"
+          description: Each pair's answer, in pair order.
     Gaps:
       type: object
       required: [run_id, gaps]
@@ -3669,7 +3779,7 @@ components:
           type: integer
         job:
           type: string
-          enum: [ai_check, model_refresh]
+          enum: [ai_check, model_refresh, source_fetch]
         trigger:
           $ref: "#/components/schemas/Trigger"
         run_id:
@@ -3690,3 +3800,243 @@ components:
         spend_usd:
           type: [number, "null"]
           description: The run's spend, for an AI check. Null for any other job.
+    GapPair:
+      description: One pair's answer to a gap's question.
+      allOf:
+        - $ref: "#/components/schemas/Series"
+        - type: object
+          required: [answer_id, status, named, position, fan_out]
+          properties:
+            answer_id:
+              type: integer
+            status:
+              type: string
+              enum: [ok, no_answer, failed]
+            named:
+              type: boolean
+            position:
+              type: [integer, "null"]
+            fan_out:
+              type: array
+              items:
+                type: string
+              description: The web searches the engine ran for the question. Empty where the endpoint does not expose them.
+    RunRef:
+      type: object
+      required: [id, started_at]
+      properties:
+        id:
+          type: integer
+        started_at:
+          type: string
+          format: date-time
+    Dot:
+      type: object
+      description: One question in one run over the pairs in scope.
+      required: [run_id, state, named, answered]
+      properties:
+        run_id:
+          type: integer
+        state:
+          type: string
+          enum: [named, cited, not_named, failed]
+          description: named when some pair named you, cited when none did but one cited your domains, not_named when some pair answered without either, failed when every call failed.
+        named:
+          type: integer
+        answered:
+          type: integer
+    PromptRow:
+      type: object
+      required: [question, answered, named_by, best_position, instead, dots]
+      properties:
+        question:
+          $ref: "#/components/schemas/QuestionRef"
+        answered:
+          type: integer
+          description: Pairs that answered on the latest run.
+        named_by:
+          type: array
+          items:
+            $ref: "#/components/schemas/Series"
+          description: The pairs that named you on the latest run.
+        best_position:
+          type: [integer, "null"]
+        instead:
+          type: array
+          items:
+            type: string
+          description: Competitors named on the latest run by answers that did not name you, most often first.
+        dots:
+          type: array
+          items:
+            oneOf:
+              - $ref: "#/components/schemas/Dot"
+              - type: "null"
+          description: One per run in Prompts.runs, null where the question was not asked.
+    Prompts:
+      type: object
+      required: [runs, latest_run_id, rows]
+      properties:
+        runs:
+          type: array
+          items:
+            $ref: "#/components/schemas/RunRef"
+          description: Runs in range with answers on the pairs in scope, oldest first.
+        latest_run_id:
+          type: integer
+          description: 0 when no run in range has answers.
+        rows:
+          type: array
+          items:
+            $ref: "#/components/schemas/PromptRow"
+          description: In question order.
+    PageCheck:
+      type: object
+      description: What Byname found on a cited page the last time it read it.
+      required: [status, fetched_at, self_present, brands, competitors, error]
+      properties:
+        status:
+          type: string
+          enum: [ok, failed, disallowed, refused]
+          description: disallowed means robots.txt said no; refused means not http(s), or a private or loopback address.
+        fetched_at:
+          type: string
+          format: date-time
+        self_present:
+          type: [boolean, "null"]
+          description: Whether the page's HTML names you. Null unless status is ok.
+        brands:
+          type: array
+          items:
+            type: string
+        competitors:
+          type: array
+          items:
+            type: string
+        error:
+          type: string
+    SourcePage:
+      type: object
+      required: [url, domain, is_self, citations, answers, check, outreach]
+      properties:
+        url:
+          type: string
+        domain:
+          type: string
+        is_self:
+          type: boolean
+        citations:
+          type: integer
+        answers:
+          type: integer
+        check:
+          oneOf:
+            - $ref: "#/components/schemas/PageCheck"
+            - type: "null"
+          description: Null until the page has been fetched.
+        outreach:
+          type: boolean
+          description: A page on another site that names a competitor and not you.
+    SourceDomain:
+      type: object
+      required: [domain, is_self, citations, answers, pages, outreach]
+      properties:
+        domain:
+          type: string
+        is_self:
+          type: boolean
+        citations:
+          type: integer
+        answers:
+          type: integer
+        pages:
+          type: integer
+        outreach:
+          type: integer
+          description: Pages flagged as outreach targets.
+    Sources:
+      type: object
+      required: [answered, citing, citations, domain_count, page_count, domains, pages]
+      properties:
+        answered:
+          type: integer
+        citing:
+          type: integer
+          description: Answers that cited at least one page.
+        citations:
+          type: integer
+        domain_count:
+          type: integer
+        page_count:
+          type: integer
+        domains:
+          type: array
+          items:
+            $ref: "#/components/schemas/SourceDomain"
+          description: The 50 most cited.
+        pages:
+          type: array
+          items:
+            $ref: "#/components/schemas/SourcePage"
+          description: The 100 most cited.
+    EnginePrompt:
+      type: object
+      required: [question, answer_id, position, cited, instead]
+      properties:
+        question:
+          $ref: "#/components/schemas/QuestionRef"
+        answer_id:
+          type: integer
+          description: The answer to open, the best placed one when the line combines models.
+        position:
+          type: [integer, "null"]
+        cited:
+          type: boolean
+        instead:
+          type: array
+          items:
+            type: string
+    Engine:
+      description: One line's standing on its latest run in range, its visibility per run, and the brands it names.
+      allOf:
+        - $ref: "#/components/schemas/Series"
+        - type: object
+          required: [models, runs, latest_run_id, answered, named, visibility, prompts, visible_prompts, average_position, points, ranking, not_mentioned, visible]
+          properties:
+            models:
+              type: array
+              items:
+                type: string
+            runs:
+              type: integer
+            latest_run_id:
+              type: integer
+            answered:
+              type: integer
+            named:
+              type: integer
+            visibility:
+              type: [number, "null"]
+              description: Named over answered on the latest run.
+            prompts:
+              type: integer
+            visible_prompts:
+              type: integer
+            average_position:
+              type: [number, "null"]
+            points:
+              type: array
+              items:
+                $ref: "#/components/schemas/RatePoint"
+            ranking:
+              type: array
+              items:
+                $ref: "#/components/schemas/BrandStanding"
+            not_mentioned:
+              type: array
+              items:
+                $ref: "#/components/schemas/EnginePrompt"
+            visible:
+              type: array
+              items:
+                $ref: "#/components/schemas/EnginePrompt"

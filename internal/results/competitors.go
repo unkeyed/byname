@@ -135,18 +135,9 @@ func (s *Service) Competitors(ctx context.Context, since *time.Time, sc Scope, b
 		}
 		out.Brands = append(out.Brands, *b)
 	}
-	slices.SortFunc(out.Brands, func(a, b BrandStanding) int {
-		return cmp.Or(cmp.Compare(b.Mentions, a.Mentions), cmp.Compare(a.Name, b.Name))
-	})
-	for i := range out.Brands {
-		switch b := &out.Brands[i]; {
-		case b.Mentions == 0:
-		case i > 0 && out.Brands[i-1].Mentions == b.Mentions:
-			b.Rank = out.Brands[i-1].Rank
-		default:
-			b.Rank = i + 1
-		}
-		if out.Brands[i].Mentions > 0 {
+	rankBrands(out.Brands)
+	for _, b := range out.Brands {
+		if b.Mentions > 0 {
 			out.BrandsNamed++
 		}
 	}

@@ -202,6 +202,9 @@ type Citation struct {
 	URL    string `json:"url"`
 	Domain string `json:"domain"`
 	IsSelf bool   `json:"is_self"`
+	// Page is what the cited page said the last time Byname read it, null
+	// until it has been fetched.
+	Page *PageCheck `json:"page"`
 }
 
 const answerSelect = `SELECT a.id, a.run_id, q.id, q.group_name, q.text, m.id, m.surface_key, coalesce(m.model, ''),
@@ -282,13 +285,28 @@ func (s *Service) Answer(ctx context.Context, id int64) (Answer, error) {
 	if raw != nil {
 		a.Raw = raw
 	}
-	rows, err = s.db.Query(ctx, `SELECT url, domain, is_self FROM citation WHERE answer_id = $1 ORDER BY ord`, id)
+	kinds, err := s.brandKinds(ctx)
+	if err != nil {
+		return Answer{}, err
+	}
+	rows, err = s.db.Query(ctx, `SELECT c.url, c.domain, c.is_self, p.status, p.fetched_at, p.self_present, coalesce(p.brands_present, '{}'), coalesce(p.error, '')
+		FROM citation c LEFT JOIN source_page p ON p.url = c.url WHERE c.answer_id = $1 ORDER BY c.ord`, id)
 	if err != nil {
 		return Answer{}, err
 	}
 	a.Citations, err = pgx.CollectRows(rows, func(r pgx.CollectableRow) (Citation, error) {
 		var c Citation
-		return c, r.Scan(&c.URL, &c.Domain, &c.IsSelf)
+		var status *string
+		var fetched *time.Time
+		var check PageCheck
+		if err := r.Scan(&c.URL, &c.Domain, &c.IsSelf, &status, &fetched, &check.SelfPresent, &check.Brands, &check.Error); err != nil {
+			return c, err
+		}
+		if status != nil {
+			check.Status, check.FetchedAt, check.Competitors = *status, *fetched, competitorsIn(check.Brands, kinds)
+			c.Page = &check
+		}
+		return c, nil
 	})
 	return a, err
 }
@@ -296,7 +314,7 @@ func (s *Service) Answer(ctx context.Context, id int64) (Answer, error) {
 // Job is one entry of the jobs log.
 type Job struct {
 	ID         int64      `json:"id"`
-	Job        string     `json:"job" jsonschema:"ai_check or model_refresh"`
+	Job        string     `json:"job" jsonschema:"ai_check, model_refresh or source_fetch"`
 	Trigger    string     `json:"trigger"`
 	RunID      *int64     `json:"run_id"`
 	Status     string     `json:"status"`
