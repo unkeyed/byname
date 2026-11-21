@@ -467,7 +467,7 @@ func (s *Service) liveModels(ctx context.Context, key engines.Surface, route eng
 }
 
 // testQuestion is asked when no question set exists yet. It names no brand.
-const testQuestion = "What's the best way to add rate limiting to a REST API?"
+const testQuestion = "What should I look for when choosing a project management tool for a small team?"
 
 // PairTest is what one short call through a pair's route showed.
 type PairTest struct {

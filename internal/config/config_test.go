@@ -181,26 +181,26 @@ func TestQuestionSetsVersionEveryChange(t *testing.T) {
 	is(t, err, core.ErrNotFound)
 
 	v1, err := svc.PutQuestions(ctx, config.QuestionsInput{Questions: []config.QuestionInput{
-		q("Rate limiting", "How do I rate limit a REST API?"),
-		q("Rate limiting", "What is the best rate limiting service?"),
-		q("Auth", "How should I issue API keys to customers?"),
+		q("Deploying", "How do I deploy a REST API?"),
+		q("Deploying", "What is the best hosting platform?"),
+		q("Databases", "How should I back up a managed Postgres database?"),
 	}})
 	if err != nil || v1.Version != 1 || len(v1.Questions) != 3 {
 		t.Fatalf("v1 = %+v %v", v1, err)
 	}
 	same, err := svc.PutQuestions(ctx, config.QuestionsInput{Questions: []config.QuestionInput{
-		q("Rate limiting", "How do I rate limit a REST API?"),
-		q("Rate limiting", "What is the best rate limiting service?"),
-		q("Auth", "How should I issue API keys to customers?"),
+		q("Deploying", "How do I deploy a REST API?"),
+		q("Deploying", "What is the best hosting platform?"),
+		q("Databases", "How should I back up a managed Postgres database?"),
 	}})
 	if err != nil || same.ID != v1.ID {
 		t.Fatalf("resending the set made version %d, want it unchanged: %v", same.Version, err)
 	}
 
 	edit := config.QuestionsInput{Questions: []config.QuestionInput{
-		q("Rate limiting", "how do i rate-limit a REST API"),
-		q("Rate limiting", "Which rate limiting service is best for a startup?"),
-		q("Billing", "How do I bill customers per API call?"),
+		q("Deploying", "how do i deploy a REST-API"),
+		q("Deploying", "Which hosting platform is best for a startup?"),
+		q("Pricing", "How is hosting billed per request?"),
 	}}
 	_, err = svc.PutQuestions(ctx, edit)
 	if !errors.Is(err, core.ErrInvalid) || !strings.Contains(err.Error(), "replaces") {
@@ -225,8 +225,8 @@ func TestQuestionSetsVersionEveryChange(t *testing.T) {
 	for name, in := range map[string]config.QuestionsInput{
 		"empty":     {},
 		"too short": {Questions: []config.QuestionInput{q("A", "Why?")}},
-		"duplicate": {Questions: []config.QuestionInput{q("A", "How do I bill per call?"), q("B", "how do I bill per call")}},
-		"no group":  {Questions: []config.QuestionInput{q("", "How do I bill per call?")}},
+		"duplicate": {Questions: []config.QuestionInput{q("A", "How is hosting billed?"), q("B", "how is hosting billed")}},
+		"no group":  {Questions: []config.QuestionInput{q("", "How is hosting billed?")}},
 		"replaces an old version's question": {Questions: []config.QuestionInput{
 			q("A", "A brand new question here", v1.Questions[2].ID)}},
 	} {

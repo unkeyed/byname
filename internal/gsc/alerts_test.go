@@ -40,11 +40,11 @@ func TestSearchAlertsFireOncePerGoalAndWindow(t *testing.T) {
 	e.withAlerts()
 	e.seedHistory()
 	e.connectServiceAccount(prefixProperty)
-	reached, err := e.svc.UpsertGoal(e.ctx, gsc.GoalInput{Metric: gsc.MetricClicks, WindowDays: 28, Target: 500, DueOn: "2027-01-31"})
+	reached, err := e.svc.UpsertGoal(e.ctx, gsc.GoalInput{Metric: gsc.MetricClicks, WindowDays: 28, Target: 500, DueOn: "2028-03-15"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := e.svc.UpsertGoal(e.ctx, gsc.GoalInput{Metric: gsc.MetricNonBrandClicks, WindowDays: 28, Target: 5000, DueOn: "2027-01-31"}); err != nil {
+	if _, err := e.svc.UpsertGoal(e.ctx, gsc.GoalInput{Metric: gsc.MetricNonBrandClicks, WindowDays: 28, Target: 5000, DueOn: "2028-03-15"}); err != nil {
 		t.Fatal(err)
 	}
 

@@ -37,7 +37,7 @@ type GoalInput struct {
 	Metric     Metric `json:"metric" jsonschema:"clicks, impressions or non_brand_clicks"`
 	WindowDays int    `json:"window_days" jsonschema:"the trailing window, 28 or 90 days"`
 	Target     int64  `json:"target" jsonschema:"the number to reach over the window"`
-	DueOn      string `json:"due_on" jsonschema:"the date to reach it by, such as 2027-01-31"`
+	DueOn      string `json:"due_on" jsonschema:"the date to reach it by, such as 2028-03-15"`
 }
 
 func (in GoalInput) validate() error {

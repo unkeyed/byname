@@ -322,7 +322,7 @@ func TestVerdictsAgainstTheControlsStillHeld(t *testing.T) {
 	e.seedDays(steady, 80, 0, 10, 1000, 8)
 	e.seedDays(released, 80, 41, 10, 1000, 8)
 	e.seedDays(released, 40, 0, 50, 3000, 2)
-	for url, hold := range map[string]string{steady: "2027-01-31", released: e.now.AddDate(0, 0, -1).Format(time.DateOnly)} {
+	for url, hold := range map[string]string{steady: "2028-03-15", released: e.now.AddDate(0, 0, -1).Format(time.DateOnly)} {
 		if _, err := e.svc.UpsertControlPage(e.ctx, changes.ControlInput{URL: url, HoldUntil: hold}); err != nil {
 			t.Fatal(err)
 		}

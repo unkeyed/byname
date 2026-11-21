@@ -104,7 +104,7 @@ func TestSiteChangesOverHTTP(t *testing.T) {
 		ID     int64 `json:"id"`
 		Active bool  `json:"active"`
 	}
-	agent.call("POST", "/v1/control-pages", map[string]string{"url": "https://www.northwind.example/docs", "hold_until": "2027-01-31"}, http.StatusOK, &control)
+	agent.call("POST", "/v1/control-pages", map[string]string{"url": "https://www.northwind.example/docs", "hold_until": "2028-03-15"}, http.StatusOK, &control)
 	if !control.Active {
 		t.Fatalf("control page held to 2027 = %+v, want active", control)
 	}
@@ -144,7 +144,7 @@ func TestChangeToolsOverMCP(t *testing.T) {
 	person.call("PUT", "/v1/repo", map[string]string{"repo": "northwind/site", "token": githubToken}, http.StatusOK, nil)
 	editor := anon.withKey(t, person, core.ConfigWrite)
 	editor.call("POST", "/v1/changes", map[string]string{"url": "https://www.northwind.example/contact", "kind": "edit", "merged_at": "2026-11-01"}, http.StatusCreated, nil)
-	editor.call("POST", "/v1/control-pages", map[string]string{"url": "https://www.northwind.example/docs", "hold_until": "2027-01-31"}, http.StatusOK, nil)
+	editor.call("POST", "/v1/control-pages", map[string]string{"url": "https://www.northwind.example/docs", "hold_until": "2028-03-15"}, http.StatusOK, nil)
 	_, tok := connect(t, anon, person, "changes reader")
 	cs, err := mcpSession(anon, tok.AccessToken)
 	if err != nil {

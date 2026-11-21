@@ -131,7 +131,7 @@ func TestPathRules(t *testing.T) {
 		t.Fatal(err)
 	}
 	for path, want := range map[string]string{
-		"content/blog/rate-limits.mdx":        "https://www.northwind.example/blog/rate-limits",
+		"content/blog/zero-downtime.mdx":      "https://www.northwind.example/blog/zero-downtime",
 		"content/blog/2026/nested.mdx":        "",
 		"app/(marketing)/page.tsx":            "https://www.northwind.example/",
 		"app/(marketing)/pricing/page.tsx":    "https://www.northwind.example/pricing",

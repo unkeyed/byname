@@ -390,7 +390,7 @@ type ControlPage struct {
 // the one with the same URL.
 type ControlInput struct {
 	URL       string `json:"url"`
-	HoldUntil string `json:"hold_until" jsonschema:"the last day it counts as a control, such as 2027-01-31"`
+	HoldUntil string `json:"hold_until" jsonschema:"the last day it counts as a control, such as 2028-03-15"`
 	Note      string `json:"note,omitempty"`
 }
 
@@ -414,7 +414,7 @@ func (s *Service) UpsertControlPage(ctx context.Context, in ControlInput) (Contr
 		return ControlPage{}, err
 	}
 	if _, err := time.Parse(time.DateOnly, in.HoldUntil); err != nil {
-		return ControlPage{}, fmt.Errorf("%w: hold_until must be a day such as 2027-01-31, got %q", core.ErrInvalid, in.HoldUntil)
+		return ControlPage{}, fmt.Errorf("%w: hold_until must be a day such as 2028-03-15, got %q", core.ErrInvalid, in.HoldUntil)
 	}
 	if len(in.Note) > 500 {
 		return ControlPage{}, fmt.Errorf("%w: a note is at most 500 characters", core.ErrInvalid)

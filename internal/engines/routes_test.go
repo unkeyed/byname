@@ -16,7 +16,7 @@ import (
 	"github.com/unkeyed/byname/internal/engines/tregtest"
 )
 
-const question = "What's the best way to add rate limiting to a REST API?"
+const question = "What should I look for when choosing a project management tool for a small team?"
 
 func ask(s engines.Surface, model string, force bool) engines.Request {
 	return engines.Request{Question: question, Surface: s, Model: model, ForceWebSearch: force, Location: "US", Language: "en"}

@@ -28,7 +28,7 @@ func seedGoogle(g *gsctest.Server) {
 		d := today.AddDate(0, 0, -n).Format(time.DateOnly)
 		g.SetRows("sc-domain:northwind.example",
 			gsctest.Row{Date: d, Query: "northwind pricing", Page: "https://www.northwind.example/pricing", Clicks: 6, Impressions: 60, Position: 1.4},
-			gsctest.Row{Date: d, Query: "rate limiting api", Page: "https://www.northwind.example/docs", Clicks: 3, Impressions: 200, Position: 8.2},
+			gsctest.Row{Date: d, Query: "go api hosting", Page: "https://www.northwind.example/docs", Clicks: 3, Impressions: 200, Position: 8.2},
 			gsctest.Row{Date: d, Page: "https://www.northwind.example/docs", Clicks: 1, Impressions: 30, Position: 11})
 	}
 	g.SetFirstIncomplete(today.AddDate(0, 0, -2).Format(time.DateOnly))
@@ -147,7 +147,7 @@ func TestSearchConsoleOverHTTP(t *testing.T) {
 	reader.call("GET", "/v1/search/queries?non_brand=maybe", nil, http.StatusBadRequest, nil)
 	reader.call("GET", "/v1/search/daily?from=yesterday", nil, http.StatusBadRequest, nil)
 
-	goal := map[string]any{"metric": "non_brand_clicks", "window_days": 28, "target": 180, "due_on": "2027-01-31"}
+	goal := map[string]any{"metric": "non_brand_clicks", "window_days": 28, "target": 240, "due_on": "2028-03-15"}
 	reader.call("POST", "/v1/goals", goal, http.StatusForbidden, nil)
 	var g struct {
 		ID       int64 `json:"id"`
@@ -223,11 +223,11 @@ func TestSearchToolsOverMCP(t *testing.T) {
 	if err := anon.svc.GSC.Sync(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	editor.call("POST", "/v1/goals", map[string]any{"metric": "clicks", "window_days": 90, "target": 5, "due_on": "2027-01-31"}, http.StatusOK, nil)
+	editor.call("POST", "/v1/goals", map[string]any{"metric": "clicks", "window_days": 90, "target": 5, "due_on": "2028-03-15"}, http.StatusOK, nil)
 	for name, args := range reads {
 		call(name, args)
 	}
-	res, err := cs.CallTool(context.Background(), &mcp.CallToolParams{Name: "upsert_goal", Arguments: map[string]any{"metric": "clicks", "window_days": 28, "target": 1, "due_on": "2027-01-31"}})
+	res, err := cs.CallTool(context.Background(), &mcp.CallToolParams{Name: "upsert_goal", Arguments: map[string]any{"metric": "clicks", "window_days": 28, "target": 1, "due_on": "2028-03-15"}})
 	if err != nil || !res.IsError {
 		t.Fatalf("upsert_goal over a results:read connection: %v %+v, want a tool error", err, res)
 	}

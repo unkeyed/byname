@@ -169,7 +169,7 @@ func TestSeriesFollowQuestionVersionsAndSplitOnFidelity(t *testing.T) {
 	second := e.check(t)
 
 	edit := config.QuestionsInput{Questions: []config.QuestionInput{
-		{Group: "Rate limiting", Text: "How should I rate limit a public REST API?", Replaces: []int64{v1.Questions[0].ID}},
+		{Group: "Deploying", Text: "How should I deploy a public REST API?", Replaces: []int64{v1.Questions[0].ID}},
 		checkstest.Questions[1],
 	}}
 	v2, err := e.config.PutQuestions(ctx, edit)

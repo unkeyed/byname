@@ -24,8 +24,8 @@ func Settings() config.Settings {
 
 // Questions are the two questions every seeded run asks.
 var Questions = []config.QuestionInput{
-	{Group: "Rate limiting", Text: "How do I add rate limiting to a REST API?"},
-	{Group: "Rate limiting", Text: "Which managed rate limiting service should I use?"},
+	{Group: "Deploying", Text: "How do I deploy a Go API with zero downtime?"},
+	{Group: "Deploying", Text: "Which managed hosting platform should I use for a Go API?"},
 }
 
 // Pairs are the six pairs a seeded run asks each question on: four that

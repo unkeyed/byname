@@ -98,7 +98,7 @@ func (e *env) status() gsc.Status {
 
 // site is one day of site numbers spread over one page and one query.
 func site(date string, clicks, impressions int) gsctest.Row {
-	return gsctest.Row{Date: date, Query: "rate limiting api", Page: prefixProperty + "docs", Clicks: clicks, Impressions: impressions, Position: 7.5}
+	return gsctest.Row{Date: date, Query: "go api hosting", Page: prefixProperty + "docs", Clicks: clicks, Impressions: impressions, Position: 7.5}
 }
 
 func (e *env) count(sql string, args ...any) int64 {
@@ -382,7 +382,7 @@ func TestBrandAndNonBrand(t *testing.T) {
 		e.fake.SetRows(domainProperty,
 			gsctest.Row{Date: e.day(n), Query: "fernhollow pricing", Page: prefixProperty + "pricing", Clicks: 10, Impressions: 100, Position: 1},
 			gsctest.Row{Date: e.day(n), Query: "Fern Hollow login", Page: prefixProperty, Clicks: 5, Impressions: 20, Position: 1},
-			gsctest.Row{Date: e.day(n), Query: "rate limiting api", Page: prefixProperty + "docs", Clicks: 7, Impressions: 300, Position: 6},
+			gsctest.Row{Date: e.day(n), Query: "go api hosting", Page: prefixProperty + "docs", Clicks: 7, Impressions: 300, Position: 6},
 			gsctest.Row{Date: e.day(n), Query: "", Page: prefixProperty + "docs", Clicks: 4, Impressions: 80, Position: 9},
 		)
 	}
@@ -404,7 +404,7 @@ func TestBrandAndNonBrand(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(top.Queries) != 1 || top.Queries[0].Query != "rate limiting api" || top.Queries[0].Branded {
+	if len(top.Queries) != 1 || top.Queries[0].Query != "go api hosting" || top.Queries[0].Branded {
 		t.Fatalf("top non-brand queries = %+v", top.Queries)
 	}
 	all, err := e.svc.TopQueries(e.ctx, gsc.Top{})
@@ -422,7 +422,7 @@ func TestBrandAndNonBrand(t *testing.T) {
 		t.Fatalf("default branded terms = %v", split.Terms)
 	}
 
-	if _, err := e.cfg.SetBrandedTerms(e.ctx, []string{"Rate Limiting"}); err != nil {
+	if _, err := e.cfg.SetBrandedTerms(e.ctx, []string{"API Hosting"}); err != nil {
 		t.Fatal(err)
 	}
 	sum, _ = e.svc.Summary(e.ctx)
@@ -450,13 +450,13 @@ func TestGoals(t *testing.T) {
 	if err != nil || len(goals) != 0 {
 		t.Fatalf("goals on a new instance = %v, %v; want none", goals, err)
 	}
-	if _, err := e.svc.UpsertGoal(e.ctx, gsc.GoalInput{Metric: "sessions", WindowDays: 28, Target: 1, DueOn: "2027-01-31"}); !errors.Is(err, core.ErrInvalid) {
+	if _, err := e.svc.UpsertGoal(e.ctx, gsc.GoalInput{Metric: "sessions", WindowDays: 28, Target: 1, DueOn: "2028-03-15"}); !errors.Is(err, core.ErrInvalid) {
 		t.Fatalf("unknown metric: %v", err)
 	}
-	if _, err := e.svc.UpsertGoal(e.ctx, gsc.GoalInput{Metric: gsc.MetricClicks, WindowDays: 30, Target: 1, DueOn: "2027-01-31"}); !errors.Is(err, core.ErrInvalid) {
+	if _, err := e.svc.UpsertGoal(e.ctx, gsc.GoalInput{Metric: gsc.MetricClicks, WindowDays: 30, Target: 1, DueOn: "2028-03-15"}); !errors.Is(err, core.ErrInvalid) {
 		t.Fatalf("a 30-day window: %v", err)
 	}
-	g, err := e.svc.UpsertGoal(e.ctx, gsc.GoalInput{Metric: gsc.MetricClicks, WindowDays: 28, Target: 1000, DueOn: "2027-01-31"})
+	g, err := e.svc.UpsertGoal(e.ctx, gsc.GoalInput{Metric: gsc.MetricClicks, WindowDays: 28, Target: 1000, DueOn: "2028-03-15"})
 	if err != nil || g.Progress != nil {
 		t.Fatalf("a goal before any data: %+v, %v", g, err)
 	}
@@ -474,7 +474,7 @@ func TestGoals(t *testing.T) {
 	e.connectServiceAccount(domainProperty)
 	e.sync()
 
-	same, err := e.svc.UpsertGoal(e.ctx, gsc.GoalInput{Metric: gsc.MetricClicks, WindowDays: 28, Target: 200, DueOn: "2027-01-31"})
+	same, err := e.svc.UpsertGoal(e.ctx, gsc.GoalInput{Metric: gsc.MetricClicks, WindowDays: 28, Target: 200, DueOn: "2028-03-15"})
 	if err != nil || same.ID != g.ID || same.Target != 200 {
 		t.Fatalf("the same goal again: %+v, %v; want goal %d with the new target", same, err, g.ID)
 	}
@@ -482,15 +482,15 @@ func TestGoals(t *testing.T) {
 	if p == nil || p.Value != 280 || !p.Reached || p.To != e.day(3) || p.From != e.day(30) || p.DaysWithData != 28 || p.Fraction != 1.4 {
 		t.Fatalf("28-day clicks progress = %+v", p)
 	}
-	imp, err := e.svc.UpsertGoal(e.ctx, gsc.GoalInput{Metric: gsc.MetricImpressions, WindowDays: 90, Target: 10000, DueOn: "2027-01-31"})
+	imp, err := e.svc.UpsertGoal(e.ctx, gsc.GoalInput{Metric: gsc.MetricImpressions, WindowDays: 90, Target: 10000, DueOn: "2028-03-15"})
 	if err != nil || imp.Progress.Value != 9000 || imp.Progress.Reached || imp.Progress.From != e.day(92) {
 		t.Fatalf("90-day impressions progress = %+v, %v", imp.Progress, err)
 	}
-	nb, err := e.svc.UpsertGoal(e.ctx, gsc.GoalInput{Metric: gsc.MetricNonBrandClicks, WindowDays: 28, Target: 180, DueOn: "2027-01-31"})
+	nb, err := e.svc.UpsertGoal(e.ctx, gsc.GoalInput{Metric: gsc.MetricNonBrandClicks, WindowDays: 28, Target: 240, DueOn: "2028-03-15"})
 	if err != nil || nb.Progress.Value != 280 {
 		t.Fatalf("non-brand clicks progress = %+v, %v", nb.Progress, err)
 	}
-	if _, err := e.svc.UpdateGoal(e.ctx, imp.ID, gsc.GoalInput{Metric: gsc.MetricClicks, WindowDays: 28, Target: 5, DueOn: "2027-01-31"}); !errors.Is(err, core.ErrConflict) {
+	if _, err := e.svc.UpdateGoal(e.ctx, imp.ID, gsc.GoalInput{Metric: gsc.MetricClicks, WindowDays: 28, Target: 5, DueOn: "2028-03-15"}); !errors.Is(err, core.ErrConflict) {
 		t.Fatalf("updating a goal onto another's key: %v", err)
 	}
 	if err := e.svc.DeleteGoal(e.ctx, imp.ID); err != nil {

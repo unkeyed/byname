@@ -158,7 +158,7 @@ function GoalForm({ goal, onDone }: { goal: Goal | null; onDone: () => void }) {
             </select>
           </Field>
           <Field label="Target" hint={`${metricInfo[metric]} over the trailing ${windowInfo[windowDays]}.`}>
-            <input className={inputClass} inputMode="numeric" required value={target} onChange={(e) => setTarget(e.target.value)} placeholder="1900" data-autofocus />
+            <input className={inputClass} inputMode="numeric" required value={target} onChange={(e) => setTarget(e.target.value)} placeholder="2400" data-autofocus />
           </Field>
           <Field label="Due">
             <input className={inputClass} type="date" required value={due} onChange={(e) => setDue(e.target.value)} />

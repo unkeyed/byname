@@ -61,14 +61,14 @@ func jsonValue(t *testing.T, s string) any {
 
 func ask(s Surface, model string, force bool) Request {
 	return Request{
-		Question: "What's the best way to add rate limiting to a REST API?",
+		Question: "What should I look for when choosing a project management tool for a small team?",
 		Surface:  s, Model: model, ForceWebSearch: force, Location: "US", Language: "en",
 		IdempotencyKey: "run-7/q-3/sm-2/1",
 	}
 }
 
 func TestTregSendsTheProviderRequest(t *testing.T) {
-	const q = "What's the best way to add rate limiting to a REST API?"
+	const q = "What should I look for when choosing a project management tool for a small team?"
 	for _, tc := range []struct {
 		req    Request
 		method string

@@ -68,7 +68,7 @@ func TestPrompts(t *testing.T) {
 	if err != nil || all.LatestRunID != second || len(all.Runs) != 2 || len(all.Rows) != 2 {
 		t.Fatalf("prompts = %+v, %v; want two questions over two runs", all, err)
 	}
-	if all.Runs[0].ID != first || all.Rows[0].Question.Text != "How do I add rate limiting to a REST API?" {
+	if all.Runs[0].ID != first || all.Rows[0].Question.Text != "How do I deploy a Go API with zero downtime?" {
 		t.Errorf("runs %+v, first row %q; want oldest run first and question order", all.Runs, all.Rows[0].Question.Text)
 	}
 	row := all.Rows[0]
