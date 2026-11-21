@@ -4,7 +4,7 @@ import { useReauthMutation } from "./Reauth";
 import { useNavigate } from "react-router";
 import { api, inviteURL, roleInfo, roles, type Email, type Role } from "../../api";
 import { keys, useAuthOptions, useMe } from "../../queries";
-import { Avatar, Badge, Button, Card, ConfirmButton, CopyField, ErrorNote, inputClass, PageSpinner, RelativeTime, selectClass } from "../../ui";
+import { Avatar, Badge, Button, Card, ConfirmButton, CopyField, cx, ErrorNote, inputClass, PageSpinner, RelativeTime, selectClass } from "../../ui";
 import { SettingsHeader, SettingsSubhead } from "./Settings";
 
 /** An invite made on this page. The API cannot list invites, so only these are shown. */
@@ -182,7 +182,7 @@ function Invite({ onSent }: { onSent: (i: SentInvite) => void }) {
     <div className="space-y-2">
       <form onSubmit={submit} className="flex flex-col gap-2 sm:flex-row">
         <input type="email" required aria-label="Teammate's email" placeholder="teammate@company.com" value={email} onChange={(e) => setEmail(e.target.value)} className={inputClass} />
-        <select aria-label="Role" className={selectClass} value={role} onChange={(e) => setRole(e.target.value as Role)}>
+        <select aria-label="Role" className={cx(selectClass, "sm:w-28 sm:shrink-0")} value={role} onChange={(e) => setRole(e.target.value as Role)}>
           {roles.map((r) => (
             <option key={r} value={r}>
               {r}
