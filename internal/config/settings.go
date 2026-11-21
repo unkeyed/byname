@@ -47,6 +47,10 @@ type SettingsView struct {
 	NextCheckAt  *time.Time `json:"next_check_at"`
 	LastCheckAt  *time.Time `json:"last_check_at"`
 	UpdatedAt    time.Time  `json:"updated_at"`
+	// BrandedTerms decide brand against non-brand search queries; set with
+	// PUT /v1/settings/branded-terms.
+	BrandedTerms        []string `json:"branded_terms" jsonschema:"lowercased; a Search Console query containing one is brand"`
+	BrandedTermsDefault bool     `json:"branded_terms_default" jsonschema:"true while the terms are the brand's name and aliases"`
 }
 
 const settingsColumns = `match_mode, market, language, time_zone, check_every_days,
@@ -68,9 +72,10 @@ func getSettings(ctx context.Context, q querier) (SettingsView, error) {
 	}
 	v.Brand = SelfBrand{Aliases: []string{}, Domains: []string{}}
 	err = q.QueryRow(ctx, `SELECT name, aliases, domains FROM brand WHERE kind = 'self'`).Scan(&v.Brand.Name, &v.Brand.Aliases, &v.Brand.Domains)
-	if err == pgx.ErrNoRows {
-		err = nil
+	if err != nil && err != pgx.ErrNoRows {
+		return v, err
 	}
+	v.BrandedTerms, v.BrandedTermsDefault, err = brandedTerms(ctx, q)
 	return v, err
 }
 
