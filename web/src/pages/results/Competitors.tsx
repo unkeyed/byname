@@ -4,7 +4,7 @@ import { api, type BrandStanding, type Competitors as Data } from "../../api";
 import { Donut, type Segment } from "../../charts";
 import { fidelityInfo, lineKey, pct, useLabels } from "../../lines";
 import { keys, useAnsweredRuns, useBrands, useSettings, useSurfaces } from "../../queries";
-import { Badge, Card, cx, EmptyState, ErrorNote, PageSpinner } from "../../ui";
+import { Badge, Card, CardHeader, cx, EmptyState, ErrorNote, PageSpinner, ScrollX } from "../../ui";
 import { useFilter, useView } from "../../view";
 import { ViewHeader } from "./Header";
 
@@ -42,13 +42,13 @@ export function Competitors() {
   );
 }
 
-/** Your brand takes the first hue; competitors keep theirs in brand table order whatever their rank. */
+/** Your brand is drawn in ink, as everywhere; competitors keep their hue in brand table order whatever their rank. */
 function useBrandColor() {
   const brands = useBrands();
   const competitors = (brands.data ?? []).filter((b) => b.kind === "competitor").sort((a, b) => a.id - b.id);
-  const slot = new Map(competitors.map((b, i) => [b.id, i + 2]));
+  const slot = new Map(competitors.map((b, i) => [b.id, i + 1]));
   return (b: BrandStanding) => {
-    if (b.kind === "self") return "var(--series-1)";
+    if (b.kind === "self") return "var(--you)";
     const s = slot.get(b.brand_id);
     return s && s <= 8 ? `var(--series-${s})` : "var(--faint)";
   };
@@ -64,12 +64,10 @@ function ShareOfVoice({ data }: { data: Data }) {
   const segments: Segment[] = [...top.map((b) => ({ key: String(b.brand_id), label: `${b.name}: ${pct(b.share)}`, value: b.mentions, color: color(b) })), ...(rest ? [{ key: "other", label: `Other brands: ${pct(rest / data.mentions)}`, value: rest, color: "var(--line-hover)" }] : [])];
   return (
     <Card>
-      <div className="px-4 py-3">
-        <h2 className="text-sm font-semibold">Share of voice</h2>
-        <p className="text-xs text-muted">
-          Each brand's share of the {data.mentions} mentions of you and your competitors over {data.runs} {data.runs === 1 ? "check" : "checks"}. Technologies are left out.
-        </p>
-      </div>
+      <CardHeader
+        title="Share of voice"
+        description={`Each brand's share of the ${data.mentions} mentions of you and your competitors over ${data.runs} ${data.runs === 1 ? "check" : "checks"}. Technologies are left out.`}
+      />
       <div className="flex flex-col items-center gap-6 px-4 pb-4 sm:flex-row sm:items-start">
         <Donut segments={segments} label={`Share of voice: ${segments.map((s) => s.label).join(", ")}`}>
           <div>
@@ -115,6 +113,9 @@ function ShareOfVoice({ data }: { data: Data }) {
   );
 }
 
+/** A rate's step on the sequential ramp in index.css; 0 stays off the ramp so "never named" reads as empty. */
+const heatStep = (rate: number) => Math.min(12, Math.max(0, Math.round(rate * 12)));
+
 function Heatmap({ data }: { data: Data }) {
   const surfaces = useSurfaces();
   const labels = useLabels(surfaces.data);
@@ -123,69 +124,91 @@ function Heatmap({ data }: { data: Data }) {
   if (data.columns.length === 0) return null;
   return (
     <Card>
-      <div className="px-4 py-3">
-        <h2 className="text-sm font-semibold">Named by surface</h2>
-        <p className="text-xs text-muted">Each cell is the share of that line's answers naming the brand. Hover for the count.</p>
-      </div>
-      <div className="overflow-x-auto px-4 pb-4">
-        <table className="w-full min-w-max border-separate border-spacing-0.5 text-xs">
-          <thead>
-            <tr>
-              <th />
+      <CardHeader title="Named by surface" description="Each cell is the share of that line's answers naming the brand, on the scale below. Hover or focus a cell for the count." />
+      <div className="px-4 pb-4">
+        <ScrollX label="brands by surface">
+          <table className="w-full table-fixed border-separate border-spacing-0.5 text-xs" style={{ minWidth: `calc(7.5rem + ${data.columns.length} * 5.5rem)` }}>
+            <colgroup>
+              <col className="w-30 md:w-44" />
               {data.columns.map((c) => (
-                <th key={lineKey(c)} scope="col" className="px-2 pb-1 text-left align-bottom font-medium text-muted" title={c.models.join(", ") || undefined}>
-                  <span className="block text-fg">{labels.line(c.pair, c.models)}</span>
-                  <span className={c.fidelity === "approximation" ? "text-warn" : "font-normal"}>{fidelityInfo[c.fidelity].label}</span>
-                  <span className="block font-normal text-faint">{c.answered} answers</span>
-                </th>
+                <col key={lineKey(c)} />
               ))}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((b) => (
-              <tr key={b.brand_id}>
-                <th scope="row" className={cx("pr-3 text-left whitespace-nowrap", b.kind === "self" ? "font-semibold" : "font-normal text-muted")}>
-                  {b.name}
-                  {b.kind === "self" && " (you)"}
-                </th>
-                {data.columns.map((c) => {
-                  const cell = c.cells.find((x) => x.brand_id === b.brand_id);
-                  const rate = cell?.rate ?? 0;
-                  const k = `${b.brand_id}|${lineKey(c)}`;
-                  const tip = `${b.name} on ${labels.line(c.pair, c.models)}: named in ${cell?.named ?? 0} of ${c.answered} answers`;
-                  return (
-                    <td key={k} className="relative p-0">
-                      <div
-                        tabIndex={0}
-                        aria-label={tip}
-                        onPointerEnter={() => setHover(k)}
-                        onPointerLeave={() => setHover(null)}
-                        onFocus={() => setHover(k)}
-                        onBlur={() => setHover(null)}
-                        className={cx("grid h-9 min-w-20 place-items-center rounded-inner tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-ring", hover === k && "ring-1 ring-line-hover")}
-                        style={{ background: rate > 0 ? `color-mix(in oklab, var(--series-1) ${Math.round(12 + rate * 88)}%, var(--surface))` : "var(--subtle)", color: rate > 0.55 ? "#fff" : undefined }}
-                      >
-                        {rate > 0 ? pct(rate) : <span className="text-faint">0</span>}
-                      </div>
-                      {hover === k && (
-                        <div role="status" className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-1 w-max max-w-56 -translate-x-1/2 rounded-surface bg-surface px-2.5 py-1.5 text-xs shadow-floating">
-                          <span className="font-semibold">
-                            {cell?.named ?? 0} of {c.answered}
-                          </span>{" "}
-                          <span className="text-muted">
-                            answers on {labels.line(c.pair, c.models)} named {b.name}
-                          </span>
-                        </div>
-                      )}
-                    </td>
-                  );
-                })}
+            </colgroup>
+            <thead>
+              <tr>
+                <th className="sticky left-0 z-[1] bg-surface" />
+                {data.columns.map((c) => (
+                  <th key={lineKey(c)} scope="col" className="px-1.5 pb-1 text-left align-bottom font-medium text-muted" title={c.models.join(", ") || undefined}>
+                    <span className="block text-fg">{labels.surfaceTitle(c.pair.surface)}</span>
+                    {(c.pair.model || c.models.length > 1) && <span className="block font-normal [overflow-wrap:anywhere]">{c.pair.model || `${c.models.length} models`}</span>}
+                    <span className={cx("block", c.fidelity === "approximation" ? "text-warn" : "font-normal")}>{fidelityInfo[c.fidelity].label}</span>
+                    <span className="block font-normal text-faint">{c.answered} answers</span>
+                  </th>
+                ))}
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {rows.map((b) => (
+                <tr key={b.brand_id}>
+                  <th data-sticky scope="row" className={cx("sticky left-0 z-[1] truncate bg-surface pr-2 text-left", b.kind === "self" ? "font-semibold" : "font-normal text-muted")} title={b.name}>
+                    {b.name}
+                    {b.kind === "self" && " (you)"}
+                  </th>
+                  {data.columns.map((c) => {
+                    const cell = c.cells.find((x) => x.brand_id === b.brand_id);
+                    const rate = cell?.rate ?? 0;
+                    const step = heatStep(rate);
+                    const k = `${b.brand_id}|${lineKey(c)}`;
+                    const tip = `${b.name} on ${labels.line(c.pair, c.models)}: named in ${cell?.named ?? 0} of ${c.answered} answers`;
+                    return (
+                      <td key={k} className="relative p-0">
+                        <div
+                          tabIndex={0}
+                          aria-label={tip}
+                          onPointerEnter={() => setHover(k)}
+                          onPointerLeave={() => setHover(null)}
+                          onFocus={() => setHover(k)}
+                          onBlur={() => setHover(null)}
+                          className={cx("grid h-9 place-items-center rounded-inner font-medium tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-ring", hover === k && "ring-2 ring-fg")}
+                          style={rate > 0 ? { background: `var(--heat-${step})`, color: `var(--heat-ink-${step})` } : { background: "var(--subtle)" }}
+                        >
+                          {rate > 0 ? pct(rate) : <span className="text-faint">0</span>}
+                        </div>
+                        {hover === k && (
+                          <div role="status" className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-1 w-max max-w-56 -translate-x-1/2 rounded-surface bg-surface px-2.5 py-1.5 text-xs shadow-floating">
+                            <span className="font-semibold">
+                              {cell?.named ?? 0} of {c.answered}
+                            </span>{" "}
+                            <span className="text-muted">
+                              answers on {labels.line(c.pair, c.models)} named {b.name}
+                            </span>
+                          </div>
+                        )}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </ScrollX>
+        <HeatKey />
       </div>
     </Card>
+  );
+}
+
+function HeatKey() {
+  return (
+    <div className="mt-2 flex items-center gap-2 text-xs text-faint" aria-hidden="true">
+      0%
+      <span className="flex h-2 w-32 overflow-hidden rounded-full">
+        {Array.from({ length: 13 }, (_, i) => (
+          <span key={i} className="flex-1" style={{ background: `var(--heat-${i})` }} />
+        ))}
+      </span>
+      100%
+    </div>
   );
 }
 
@@ -197,10 +220,7 @@ function WhereYouLose({ run }: { run: number }) {
   const losses = gaps.data.gaps.filter((g) => g.named_on_miss.length > 0);
   return (
     <Card>
-      <div className="px-4 py-3">
-        <h2 className="text-sm font-semibold">Where you lose</h2>
-        <p className="text-xs text-muted">Questions in check #{gaps.data.run_id} where a surface and model named a competitor but not you, with who was named instead. Covers every surface.</p>
-      </div>
+      <CardHeader title="Where you lose" description={`Questions in check #${gaps.data.run_id} where a surface and model named a competitor but not you, with who was named instead. Covers every surface.`} />
       {losses.length === 0 ? (
         <p className="px-4 pb-6 text-sm text-muted">No answer in the latest check named a competitor without naming you.</p>
       ) : (

@@ -48,6 +48,33 @@
   /* Your brand wherever it sits among others: the ink itself, so it never borrows a series hue that names a surface elsewhere. */
   --you: oklch(0.24 0 0);
   --you-fg: oklch(1 0 0);
+  /* Sequential blue for magnitude, light (low) to dark (high), each step with the text colour APCA reads best on it. */
+  --heat-0: #cde2fb;
+  --heat-ink-0: #0b0b0b;
+  --heat-1: #b7d3f6;
+  --heat-ink-1: #0b0b0b;
+  --heat-2: #9ec5f4;
+  --heat-ink-2: #0b0b0b;
+  --heat-3: #86b6ef;
+  --heat-ink-3: #0b0b0b;
+  --heat-4: #6da7ec;
+  --heat-ink-4: #0b0b0b;
+  --heat-5: #5598e7;
+  --heat-ink-5: #ffffff;
+  --heat-6: #3987e5;
+  --heat-ink-6: #ffffff;
+  --heat-7: #2a78d6;
+  --heat-ink-7: #ffffff;
+  --heat-8: #256abf;
+  --heat-ink-8: #ffffff;
+  --heat-9: #1c5cab;
+  --heat-ink-9: #ffffff;
+  --heat-10: #184f95;
+  --heat-ink-10: #ffffff;
+  --heat-11: #104281;
+  --heat-ink-11: #ffffff;
+  --heat-12: #0d366b;
+  --heat-ink-12: #ffffff;
   color-scheme: light;
 }
 
@@ -90,6 +117,33 @@
   --series-8: #e66767;
   --you: oklch(0.95 0 0);
   --you-fg: oklch(0.18 0 0);
+  /* The same ramp anchored the other way, so low values recede into the dark surface. */
+  --heat-0: #0d366b;
+  --heat-ink-0: #ffffff;
+  --heat-1: #104281;
+  --heat-ink-1: #ffffff;
+  --heat-2: #184f95;
+  --heat-ink-2: #ffffff;
+  --heat-3: #1c5cab;
+  --heat-ink-3: #ffffff;
+  --heat-4: #256abf;
+  --heat-ink-4: #ffffff;
+  --heat-5: #2a78d6;
+  --heat-ink-5: #ffffff;
+  --heat-6: #3987e5;
+  --heat-ink-6: #ffffff;
+  --heat-7: #5598e7;
+  --heat-ink-7: #ffffff;
+  --heat-8: #6da7ec;
+  --heat-ink-8: #0b0b0b;
+  --heat-9: #86b6ef;
+  --heat-ink-9: #0b0b0b;
+  --heat-10: #9ec5f4;
+  --heat-ink-10: #0b0b0b;
+  --heat-11: #b7d3f6;
+  --heat-ink-11: #0b0b0b;
+  --heat-12: #cde2fb;
+  --heat-ink-12: #0b0b0b;
   color-scheme: dark;
 }
 
