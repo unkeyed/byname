@@ -516,7 +516,7 @@ func (u *Users) socialUser(ctx context.Context, ident ExternalIdentity) (id int6
 				return err
 			}
 		case socialJoinDomain:
-			if id, err = createUser(ctx, tx, ident.Email, ident.Name, domainRole, nil); err != nil {
+			if id, err = createUser(ctx, tx, ident.Email, ident.Name, u.cfg.DomainRole, nil); err != nil {
 				return err
 			}
 		}

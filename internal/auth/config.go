@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/unkeyed/byname/internal/core"
 	"github.com/unkeyed/byname/internal/secretbox"
 )
 
@@ -20,6 +21,10 @@ type Config struct {
 	// AllowedEmailDomains lets anyone with a provider-verified address at one
 	// of these domains join by social sign-in without an invite. Lower case.
 	AllowedEmailDomains []string
+	// DomainRole is the role of someone who joins through
+	// AllowedEmailDomains. Empty means core.Viewer: nobody chose them, so by
+	// default they start able to read only.
+	DomainRole core.Role
 	// ClientIPHeader names a header that a trusted proxy in front of Byname
 	// sets to the client's address. Empty means use the TCP peer address.
 	ClientIPHeader string

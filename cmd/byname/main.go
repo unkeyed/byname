@@ -26,6 +26,7 @@ import (
 	"github.com/unkeyed/byname/internal/changes"
 	"github.com/unkeyed/byname/internal/checks"
 	instconfig "github.com/unkeyed/byname/internal/config"
+	"github.com/unkeyed/byname/internal/core"
 	"github.com/unkeyed/byname/internal/db"
 	"github.com/unkeyed/byname/internal/engines"
 	"github.com/unkeyed/byname/internal/gsc"
@@ -221,6 +222,13 @@ func loadAuthConfig(port string) (auth.Config, error) {
 			}
 			c.AllowedEmailDomains = append(c.AllowedEmailDomains, d)
 		}
+	}
+	if v := os.Getenv("ALLOWED_EMAIL_DOMAINS_ROLE"); v != "" {
+		r, err := core.ParseRole(strings.ToLower(strings.TrimSpace(v)))
+		if err != nil || r == core.Admin {
+			return c, fmt.Errorf("ALLOWED_EMAIL_DOMAINS_ROLE must be viewer or editor, got %q; invite admins by name, since an admin manages credentials and the team", v)
+		}
+		c.DomainRole = r
 	}
 	c.ClientIPHeader = os.Getenv("CLIENT_IP_HEADER")
 	for _, p := range []struct {

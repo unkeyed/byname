@@ -53,6 +53,25 @@ func socialFixture(t *testing.T, iss *authtest.Issuer, domains ...string) *fixtu
 	})
 }
 
+// An instance can let people from its allowed domains start as editors.
+func TestDomainSignUpsTakeTheConfiguredRole(t *testing.T) {
+	t.Parallel()
+	iss := authtest.NewIssuer()
+	defer iss.Close()
+	f := newFixture(t, func(c *Config) {
+		c.AllowedEmailDomains = []string{"acme.com"}
+		c.DomainRole = core.Editor
+		c.Providers = []ProviderConfig{{ID: "oidc", Name: "Acme SSO", ClientID: "byname", ClientSecret: "s3cret", Issuer: iss.URL}}
+	})
+	f.firstUser("ada@example.com")
+	iss.SetNext(authtest.Identity{Subject: "eve", Email: "eve@acme.com", EmailVerified: true, Name: "Eve"})
+	res, err := f.oauth("oidc", IntentLogin, "", nil)
+	f.must(err)
+	if got := f.actor(res.SignIn.Session).Role; got != core.Editor {
+		t.Fatalf("a domain sign-up became %s, want editor", got)
+	}
+}
+
 func TestSocialSignInAgainstFakeIssuer(t *testing.T) {
 	t.Parallel()
 	iss := authtest.NewIssuer()

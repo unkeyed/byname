@@ -94,10 +94,6 @@ type User struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
-// domainRole is the role of someone who joins through
-// ALLOWED_EMAIL_DOMAINS: nobody chose them, so they start able to read only.
-const domainRole = core.Viewer
-
 func NewUsers(db *pgxpool.Pool, cfg Config) (*Users, error) {
 	if cfg.Secrets == nil {
 		return nil, errors.New("auth: Config.Secrets is required to seal TOTP seeds")
@@ -109,6 +105,9 @@ func NewUsers(db *pgxpool.Pool, cfg Config) (*Users, error) {
 	})
 	if err != nil {
 		return nil, fmt.Errorf("PUBLIC_URL %s cannot be a WebAuthn relying party: %w", cfg.PublicURL, err)
+	}
+	if cfg.DomainRole == "" {
+		cfg.DomainRole = core.Viewer
 	}
 	u := &Users{db: db, cfg: cfg, webauthn: wa, providers: map[string]provider{}}
 	for _, p := range cfg.Providers {
