@@ -1,17 +1,122 @@
 import { useQuery } from "@tanstack/react-query";
-import { api, type Run } from "../../api";
+import { api, type Run, type RunStatus } from "../../api";
 import { pct, usd } from "../../lines";
 import { keys, useRuns, useSurfaces } from "../../queries";
-import { Badge, Card, cx, EmptyState, ErrorNote, Icon, PageSpinner, RelativeTime } from "../../ui";
+import { Badge, Card, cx, EmptyState, ErrorNote, Icon, PageSpinner, RelativeTime, type Tone } from "../../ui";
 import { runTime, useFilter } from "../../view";
 import { ViewHeader } from "./Header";
-import { RunNowButton, RunStatusBadge, useCanRun } from "./RunNow";
+import { RunNowButton, runStatus, RunStatusBadge, useCanRun } from "./RunNow";
 
 function duration(r: Run): string {
   if (!r.started_at) return "–";
   const ms = new Date(r.finished_at ?? Date.now()).getTime() - new Date(r.started_at).getTime();
+  if (ms < 1000) return "<1s";
   const s = Math.round(ms / 1000);
   return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${s % 60}s`;
+}
+
+const triggers: Record<string, string> = { run_now: "Run now", scheduled: "Scheduled" };
+const triggerLabel = (t: string) => triggers[t] ?? t.charAt(0).toUpperCase() + t.slice(1).replaceAll("_", " ");
+
+/** A job's status in the same words and tones as a run's; only a job can be skipped. */
+const jobStatus = (status: string): { label: string; tone: Tone } =>
+  status === "skipped" ? { label: "Skipped", tone: "neutral" } : (runStatus[status as RunStatus] ?? { label: status, tone: "neutral" });
+
+/** The endpoint that did worst, which is the one worth a look; all of them when none fell short. */
+function EndpointSummary({ run, title }: { run: Run; title: (endpoint: string) => string }) {
+  if (run.endpoints.length === 0) return <span className="text-faint">No calls</span>;
+  const worst = run.endpoints.reduce((w, e) => (e.success_rate < w.success_rate ? e : w));
+  if (worst.success_rate >= 1) return <span className="text-muted">All {run.endpoints.length} answered every call</span>;
+  return (
+    <span className="text-muted">
+      Lowest <span className="text-fg">{title(worst.endpoint)}</span>{" "}
+      <span className={cx("tabular-nums", worst.success_rate < 0.9 ? "font-semibold text-danger" : "text-fg")} title={`${worst.succeeded} of ${worst.calls} calls answered`}>
+        {pct(worst.success_rate)}
+      </span>
+    </span>
+  );
+}
+
+function MissingCost({ run }: { run: Run }) {
+  if (run.spend_missing_calls === 0) return null;
+  return (
+    <Badge tone="warn" title="These calls reported no cost. Their cost is unknown, not $0, so the real spend is higher.">
+      <Icon name="alert" className="size-3" />
+      {run.spend_missing_calls} without a cost
+    </Badge>
+  );
+}
+
+const runGrid = "md:grid md:grid-cols-[5.5rem_10rem_6rem_3.5rem_7rem_11rem_minmax(0,1fr)_1rem] md:items-center md:gap-x-3";
+
+function RunRow({ run: r, title }: { run: Run; title: (endpoint: string) => string }) {
+  return (
+    <details className="group">
+      <summary className={cx("cursor-pointer list-none px-4 py-2.5 hover:bg-subtle [&::-webkit-details-marker]:hidden", runGrid)}>
+        <div className="flex items-start justify-between gap-3 md:contents">
+          <div>
+            <span className="font-medium">#{r.id}</span>
+            <span className="text-xs text-muted md:block">
+              <span className="md:hidden"> · </span>
+              <RelativeTime iso={runTime(r)} />
+            </span>
+          </div>
+          <div className="md:order-none">
+            <RunStatusBadge run={r} />
+          </div>
+        </div>
+        <div className="mt-1 text-xs text-muted md:contents">
+          <span>{triggerLabel(r.trigger)}</span>
+          <span className="md:hidden"> · took </span>
+          <span className="tabular-nums">{duration(r)}</span>
+        </div>
+        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 md:contents">
+          <span className="tabular-nums md:text-right">
+            {r.succeeded} <span className="text-faint">of {r.calls}</span>
+            <span className="text-xs text-muted md:hidden"> answered</span>
+          </span>
+          <span className="flex flex-wrap items-center gap-1.5 tabular-nums md:justify-end">
+            {usd(r.spend_usd)}
+            <MissingCost run={r} />
+          </span>
+        </div>
+        <div className="mt-1 flex items-center justify-between gap-2 text-xs md:contents">
+          <EndpointSummary run={r} title={title} />
+          <span className="flex items-center gap-1 text-muted">
+            <span className="md:sr-only">Endpoints</span>
+            <Icon name="down" className="size-3.5 transition-transform group-open:rotate-180" />
+          </span>
+        </div>
+      </summary>
+      <div className="px-4 pb-3 md:pl-[calc(1rem+5.5rem+0.75rem)]">
+        {r.error && <p className="mb-2 text-xs text-danger [overflow-wrap:anywhere]">{r.error}</p>}
+        <table className="w-full max-w-xl text-xs">
+          <caption className="sr-only">Check #{r.id} by endpoint</caption>
+          <thead className="text-muted">
+            <tr>
+              <th className="py-1 pr-3 text-left font-medium">Endpoint</th>
+              <th className="py-1 pr-3 text-right font-medium">Answered</th>
+              <th className="py-1 text-right font-medium">Cost per call</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-line">
+            {r.endpoints.map((e) => (
+              <tr key={e.endpoint}>
+                <td className="py-1 pr-3" title={e.endpoint}>
+                  {title(e.endpoint)}
+                  {e.missing_cost > 0 && <span className="block text-warn">{e.missing_cost} without a cost</span>}
+                </td>
+                <td className={cx("py-1 pr-3 text-right align-top tabular-nums", e.success_rate < 0.9 ? "font-semibold text-danger" : "text-muted")} title={`${e.succeeded} of ${e.calls} calls answered`}>
+                  {pct(e.success_rate)}
+                </td>
+                <td className="py-1 text-right align-top text-muted tabular-nums">{e.cost_per_call == null ? "–" : usd(e.cost_per_call)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </details>
+  );
 }
 
 export function Runs() {
@@ -22,6 +127,7 @@ export function Runs() {
   // Surfaces can share an endpoint (Claude Code and the Claude app), so name it by the ones in use.
   const endpointTitle = new Map<string, string>();
   for (const s of surfaces.data ?? []) if (s.pairs.length > 0) endpointTitle.set(s.endpoint, endpointTitle.has(s.endpoint) ? `${endpointTitle.get(s.endpoint)} / ${s.title}` : s.title);
+  const title = (endpoint: string) => endpointTitle.get(endpoint) ?? endpoint;
   const shown = (runs.data ?? []).filter((r) => !filter.since || runTime(r) >= filter.since);
 
   let body;
@@ -36,71 +142,22 @@ export function Runs() {
   else
     body = (
       <Card>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-max text-sm">
-            <thead className="border-b border-line text-xs text-muted">
-              <tr>
-                <th className="px-4 py-2 text-left font-medium">Check</th>
-                <th className="px-3 py-2 text-left font-medium">Status</th>
-                <th className="px-3 py-2 text-left font-medium">Trigger</th>
-                <th className="px-3 py-2 text-left font-medium">Took</th>
-                <th className="px-3 py-2 text-right font-medium">Calls answered</th>
-                <th className="px-3 py-2 text-right font-medium">Spend</th>
-                <th className="px-3 py-2 text-left font-medium">Success rate and cost per call, by endpoint</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-line">
-              {shown.map((r) => (
-                <tr key={r.id} className="align-top">
-                  <td className="px-4 py-2.5">
-                    <div className="font-medium">#{r.id}</div>
-                    <div className="text-xs text-muted">
-                      <RelativeTime iso={runTime(r)} />
-                    </div>
-                  </td>
-                  <td className="px-3 py-2.5">
-                    <RunStatusBadge run={r} />
-                    {r.error && <div className="mt-1 max-w-56 text-xs text-danger [overflow-wrap:anywhere]">{r.error}</div>}
-                  </td>
-                  <td className="px-3 py-2.5 text-xs text-muted">{r.trigger.replace("_", " ")}</td>
-                  <td className="px-3 py-2.5 text-xs text-muted tabular-nums">{duration(r)}</td>
-                  <td className="px-3 py-2.5 text-right tabular-nums">
-                    {r.succeeded} <span className="text-faint">of {r.calls}</span>
-                    {r.calls > 0 && <div className="text-xs text-muted">{pct(r.succeeded / r.calls)}</div>}
-                  </td>
-                  <td className="px-3 py-2.5 text-right tabular-nums">
-                    {usd(r.spend_usd)}
-                    {r.spend_missing_calls > 0 && (
-                      <div className="mt-1">
-                        <Badge tone="warn" title="These calls reported no cost. Their cost is unknown, not $0.">
-                          <Icon name="alert" className="size-3" />
-                          {r.spend_missing_calls} without a cost
-                        </Badge>
-                      </div>
-                    )}
-                  </td>
-                  <td className="px-3 py-2.5">
-                    <ul className="space-y-1 text-xs">
-                      {r.endpoints.map((e) => (
-                        <li key={e.endpoint} className="grid grid-cols-[10rem_3.5rem_5rem_auto] items-center gap-2">
-                          <span className="truncate" title={e.endpoint}>
-                            {endpointTitle.get(e.endpoint) ?? e.endpoint}
-                          </span>
-                          <span className={cx("tabular-nums", e.success_rate < 0.9 ? "font-semibold text-danger" : "text-muted")} title={`${e.succeeded} of ${e.calls} calls answered`}>
-                            {pct(e.success_rate)}
-                          </span>
-                          <span className="text-muted tabular-nums">{e.cost_per_call == null ? "–" : `${usd(e.cost_per_call)}/call`}</span>
-                          {e.missing_cost > 0 ? <span className="text-warn">{e.missing_cost} without a cost</span> : <span />}
-                        </li>
-                      ))}
-                    </ul>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {shown.length === 0 && <p className="px-4 py-8 text-center text-sm text-muted">No check in this range.</p>}
+        <div className={cx("hidden border-b border-line px-4 py-2 text-xs font-medium text-muted", runGrid)} aria-hidden="true">
+          <span>Check</span>
+          <span>Status</span>
+          <span>Trigger</span>
+          <span>Took</span>
+          <span className="text-right">Calls answered</span>
+          <span className="text-right">Spend</span>
+          <span>Endpoints</span>
+          <span />
         </div>
+        <div className="divide-y divide-line">
+          {shown.map((r) => (
+            <RunRow key={r.id} run={r} title={title} />
+          ))}
+        </div>
+        {shown.length === 0 && <p className="px-4 py-8 text-center text-sm text-muted">No check in this range.</p>}
       </Card>
     );
 
@@ -132,19 +189,26 @@ function Jobs() {
       <h2 className="mb-2 text-sm font-semibold">Recent jobs</h2>
       <Card>
         <ul className="divide-y divide-line text-sm">
-          {jobs.data.map((j) => (
-            <li key={j.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-2">
-              <span className="w-28 font-medium">{j.job === "ai_check" ? "AI check" : j.job === "model_refresh" ? "Model lists" : j.job}</span>
-              <Badge tone={j.status === "completed" ? "success" : j.status === "failed" || j.status === "refused" ? "danger" : j.status === "skipped" ? "neutral" : "info"}>{j.status}</Badge>
-              <span className="text-xs text-muted">{j.trigger.replace("_", " ")}</span>
-              {j.run_id && <span className="text-xs text-muted">check #{j.run_id}</span>}
-              {j.spend_usd != null && <span className="text-xs text-muted tabular-nums">{usd(j.spend_usd)}</span>}
-              <span className="ml-auto text-xs text-muted">
-                <RelativeTime iso={j.started_at} />
-              </span>
-              {j.error && <span className="w-full text-xs text-danger [overflow-wrap:anywhere]">{j.error}</span>}
-            </li>
-          ))}
+          {jobs.data.map((j) => {
+            const st = jobStatus(j.status);
+            return (
+              <li key={j.id} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 px-4 py-2 md:grid-cols-[7rem_10rem_6rem_6rem_5rem_minmax(0,1fr)]">
+                <span className="font-medium">{j.job === "ai_check" ? "AI check" : j.job === "model_refresh" ? "Model lists" : j.job}</span>
+                <span className="justify-self-end md:justify-self-start">
+                  <Badge tone={st.tone}>{st.label}</Badge>
+                </span>
+                <span className="col-span-2 flex flex-wrap gap-x-2 text-xs text-muted md:contents">
+                  <span>{triggerLabel(j.trigger)}</span>
+                  <span className={cx("tabular-nums", !j.run_id && "hidden text-faint md:inline")}>{j.run_id ? `Check #${j.run_id}` : "–"}</span>
+                  <span className={cx("tabular-nums", j.spend_usd == null && "hidden text-faint md:inline")}>{j.spend_usd != null ? usd(j.spend_usd) : "–"}</span>
+                  <span className="md:text-right">
+                    <RelativeTime iso={j.started_at} />
+                  </span>
+                </span>
+                {j.error && <span className="col-span-2 text-xs text-danger [overflow-wrap:anywhere] md:col-span-6">{j.error}</span>}
+              </li>
+            );
+          })}
         </ul>
       </Card>
     </section>
