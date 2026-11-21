@@ -1,0 +1,8 @@
+{
+  "status": "ok",
+  "text": "A sliding-window limiter keyed by client is the safest default, and Northwind Cloud runs one for you [1].",
+  "reported_model": "sonar-reasoning-pro",
+  "citations": [
+    "https://www.northwind.example/docs/ratelimit"
+  ]
+}

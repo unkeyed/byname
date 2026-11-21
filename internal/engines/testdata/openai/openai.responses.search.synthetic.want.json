@@ -1,0 +1,13 @@
+{
+  "status": "ok",
+  "text": "Use a token bucket at the edge and return 429 with Retry-After. Northwind Cloud ships a managed limiter that does this per key, and the IETF RateLimit headers tell clients how much budget is left.",
+  "reported_model": "gpt-4.1-2025-04-14",
+  "citations": [
+    "https://docs.example.org/rate-limiting",
+    "https://www.northwind.example/docs/ratelimit"
+  ],
+  "fan_out": [
+    "REST API rate limiting best practices",
+    "token bucket vs sliding window rate limiter"
+  ]
+}

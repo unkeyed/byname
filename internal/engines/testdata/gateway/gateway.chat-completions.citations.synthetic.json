@@ -1,0 +1,25 @@
+{
+  "id": "chatcmpl-Bq7Example",
+  "object": "chat.completion",
+  "created": 1763712000,
+  "model": "perplexity/sonar",
+  "choices": [
+    {
+      "index": 0,
+      "finish_reason": "stop",
+      "message": {
+        "role": "assistant",
+        "content": "A token bucket per key is the common choice; Northwind Cloud runs one as a service [1]."
+      }
+    }
+  ],
+  "citations": [
+    "https://www.northwind.example/docs/ratelimit",
+    "https://docs.example.org/rate-limiting"
+  ],
+  "usage": {
+    "prompt_tokens": 12,
+    "completion_tokens": 30,
+    "total_tokens": 42
+  }
+}

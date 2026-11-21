@@ -19,6 +19,14 @@ type Endpoint struct {
 	// Models is the Treg tool id of the endpoint's free model list, or empty
 	// when the endpoint takes no model.
 	Models string
+	// SampleCostUSD is what one call cost in the Nov 21, 2026 sample, for
+	// the estimate before a first check. Token-billed endpoints vary with
+	// every answer, so it is only ever shown as an estimate.
+	SampleCostUSD *float64
+	// Native is the endpoint's path at its own provider, which the scraper
+	// route calls with the team's key. NativeModels is the model list's.
+	Native       string
+	NativeModels string
 
 	build func(Endpoint, Request) (providerRequest, error)
 	parse func(raw []byte) Result
@@ -56,61 +64,83 @@ type Spec struct {
 var (
 	chatGPTScraper = Endpoint{
 		ID: "dataforseo.x.ai-optimization-chat-gpt-llm-scraper-live-advanced", Family: "dataforseo",
-		Method: http.MethodPost, Search: SearchByApp,
+		SampleCostUSD: usd(0.004),
+		Native:        "/v3/ai_optimization/chat_gpt/llm_scraper/live/advanced",
+		Method:        http.MethodPost, Search: SearchByApp,
 		build: dataforseoScraperRequest, parse: parseDataForSEOScraper,
 	}
 	claudeAPI = Endpoint{
 		ID: "dataforseo.x.ai-optimization-claude-llm-responses-live", Family: "dataforseo",
+		SampleCostUSD: usd(0.055),
+		Native:        "/v3/ai_optimization/claude/llm_responses/live", NativeModels: "/v3/ai_optimization/claude/llm_responses/models",
 		Method: http.MethodPost, Search: SearchForceable,
 		Models: "dataforseo.x.ai-optimization-claude-llm-responses-models",
 		build:  dataforseoLLMRequest(true), parse: parseDataForSEOLLM,
 	}
 	chatGPTAPI = Endpoint{
 		ID: "dataforseo.x.ai-optimization-chat-gpt-llm-responses-live", Family: "dataforseo",
+		SampleCostUSD: usd(0.073),
+		Native:        "/v3/ai_optimization/chat_gpt/llm_responses/live", NativeModels: "/v3/ai_optimization/chat_gpt/llm_responses/models",
 		Method: http.MethodPost, Search: SearchForceable,
 		Models: "dataforseo.x.ai-optimization-chat-gpt-llm-responses-models",
 		build:  dataforseoLLMRequest(true), parse: parseDataForSEOLLM,
 	}
 	geminiAPI = Endpoint{
 		ID: "dataforseo.x.ai-optimization-gemini-llm-responses-live", Family: "dataforseo",
+		SampleCostUSD: usd(0.060),
+		Native:        "/v3/ai_optimization/gemini/llm_responses/live", NativeModels: "/v3/ai_optimization/gemini/llm_responses/models",
 		Method: http.MethodPost, Search: SearchEnableOnly,
 		Models: "dataforseo.x.ai-optimization-gemini-llm-responses-models",
 		build:  dataforseoLLMRequest(false), parse: parseDataForSEOLLM,
 	}
 	perplexityAPI = Endpoint{
 		ID: "dataforseo.x.ai-optimization-perplexity-llm-responses-live", Family: "dataforseo",
+		SampleCostUSD: usd(0.0061),
+		Native:        "/v3/ai_optimization/perplexity/llm_responses/live", NativeModels: "/v3/ai_optimization/perplexity/llm_responses/models",
 		Method: http.MethodPost, Search: SearchAlways,
 		Models: "dataforseo.x.ai-optimization-perplexity-llm-responses-models",
 		build:  dataforseoLLMRequest(true), parse: parseDataForSEOLLM,
 	}
 	geminiScrape = Endpoint{
 		ID: "cloro.ai-search.gemini.scrape", Family: "cloro",
-		Method: http.MethodPost, Search: SearchByApp,
+		SampleCostUSD: usd(0.0024),
+		Native:        "/v1/monitor/gemini",
+		Method:        http.MethodPost, Search: SearchByApp,
 		build: cloroPromptRequest, parse: parseCloroAnswer,
 	}
 	googleAIMode = Endpoint{
 		ID: "cloro.google.serp.ai_mode", Family: "cloro",
-		Method: http.MethodPost, Search: SearchByApp,
+		SampleCostUSD: usd(0.0024),
+		Native:        "/v1/monitor/aimode",
+		Method:        http.MethodPost, Search: SearchByApp,
 		build: cloroAIModeRequest, parse: parseCloroAnswer,
 	}
 	googleOrganic = Endpoint{
 		ID: "cloro.google.serp.organic", Family: "cloro",
-		Method: http.MethodPost, Search: SearchByApp,
+		SampleCostUSD: usd(0.0028),
+		Native:        "/v1/monitor/google",
+		Method:        http.MethodPost, Search: SearchByApp,
 		build: cloroOrganicRequest, parse: parseCloroAIOverview,
 	}
 	bingAIMode = Endpoint{
 		ID: "cloro.bing.serp.ai_mode", Family: "cloro",
-		Method: http.MethodPost, Search: SearchByApp,
+		SampleCostUSD: usd(0.0024),
+		Native:        "/v1/monitor/bing/aimode",
+		Method:        http.MethodPost, Search: SearchByApp,
 		build: cloroPromptRequest, parse: parseCloroAnswer,
 	}
 	bingCopilot = Endpoint{
 		ID: "serpapi.x.bing-copilot", Family: "serpapi",
-		Method: http.MethodGet, Search: SearchByApp,
+		SampleCostUSD: usd(0.015),
+		Native:        "/search.json",
+		Method:        http.MethodGet, Search: SearchByApp,
 		build: serpapiRequest("bing_copilot"), parse: parseSerpApi,
 	}
 	braveAIMode = Endpoint{
 		ID: "serpapi.x.brave-ai-mode", Family: "serpapi",
-		Method: http.MethodGet, Search: SearchByApp,
+		SampleCostUSD: usd(0.015),
+		Native:        "/search.json",
+		Method:        http.MethodGet, Search: SearchByApp,
 		build: serpapiRequest("brave_ai_mode"), parse: parseSerpApi,
 	}
 )
@@ -131,6 +161,8 @@ var registry = []Spec{
 	{ClaudeApp, "Claude app", claudeAPI, FidelityApproximation},
 	{PerplexityApp, "Perplexity app", perplexityAPI, FidelityApproximation},
 }
+
+func usd(v float64) *float64 { return &v }
 
 // Lookup returns the registry row for a surface.
 func Lookup(s Surface) (Spec, bool) {

@@ -1,0 +1,24 @@
+{
+  "id": "7d1a2b3c-4e5f-4a6b-9c8d-0e1f2a3b4c5d",
+  "model": "sonar-reasoning-pro",
+  "created": 1763712000,
+  "object": "chat.completion",
+  "choices": [
+    {
+      "index": 0,
+      "finish_reason": "stop",
+      "message": {
+        "role": "assistant",
+        "content": "<think>\nThe user wants rate limiting advice. Contoso Gateway came up, but it is less relevant.\n</think>\n\nA sliding-window limiter keyed by client is the safest default, and Northwind Cloud runs one for you [1]."
+      }
+    }
+  ],
+  "citations": [
+    "https://www.northwind.example/docs/ratelimit"
+  ],
+  "usage": {
+    "prompt_tokens": 14,
+    "completion_tokens": 120,
+    "total_tokens": 134
+  }
+}

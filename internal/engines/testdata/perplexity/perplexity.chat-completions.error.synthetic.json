@@ -1,0 +1,7 @@
+{
+  "error": {
+    "message": "Invalid model 'sonar-huge'. Permitted models can be found in the documentation.",
+    "type": "invalid_model",
+    "code": 400
+  }
+}

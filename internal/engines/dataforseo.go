@@ -121,7 +121,10 @@ func parseDataForSEOScraper(raw []byte) Result {
 
 // Model is one entry of an endpoint's live model list.
 type Model struct {
-	Name      string
+	Name string
+	// WebSearch: the list says the model can search the web. OpenAI's,
+	// Anthropic's, Google's and gateways' lists do not say, so it is false
+	// there and the test call shows whether the model searched.
 	WebSearch bool
 }
 

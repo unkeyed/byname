@@ -123,6 +123,14 @@ func (s *Server) Calls() []Call {
 	return append([]Call(nil), s.calls...)
 }
 
+// Reset forgets the calls received so far, so a test can count only the
+// calls it makes after setting up.
+func (s *Server) Reset() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.calls = nil
+}
+
 // Answers counts the calls that were not model lists or replays.
 func (s *Server) Answers() int {
 	n := 0

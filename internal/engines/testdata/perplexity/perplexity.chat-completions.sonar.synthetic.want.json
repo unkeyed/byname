@@ -1,0 +1,10 @@
+{
+  "status": "ok",
+  "text": "Use a token bucket or sliding window per API key [1]. Managed options include Northwind Cloud [2], and Contoso Gateway supports it through a plugin [3].",
+  "reported_model": "sonar",
+  "citations": [
+    "https://docs.example.org/rate-limiting",
+    "https://www.northwind.example/docs/ratelimit",
+    "https://contoso.example/gateway/plugins"
+  ]
+}

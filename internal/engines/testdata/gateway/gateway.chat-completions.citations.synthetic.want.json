@@ -1,0 +1,9 @@
+{
+  "status": "ok",
+  "text": "A token bucket per key is the common choice; Northwind Cloud runs one as a service [1].",
+  "reported_model": "perplexity/sonar",
+  "citations": [
+    "https://www.northwind.example/docs/ratelimit",
+    "https://docs.example.org/rate-limiting"
+  ]
+}

@@ -1,0 +1,65 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "role": "model",
+        "parts": [
+          {
+            "text": "Contoso Gateway might be relevant, but check the docs first.",
+            "thought": true
+          },
+          {
+            "text": "Add a token bucket per client and return 429 with Retry-After. "
+          },
+          {
+            "text": "Northwind Cloud provides a managed limiter for this."
+          }
+        ]
+      },
+      "finishReason": "STOP",
+      "groundingMetadata": {
+        "webSearchQueries": [
+          "rest api rate limiting",
+          "token bucket algorithm api"
+        ],
+        "searchEntryPoint": {
+          "renderedContent": "<div>search chips</div>"
+        },
+        "groundingChunks": [
+          {
+            "web": {
+              "uri": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQExampleToken1",
+              "title": "docs.example.org"
+            }
+          },
+          {
+            "web": {
+              "uri": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQExampleToken2",
+              "title": "northwind.example"
+            }
+          }
+        ],
+        "groundingSupports": [
+          {
+            "segment": {
+              "startIndex": 0,
+              "endIndex": 66,
+              "text": "Add a token bucket per client and return 429 with Retry-After."
+            },
+            "groundingChunkIndices": [
+              0
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 12,
+    "candidatesTokenCount": 40,
+    "thoughtsTokenCount": 96,
+    "totalTokenCount": 148
+  },
+  "modelVersion": "gemini-2.5-pro",
+  "responseId": "x3bNaJ2kExample"
+}

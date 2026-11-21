@@ -1,0 +1,59 @@
+{
+  "id": "3c90c3cc-0d44-4b50-8888-8dd25736052a",
+  "model": "sonar",
+  "created": 1763712000,
+  "object": "chat.completion",
+  "choices": [
+    {
+      "index": 0,
+      "finish_reason": "stop",
+      "message": {
+        "role": "assistant",
+        "content": "Use a token bucket or sliding window per API key [1]. Managed options include Northwind Cloud [2], and Contoso Gateway supports it through a plugin [3]."
+      }
+    }
+  ],
+  "citations": [
+    "https://docs.example.org/rate-limiting",
+    "https://www.northwind.example/docs/ratelimit",
+    "https://contoso.example/gateway/plugins"
+  ],
+  "search_results": [
+    {
+      "title": "Rate limiting patterns",
+      "url": "https://docs.example.org/rate-limiting",
+      "date": "2026-03-03",
+      "last_updated": "2026-10-01",
+      "snippet": "Token buckets...",
+      "source": "web"
+    },
+    {
+      "title": "Northwind rate limits",
+      "url": "https://www.northwind.example/docs/ratelimit",
+      "date": null,
+      "last_updated": "2026-09-12",
+      "snippet": "Northwind enforces...",
+      "source": "web"
+    },
+    {
+      "title": "Contoso Gateway plugins",
+      "url": "https://contoso.example/gateway/plugins",
+      "date": null,
+      "last_updated": "2026-08-20",
+      "snippet": "Plugins...",
+      "source": "web"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 14,
+    "completion_tokens": 52,
+    "total_tokens": 66,
+    "search_context_size": "low",
+    "cost": {
+      "input_tokens_cost": 1.4e-05,
+      "output_tokens_cost": 5.2e-05,
+      "request_cost": 0.005,
+      "total_cost": 0.005066
+    }
+  }
+}

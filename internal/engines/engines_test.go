@@ -38,35 +38,108 @@ func TestAppSurfacesTakeNoModelAndToolsDo(t *testing.T) {
 	}
 }
 
+// TestPairFidelity is the fidelity table over every surface on every route
+// it can take, before a test call and after tests that did and did not
+// confirm the model and search.
 func TestPairFidelity(t *testing.T) {
-	claudeCode, _ := Lookup(ClaudeCode)
-	geminiCLI, _ := Lookup(GeminiCLI)
-	codex, _ := Lookup(CodexCLI)
-	claudeApp, _ := Lookup(ClaudeApp)
-	chatgpt, _ := Lookup(ChatGPTApp)
-	all := TestOutcome{ModelAccepted: true, ForceAccepted: true, Searched: true}
-
-	for _, tc := range []struct {
-		name string
-		spec Spec
-		got  TestOutcome
-		want Fidelity
-	}{
-		{"claude code forced and searched", claudeCode, all, FidelityModelMatch},
-		{"claude code allowed but did not search", claudeCode, TestOutcome{ModelAccepted: true, ForceAccepted: true}, FidelityApproximation},
-		{"model not on the list", claudeCode, TestOutcome{ForceAccepted: true, Searched: true}, FidelityApproximation},
-		{"codex gpt-5 refuses forced search", codex, TestOutcome{ModelAccepted: true, Searched: true}, FidelityApproximation},
-		{"codex gpt-4.1 forced and searched", codex, all, FidelityModelMatch},
-		{"gemini search turned on counts without force", geminiCLI, TestOutcome{ModelAccepted: true, Searched: true}, FidelityModelMatch},
-		{"gemini that did not search", geminiCLI, TestOutcome{ModelAccepted: true}, FidelityApproximation},
-		{"claude app stays an approximation", claudeApp, all, FidelityApproximation},
-		{"app surface stays app", chatgpt, TestOutcome{}, FidelityApp},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			if got := PairFidelity(tc.spec, tc.got); got != tc.want {
-				t.Errorf("got %s, want %s", got, tc.want)
+	const (
+		app    = FidelityApp
+		match  = FidelityModelMatch
+		approx = FidelityApproximation
+		none   = Fidelity("")
+	)
+	confirmed := &TestOutcome{ModelAccepted: true, ForceAccepted: true, Searched: true}
+	noSearch := &TestOutcome{ModelAccepted: true, ForceAccepted: true}
+	notForced := &TestOutcome{ModelAccepted: true, Searched: true}
+	type want struct{ untested, confirmed, noSearch, notForced Fidelity }
+	// Per surface and route: the label with no test, after a test that
+	// confirmed everything, after one that did not search, and after one
+	// whose forced search was refused. none: the route does not serve it.
+	table := map[Surface]map[Route]want{
+		ChatGPTApp:       {RouteTreg: {app, app, app, app}, RouteScraper: {app, app, app, app}, RouteProvider: {approx, approx, approx, approx}, RouteGateway: {approx, approx, approx, approx}},
+		GeminiApp:        {RouteTreg: {app, app, app, app}, RouteScraper: {app, app, app, app}, RouteProvider: {approx, approx, approx, approx}, RouteGateway: {approx, approx, approx, approx}},
+		GoogleAIMode:     {RouteTreg: {app, app, app, app}, RouteScraper: {app, app, app, app}, RouteProvider: {approx, approx, approx, approx}, RouteGateway: {approx, approx, approx, approx}},
+		GoogleAIOverview: {RouteTreg: {app, app, app, app}, RouteScraper: {app, app, app, app}, RouteProvider: {approx, approx, approx, approx}, RouteGateway: {approx, approx, approx, approx}},
+		Copilot:          {RouteTreg: {app, app, app, app}, RouteScraper: {app, app, app, app}, RouteProvider: {approx, approx, approx, approx}, RouteGateway: {approx, approx, approx, approx}},
+		BingAIMode:       {RouteTreg: {app, app, app, app}, RouteScraper: {app, app, app, app}, RouteProvider: {approx, approx, approx, approx}, RouteGateway: {approx, approx, approx, approx}},
+		Brave:            {RouteTreg: {app, app, app, app}, RouteScraper: {app, app, app, app}, RouteProvider: {none, none, none, none}, RouteGateway: {approx, approx, approx, approx}},
+		// Forceable on every route but the gateway, where the model decides.
+		ClaudeCode: {RouteTreg: {match, match, approx, approx}, RouteScraper: {match, match, approx, approx}, RouteProvider: {match, match, approx, approx}, RouteGateway: {match, match, approx, match}},
+		CodexCLI:   {RouteTreg: {match, match, approx, approx}, RouteScraper: {match, match, approx, approx}, RouteProvider: {match, match, approx, approx}, RouteGateway: {match, match, approx, match}},
+		// Gemini turns search on but cannot force it, on every route.
+		GeminiCLI:     {RouteTreg: {match, match, approx, match}, RouteScraper: {match, match, approx, match}, RouteProvider: {match, match, approx, match}, RouteGateway: {match, match, approx, match}},
+		ClaudeApp:     {RouteTreg: {approx, approx, approx, approx}, RouteScraper: {approx, approx, approx, approx}, RouteProvider: {approx, approx, approx, approx}, RouteGateway: {approx, approx, approx, approx}},
+		PerplexityApp: {RouteTreg: {approx, approx, approx, approx}, RouteScraper: {approx, approx, approx, approx}, RouteProvider: {approx, approx, approx, approx}, RouteGateway: {approx, approx, approx, approx}},
+	}
+	if len(table) != len(All()) {
+		t.Fatalf("table covers %d surfaces, the registry has %d", len(table), len(All()))
+	}
+	for surface, routes := range table {
+		for _, r := range Routes {
+			w := routes[r]
+			rs, err := RouteOf(surface, r)
+			if w.untested == none {
+				if err == nil {
+					t.Errorf("%s on %s: the route serves it, the table says it does not", surface, r)
+				}
+				continue
 			}
-		})
+			if err != nil {
+				t.Errorf("%s on %s: %v", surface, r, err)
+				continue
+			}
+			for _, c := range []struct {
+				name string
+				t    *TestOutcome
+				want Fidelity
+			}{{"untested", nil, w.untested}, {"confirmed", confirmed, w.confirmed}, {"no search", noSearch, w.noSearch}, {"force refused", notForced, w.notForced}} {
+				if got := PairFidelity(rs, c.t); got != c.want {
+					t.Errorf("%s on %s, %s: got %s, want %s", surface, r, c.name, got, c.want)
+				}
+			}
+			if got := PairFidelity(rs, &TestOutcome{ForceAccepted: true, Searched: true}); rs.Spec.Fidelity == match && got != approx {
+				t.Errorf("%s on %s: a model the route does not list got %s, want approximation", surface, r, got)
+			}
+		}
+	}
+}
+
+func TestEveryDirectProviderStandsInOnce(t *testing.T) {
+	for _, s := range All() {
+		n := 0
+		for _, a := range Adapters() {
+			if a.Route == RouteProvider && a.serves(s) {
+				n++
+			}
+		}
+		if n > 1 {
+			t.Errorf("%s has %d direct providers, want at most one", s.Surface, n)
+		}
+		if _, err := RouteOf(s.Surface, RouteTreg); err != nil {
+			t.Errorf("%s has no Treg route", s.Surface)
+		}
+		if _, err := RouteOf(s.Surface, RouteScraper); err != nil {
+			t.Errorf("%s: its pinned endpoint's provider has no own-key route", s.Surface)
+		}
+	}
+}
+
+func TestEndpointIDSplitsSeriesByRoute(t *testing.T) {
+	seen := map[string]Route{}
+	for _, r := range Routes {
+		rs, err := RouteOf(ClaudeCode, r)
+		if err != nil {
+			t.Fatal(err)
+		}
+		id := rs.EndpointID("https://gateway.example/v1")
+		if prev, dup := seen[id]; dup {
+			t.Errorf("%s and %s store the same endpoint %q, so their answers would share a series", prev, r, id)
+		}
+		seen[id] = r
+	}
+	gw, _ := RouteOf(ClaudeCode, RouteGateway)
+	if a, b := gw.EndpointID("https://one.example/v1"), gw.EndpointID("https://two.example/v1"); a == b {
+		t.Errorf("two gateways share endpoint %q", a)
 	}
 }
 

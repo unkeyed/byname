@@ -1,0 +1,9 @@
+{
+  "status": "ok",
+  "text": "Put a token bucket in front of the API and answer 429 with Retry-After when it empties. Northwind Cloud and Contoso Gateway both offer this, Northwind as a managed service.",
+  "reported_model": "anthropic/claude-sonnet-4.5",
+  "citations": [
+    "https://docs.example.org/rate-limiting",
+    "https://www.northwind.example/docs/ratelimit"
+  ]
+}

@@ -9,8 +9,6 @@
 // adapter through an injected Resolver.
 package engines
 
-import "context"
-
 // Surface is a place people ask. The values are stored in surface.key and
 // never change once shipped.
 type Surface string
@@ -58,6 +56,9 @@ const (
 	SearchEnableOnly SearchControl = "enable_only"
 	// SearchAlways: the model searches on every call (Perplexity sonar).
 	SearchAlways SearchControl = "always"
+	// SearchByModel: a gateway passes no search option, so the model
+	// decides; the test call shows whether it searched.
+	SearchByModel SearchControl = "by_model"
 )
 
 // Request is one question for one surface. Question is the raw question
@@ -119,42 +120,11 @@ func (r Result) Searched() bool {
 	return len(r.FanOut) > 0 || len(r.Citations) > 0
 }
 
-// Adapter sends a Request to a surface's pinned endpoint over one route.
-type Adapter interface {
-	Call(ctx context.Context, req Request) (Result, error)
-}
-
-// TestOutcome is what a surface and model pair's test call showed.
-type TestOutcome struct {
-	// ModelAccepted: the model is on the endpoint's live model list.
-	ModelAccepted bool
-	// ForceAccepted: force_web_search was sent and the endpoint did not
-	// refuse it.
-	ForceAccepted bool
-	// Searched is the test call's Result.Searched.
-	Searched bool
-}
-
-// PairFidelity is the fidelity of a surface and model pair after its test
-// call. App surfaces stay app and stand-ins stay approximation. A developer
-// tool is model_match only when the endpoint accepts the model, search was
-// forced (or turned on, where it cannot be forced) and the call searched.
-// Before the first test, a pair shows the surface's default Fidelity.
-func PairFidelity(s Spec, t TestOutcome) Fidelity {
-	if s.Fidelity != FidelityModelMatch {
-		return s.Fidelity
-	}
-	if t.ModelAccepted && s.Endpoint.Search.on(t.ForceAccepted) && t.Searched {
-		return FidelityModelMatch
-	}
-	return FidelityApproximation
-}
-
 func (c SearchControl) on(forceAccepted bool) bool {
 	switch c {
 	case SearchForceable:
 		return forceAccepted
-	case SearchEnableOnly, SearchAlways:
+	case SearchEnableOnly, SearchAlways, SearchByModel:
 		return true
 	default:
 		return false

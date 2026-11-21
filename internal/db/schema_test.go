@@ -84,3 +84,35 @@ func TestPanelChecksMatchEngines(t *testing.T) {
 		}
 	}
 }
+
+// TestRouteChecksMatchEngines fails when 005_routes.sql's route or
+// credential kind CHECKs list other values than internal/engines.
+func TestRouteChecksMatchEngines(t *testing.T) {
+	sql, err := os.ReadFile("migrations/005_routes.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var routes, kinds []string
+	for _, r := range engines.Routes {
+		routes = append(routes, string(r))
+	}
+	for _, k := range engines.CredentialKinds {
+		kinds = append(kinds, string(k))
+	}
+	for column, want := range map[string][]string{"route": routes, "kind": kinds} {
+		m := regexp.MustCompile(`CHECK \(` + column + ` IN \(([^)]*)\)`).FindStringSubmatch(string(sql))
+		if m == nil {
+			t.Errorf("no CHECK (%s IN (...)) in 005_routes.sql", column)
+			continue
+		}
+		var got []string
+		for _, v := range strings.Split(m[1], ",") {
+			got = append(got, strings.Trim(strings.TrimSpace(v), "'"))
+		}
+		slices.Sort(got)
+		slices.Sort(want)
+		if !slices.Equal(got, want) {
+			t.Errorf("CHECK (%s IN ...) lists %v, internal/engines has %v", column, got, want)
+		}
+	}
+}

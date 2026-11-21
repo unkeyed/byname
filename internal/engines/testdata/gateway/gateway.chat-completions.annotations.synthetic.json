@@ -1,0 +1,43 @@
+{
+  "id": "gen-1763712000-AbCdEfGhIjKlMnOp",
+  "provider": "Anthropic",
+  "model": "anthropic/claude-sonnet-4.5",
+  "object": "chat.completion",
+  "created": 1763712000,
+  "choices": [
+    {
+      "index": 0,
+      "finish_reason": "stop",
+      "message": {
+        "role": "assistant",
+        "content": "Put a token bucket in front of the API and answer 429 with Retry-After when it empties. Northwind Cloud and Contoso Gateway both offer this, Northwind as a managed service.",
+        "annotations": [
+          {
+            "type": "url_citation",
+            "url_citation": {
+              "url": "https://docs.example.org/rate-limiting",
+              "title": "Rate limiting patterns",
+              "start_index": 0,
+              "end_index": 80
+            }
+          },
+          {
+            "type": "url_citation",
+            "url_citation": {
+              "url": "https://www.northwind.example/docs/ratelimit",
+              "title": "Northwind rate limits",
+              "start_index": 81,
+              "end_index": 160
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 1520,
+    "completion_tokens": 60,
+    "total_tokens": 1580,
+    "cost": 0.02341
+  }
+}

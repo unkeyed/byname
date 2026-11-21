@@ -1,0 +1,5 @@
+{
+  "status": "failed",
+  "error": "perplexity: 400: Invalid model 'sonar-huge'. Permitted models can be found in the documentation.",
+  "text": ""
+}
