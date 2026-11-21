@@ -142,7 +142,7 @@ func addTool[In, Out any](srv *mcp.Server, scope core.Scope, t *mcp.Tool, run fu
 // under a request id and reported by that id only, as REST does, so SQL and
 // network details never reach the agent.
 func toolError(tool string, err error) error {
-	if errors.Is(err, core.ErrInvalid) || errors.Is(err, core.ErrNotFound) || errors.Is(err, core.ErrConflict) || errors.Is(err, core.ErrForbidden) {
+	if errors.Is(err, core.ErrInvalid) || errors.Is(err, core.ErrNotFound) || errors.Is(err, core.ErrConflict) || errors.Is(err, core.ErrForbidden) || errors.Is(err, core.ErrUpstream) {
 		return err
 	}
 	id := requestID()

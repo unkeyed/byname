@@ -23,8 +23,10 @@ info:
     not use this route (the message says which scope, role or sign-in it
     needs), 404 no such thing, 405 wrong method for this path (the `Allow`
     header lists the right ones), 409 it already exists, 429 wait for
-    `Retry-After` seconds, 503 the database or key store is down so retry
-    later. A 5xx also carries `request_id`, which the server log repeats.
+    `Retry-After` seconds, 502 Treg did not answer a call Byname made for
+    this request (the message says which), 503 the database or key store is
+    down so retry later. Any other 5xx carries `request_id`, which the server
+    log repeats.
 
     Lists are never null: an empty list is `[]`. Timestamps are RFC 3339.
     Unknown body fields are rejected with 400.

@@ -17,6 +17,9 @@ var (
 	ErrInvalid   = errors.New("invalid input")
 	ErrConflict  = errors.New("conflict") // the thing to create already exists
 	ErrForbidden = errors.New("forbidden")
+	// ErrUpstream is Treg failing to answer a call Byname made for the
+	// caller, such as reading a model list. Retrying later may work.
+	ErrUpstream = errors.New("upstream unavailable")
 )
 
 // Role is what a team member may do. Each role grants the scopes RoleScopes

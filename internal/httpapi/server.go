@@ -243,7 +243,7 @@ func (s *server) writeError(w http.ResponseWriter, r *http.Request, err error) {
 	case errors.Is(err, auth.ErrReauth):
 		writeJSON(w, code, map[string]string{"error": err.Error(), "code": "reauth_required"})
 		return
-	case code < 500:
+	case code < 500, code == http.StatusBadGateway:
 		writeJSON(w, code, map[string]string{"error": err.Error()})
 		return
 	}
@@ -270,6 +270,8 @@ func statusOf(err error) int {
 		return http.StatusNotFound
 	case errors.Is(err, core.ErrConflict):
 		return http.StatusConflict
+	case errors.Is(err, core.ErrUpstream):
+		return http.StatusBadGateway
 	case errors.As(err, &throttled):
 		return http.StatusTooManyRequests
 	case errors.Is(err, errUnavailable), errors.As(err, &netErr):
