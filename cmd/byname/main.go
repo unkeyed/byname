@@ -27,6 +27,7 @@ import (
 	instconfig "github.com/unkeyed/byname/internal/config"
 	"github.com/unkeyed/byname/internal/db"
 	"github.com/unkeyed/byname/internal/engines"
+	"github.com/unkeyed/byname/internal/gsc"
 	"github.com/unkeyed/byname/internal/httpapi"
 	"github.com/unkeyed/byname/internal/instance"
 	"github.com/unkeyed/byname/internal/mcpserver"
@@ -65,6 +66,14 @@ type config struct {
 	// OPENAI_BASE_URL and the rest of providerURLEnv do the same for
 	// surfaces routed to a provider's own key.
 	ProviderURLs map[engines.CredentialKind]string
+	// GSC_GOOGLE_CLIENT_ID + GSC_GOOGLE_CLIENT_SECRET, both or neither: the
+	// instance's own Google OAuth client for Sign in with Google on the
+	// Search Console connection.
+	GSCClient gsc.OAuthClient
+	// GSC_GOOGLE_BASE_URL, optional and for tests and local development
+	// only: sends every Google call the Search Console connection makes to
+	// a fake Google at this URL. Never set it in production.
+	GSCBaseURL string
 }
 
 // providerURLEnv names each provider's base URL override.
@@ -167,6 +176,13 @@ func loadConfig() (config, error) {
 			return c, fmt.Errorf("RESEND_BASE_URL must be an http(s) URL such as http://localhost:9998, got %q", raw)
 		}
 		c.ResendBaseURL = raw
+	}
+	if c.GSCBaseURL, err = baseURLEnv("GSC_GOOGLE_BASE_URL"); err != nil {
+		return c, err
+	}
+	c.GSCClient = gsc.OAuthClient{ID: os.Getenv("GSC_GOOGLE_CLIENT_ID"), Secret: os.Getenv("GSC_GOOGLE_CLIENT_SECRET")}
+	if (c.GSCClient.ID == "") != (c.GSCClient.Secret == "") {
+		return c, errors.New("set both GSC_GOOGLE_CLIENT_ID and GSC_GOOGLE_CLIENT_SECRET to connect Search Console with Google sign-in, or neither to connect it with a service account only")
 	}
 	c.Auth, err = loadAuthConfig(c.Port)
 	c.Auth.Secrets = c.Secrets
@@ -353,7 +369,11 @@ func run(log *slog.Logger) error {
 		Alerts: alerts,
 	})
 	runs := checks.New(pool, settings, checks.Options{Log: log, Alerts: alerts})
-	if err := sealSecrets(ctx, log, users, settings, alerts); err != nil {
+	search := gsc.New(pool, gsc.Options{
+		Secrets: cfg.Secrets, Endpoints: gsc.GoogleEndpoints(cfg.GSCBaseURL), Client: cfg.GSCClient,
+		PublicURL: cfg.Auth.PublicURL, Terms: settings,
+	})
+	if err := sealSecrets(ctx, log, users, settings, alerts, search); err != nil {
 		return err
 	}
 	if err := announceSetup(ctx, log, users, cfg.SetupToken); err != nil {
@@ -361,7 +381,7 @@ func run(log *slog.Logger) error {
 	}
 	authn := &auth.Authenticator{Keys: auth.NewKeyStore(pool, cfg.Unkey), Users: users, OAuth: auth.NewOAuthServer(pool, cfg.Auth.PublicURL)}
 
-	services := app.Services{Instance: instance.New(version, settings), Config: settings, Checks: runs, Results: res, Notify: alerts}
+	services := app.Services{Instance: instance.New(version, settings), Config: settings, Checks: runs, Results: res, Notify: alerts, GSC: search}
 	mux := httpapi.NewMux(services, authn, log)
 	mux.Handle("/mcp", mcpserver.Handler(services, authn.OAuth, version))
 	mux.Handle("/", web.Handler())
@@ -380,12 +400,17 @@ func run(log *slog.Logger) error {
 			log.Warn(providerURLEnv[kind]+" is set: calls go to it, not to the provider. Use it only in tests and local development", "url", u)
 		}
 	}
+	if cfg.GSCBaseURL != "" {
+		log.Warn("GSC_GOOGLE_BASE_URL is set: Search Console calls go to it, not to Google. Use it only in tests and local development", "gsc_google_base_url", cfg.GSCBaseURL)
+	}
 	var jobs sync.WaitGroup
 	if cfg.SourcesAllowPrivate {
 		log.Warn("SOURCES_ALLOW_PRIVATE_IPS is set: cited-source fetching may reach private and loopback addresses. Use it only in tests and local development")
 	}
 	cited := sources.New(pool, settings, sources.Options{AllowPrivate: cfg.SourcesAllowPrivate, UserAgent: "Byname/" + version, Log: log})
-	jobs.Go(func() { scheduler.New(runs, settings, scheduler.Options{Log: log, Sources: cited}).Run(ctx) })
+	jobs.Go(func() {
+		scheduler.New(runs, settings, scheduler.Options{Log: log, Sources: cited, Search: search}).Run(ctx)
+	})
 	jobs.Go(func() { alerts.Run(ctx) })
 	log.Info("Byname listening", "port", cfg.Port, "version", version, "keys", authn.Keys.Mode(),
 		"public_url", cfg.Auth.PublicURL.String(), "password_login", cfg.Auth.PasswordLogin, "providers", len(cfg.Auth.Providers))
@@ -419,7 +444,7 @@ func run(log *slog.Logger) error {
 // sealSecrets reseals TOTP seeds and credentials sealed under
 // ENCRYPTION_KEY_PREVIOUS with ENCRYPTION_KEY, so a rotation finishes with
 // one restart.
-func sealSecrets(ctx context.Context, log *slog.Logger, users *auth.Users, settings *instconfig.Service, alerts *notify.Service) error {
+func sealSecrets(ctx context.Context, log *slog.Logger, users *auth.Users, settings *instconfig.Service, alerts *notify.Service, search *gsc.Service) error {
 	totp, err := users.SealTOTPSecrets(ctx)
 	if err != nil {
 		return fmt.Errorf("encrypt TOTP seeds with ENCRYPTION_KEY: %w", err)
@@ -428,6 +453,11 @@ func sealSecrets(ctx context.Context, log *slog.Logger, users *auth.Users, setti
 	if err != nil {
 		return fmt.Errorf("encrypt credentials with ENCRYPTION_KEY: %w", err)
 	}
+	gscCreds, err := search.SealSecrets(ctx)
+	if err != nil {
+		return fmt.Errorf("encrypt the Search Console credential with ENCRYPTION_KEY: %w", err)
+	}
+	creds += gscCreds
 	channels, err := alerts.SealChannels(ctx)
 	if err != nil {
 		return fmt.Errorf("encrypt notification channel secrets with ENCRYPTION_KEY: %w", err)

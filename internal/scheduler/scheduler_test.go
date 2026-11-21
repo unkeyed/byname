@@ -188,3 +188,50 @@ func TestTickFetchesWhatTheCheckCited(t *testing.T) {
 		t.Errorf("completed source_fetch jobs = %d, want 1", n)
 	}
 }
+
+// slowSearch is a Search Console sync that runs until released.
+type slowSearch struct {
+	started chan struct{}
+	release chan struct{}
+	mu      sync.Mutex
+	calls   int
+}
+
+func (s *slowSearch) SyncIfDue(context.Context) error {
+	s.mu.Lock()
+	s.calls++
+	s.mu.Unlock()
+	s.started <- struct{}{}
+	<-s.release
+	return nil
+}
+
+// TestSearchSyncDoesNotHoldUpChecks: a long Search Console backfill runs
+// beside the checks, and never twice at once.
+func TestSearchSyncDoesNotHoldUpChecks(t *testing.T) {
+	e := setup(t)
+	p := e.process(nil)
+	search := &slowSearch{started: make(chan struct{}, 2), release: make(chan struct{})}
+	sched := scheduler.New(p.checks, p.cfg, scheduler.Options{Now: func() time.Time { return now }, Search: search})
+	ctx := context.Background()
+	if _, _, err := p.checks.RunNow(ctx); err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan struct{})
+	go func() { sched.Tick(ctx); sched.Tick(ctx); close(done) }()
+	select {
+	case <-done:
+	case <-time.After(30 * time.Second):
+		t.Fatal("ticks waited for the Search Console sync")
+	}
+	<-search.started
+	if n := e.count(t, `SELECT count(*) FROM run WHERE status = 'completed'`); n != 1 {
+		t.Fatalf("completed runs while the sync ran = %d, want 1", n)
+	}
+	close(search.release)
+	search.mu.Lock()
+	defer search.mu.Unlock()
+	if search.calls != 1 {
+		t.Fatalf("syncs started = %d, want 1 while one was running", search.calls)
+	}
+}

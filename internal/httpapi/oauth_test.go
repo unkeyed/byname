@@ -590,11 +590,22 @@ var mcpTools = map[string]string{
 	"GET /v1/gaps":                   "gaps",
 	"GET /v1/jobs":                   "list_jobs",
 
-	"GET /v1/prompts":        "prompts",
-	"GET /v1/sources":        "cited_sources",
-	"GET /v1/metrics/engine": "engine_view",
-	"GET /v1/alerts":         "list_alerts",
-	"POST /v1/alerts/read":   "mark_alerts_read",
+	"GET /v1/prompts":                "prompts",
+	"GET /v1/sources":                "cited_sources",
+	"GET /v1/metrics/engine":         "engine_view",
+	"GET /v1/alerts":                 "list_alerts",
+	"POST /v1/alerts/read":           "mark_alerts_read",
+	"GET /v1/search/summary":         "search_summary",
+	"GET /v1/search/daily":           "search_daily",
+	"GET /v1/search/brand":           "search_brand_split",
+	"GET /v1/search/pages":           "top_pages",
+	"GET /v1/search/queries":         "top_queries",
+	"GET /v1/goals":                  "list_goals",
+	"POST /v1/goals":                 "upsert_goal",
+	"PUT /v1/goals/{id}":             "update_goal",
+	"DELETE /v1/goals/{id}":          "delete_goal",
+	"PUT /v1/settings/branded-terms": "update_branded_terms",
+	"GET /v1/gsc":                    "search_console_status",
 }
 
 // TestEveryAPIKeyRouteHasAnMCPTool fails when a route an API key can call

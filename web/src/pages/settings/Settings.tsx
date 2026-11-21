@@ -7,6 +7,7 @@ import { Apps } from "./Apps";
 import { ApiKeys } from "./ApiKeys";
 import { Notifications } from "./Notifications";
 import { ReauthProvider } from "./Reauth";
+import { SearchConsole } from "./SearchConsole";
 import { Team } from "./Team";
 import { Competitors, Credentials, General, Limits, Questions, Schedule, WherePeopleAsk } from "./SetupTabs";
 
@@ -24,6 +25,7 @@ const tabs: { path: string; label: string; element: ReactNode; admin?: boolean }
   { path: "apps", label: "Apps", element: <Apps />, admin: true },
   { path: "team", label: "Team", element: <Team />, admin: true },
   { path: "notifications", label: "Notifications", element: <Notifications />, admin: true },
+  { path: "search-console", label: "Search Console", element: <SearchConsole />, admin: true },
 ];
 
 export const settingsRoutes: RouteObject[] = [
