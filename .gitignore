@@ -1,0 +1,10 @@
+/bin/
+*.test
+*.out
+.env
+.byname-dev-key
+.DS_Store
+
+web/node_modules/
+web/dist/*
+!web/dist/.gitkeep
