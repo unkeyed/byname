@@ -39,27 +39,72 @@ export interface ChartX {
   title: string;
 }
 
+
+/** An event on the x axis, such as a merged change, drawn as a hairline with a flag. */
+export interface ChartMarker {
+  /** The index into xs. */
+  at: number;
+  label: string;
+}
+
 const M = { top: 10, right: 14, bottom: 24, left: 40 };
-const yTicks = [0, 0.25, 0.5, 0.75, 1];
+const rateTicks = [0, 0.25, 0.5, 0.75, 1];
+
+/** Round steps from 0 that cover max, for counts. */
+export function niceTicks(max: number, count = 4): number[] {
+  if (!(max > 0)) return [0, 1];
+  const raw = max / count;
+  const mag = 10 ** Math.floor(Math.log10(raw));
+  const step = ([1, 2, 2.5, 5, 10].find((s) => s * mag >= raw) ?? 10) * mag;
+  const out: number[] = [];
+  for (let t = 0; t < max + step * 1e-9; t += step) out.push(t);
+  if (out[out.length - 1] < max) out.push(out[out.length - 1] + step);
+  return out;
+}
 
 /**
- * Rates from 0 to 1 plotted by run. A crosshair snaps to the nearest run
- * and the tooltip lists every line there; arrow keys move it too.
+ * Lines over an x axis of runs or days, on rates from 0 to 1 unless ticks
+ * set the scale. A crosshair snaps to the nearest x and the tooltip lists
+ * every line there; arrow keys move it too. Values from partialFrom on are
+ * provisional: drawn dashed and faded on a shaded band.
  */
-export function LineChart({ xs, lines, format, height = 240, label }: { xs: ChartX[]; lines: ChartLine[]; format: (v: number) => string; height?: number; label: string }) {
+export function LineChart({
+  xs,
+  lines,
+  format,
+  height = 240,
+  label,
+  ticks = rateTicks,
+  partialFrom,
+  partialNote = "Partial: may still change",
+  markers = [],
+}: {
+  xs: ChartX[];
+  lines: ChartLine[];
+  format: (v: number) => string;
+  height?: number;
+  label: string;
+  ticks?: number[];
+  partialFrom?: number;
+  partialNote?: string;
+  markers?: ChartMarker[];
+}) {
   const [ref, width] = useWidth<HTMLDivElement>();
   const [hover, setHover] = useState<number | null>(null);
   const w = Math.max(width, 200);
   const iw = w - M.left - M.right;
   const ih = height - M.top - M.bottom;
+  const lo = ticks[0];
+  const hi = ticks[ticks.length - 1];
   const x = (i: number) => M.left + (xs.length === 1 ? iw / 2 : (i / (xs.length - 1)) * iw);
-  const y = (v: number) => M.top + (1 - v) * ih;
+  const y = (v: number) => M.top + (1 - (v - lo) / (hi - lo || 1)) * ih;
+  const partial = partialFrom != null && partialFrom < xs.length ? partialFrom : null;
 
-  const path = (values: (number | null)[]) => {
+  const path = (values: (number | null)[], from = 0, to = values.length - 1) => {
     let d = "";
     let pen = false;
     values.forEach((v, i) => {
-      if (v == null) {
+      if (v == null || i < from || i > to) {
         pen = false;
         return;
       }
@@ -79,6 +124,8 @@ export function LineChart({ xs, lines, format, height = 240, label }: { xs: Char
   const tickEvery = Math.max(1, Math.ceil(xs.length / Math.max(2, Math.floor(iw / 72))));
   const rows = hover == null ? [] : lines.filter((l) => l.values[hover] != null).sort((a, b) => (b.values[hover] ?? 0) - (a.values[hover] ?? 0));
   const tipLeft = hover == null ? 0 : x(hover);
+  const bandLeft = partial == null ? 0 : partial === 0 ? M.left : (x(partial - 1) + x(partial)) / 2;
+  const here = hover == null ? [] : markers.filter((m) => m.at === hover);
 
   return (
     <div ref={ref} className="relative">
@@ -100,9 +147,19 @@ export function LineChart({ xs, lines, format, height = 240, label }: { xs: Char
           e.preventDefault();
         }}
       >
-        {yTicks.map((t) => (
+        {partial != null && (
+          <g>
+            <rect x={bandLeft} y={M.top} width={w - M.right - bandLeft} height={ih} fill="var(--subtle)" />
+            {w - M.right - bandLeft >= 44 && (
+              <text x={w - M.right - 4} y={M.top + 10} textAnchor="end" className="fill-faint text-2xs">
+                Partial
+              </text>
+            )}
+          </g>
+        )}
+        {ticks.map((t) => (
           <g key={t}>
-            <line x1={M.left} x2={w - M.right} y1={y(t)} y2={y(t)} stroke={t === 0 ? "var(--line-strong)" : "var(--line)"} strokeWidth="1" />
+            <line x1={M.left} x2={w - M.right} y1={y(t)} y2={y(t)} stroke={t === lo ? "var(--line-strong)" : "var(--line)"} strokeWidth="1" />
             <text x={M.left - 8} y={y(t)} dy="0.32em" textAnchor="end" className="fill-faint text-2xs tabular-nums">
               {format(t)}
             </text>
@@ -115,26 +172,42 @@ export function LineChart({ xs, lines, format, height = 240, label }: { xs: Char
             </text>
           ) : null,
         )}
+        {markers.map((m) => (
+          <g key={`${m.at}-${m.label}`}>
+            <line x1={x(m.at)} x2={x(m.at)} y1={M.top} y2={M.top + ih} stroke="var(--muted)" strokeOpacity="0.6" strokeWidth="1" />
+            <circle cx={x(m.at)} cy={M.top} r="3.5" fill="var(--muted)" stroke="var(--surface)" strokeWidth="1.5">
+              <title>{m.label}</title>
+            </circle>
+          </g>
+        ))}
         {hover != null && <line x1={tipLeft} x2={tipLeft} y1={M.top} y2={M.top + ih} stroke="var(--line-hover)" strokeWidth="1" />}
         {lines.map((l) => {
           const last = l.values.reduce<number>((at, v, i) => (v == null ? at : i), -1);
+          const dash = l.approx ? "5 4" : undefined;
           return (
-          <g key={l.key}>
-            <path d={path(l.values)} fill="none" stroke={l.color} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" strokeDasharray={l.approx ? "5 4" : undefined} />
-            {l.values.map((v, i) => {
-              const isolated = v != null && l.values[i - 1] == null && l.values[i + 1] == null;
-              return v != null && (i === last || isolated || i === hover) ? (
-                <circle key={i} cx={x(i)} cy={y(v)} r="4" fill={l.color} stroke="var(--surface)" strokeWidth="2" />
-              ) : null;
-            })}
-          </g>
+            <g key={l.key}>
+              {partial == null ? (
+                <path d={path(l.values)} fill="none" stroke={l.color} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" strokeDasharray={dash} />
+              ) : (
+                <>
+                  <path d={path(l.values, 0, partial - 1)} fill="none" stroke={l.color} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" strokeDasharray={dash} />
+                  <path d={path(l.values, Math.max(0, partial - 1))} fill="none" stroke={l.color} strokeOpacity="0.55" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" strokeDasharray="2 4" />
+                </>
+              )}
+              {l.values.map((v, i) => {
+                const isolated = v != null && l.values[i - 1] == null && l.values[i + 1] == null;
+                return v != null && (i === last || isolated || i === hover) ? (
+                  <circle key={i} cx={x(i)} cy={y(v)} r="4" fill={l.color} fillOpacity={partial != null && i >= partial ? 0.55 : 1} stroke="var(--surface)" strokeWidth="2" />
+                ) : null;
+              })}
+            </g>
           );
         })}
       </svg>
-      {hover != null && rows.length > 0 && (
+      {hover != null && (rows.length > 0 || here.length > 0) && (
         <div
           role="status"
-          className="pointer-events-none absolute top-1 z-10 min-w-44 rounded-surface bg-surface px-3 py-2 text-xs shadow-floating"
+          className="pointer-events-none absolute top-1 z-10 max-w-64 min-w-44 rounded-surface bg-surface px-3 py-2 text-xs shadow-floating"
           style={tipLeft > w / 2 ? { right: w - tipLeft + 12 } : { left: tipLeft + 12 }}
         >
           <div className="mb-1.5 text-muted">{xs[hover].title}</div>
@@ -142,7 +215,7 @@ export function LineChart({ xs, lines, format, height = 240, label }: { xs: Char
             {rows.map((l) => (
               <li key={l.key} className="flex items-center gap-2">
                 <LineKey color={l.color} dashed={l.approx} />
-                <span className="w-10 font-semibold tabular-nums">{format(l.values[hover]!)}</span>
+                <span className="min-w-10 font-semibold tabular-nums">{format(l.values[hover]!)}</span>
                 <span className="min-w-0 truncate text-muted">
                   {l.label}
                   {l.approx && " (approx.)"}
@@ -150,6 +223,13 @@ export function LineChart({ xs, lines, format, height = 240, label }: { xs: Char
               </li>
             ))}
           </ul>
+          {partial != null && hover >= partial && <div className="mt-1.5 text-warn">{partialNote}</div>}
+          {here.map((m) => (
+            <div key={m.label} className="mt-1.5 flex items-start gap-1.5 text-fg">
+              <span className="mt-1 size-2 shrink-0 rounded-full bg-muted" aria-hidden="true" />
+              <span className="min-w-0 [overflow-wrap:anywhere]">{m.label}</span>
+            </div>
+          ))}
         </div>
       )}
     </div>
