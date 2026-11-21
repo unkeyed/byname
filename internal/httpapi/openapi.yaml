@@ -57,6 +57,14 @@ tags:
       fidelity. Changing the endpoint or the fidelity starts a new series, and
       no number averages across series. A mention (the answer names you) and a
       citation (it links to one of your domains) are counted separately.
+  - name: search
+    description: >-
+      Google Search Console. results:read reads the synced clicks, impressions
+      and position, goals and the connection's status; config:write changes
+      goals and branded search terms; a signed-in admin connects Search
+      Console, picks the property and disconnects. Dates are Search Console's
+      Pacific Time days, and windows end on the latest day Google has
+      finalized.
   - name: settings
     description: Keys, apps, the team and the Treg token, for signed-in admins, and the consent page.
   - name: auth
@@ -951,6 +959,452 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /v1/search/summary:
+    get:
+      tags: [search]
+      operationId: getSearchSummary
+      summary: The Search Console headline over the latest 28 days, and the 28 days before for the trend.
+      description: Both windows end on the latest day Google has finalized. Non-brand clicks never include anonymized queries.
+      security:
+        - apiKey: [results:read]
+        - session: [results:read]
+      responses:
+        "200":
+          description: The headline. current is null until something is synced.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchSummary"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /v1/search/daily:
+    get:
+      tags: [search]
+      operationId: getSearchDaily
+      summary: The site's clicks, impressions, CTR and position per day, partial days marked.
+      security:
+        - apiKey: [results:read]
+        - session: [results:read]
+      parameters:
+        - $ref: "#/components/parameters/searchFrom"
+        - $ref: "#/components/parameters/searchTo"
+      responses:
+        "200":
+          description: The days.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchDaily"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /v1/search/brand:
+    get:
+      tags: [search]
+      operationId: getSearchBrand
+      summary: Brand against non-brand clicks over trailing 28-day windows, one window per day.
+      description: Windows end on final days only. A query is brand when it contains a branded search term; anonymized clicks are never non-brand.
+      security:
+        - apiKey: [results:read]
+        - session: [results:read]
+      parameters:
+        - $ref: "#/components/parameters/searchFrom"
+        - $ref: "#/components/parameters/searchTo"
+      responses:
+        "200":
+          description: The windows.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchBrand"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /v1/search/pages:
+    get:
+      tags: [search]
+      operationId: getSearchPages
+      summary: The top pages by clicks over the window ending on the latest final day.
+      security:
+        - apiKey: [results:read]
+        - session: [results:read]
+      parameters:
+        - $ref: "#/components/parameters/searchDays"
+        - $ref: "#/components/parameters/searchLimit"
+      responses:
+        "200":
+          description: The pages.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchPages"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /v1/search/queries:
+    get:
+      tags: [search]
+      operationId: getSearchQueries
+      summary: The top search queries by clicks over the window ending on the latest final day.
+      description: Anonymized queries never appear. With non_brand=true, queries containing a branded search term are left out.
+      security:
+        - apiKey: [results:read]
+        - session: [results:read]
+      parameters:
+        - $ref: "#/components/parameters/searchDays"
+        - $ref: "#/components/parameters/searchLimit"
+        - name: non_brand
+          in: query
+          description: Only non-brand queries.
+          schema:
+            type: boolean
+            default: false
+      responses:
+        "200":
+          description: The queries.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchQueries"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /v1/goals:
+    get:
+      tags: [search]
+      operationId: listGoals
+      summary: The search goals by due date, each with its progress over its trailing window.
+      description: None exist until someone adds one. Progress counts the window ending on the latest final day.
+      security:
+        - apiKey: [results:read]
+        - session: [results:read]
+      responses:
+        "200":
+          description: Goals.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Goal"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+    post:
+      tags: [search]
+      operationId: upsertGoal
+      summary: Add a goal, or set the target of the goal with the same metric, window and due date.
+      security:
+        - apiKey: [config:write]
+        - session: [config:write]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GoalInput"
+      responses:
+        "200":
+          description: The goal as saved, with its progress.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Goal"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /v1/goals/{id}:
+    parameters:
+      - $ref: "#/components/parameters/id"
+    put:
+      tags: [search]
+      operationId: updateGoal
+      summary: Replace a goal by id.
+      security:
+        - apiKey: [config:write]
+        - session: [config:write]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GoalInput"
+      responses:
+        "200":
+          description: The goal as saved, with its progress.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Goal"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+    delete:
+      tags: [search]
+      operationId: deleteGoal
+      summary: Delete a goal.
+      security:
+        - apiKey: [config:write]
+        - session: [config:write]
+      responses:
+        "204":
+          description: Deleted.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /v1/settings/branded-terms:
+    put:
+      tags: [search]
+      operationId: setBrandedTerms
+      summary: Replace the branded search terms that decide brand against non-brand queries.
+      description: Terms are lowercased. A query containing any of them, ignoring case, is brand. An empty list goes back to the default, your brand's name and aliases.
+      security:
+        - apiKey: [config:write]
+        - session: [config:write]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [terms]
+              additionalProperties: false
+              properties:
+                terms:
+                  type: array
+                  maxItems: 50
+                  items:
+                    type: string
+                    minLength: 2
+                    maxLength: 80
+      responses:
+        "200":
+          description: The settings, with the branded terms in use.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SettingsView"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /v1/gsc:
+    get:
+      tags: [search]
+      operationId: getSearchConsole
+      summary: The Search Console connection, its last sync and the stored days. Never the credential.
+      security:
+        - apiKey: [results:read]
+        - session: [results:read]
+      responses:
+        "200":
+          description: The connection.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchConsoleStatus"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+    delete:
+      tags: [search]
+      operationId: disconnectSearchConsole
+      summary: Delete the connection and its credential. The synced numbers stay.
+      security:
+        - session: [admin]
+      responses:
+        "204":
+          description: Disconnected.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /v1/gsc/properties:
+    get:
+      tags: [search]
+      operationId: listSearchConsoleProperties
+      summary: The properties the connected account can read, from Google's sites.list.
+      description: The one matching your primary domain is marked suggested, preferring its domain property.
+      security:
+        - session: [admin]
+      responses:
+        "200":
+          description: Properties.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SearchConsoleProperty"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "502":
+          $ref: "#/components/responses/BadGateway"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /v1/gsc/property:
+    put:
+      tags: [search]
+      operationId: setSearchConsoleProperty
+      summary: Pick the property to sync. The scheduler syncs it within a minute.
+      description: The property must be one the connected account can read. backfill (default true) makes the first sync pull every day Google keeps, about 16 months; without it the first sync pulls 28 days.
+      security:
+        - session: [admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [property]
+              additionalProperties: false
+              properties:
+                property:
+                  type: string
+                  description: A site_url from GET /v1/gsc/properties, such as sc-domain:example.com or https://www.example.com/.
+                backfill:
+                  type: boolean
+                  default: true
+      responses:
+        "200":
+          description: The connection.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchConsoleStatus"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "502":
+          $ref: "#/components/responses/BadGateway"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /v1/gsc/service-account:
+    put:
+      tags: [search]
+      operationId: connectSearchConsoleServiceAccount
+      summary: Connect Search Console with a service account's JSON key, stored sealed with ENCRYPTION_KEY.
+      description: Needs a recent sign-in. Byname checks that Google accepts the key first. Add the service account's email as a user on the property in Search Console. The response never carries the key.
+      security:
+        - session: [admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [key]
+              additionalProperties: false
+              properties:
+                key:
+                  type: string
+                  description: The JSON key file's contents, as Google downloads it.
+      responses:
+        "200":
+          description: The connection.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchConsoleStatus"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Reauth"
+        "502":
+          $ref: "#/components/responses/BadGateway"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /v1/gsc/oauth/start:
+    post:
+      tags: [search]
+      operationId: startSearchConsoleOAuth
+      summary: Start connecting Search Console with Google sign-in, read-only.
+      description: Needs a recent sign-in and GSC_GOOGLE_CLIENT_ID. Open the returned URL in the browser; Google sends it back to /auth/gsc/callback, which stores the refresh token sealed and redirects to Settings > Search Console.
+      security:
+        - session: [admin]
+      responses:
+        "200":
+          description: Google's consent page.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [url]
+                properties:
+                  url:
+                    type: string
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Reauth"
         "503":
           $ref: "#/components/responses/Unavailable"
   /v1/keys:
@@ -2003,6 +2457,34 @@ paths:
           description: Into the app, to /login?second_factor=1 when a code is due, or back with ?error=.
         "503":
           $ref: "#/components/responses/Unavailable"
+  /auth/gsc/callback:
+    get:
+      tags: [search]
+      operationId: finishSearchConsoleOAuth
+      summary: Where Google sends the browser back after Search Console consent.
+      description: Only the admin who started the sign-in can finish it. Always redirects to /settings/search-console, with ?connected=google, or ?error= saying what went wrong.
+      security:
+        - session: [admin]
+      parameters:
+        - name: state
+          in: query
+          schema:
+            type: string
+        - name: code
+          in: query
+          schema:
+            type: string
+        - name: error
+          in: query
+          schema:
+            type: string
+      responses:
+        "303":
+          description: Back to Settings > Search Console.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
   /auth/setup/{token}:
     parameters:
       - name: token
@@ -2188,6 +2670,38 @@ components:
         type: string
         enum: [pair, surface]
         default: pair
+    searchFrom:
+      name: from
+      in: query
+      description: The first day, such as 2026-08-01. Defaults to 90 days before to.
+      schema:
+        type: string
+        format: date
+    searchTo:
+      name: to
+      in: query
+      description: The last day. Defaults to the latest day stored for daily, and the latest final day for brand.
+      schema:
+        type: string
+        format: date
+    searchDays:
+      name: days
+      in: query
+      description: The window in days, ending on the latest final day.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 480
+        default: 28
+    searchLimit:
+      name: limit
+      in: query
+      description: How many rows, 1 to 200.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 200
+        default: 25
   responses:
     BadRequest:
       description: The request is malformed. The message says which field.
@@ -2679,7 +3193,7 @@ components:
       allOf:
         - $ref: "#/components/schemas/Settings"
         - type: object
-          required: [checks_paused, next_check_at, last_check_at, updated_at]
+          required: [checks_paused, next_check_at, last_check_at, updated_at, branded_terms, branded_terms_default]
           properties:
             checks_paused:
               type: boolean
@@ -2695,6 +3209,14 @@ components:
             updated_at:
               type: string
               format: date-time
+            branded_terms:
+              type: array
+              items:
+                type: string
+              description: Lowercased. A Search Console query containing one is brand. Set with PUT /v1/settings/branded-terms.
+            branded_terms_default:
+              type: boolean
+              description: True while the terms are your brand's name and aliases.
     Brand:
       type: object
       required: [id, name, aliases, domains, kind]
@@ -3669,7 +4191,7 @@ components:
           type: integer
         job:
           type: string
-          enum: [ai_check, model_refresh]
+          enum: [ai_check, model_refresh, gsc_sync]
         trigger:
           $ref: "#/components/schemas/Trigger"
         run_id:
@@ -3690,3 +4212,271 @@ components:
         spend_usd:
           type: [number, "null"]
           description: The run's spend, for an AI check. Null for any other job.
+    SearchTotals:
+      type: object
+      required: [clicks, impressions, ctr, position]
+      properties:
+        clicks:
+          type: integer
+        impressions:
+          type: integer
+        ctr:
+          type: number
+          description: Clicks over impressions, 0 to 1.
+        position:
+          type: number
+          description: Average position, weighted by impressions. 0 with no impressions.
+    SearchPeriod:
+      description: The site's numbers over from to to, inclusive.
+      allOf:
+        - $ref: "#/components/schemas/SearchTotals"
+        - type: object
+          required: [from, to, brand_clicks, non_brand_clicks, anonymized_clicks, days_with_data]
+          properties:
+            from:
+              type: string
+              format: date
+            to:
+              type: string
+              format: date
+            brand_clicks:
+              type: integer
+              description: Clicks on queries containing a branded search term.
+            non_brand_clicks:
+              type: integer
+              description: Clicks on named queries without a branded term. Anonymized queries are never non-brand.
+            anonymized_clicks:
+              type: integer
+              description: Clicks Google counts for the site but on no query, because it hides rare queries.
+            days_with_data:
+              type: integer
+    SearchSummary:
+      type: object
+      required: [property, current, previous]
+      properties:
+        property:
+          type: string
+          description: Empty until something is synced.
+        current:
+          oneOf:
+            - $ref: "#/components/schemas/SearchPeriod"
+            - type: "null"
+          description: The latest 28 days, ending on the latest final day.
+        previous:
+          oneOf:
+            - $ref: "#/components/schemas/SearchPeriod"
+            - type: "null"
+          description: The 28 days before current. Null without data there.
+    SearchDay:
+      allOf:
+        - $ref: "#/components/schemas/SearchTotals"
+        - type: object
+          required: [date, final]
+          properties:
+            date:
+              type: string
+              format: date
+            final:
+              type: boolean
+              description: False while Google still revises the day.
+    SearchDaily:
+      type: object
+      required: [property, latest_final_day, days]
+      properties:
+        property:
+          type: string
+        latest_final_day:
+          type: string
+        days:
+          type: array
+          description: Days Google reported, oldest first. A day with no entry had no impressions.
+          items:
+            $ref: "#/components/schemas/SearchDay"
+    SearchBrandPoint:
+      type: object
+      required: [date, clicks, brand_clicks, non_brand_clicks, anonymized_clicks]
+      properties:
+        date:
+          type: string
+          format: date
+          description: The last day of the 28-day window.
+        clicks:
+          type: integer
+        brand_clicks:
+          type: integer
+        non_brand_clicks:
+          type: integer
+        anonymized_clicks:
+          type: integer
+    SearchBrand:
+      type: object
+      required: [property, terms, points]
+      properties:
+        property:
+          type: string
+        terms:
+          type: array
+          items:
+            type: string
+          description: The branded search terms in use.
+        points:
+          type: array
+          items:
+            $ref: "#/components/schemas/SearchBrandPoint"
+    SearchPages:
+      type: object
+      required: [property, from, to, pages]
+      properties:
+        property:
+          type: string
+        from:
+          type: string
+        to:
+          type: string
+        pages:
+          type: array
+          items:
+            allOf:
+              - $ref: "#/components/schemas/SearchTotals"
+              - type: object
+                required: [page]
+                properties:
+                  page:
+                    type: string
+    SearchQueries:
+      type: object
+      required: [property, from, to, non_brand, queries]
+      properties:
+        property:
+          type: string
+        from:
+          type: string
+        to:
+          type: string
+        non_brand:
+          type: boolean
+        queries:
+          type: array
+          items:
+            allOf:
+              - $ref: "#/components/schemas/SearchTotals"
+              - type: object
+                required: [query, branded]
+                properties:
+                  query:
+                    type: string
+                  branded:
+                    type: boolean
+    GoalInput:
+      type: object
+      required: [metric, window_days, target, due_on]
+      additionalProperties: false
+      properties:
+        metric:
+          type: string
+          enum: [clicks, impressions, non_brand_clicks]
+        window_days:
+          type: integer
+          enum: [28, 90]
+          description: The trailing window the metric is summed over.
+        target:
+          type: integer
+          minimum: 1
+        due_on:
+          type: string
+          format: date
+    Goal:
+      allOf:
+        - $ref: "#/components/schemas/GoalInput"
+        - type: object
+          required: [id, progress]
+          properties:
+            id:
+              type: integer
+            progress:
+              description: The metric over the window ending on the latest final day. Null until Search Console data is synced.
+              oneOf:
+                - type: "null"
+                - type: object
+                  required: [from, to, value, fraction, reached, days_with_data]
+                  properties:
+                    from:
+                      type: string
+                      format: date
+                    to:
+                      type: string
+                      format: date
+                    value:
+                      type: integer
+                    fraction:
+                      type: number
+                      description: Value over target, 1 or more once reached.
+                    reached:
+                      type: boolean
+                    days_with_data:
+                      type: integer
+                      description: Less than the window while history is short.
+    SearchConsoleStatus:
+      type: object
+      description: The connection as anyone with results:read sees it. Never the credential.
+      required: [connected, oauth_available, method, account, property, property_kind, backfill, connected_at, last_sync_at, last_sync_error, syncing, data_property, first_day, latest_final_day, partial_days]
+      properties:
+        connected:
+          type: boolean
+        oauth_available:
+          type: boolean
+          description: The instance has a Google OAuth client (GSC_GOOGLE_CLIENT_ID), which Sign in with Google needs.
+        method:
+          type: string
+          enum: ["", oauth, service_account]
+        account:
+          type: string
+          description: The service account's email. Empty for a Google sign-in.
+        property:
+          type: string
+          description: The property synced. Empty until one is picked.
+        property_kind:
+          type: string
+          enum: ["", domain, url_prefix]
+        backfill:
+          type: boolean
+        connected_at:
+          type: [string, "null"]
+          format: date-time
+        last_sync_at:
+          type: [string, "null"]
+          format: date-time
+          description: When the last sync finished. Null before the first, and after another property is picked.
+        last_sync_error:
+          type: string
+          description: Why the last sync failed. Empty when it did not.
+        syncing:
+          type: boolean
+        data_property:
+          type: string
+          description: The property the stored numbers are for, which the Search page shows. Empty when nothing is stored.
+        first_day:
+          type: string
+        latest_final_day:
+          type: string
+          description: The latest day Google has finalized. Every window ends on it.
+        partial_days:
+          type: array
+          items:
+            type: string
+          description: Stored days Google still revises. The next sync overwrites them.
+    SearchConsoleProperty:
+      type: object
+      required: [site_url, permission_level, kind, suggested]
+      properties:
+        site_url:
+          type: string
+        permission_level:
+          type: string
+          description: Google's permission level, such as siteOwner.
+        kind:
+          type: string
+          enum: [domain, url_prefix]
+        suggested:
+          type: boolean
+          description: The property matching your primary domain.

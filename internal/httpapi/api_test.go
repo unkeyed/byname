@@ -25,6 +25,8 @@ import (
 	"github.com/unkeyed/byname/internal/config"
 	"github.com/unkeyed/byname/internal/core"
 	"github.com/unkeyed/byname/internal/engines/tregtest"
+	"github.com/unkeyed/byname/internal/gsc"
+	"github.com/unkeyed/byname/internal/gsc/gsctest"
 	"github.com/unkeyed/byname/internal/instance"
 	"github.com/unkeyed/byname/internal/mcpserver"
 	"github.com/unkeyed/byname/internal/results"
@@ -50,6 +52,7 @@ type client struct {
 	db         *pgxpool.Pool
 	svc        app.Services
 	treg       *tregtest.Server
+	google     *gsctest.Server
 }
 
 type reply struct {
@@ -173,13 +176,16 @@ func serve(t *testing.T, srv *httptest.Server, publicURL string, mod ...func(*au
 	authn := &auth.Authenticator{Keys: auth.NewKeyStore(pool, auth.UnkeyConfig{}), Users: users, OAuth: auth.NewOAuthServer(pool, u)}
 	treg := tregtest.New(t)
 	settings := config.New(pool, config.Options{Secrets: cfg.Secrets, TregBaseURL: treg.URL})
-	svc := app.Services{Instance: instance.New("test"), Config: settings, Checks: checks.New(pool, settings, checks.Options{}), Results: results.New(pool)}
+	google := gsctest.New(t)
+	search := gsc.New(pool, gsc.Options{Secrets: cfg.Secrets, Endpoints: gsc.GoogleEndpoints(google.URL),
+		Client: gsc.OAuthClient{ID: "test-client", Secret: "test-secret"}, PublicURL: u, Terms: settings})
+	svc := app.Services{Instance: instance.New("test"), Config: settings, Checks: checks.New(pool, settings, checks.Options{}), Results: results.New(pool), GSC: search}
 	mux := NewMux(svc, authn, slog.New(slog.DiscardHandler))
 	mux.Handle("/mcp", mcpserver.Handler(svc, authn.OAuth, "test"))
 	srv.Config.Handler = mux
 	srv.Start()
 	t.Cleanup(srv.Close)
-	return client{t: t, base: srv.URL, origin: publicURL, setupToken: token, db: pool, svc: svc, treg: treg}
+	return client{t: t, base: srv.URL, origin: publicURL, setupToken: token, db: pool, svc: svc, treg: treg, google: google}
 }
 
 func cookieValue(r reply, name string) string {
