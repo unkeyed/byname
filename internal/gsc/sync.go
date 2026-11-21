@@ -83,6 +83,13 @@ func (s *Service) withLock(ctx context.Context, take string, f func() error) err
 			_ = conn.Conn().Close(context.WithoutCancel(ctx))
 		}
 	}()
+	// With the lock held no sync runs anywhere, so one still marked running
+	// was cut off by a crash or a redeploy.
+	if _, err := conn.Exec(ctx, `UPDATE job_run SET status = 'failed', finished_at = $1,
+			error = 'the process stopped before this sync finished; the next sync carries on from the last stored day'
+		WHERE job = 'gsc_sync' AND status = 'running'`, s.now()); err != nil {
+		return err
+	}
 	return f()
 }
 

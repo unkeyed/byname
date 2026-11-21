@@ -513,6 +513,21 @@ func TestSyncSchedule(t *testing.T) {
 	if n := e.count(`SELECT count(*) FROM job_run`); n != 0 {
 		t.Fatal("a sync ran with nothing connected")
 	}
+	if _, err := e.db.Exec(e.ctx, `INSERT INTO job_run (job, trigger, started_at) VALUES ('gsc_sync', 'scheduled', $1)`, e.now.Add(-3*time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	if !e.status().Syncing {
+		t.Fatal("a running sync does not show as syncing")
+	}
+	if err := e.svc.SyncIfDue(e.ctx); err != nil {
+		t.Fatal(err)
+	}
+	if e.status().Syncing || e.count(`SELECT count(*) FROM job_run WHERE status = 'failed'`) != 1 {
+		t.Fatal("a sync a crash cut off still shows as running")
+	}
+	if _, err := e.db.Exec(e.ctx, `DELETE FROM job_run`); err != nil {
+		t.Fatal(err)
+	}
 	e.connectServiceAccount(domainProperty)
 	syncs := func() int64 { return e.count(`SELECT count(*) FROM job_run WHERE job = 'gsc_sync'`) }
 	for range 2 {

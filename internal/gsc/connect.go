@@ -99,10 +99,12 @@ type Data struct {
 func (s *Service) Status(ctx context.Context) (Status, error) {
 	st := Status{OAuthAvailable: s.client.set()}
 	var prop, kind *string
+	if err := s.db.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM job_run WHERE job = 'gsc_sync' AND status = 'running')`).Scan(&st.Syncing); err != nil {
+		return st, err
+	}
 	err := s.db.QueryRow(ctx, `SELECT method, account, property, property_kind, backfill, connected_at, last_sync_at,
-			coalesce(last_sync_error, ''),
-			EXISTS (SELECT 1 FROM job_run WHERE job = 'gsc_sync' AND status = 'running')
-		FROM gsc_connection`).Scan(&st.Method, &st.Account, &prop, &kind, &st.Backfill, &st.ConnectedAt, &st.LastSyncAt, &st.LastSyncError, &st.Syncing)
+			coalesce(last_sync_error, '')
+		FROM gsc_connection`).Scan(&st.Method, &st.Account, &prop, &kind, &st.Backfill, &st.ConnectedAt, &st.LastSyncAt, &st.LastSyncError)
 	switch {
 	case err == nil:
 		st.Connected = true
