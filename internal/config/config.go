@@ -28,6 +28,13 @@ type Service struct {
 	secrets *secretbox.Box
 	treg    engines.Treg
 	now     func() time.Time
+	alerts  Alerts
+}
+
+// Alerts hears when a model leaves its surface's live list and its pair is
+// paused (internal/notify). It must be idempotent.
+type Alerts interface {
+	PairPaused(ctx context.Context, pairID int64, surface engines.Surface, model, reason string) error
 }
 
 type Options struct {
@@ -40,6 +47,8 @@ type Options struct {
 	// Resolve follows redirect links in citations. Nil keeps them as sent.
 	Resolve engines.Resolver
 	Now     func() time.Time
+	// Alerts, when set, hears about each pair the model refresh pauses.
+	Alerts Alerts
 }
 
 func New(db *pgxpool.Pool, o Options) *Service {
@@ -51,6 +60,7 @@ func New(db *pgxpool.Pool, o Options) *Service {
 		secrets: o.Secrets,
 		treg:    engines.Treg{Client: o.HTTPClient, BaseURL: o.TregBaseURL, Resolve: o.Resolve},
 		now:     o.Now,
+		alerts:  o.Alerts,
 	}
 }
 

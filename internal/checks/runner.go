@@ -355,7 +355,7 @@ func (s *Service) finish(ctx context.Context, runID int64, out *outcome) error {
 	if out.code != "" {
 		code = &out.code
 	}
-	return pgx.BeginFunc(ctx, s.db, func(tx pgx.Tx) error {
+	err := pgx.BeginFunc(ctx, s.db, func(tx pgx.Tx) error {
 		if _, err := tx.Exec(ctx, `UPDATE run SET status = $2, error = $3, refusal_code = $4, finished_at = $5,
 				started_at = coalesce(started_at, $5)
 			WHERE id = $1 AND status IN ('queued', 'running')`, runID, out.status, msg, code, s.now()); err != nil {
@@ -364,4 +364,20 @@ func (s *Service) finish(ctx context.Context, runID int64, out *outcome) error {
 		_, err := tx.Exec(ctx, `UPDATE job_run SET status = $2, error = $3, finished_at = $4 WHERE run_id = $1`, runID, out.status, msg, s.now())
 		return err
 	})
+	if err != nil {
+		return err
+	}
+	s.alertFinished(ctx, runID)
+	return nil
+}
+
+// alertFinished tells Alerts the run ended. A failure to alert is logged,
+// never the run's failure.
+func (s *Service) alertFinished(ctx context.Context, runID int64) {
+	if s.alerts == nil {
+		return
+	}
+	if err := s.alerts.RunFinished(ctx, runID); err != nil && ctx.Err() == nil {
+		s.log.Error("alert on a finished run", "run", runID, "err", err)
+	}
 }

@@ -61,6 +61,13 @@ type Service struct {
 	sleep  func(context.Context, time.Duration) error
 	log    *slog.Logger
 	wake   chan struct{}
+	alerts Alerts
+}
+
+// Alerts hears about every finished run, so it can tell people
+// (internal/notify). It must be idempotent: a run can be reported again.
+type Alerts interface {
+	RunFinished(ctx context.Context, runID int64) error
 }
 
 type Options struct {
@@ -68,6 +75,8 @@ type Options struct {
 	// Sleep waits out Treg's Retry-After. Tests replace it.
 	Sleep func(context.Context, time.Duration) error
 	Log   *slog.Logger
+	// Alerts, when set, hears about each run as it finishes.
+	Alerts Alerts
 }
 
 func New(db *pgxpool.Pool, cfg *config.Service, o Options) *Service {
@@ -80,7 +89,7 @@ func New(db *pgxpool.Pool, cfg *config.Service, o Options) *Service {
 	if o.Log == nil {
 		o.Log = slog.Default()
 	}
-	return &Service{db: db, config: cfg, now: o.Now, sleep: o.Sleep, log: o.Log, wake: make(chan struct{}, 1)}
+	return &Service{db: db, config: cfg, now: o.Now, sleep: o.Sleep, log: o.Log, wake: make(chan struct{}, 1), alerts: o.Alerts}
 }
 
 func sleep(ctx context.Context, d time.Duration) error {

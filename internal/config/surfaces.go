@@ -309,9 +309,16 @@ func (s *Service) refreshModels(ctx context.Context) error {
 		}
 		if slices.Contains(listed, p.Model) {
 			_, err = s.db.Exec(ctx, `UPDATE surface_model SET paused_reason = NULL WHERE id = $1 AND paused_reason IS NOT NULL`, p.ID)
-		} else {
+		} else if p.PausedReason == "" {
 			spec, _ := engines.Lookup(p.Surface)
 			reason := fmt.Sprintf("%s left %s's model list on %s; pick another model or wait for it to return", p.Model, spec.Title, s.now().UTC().Format(time.DateOnly))
+			// Alert first: if pausing then fails, the next refresh pauses
+			// and alerts again, and the alert is idempotent.
+			if s.alerts != nil {
+				if err := s.alerts.PairPaused(ctx, p.ID, p.Surface, p.Model, reason); err != nil {
+					return err
+				}
+			}
 			_, err = s.db.Exec(ctx, `UPDATE surface_model SET paused_reason = $2 WHERE id = $1 AND paused_reason IS NULL`, p.ID, reason)
 		}
 		if err != nil {
