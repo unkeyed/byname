@@ -3,6 +3,7 @@ package config
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/unkeyed/byname/internal/core"
@@ -24,8 +25,12 @@ func brandedTerms(ctx context.Context, q querier) (terms []string, isDefault boo
 	if set != nil {
 		return set, false, nil
 	}
-	return lowerWords(brand), true, nil
+	return slices.DeleteFunc(lowerWords(brand), func(t string) bool { return len([]rune(t)) < minTerm }), true, nil
 }
+
+// minTerm is the shortest branded term: one letter would make nearly every
+// query brand.
+const minTerm = 2
 
 func lowerWords(in []string) []string {
 	out := make([]string, 0, len(in))
@@ -44,7 +49,7 @@ func (s *Service) SetBrandedTerms(ctx context.Context, terms []string) (Settings
 		return SettingsView{}, fmt.Errorf("%w: at most 50 branded search terms", core.ErrInvalid)
 	}
 	for _, t := range terms {
-		if len([]rune(t)) < 2 || len([]rune(t)) > 80 {
+		if len([]rune(t)) < minTerm || len([]rune(t)) > 80 {
 			return SettingsView{}, fmt.Errorf("%w: each branded search term must be 2 to 80 characters, got %q", core.ErrInvalid, t)
 		}
 	}
