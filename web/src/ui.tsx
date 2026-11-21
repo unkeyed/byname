@@ -148,10 +148,12 @@ export function ConfirmButton({
         }
       }}
       onClick={() => (armed ? (setArmed(false), onConfirm()) : setArmed(true))}
-      className={cx("grid", className)}
+      className={className}
     >
-      <span className={cx("col-start-1 row-start-1 flex items-center justify-center gap-1.5", armed && "invisible")}>{children}</span>
-      <span className={cx("col-start-1 row-start-1", !armed && "invisible")}>{confirmLabel}</span>
+      <span className="grid">
+        <span className={cx("col-start-1 row-start-1 flex items-center justify-center gap-1.5", armed && "invisible")}>{children}</span>
+        <span className={cx("col-start-1 row-start-1", !armed && "invisible")}>{confirmLabel}</span>
+      </span>
     </Button>
   );
 }

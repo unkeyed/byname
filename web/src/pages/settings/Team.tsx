@@ -77,9 +77,9 @@ function Members() {
       <Card>
         <ul aria-label="Team members" className="divide-y divide-line">
           {users.data.map((u) => (
-            <li key={u.id} className="flex items-center gap-3 px-4 py-3">
+            <li key={u.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
               <Avatar label={u.name || u.email} size={32} />
-              <div className="min-w-0 flex-1">
+              <div className="min-w-0 flex-1 basis-40">
                 <div className="flex min-w-0 items-center gap-2">
                   <span className="min-w-0 truncate font-medium" title={u.name || u.email}>
                     {u.name || u.email}
@@ -92,30 +92,32 @@ function Members() {
                   </div>
                 )}
               </div>
-              <span className="hidden shrink-0 text-xs text-muted sm:inline">
-                Joined <RelativeTime iso={u.created_at} />
-              </span>
-              <select
-                aria-label={`Role of ${u.name || u.email}`}
-                className={selectClass}
-                value={u.role}
-                disabled={setRole.isPending}
-                onChange={(e) => setRole.mutate({ id: u.id, role: e.target.value as Role })}
-              >
-                {roles.map((r) => (
-                  <option key={r} value={r} title={roleInfo[r]}>
-                    {r}
-                  </option>
-                ))}
-              </select>
-              <ConfirmButton
-                label={`Remove ${u.name || u.email}`}
-                confirmLabel={me.data?.user_id === u.id ? "Remove you and sign out?" : "Remove?"}
-                onConfirm={() => remove.mutate(u.id)}
-                disabled={remove.isPending}
-              >
-                Remove
-              </ConfirmButton>
+              <div className="ml-auto flex shrink-0 items-center gap-2">
+                <span className="hidden shrink-0 text-xs text-muted sm:inline">
+                  Joined <RelativeTime iso={u.created_at} />
+                </span>
+                <select
+                  aria-label={`Role of ${u.name || u.email}`}
+                  className={selectClass}
+                  value={u.role}
+                  disabled={setRole.isPending}
+                  onChange={(e) => setRole.mutate({ id: u.id, role: e.target.value as Role })}
+                >
+                  {roles.map((r) => (
+                    <option key={r} value={r} title={roleInfo[r]}>
+                      {r}
+                    </option>
+                  ))}
+                </select>
+                <ConfirmButton
+                  label={`Remove ${u.name || u.email}`}
+                  confirmLabel={me.data?.user_id === u.id ? "Remove you and sign out?" : "Remove?"}
+                  onConfirm={() => remove.mutate(u.id)}
+                  disabled={remove.isPending}
+                >
+                  Remove
+                </ConfirmButton>
+              </div>
             </li>
           ))}
         </ul>
