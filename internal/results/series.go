@@ -82,6 +82,8 @@ type Standing struct {
 type PairChange struct {
 	QuestionID int64         `json:"question_id" jsonschema:"in the after run's question set"`
 	PairID     int64         `json:"pair_id"`
+	Question   QuestionRef   `json:"question"`
+	Pair       PairRef       `json:"pair"`
 	Outcome    panel.Outcome `json:"outcome"`
 	Before     *Standing     `json:"before"`
 	After      *Standing     `json:"after"`
@@ -127,7 +129,9 @@ func (s *Service) Compare(ctx context.Context, before, after int64) (Comparison,
 	if err != nil {
 		return Comparison{}, err
 	}
+	pairs := map[int64]PairRef{}
 	for _, x := range answers {
+		pairs[x.series.Pair.ID] = x.series.Pair
 		k := panel.Key{Question: x.question, SurfaceModel: panel.SurfaceModelID(x.series.Pair.ID)}
 		runs[x.runID][k] = x.scored
 		series[x.runID][k] = x.series
@@ -151,8 +155,19 @@ func (s *Service) Compare(ctx context.Context, before, after int64) (Comparison,
 	for old, now := range m {
 		reverse[now] = old
 	}
+	var ids []panel.QuestionID
 	for _, p := range c.Pairs {
-		pc := PairChange{QuestionID: int64(p.Key.Question), PairID: int64(p.Key.SurfaceModel), Outcome: p.Outcome}
+		if !slices.Contains(ids, p.Key.Question) {
+			ids = append(ids, p.Key.Question)
+		}
+	}
+	questions, err := s.questionRefs(ctx, ids)
+	if err != nil {
+		return Comparison{}, err
+	}
+	for _, p := range c.Pairs {
+		pc := PairChange{QuestionID: int64(p.Key.Question), PairID: int64(p.Key.SurfaceModel), Question: questions[p.Key.Question],
+			Pair: pairs[int64(p.Key.SurfaceModel)], Outcome: p.Outcome}
 		if st, ok := standing[after][p.Key]; ok && p.After != nil {
 			pc.After = &st
 		}
@@ -212,7 +227,11 @@ type Point struct {
 
 type HistorySeries struct {
 	Series
-	Points []Point `json:"points"`
+	Answered     int     `json:"answered" jsonschema:"runs whose answer did not fail"`
+	Named        int     `json:"named" jsonschema:"runs whose answer named you"`
+	Cited        int     `json:"cited" jsonschema:"runs whose answer cited your domains"`
+	BestPosition *int    `json:"best_position" jsonschema:"your best position over these runs; null when never named"`
+	Points       []Point `json:"points"`
 }
 
 type History struct {
@@ -256,7 +275,20 @@ func (s *Service) QuestionHistory(ctx context.Context, questionID int64, since *
 			index[x.series] = i
 			out.Series = append(out.Series, HistorySeries{Series: x.series, Points: []Point{}})
 		}
-		out.Series[i].Points = append(out.Series[i].Points, Point{
+		hs := &out.Series[i]
+		if x.scored.Status != engines.StatusFailed {
+			hs.Answered++
+		}
+		if x.scored.Mentioned {
+			hs.Named++
+		}
+		if x.scored.Cited {
+			hs.Cited++
+		}
+		if p := x.scored.Position; p > 0 && (hs.BestPosition == nil || p < *hs.BestPosition) {
+			hs.BestPosition = &p
+		}
+		hs.Points = append(hs.Points, Point{
 			RunID: x.runID, RunStartedAt: x.started, AnswerID: x.id, QuestionID: int64(x.question), Status: x.scored.Status,
 			Mentioned: x.scored.Mentioned, Cited: x.scored.Cited, Position: nullPosition(x.scored.Position), ReportedModel: x.reported,
 			Summary: panel.Summarize(prev[x.series], x.scored, brands),

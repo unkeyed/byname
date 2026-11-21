@@ -643,6 +643,37 @@ paths:
           $ref: "#/components/responses/NotFound"
         "503":
           $ref: "#/components/responses/Unavailable"
+  /v1/runs/{id}/questions:
+    parameters:
+      - $ref: "#/components/parameters/id"
+    get:
+      tags: [results]
+      operationId: getRunQuestions
+      summary: One run as the questions table, with each cell's change since the previous run.
+      description: A row per question and a column per series. Each row counts how many pairs answered and named you, your best position, and the pairs gained, lost and moved since the latest earlier run with answers.
+      security:
+        - apiKey: [results:read]
+        - session: [results:read]
+      parameters:
+        - $ref: "#/components/parameters/surface"
+        - $ref: "#/components/parameters/model"
+      responses:
+        "200":
+          description: The table.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuestionTable"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/Unavailable"
   /v1/answers/{id}:
     parameters:
       - $ref: "#/components/parameters/id"
@@ -747,12 +778,16 @@ paths:
     get:
       tags: [results]
       operationId: getMentionRates
-      summary: The mention rate and the citation rate per run for each series.
+      summary: The mention rate and the citation rate per run for each line.
+      description: One line per pair, or with by=surface one per surface, combining its models only where they share an endpoint and fidelity.
       security:
         - apiKey: [results:read]
         - session: [results:read]
       parameters:
         - $ref: "#/components/parameters/since"
+        - $ref: "#/components/parameters/surface"
+        - $ref: "#/components/parameters/model"
+        - $ref: "#/components/parameters/by"
       responses:
         "200":
           description: One entry per series.
@@ -781,6 +816,8 @@ paths:
         - session: [results:read]
       parameters:
         - $ref: "#/components/parameters/since"
+        - $ref: "#/components/parameters/surface"
+        - $ref: "#/components/parameters/model"
       responses:
         "200":
           description: One entry per series.
@@ -790,6 +827,65 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/ShareSeries"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /v1/metrics/summary:
+    get:
+      tags: [results]
+      operationId: getResultsSummary
+      summary: The headline per run, oldest first.
+      description: How many question and pair answers named or cited you out of those answered, and your share of brand mentions. It counts pairs; it is not an average of line rates.
+      security:
+        - apiKey: [results:read]
+        - session: [results:read]
+      parameters:
+        - $ref: "#/components/parameters/since"
+        - $ref: "#/components/parameters/surface"
+        - $ref: "#/components/parameters/model"
+      responses:
+        "200":
+          description: One entry per run with answers in scope.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RunSummary"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /v1/metrics/competitors:
+    get:
+      tags: [results]
+      operationId: getCompetitors
+      summary: Share of voice and the brand by surface heatmap over the runs in range.
+      description: Technologies are left out. Each heatmap cell is the share of a line's answers that named the brand.
+      security:
+        - apiKey: [results:read]
+        - session: [results:read]
+      parameters:
+        - $ref: "#/components/parameters/since"
+        - $ref: "#/components/parameters/surface"
+        - $ref: "#/components/parameters/model"
+        - $ref: "#/components/parameters/by"
+      responses:
+        "200":
+          description: Share of voice and the heatmap.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Competitors"
         "400":
           $ref: "#/components/responses/BadRequest"
         "401":
@@ -2072,6 +2168,26 @@ components:
       description: Only runs started at or after this time, as a date such as 2026-11-01 (midnight UTC) or an RFC 3339 time. Omit for all time.
       schema:
         type: string
+    surface:
+      name: surface
+      in: query
+      description: Only this surface. Omit for every surface.
+      schema:
+        $ref: "#/components/schemas/SurfaceKey"
+    model:
+      name: model
+      in: query
+      description: Only pairs on this model, such as claude-sonnet-4-5. Omit for every model.
+      schema:
+        type: string
+    by:
+      name: by
+      in: query
+      description: What one line is. pair is one per surface and model pair; surface is one per surface, combining its models only where they share an endpoint and fidelity, with pair id 0 and an empty model.
+      schema:
+        type: string
+        enum: [pair, surface]
+        default: pair
   responses:
     BadRequest:
       description: The request is malformed. The message says which field.
@@ -3084,13 +3200,17 @@ components:
           description: Your position, 1 first. Null when not named.
     PairChange:
       type: object
-      required: [question_id, pair_id, outcome, before, after]
+      required: [question_id, pair_id, question, pair, outcome, before, after]
       properties:
         question_id:
           type: integer
           description: In the after run's question set, except for an older question with no successor, which keeps its own id.
         pair_id:
           type: integer
+        question:
+          $ref: "#/components/schemas/QuestionRef"
+        pair:
+          $ref: "#/components/schemas/PairRef"
         outcome:
           $ref: "#/components/schemas/Outcome"
         before:
@@ -3173,8 +3293,21 @@ components:
       allOf:
         - $ref: "#/components/schemas/Series"
         - type: object
-          required: [points]
+          required: [answered, named, cited, best_position, points]
           properties:
+            answered:
+              type: integer
+              description: Runs whose answer did not fail.
+            named:
+              type: integer
+              description: Runs whose answer named you.
+            cited:
+              type: integer
+              description: Runs whose answer cited your domains.
+            best_position:
+              type: [integer, "null"]
+              minimum: 1
+              description: Your best position over these runs. Null when never named.
             points:
               type: array
               items:
@@ -3225,8 +3358,13 @@ components:
       allOf:
         - $ref: "#/components/schemas/Series"
         - type: object
-          required: [points]
+          required: [models, points]
           properties:
+            models:
+              type: array
+              items:
+                type: string
+              description: The models the line combines. One on a pair line, none on an app surface, which picks its own.
             points:
               type: array
               items:
@@ -3284,6 +3422,198 @@ components:
               items:
                 $ref: "#/components/schemas/SharePoint"
               description: One per run, oldest first. Plot by run, not by day.
+    RunSummary:
+      type: object
+      description: One run's headline over the pairs in scope. It counts pairs; it is not an average of line rates.
+      required: [run_id, run_started_at, answered, mentioned, cited, mention_rate, citation_rate, mentions, share]
+      properties:
+        run_id:
+          type: integer
+        run_started_at:
+          type: string
+          format: date-time
+          description: When the run started, or was queued if it never started.
+        answered:
+          type: integer
+          description: Question and pair answers that did not fail.
+        mentioned:
+          type: integer
+          description: Answers that named you.
+        cited:
+          type: integer
+          description: Answers that cited your domains.
+        mention_rate:
+          type: [number, "null"]
+          minimum: 0
+          maximum: 1
+          description: mentioned over answered. Null when none answered.
+        citation_rate:
+          type: [number, "null"]
+          minimum: 0
+          maximum: 1
+          description: cited over answered. Null when none answered.
+        mentions:
+          type: integer
+          description: Mentions of you and your competitors, the share's denominator.
+        share:
+          type: [number, "null"]
+          minimum: 0
+          maximum: 1
+          description: Your mentions over mentions. Null when no brand was named.
+    BrandStanding:
+      type: object
+      description: One brand's mentions over every run and line in range.
+      required: [brand_id, name, kind, mentions, share, rank]
+      properties:
+        brand_id:
+          type: integer
+        name:
+          type: string
+        kind:
+          type: string
+          enum: [self, competitor]
+          description: Technologies never count.
+        mentions:
+          type: integer
+          description: Answers that named the brand.
+        share:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: mentions over every brand's mentions.
+        rank:
+          type: integer
+          minimum: 0
+          description: 1 for the most mentioned, shared by brands with equal mentions. 0 for a brand never named.
+    HeatCell:
+      type: object
+      required: [brand_id, named, rate]
+      properties:
+        brand_id:
+          type: integer
+        named:
+          type: integer
+          description: Answers on this line that named the brand.
+        rate:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: named over the line's answered.
+    HeatColumn:
+      allOf:
+        - $ref: "#/components/schemas/Series"
+        - type: object
+          required: [models, answered, cells]
+          properties:
+            models:
+              type: array
+              items:
+                type: string
+              description: The models the line combines. None on an app surface.
+            answered:
+              type: integer
+            cells:
+              type: array
+              items:
+                $ref: "#/components/schemas/HeatCell"
+              description: One per brand the line's answers named. A brand missing here was named 0 times.
+    Competitors:
+      type: object
+      required: [runs, answered, mentions, brands_named, brands, columns]
+      properties:
+        runs:
+          type: integer
+          description: Runs counted.
+        answered:
+          type: integer
+          description: Question and pair answers that did not fail.
+        mentions:
+          type: integer
+          description: Mentions of you and your competitors, the share's denominator.
+        brands_named:
+          type: integer
+          description: Brands named at least once, the M in "your rank N of M".
+        brands:
+          type: array
+          items:
+            $ref: "#/components/schemas/BrandStanding"
+          description: You and every competitor named, most mentioned first. You are listed even when never named.
+        columns:
+          type: array
+          items:
+            $ref: "#/components/schemas/HeatColumn"
+          description: One per line, in pair order.
+    Cell:
+      type: object
+      description: One pair's answer to one question.
+      required: [answer_id, status, mentioned, cited, position, outcome]
+      properties:
+        answer_id:
+          type: integer
+        status:
+          $ref: "#/components/schemas/AnswerStatus"
+        mentioned:
+          type: boolean
+        cited:
+          type: boolean
+        position:
+          type: [integer, "null"]
+          minimum: 1
+          description: Your position, 1 first. Null when not named.
+        outcome:
+          $ref: "#/components/schemas/Outcome"
+    QuestionRow:
+      type: object
+      required: [question, cells, answered, named, cited, best_position, gained, lost, moved]
+      properties:
+        question:
+          $ref: "#/components/schemas/QuestionRef"
+        cells:
+          type: array
+          items:
+            oneOf:
+              - $ref: "#/components/schemas/Cell"
+              - type: "null"
+          description: One per column, in column order. Null where that pair has no answer to this question.
+        answered:
+          type: integer
+          description: Cells that did not fail.
+        named:
+          type: integer
+          description: Cells that named you.
+        cited:
+          type: integer
+          description: Cells that cited your domains.
+        best_position:
+          type: [integer, "null"]
+          minimum: 1
+          description: Your best position across the row. Null when no cell named you.
+        gained:
+          type: integer
+          description: Cells that gained a mention since the previous run.
+        lost:
+          type: integer
+        moved:
+          type: integer
+    QuestionTable:
+      type: object
+      required: [run_id, previous_run_id, columns, rows]
+      properties:
+        run_id:
+          type: integer
+        previous_run_id:
+          type: [integer, "null"]
+          description: The run changes count from, the latest earlier run with answers. Null on the first run.
+        columns:
+          type: array
+          items:
+            $ref: "#/components/schemas/Series"
+          description: One per pair, endpoint and fidelity in scope, in pair order.
+        rows:
+          type: array
+          items:
+            $ref: "#/components/schemas/QuestionRow"
+          description: In question order.
     Gap:
       type: object
       description: A question where at least one pair did not name you in the run.

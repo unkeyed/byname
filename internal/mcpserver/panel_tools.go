@@ -43,6 +43,9 @@ type (
 	jobList struct {
 		Jobs []results.Job `json:"jobs"`
 	}
+	summaryList struct {
+		Runs []results.RunSummary `json:"runs"`
+	}
 )
 
 type deleted struct {
@@ -67,8 +70,19 @@ type updateSurfaceInput struct {
 	config.SurfaceInput
 }
 
-type sinceInput struct {
+type scopedInput struct {
 	Since *time.Time `json:"since,omitempty" jsonschema:"only runs started at or after this RFC 3339 time; omit for all time"`
+	results.Scope
+}
+
+type linesInput struct {
+	scopedInput
+	By results.Grouping `json:"by,omitempty" jsonschema:"pair (default): one line per surface and model pair; surface: one per surface, combining its models only where they share an endpoint and fidelity"`
+}
+
+type runQuestionsInput struct {
+	ID int64 `json:"id" jsonschema:"the run's id"`
+	results.Scope
 }
 
 type compareInput struct {
@@ -217,17 +231,33 @@ func addResultTools(srv *mcp.Server, svc app.Services) {
 		func(ctx context.Context, _ core.Actor, in historyInput) (results.History, error) {
 			return r.QuestionHistory(ctx, in.QuestionID, in.Since)
 		})
+	addTool(srv, core.ResultsRead, &mcp.Tool{Name: "run_questions", Annotations: readOnly(),
+		Description: "One run as the questions table: a row per question and a column per pair, each cell named, cited and position with its change since the previous run, and per row how many pairs named you and your best position. GET /v1/runs/{id}/questions."},
+		func(ctx context.Context, _ core.Actor, in runQuestionsInput) (results.QuestionTable, error) {
+			return r.RunQuestions(ctx, in.ID, in.Scope)
+		})
 	addTool(srv, core.ResultsRead, &mcp.Tool{Name: "mention_rates", Annotations: readOnly(),
-		Description: "Mention rate and citation rate per run for each series (pair, endpoint and fidelity). GET /v1/metrics/rates."},
-		func(ctx context.Context, _ core.Actor, in sinceInput) (rateList, error) {
-			v, err := r.Rates(ctx, in.Since)
+		Description: "Mention rate and citation rate per run for each line: one per pair, or per surface with by=surface. Filter by surface and model. GET /v1/metrics/rates."},
+		func(ctx context.Context, _ core.Actor, in linesInput) (rateList, error) {
+			v, err := r.Rates(ctx, in.Since, in.Scope, in.By)
 			return rateList{v}, err
 		})
 	addTool(srv, core.ResultsRead, &mcp.Tool{Name: "share_of_mentions", Annotations: readOnly(),
-		Description: "Each brand's share of mentions against your competitors, per run for each series. Technologies are left out. GET /v1/metrics/share."},
-		func(ctx context.Context, _ core.Actor, in sinceInput) (shareList, error) {
-			v, err := r.Share(ctx, in.Since)
+		Description: "Each brand's share of mentions against your competitors, per run for each series. Technologies are left out. Filter by surface and model. GET /v1/metrics/share."},
+		func(ctx context.Context, _ core.Actor, in scopedInput) (shareList, error) {
+			v, err := r.Share(ctx, in.Since, in.Scope)
 			return shareList{v}, err
+		})
+	addTool(srv, core.ResultsRead, &mcp.Tool{Name: "results_summary", Annotations: readOnly(),
+		Description: "The headline per run: how many question and pair answers named or cited you out of those answered, and your share of brand mentions. Filter by surface and model. GET /v1/metrics/summary."},
+		func(ctx context.Context, _ core.Actor, in scopedInput) (summaryList, error) {
+			v, err := r.Summary(ctx, in.Since, in.Scope)
+			return summaryList{v}, err
+		})
+	addTool(srv, core.ResultsRead, &mcp.Tool{Name: "competitors", Annotations: readOnly(),
+		Description: "Share of voice over the runs in range: each brand's mentions, share and rank, and how often each line's answers named each brand. Technologies are left out. GET /v1/metrics/competitors."},
+		func(ctx context.Context, _ core.Actor, in linesInput) (results.Competitors, error) {
+			return r.Competitors(ctx, in.Since, in.Scope, in.By)
 		})
 	addTool(srv, core.ResultsRead, &mcp.Tool{Name: "gaps", Annotations: readOnly(),
 		Description: "Questions where at least one pair did not name you on a run, ranked by opportunity, with the competitors named instead and the searches the engines ran. GET /v1/gaps."},

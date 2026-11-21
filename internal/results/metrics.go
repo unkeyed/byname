@@ -3,6 +3,7 @@ package results
 import (
 	"cmp"
 	"context"
+	"errors"
 	"fmt"
 	"maps"
 	"slices"
@@ -30,40 +31,68 @@ type RatePoint struct {
 
 type RateSeries struct {
 	Series
+	// Models are the models the line combines: one on a pair line, none on
+	// an app surface, which picks its own.
+	Models []string    `json:"models"`
 	Points []RatePoint `json:"points"`
 }
 
-// Rates is the mention rate and citation rate per run for each series.
-// since limits it to runs started then or later; nil is all time.
-func (s *Service) Rates(ctx context.Context, since *time.Time) ([]RateSeries, error) {
-	rows, err := s.db.Query(ctx, `SELECT m.id, m.surface_key, coalesce(m.model, ''), a.endpoint, a.fidelity,
-			a.run_id, coalesce(r.started_at, r.queued_at), count(*), count(*) FILTER (WHERE a.status <> 'failed'),
-			count(*) FILTER (WHERE a.mentioned), count(*) FILTER (WHERE a.cited)
-		FROM answer a JOIN run r ON r.id = a.run_id JOIN surface_model m ON m.id = a.surface_model_id
-		WHERE $1::timestamptz IS NULL OR coalesce(r.started_at, r.queued_at) >= $1
-		GROUP BY m.id, a.endpoint, a.fidelity, a.run_id, r.id
-		ORDER BY m.id, min(a.run_id) OVER (PARTITION BY m.id, a.endpoint, a.fidelity), a.endpoint, a.fidelity, a.run_id`, since)
+// Rates is the mention rate and citation rate per run for each line, one
+// per pair or per surface (by), over the pairs in scope. since limits it to
+// runs started then or later; nil is all time.
+func (s *Service) Rates(ctx context.Context, since *time.Time, sc Scope, by Grouping) ([]RateSeries, error) {
+	if by == "" {
+		by = ByPair
+	}
+	if err := errors.Join(sc.check(), by.check()); err != nil {
+		return nil, err
+	}
+	rows, err := s.db.Query(ctx, `SELECT `+lineKey+`, a.run_id, coalesce(r.started_at, r.queued_at), min(m.id), `+lineModels+`,
+			count(*), count(*) FILTER (WHERE a.status <> 'failed'), count(*) FILTER (WHERE a.mentioned), count(*) FILTER (WHERE a.cited)`+
+		scopedFrom+scopedWhere+`GROUP BY 1, 2, 3, 4, 5, 6, 7 ORDER BY 6`, scopeArgs(since, sc, by)...)
 	if err != nil {
 		return nil, err
 	}
 	out := []RateSeries{}
+	first := map[Series]int64{}
+	index := map[Series]int{}
 	for rows.Next() {
 		var sr Series
 		var p RatePoint
+		var pair int64
+		var models []string
 		if err := rows.Scan(&sr.Pair.ID, &sr.Pair.Surface, &sr.Pair.Model, &sr.Endpoint, &sr.Fidelity,
-			&p.RunID, &p.RunStartedAt, &p.Calls, &p.Answered, &p.Mentioned, &p.Cited); err != nil {
+			&p.RunID, &p.RunStartedAt, &pair, &models, &p.Calls, &p.Answered, &p.Mentioned, &p.Cited); err != nil {
 			return nil, err
 		}
 		if p.Answered > 0 {
 			p.MentionRate = new(float64(p.Mentioned) / float64(p.Answered))
 			p.CitationRate = new(float64(p.Cited) / float64(p.Answered))
 		}
-		if n := len(out); n == 0 || out[n-1].Series != sr {
-			out = append(out, RateSeries{Series: sr, Points: []RatePoint{}})
+		i, ok := index[sr]
+		if !ok {
+			i = len(out)
+			index[sr] = i
+			first[sr] = pair
+			out = append(out, RateSeries{Series: sr, Models: []string{}, Points: []RatePoint{}})
 		}
-		out[len(out)-1].Points = append(out[len(out)-1].Points, p)
+		first[sr] = min(first[sr], pair)
+		for _, m := range models {
+			if !slices.Contains(out[i].Models, m) {
+				out[i].Models = append(out[i].Models, m)
+			}
+		}
+		out[i].Points = append(out[i].Points, p)
 	}
-	return out, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	// Lines follow pair order; a pair's series stay in the order they began.
+	slices.SortStableFunc(out, func(a, b RateSeries) int { return cmp.Compare(first[a.Series], first[b.Series]) })
+	for i := range out {
+		slices.Sort(out[i].Models)
+	}
+	return out, nil
 }
 
 // BrandShare is one brand's share of the brand mentions in a series' run.
@@ -90,9 +119,9 @@ type ShareSeries struct {
 }
 
 // Share is each brand's share of mentions against your competitors, per
-// run for each series. Technologies are left out.
-func (s *Service) Share(ctx context.Context, since *time.Time) ([]ShareSeries, error) {
-	rates, err := s.Rates(ctx, since)
+// run for each pair's series in scope. Technologies are left out.
+func (s *Service) Share(ctx context.Context, since *time.Time, sc Scope) ([]ShareSeries, error) {
+	rates, err := s.Rates(ctx, since, sc, ByPair)
 	if err != nil {
 		return nil, err
 	}
@@ -101,13 +130,9 @@ func (s *Service) Share(ctx context.Context, since *time.Time) ([]ShareSeries, e
 		run    int64
 	}
 	brands := map[key][]BrandShare{}
-	rows, err := s.db.Query(ctx, `SELECT m.id, m.surface_key, coalesce(m.model, ''), a.endpoint, a.fidelity, a.run_id,
-			b.id, b.name, b.kind, count(*)
-		FROM answer a JOIN run r ON r.id = a.run_id JOIN surface_model m ON m.id = a.surface_model_id
-		JOIN brand_mention bm ON bm.answer_id = a.id JOIN brand b ON b.id = bm.brand_id AND b.kind <> 'technology'
-		WHERE $1::timestamptz IS NULL OR coalesce(r.started_at, r.queued_at) >= $1
-		GROUP BY m.id, a.endpoint, a.fidelity, a.run_id, b.id
-		ORDER BY count(*) DESC, b.name`, since)
+	rows, err := s.db.Query(ctx, `SELECT `+lineKey+`, a.run_id, b.id, b.name, b.kind, count(*)`+scopedFrom+`
+			JOIN brand_mention bm ON bm.answer_id = a.id JOIN brand b ON b.id = bm.brand_id AND b.kind <> 'technology'`+
+		scopedWhere+`GROUP BY 1, 2, 3, 4, 5, 6, 7 ORDER BY count(*) DESC, b.name`, scopeArgs(since, sc, ByPair)...)
 	if err != nil {
 		return nil, err
 	}
@@ -139,6 +164,52 @@ func (s *Service) Share(ctx context.Context, since *time.Time) ([]ShareSeries, e
 		}
 	}
 	return out, nil
+}
+
+// RunSummary is one run's headline over the pairs in scope: how many
+// question and pair answers named or cited you, and your share of the
+// brand mentions. It counts pairs; it is not an average of line rates.
+type RunSummary struct {
+	RunID        int64     `json:"run_id"`
+	RunStartedAt time.Time `json:"run_started_at"`
+	Answered     int       `json:"answered" jsonschema:"question and pair answers that did not fail"`
+	Mentioned    int       `json:"mentioned" jsonschema:"answers that named you"`
+	Cited        int       `json:"cited" jsonschema:"answers that cited your domains"`
+	MentionRate  *float64  `json:"mention_rate" jsonschema:"mentioned over answered; null when none answered"`
+	CitationRate *float64  `json:"citation_rate" jsonschema:"cited over answered; null when none answered"`
+	Mentions     int       `json:"mentions" jsonschema:"mentions of you and your competitors, the share's denominator"`
+	Share        *float64  `json:"share" jsonschema:"your mentions over mentions; null when no brand was named"`
+}
+
+// Summary is the headline per run over the pairs in scope, oldest run first.
+func (s *Service) Summary(ctx context.Context, since *time.Time, sc Scope) ([]RunSummary, error) {
+	if err := sc.check(); err != nil {
+		return nil, err
+	}
+	rows, err := s.db.Query(ctx, `SELECT a.run_id, coalesce(r.started_at, r.queued_at),
+			count(*) FILTER (WHERE a.status <> 'failed'), count(*) FILTER (WHERE a.mentioned), count(*) FILTER (WHERE a.cited),
+			coalesce(sum(n.brands), 0)::int, coalesce(sum(n.self), 0)::int`+scopedFrom+`
+			CROSS JOIN LATERAL (SELECT count(*) AS brands, count(*) FILTER (WHERE b.kind = 'self') AS self
+				FROM brand_mention bm JOIN brand b ON b.id = bm.brand_id AND b.kind <> 'technology' WHERE bm.answer_id = a.id) n`+
+		scopedWhere+`GROUP BY 1, 2 ORDER BY 1`, scopeArgs(since, sc, "")[:3]...)
+	if err != nil {
+		return nil, err
+	}
+	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (RunSummary, error) {
+		var x RunSummary
+		var self int
+		if err := r.Scan(&x.RunID, &x.RunStartedAt, &x.Answered, &x.Mentioned, &x.Cited, &x.Mentions, &self); err != nil {
+			return x, err
+		}
+		if x.Answered > 0 {
+			x.MentionRate = new(float64(x.Mentioned) / float64(x.Answered))
+			x.CitationRate = new(float64(x.Cited) / float64(x.Answered))
+		}
+		if x.Mentions > 0 {
+			x.Share = new(float64(self) / float64(x.Mentions))
+		}
+		return x, nil
+	})
 }
 
 // Gap is a question where at least one pair did not name you on a run.

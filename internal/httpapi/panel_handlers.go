@@ -235,12 +235,21 @@ func (s *server) questionHistory(w http.ResponseWriter, r *http.Request, _ core.
 	return respond(w, http.StatusOK, v, err)
 }
 
+func (s *server) runQuestions(w http.ResponseWriter, r *http.Request, _ core.Actor) error {
+	id, err := pathID(r, "run")
+	if err != nil {
+		return err
+	}
+	v, err := s.svc.Results.RunQuestions(r.Context(), id, queryScope(r))
+	return respond(w, http.StatusOK, v, err)
+}
+
 func (s *server) mentionRates(w http.ResponseWriter, r *http.Request, _ core.Actor) error {
 	since, err := querySince(r)
 	if err != nil {
 		return err
 	}
-	v, err := s.svc.Results.Rates(r.Context(), since)
+	v, err := s.svc.Results.Rates(r.Context(), since, queryScope(r), results.Grouping(r.URL.Query().Get("by")))
 	return respond(w, http.StatusOK, v, err)
 }
 
@@ -249,7 +258,25 @@ func (s *server) shareOfMentions(w http.ResponseWriter, r *http.Request, _ core.
 	if err != nil {
 		return err
 	}
-	v, err := s.svc.Results.Share(r.Context(), since)
+	v, err := s.svc.Results.Share(r.Context(), since, queryScope(r))
+	return respond(w, http.StatusOK, v, err)
+}
+
+func (s *server) summary(w http.ResponseWriter, r *http.Request, _ core.Actor) error {
+	since, err := querySince(r)
+	if err != nil {
+		return err
+	}
+	v, err := s.svc.Results.Summary(r.Context(), since, queryScope(r))
+	return respond(w, http.StatusOK, v, err)
+}
+
+func (s *server) competitors(w http.ResponseWriter, r *http.Request, _ core.Actor) error {
+	since, err := querySince(r)
+	if err != nil {
+		return err
+	}
+	v, err := s.svc.Results.Competitors(r.Context(), since, queryScope(r), results.Grouping(r.URL.Query().Get("by")))
 	return respond(w, http.StatusOK, v, err)
 }
 
@@ -290,6 +317,12 @@ func queryInt(r *http.Request, name string) (int, error) {
 		return 0, fmt.Errorf("%w: %s must be a whole number, got %q", core.ErrInvalid, name, raw)
 	}
 	return n, nil
+}
+
+// queryScope reads ?surface= and ?model=; the results service checks them.
+func queryScope(r *http.Request) results.Scope {
+	q := r.URL.Query()
+	return results.Scope{Surface: engines.Surface(q.Get("surface")), Model: q.Get("model")}
 }
 
 // querySince reads ?since= as an RFC 3339 time or a date (midnight UTC).

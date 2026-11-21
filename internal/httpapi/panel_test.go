@@ -120,6 +120,8 @@ func TestConfigureAndReadAChecksResults(t *testing.T) {
 		fmt.Sprintf("/v1/runs/%d", run.ID),
 		fmt.Sprintf("/v1/questions/%d/history?since=2026-01-01", questions.Questions[0].ID),
 		"/v1/metrics/rates", "/v1/metrics/share?since=2026-01-01T00:00:00Z", "/v1/gaps", "/v1/jobs?limit=5",
+		"/v1/metrics/rates?by=surface&surface=claude_code", "/v1/metrics/summary?model=claude-sonnet-5-5",
+		"/v1/metrics/competitors?by=surface", fmt.Sprintf("/v1/runs/%d/questions?surface=claude_code", run.ID),
 	} {
 		get(path, nil)
 	}
@@ -138,6 +140,8 @@ func TestConfigureAndReadAChecksResults(t *testing.T) {
 	for _, tc := range []struct{ method, path, want string }{
 		{"GET", "/v1/compare?before=1", "before"},
 		{"GET", "/v1/metrics/rates?since=yesterday", "since"},
+		{"GET", "/v1/metrics/rates?by=engine", "by"},
+		{"GET", "/v1/metrics/competitors?surface=myspace", "surface"},
 		{"GET", "/v1/runs?limit=500", "limit"},
 		{"PUT", "/v1/surfaces/claude_code", "model list"},
 	} {
@@ -207,7 +211,8 @@ func TestMCPToolsServeTheSameResults(t *testing.T) {
 		"get_question_set": {"id": 1}, "list_surfaces": nil, "list_surface_models": {"surface": "claude_code"},
 		"list_runs": nil, "get_run": {"id": run.ID}, "list_run_answers": {"id": run.ID}, "get_answer": {"id": answers[0].ID},
 		"compare_runs": {"before": run.ID, "after": run.ID}, "question_history": {"question_id": questions.Questions[0].ID},
-		"mention_rates": {"since": "2026-01-01T00:00:00Z"}, "share_of_mentions": nil, "gaps": nil, "list_jobs": {"limit": 5},
+		"mention_rates": {"since": "2026-01-01T00:00:00Z", "by": "surface"}, "share_of_mentions": {"surface": "claude_code"}, "gaps": nil, "list_jobs": {"limit": 5},
+		"run_questions": {"id": run.ID}, "results_summary": nil, "competitors": {"by": "surface"},
 	} {
 		res, err := cs.CallTool(context.Background(), &mcp.CallToolParams{Name: name, Arguments: args})
 		if err != nil || res.IsError {
