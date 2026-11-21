@@ -154,24 +154,42 @@ func (s *server) gscServiceAccount(w http.ResponseWriter, r *http.Request, _ cor
 	})
 }
 
-// gscOAuthStart responds {"url": "..."}: Google's consent page, which the
-// browser opens next.
+// gscOAuthStart takes an optional body {"return_to": "settings" or
+// "onboarding"} and responds {"url": "..."}: Google's consent page, which
+// the browser opens next.
 func (s *server) gscOAuthStart(w http.ResponseWriter, r *http.Request, a core.Actor) error {
+	var b struct {
+		ReturnTo string `json:"return_to"`
+	}
+	if r.ContentLength != 0 {
+		if err := readJSON(r, &b); err != nil {
+			return err
+		}
+	}
+	back, err := gsc.ParseReturn(b.ReturnTo)
+	if err != nil {
+		return err
+	}
 	return s.recentOnly(r, func() error {
-		u, err := s.svc.GSC.StartOAuth(a)
+		u, err := s.svc.GSC.StartOAuth(a, back)
 		return respond(w, http.StatusOK, map[string]string{"url": u}, err)
 	})
 }
 
-// gscBack is the Settings tab the Google sign-in returns to.
-const gscBack = "/settings/search-console"
+// gscBack is the page each Return sends the browser to after Google.
+var gscBack = map[gsc.Return]string{
+	gsc.ReturnSettings:   "/settings/search-console",
+	gsc.ReturnOnboarding: "/onboarding/search_console",
+}
 
 // gscOAuthCallback is where Google sends the browser back. It is public so
-// that it can always redirect to Settings > Search Console, with ?error=
-// when connecting failed, including when the admin's session ended during
-// Google's consent page; it checks for that session itself.
+// that it can always redirect to the page the sign-in started from
+// (Settings > Search Console or onboarding), with ?error= when connecting
+// failed, including when the admin's session ended during Google's consent
+// page; it checks for that session itself.
 func (s *server) gscOAuthCallback(w http.ResponseWriter, r *http.Request, _ core.Actor) error {
 	q := r.URL.Query()
+	back := gscBack[s.svc.GSC.OAuthReturn(q.Get("state"))]
 	a, err := s.authn.Caller(r)
 	switch {
 	case err != nil && statusOf(callerErr(err)) >= 500:
@@ -182,7 +200,7 @@ func (s *server) gscOAuthCallback(w http.ResponseWriter, r *http.Request, _ core
 		err = s.svc.GSC.FinishOAuth(r.Context(), a, gsc.OAuthCallback{State: q.Get("state"), Code: q.Get("code"), Error: q.Get("error")})
 	}
 	if err == nil {
-		http.Redirect(w, r, gscBack+"?connected=google", http.StatusSeeOther)
+		http.Redirect(w, r, back+"?connected=google", http.StatusSeeOther)
 		return nil
 	}
 	msg := err.Error()
@@ -190,7 +208,7 @@ func (s *server) gscOAuthCallback(w http.ResponseWriter, r *http.Request, _ core
 		s.log.Error("Search Console sign-in failed", "err", err)
 		msg = "connecting Search Console failed on the server; try again"
 	}
-	http.Redirect(w, r, gscBack+"?error="+url.QueryEscape(msg), http.StatusSeeOther)
+	http.Redirect(w, r, back+"?error="+url.QueryEscape(msg), http.StatusSeeOther)
 	return nil
 }
 

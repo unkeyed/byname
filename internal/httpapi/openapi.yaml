@@ -1726,9 +1726,22 @@ paths:
       tags: [search]
       operationId: startSearchConsoleOAuth
       summary: Start connecting Search Console with Google sign-in, read-only.
-      description: Needs a recent sign-in and GSC_GOOGLE_CLIENT_ID. Open the returned URL in the browser; Google sends it back to /auth/gsc/callback, which stores the refresh token sealed and redirects to Settings > Search Console.
+      description: Needs a recent sign-in and GSC_GOOGLE_CLIENT_ID. Open the returned URL in the browser; Google sends it back to /auth/gsc/callback, which stores the refresh token sealed and redirects to the page return_to names, Settings > Search Console by default.
       security:
         - session: [admin]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                return_to:
+                  type: string
+                  enum: [settings, onboarding]
+                  default: settings
+                  description: Where the browser goes after Google. One of these names, never a URL.
       responses:
         "200":
           description: Google's consent page.
