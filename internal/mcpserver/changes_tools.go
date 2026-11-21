@@ -90,7 +90,7 @@ func addChangeTools(srv *mcp.Server, svc app.Services) {
 			return deleted{in.ID}, svc.Changes.DeleteControlPage(ctx, in.ID)
 		})
 	addTool(srv, core.ConfigWrite, &mcp.Tool{Name: "update_path_rules", Annotations: mutates(false, true),
-		Description: "Replace the rules that map a pull request's changed files to page URLs. They apply to pull requests polled from now on. PUT /v1/repo/rules."},
+		Description: "Replace the rules that map a pull request's changed files to page URLs. The next poll reads the last 30 days of merges again with them. PUT /v1/repo/rules."},
 		func(ctx context.Context, _ core.Actor, in rulesInput) (changes.RepoStatus, error) {
 			if in.Rules == nil {
 				return changes.RepoStatus{}, fmt.Errorf("%w: rules is required; send [] for none", core.ErrInvalid)

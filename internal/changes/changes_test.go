@@ -156,6 +156,31 @@ func TestPollStoresOneChangePerPullAndPageAndRepollsWithoutDuplicates(t *testing
 	}
 }
 
+func TestRulesAddedAfterAPollFindRecentMerges(t *testing.T) {
+	e := newEnv(t, "UTC")
+	if _, err := e.svc.ConnectRepo(e.ctx, changes.RepoInput{Repo: "northwind/site", Token: token}); err != nil {
+		t.Fatal(err)
+	}
+	e.gh.AddPull(githubtest.Pull{Number: 3, Title: "Launch post", MergedAt: ago(e.now, 5*24*time.Hour), Updated: e.now.Add(-5 * 24 * time.Hour),
+		Files: []githubtest.File{{Name: "content/blog/launch.mdx", Status: "added"}}})
+	if err := e.svc.Tick(e.ctx); err != nil {
+		t.Fatal(err)
+	}
+	if n := e.count(`SELECT count(*) FROM change`); n != 0 {
+		t.Fatalf("%d changes without path rules, want 0", n)
+	}
+	if _, err := e.svc.SetRules(e.ctx, []changes.Rule{{Glob: "content/blog/*.mdx", URL: site + "blog/{1}"}}); err != nil {
+		t.Fatal(err)
+	}
+	e.now = e.now.Add(time.Minute)
+	if err := e.svc.Tick(e.ctx); err != nil {
+		t.Fatal(err)
+	}
+	if list := e.list(); len(list) != 1 || list[0].URL != site+"blog/launch" {
+		t.Fatalf("after adding a rule the next tick found %+v, want the launch post", list)
+	}
+}
+
 func TestTokenExpiringFiresOnce(t *testing.T) {
 	e := newEnv(t, "UTC")
 	far := e.now.Add(60 * 24 * time.Hour)

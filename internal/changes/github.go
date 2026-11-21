@@ -257,8 +257,9 @@ func (s *Service) DisconnectRepo(ctx context.Context) error {
 	return err
 }
 
-// SetRules replaces the path rules. They apply to pull requests polled
-// from now on.
+// SetRules replaces the path rules. The next poll reads the last 30 days
+// of merges again with them, so rules added after connecting still find
+// recent changes; the upsert keeps changes already found.
 func (s *Service) SetRules(ctx context.Context, rules []Rule) (RepoStatus, error) {
 	if rules == nil {
 		return RepoStatus{}, fmt.Errorf("%w: rules is required; send [] for none", core.ErrInvalid)
@@ -275,7 +276,9 @@ func (s *Service) SetRules(ctx context.Context, rules []Rule) (RepoStatus, error
 	if err != nil {
 		return RepoStatus{}, err
 	}
-	tag, err := s.db.Exec(ctx, `UPDATE repo_connection SET path_rules = $1`, raw)
+	tag, err := s.db.Exec(ctx, `UPDATE repo_connection SET path_rules = $1,
+		polled_through = CASE WHEN path_rules = $1 THEN polled_through END,
+		last_poll_at = CASE WHEN path_rules = $1 THEN last_poll_at END`, raw)
 	if err != nil {
 		return RepoStatus{}, err
 	}
@@ -320,8 +323,9 @@ func (s *Service) warnExpiry(ctx context.Context, r repo, expires *time.Time) er
 const (
 	maxPullPages = 10
 	maxFilePages = 30
-	// firstLookback is how far back the first poll after connecting reads
-	// merges, so recent changes show up at once.
+	// firstLookback is how far back the first poll after connecting, or
+	// after the rules change, reads merges, so recent changes show up at
+	// once.
 	firstLookback = 30 * 24 * time.Hour
 )
 

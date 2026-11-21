@@ -2133,7 +2133,7 @@ paths:
       tags: [changes]
       operationId: putRepoRules
       summary: Replace the rules that map a pull request's changed files to page URLs.
-      description: The first glob a file matches gives its page. In a glob, * matches within one path segment and ** across any number. In the URL, {1}, {2} are what each wildcard matched. They apply to pull requests polled from now on.
+      description: The first glob a file matches gives its page. In a glob, * matches within one path segment and ** across any number. In the URL, {1}, {2} are what each wildcard matched. Changed rules make the next poll read the last 30 days of merges again with them.
       security:
         - apiKey: [config:write]
         - session: [config:write]
