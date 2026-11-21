@@ -135,7 +135,7 @@ function TermsForm({ onDone }: { onDone: () => void }) {
     <DialogBody>
       <div className="space-y-4">
         <p className="text-sm text-muted">
-          A Search Console query that contains any of these is brand. Matching ignores case. {settings.data.branded_terms_default ? "These are the default: your brand's name and aliases." : "The default is your brand's name and aliases."}
+          A Search Console query that contains any of these is brand. Matching ignores case. {settings.data.branded_terms_default && terms === null ? "These are the default: your brand's name and aliases." : "The default is your brand's name and aliases."}
         </p>
         <div className="flex min-h-8 flex-wrap gap-1.5" aria-label="Terms">
           {list.length === 0 ? (
