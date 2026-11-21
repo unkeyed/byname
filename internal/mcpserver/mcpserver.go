@@ -15,6 +15,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"reflect"
 	"strings"
 	"time"
 
@@ -23,6 +24,7 @@ import (
 	mcpauth "github.com/modelcontextprotocol/go-sdk/auth"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/unkeyed/byname/internal/app"
 	"github.com/unkeyed/byname/internal/auth"
 	"github.com/unkeyed/byname/internal/core"
 	"github.com/unkeyed/byname/internal/instance"
@@ -34,7 +36,7 @@ const actorKey = "actor"
 // so a client can tell which tools its connection may call.
 const ScopeMeta = "byname.dev/scope"
 
-const instructions = `Byname tracks how this team's brand shows up in AI answers and in Google Search Console. Call status for the version and whether onboarding is done. Each tool's _meta names the scope it needs ("byname.dev/scope"); a tool your connection lacks the scope for fails, and the person who approved this connection can reconnect it with more.`
+const instructions = `Byname tracks how this team's brand shows up in AI answers and in Google Search Console. It asks a fixed panel of questions on surfaces (the places people ask, such as the ChatGPT app or Claude Code), each with one or more models; a surface and model pair is a series with its own fidelity label (app, model_match or approximation), and series are never averaged together. A run asks every question on every pair. Start with list_runs, then compare_runs for what was gained or lost, gaps for questions where you were not named, and question_history for one question over time. Mentions (your name in the text) and citations (a link to your domains) are separate. Each tool's _meta names the scope it needs ("byname.dev/scope"); a tool your connection lacks the scope for fails, and the person who approved this connection can reconnect it with more.`
 
 // AccessTokens verifies the OAuth access tokens /mcp accepts:
 // auth.OAuthServer in production.
@@ -47,7 +49,7 @@ type AccessTokens interface {
 
 // Handler returns the /mcp handler. Stateless, so any replica serves any
 // request without sticky sessions.
-func Handler(svc *instance.Service, tokens AccessTokens, version string) http.Handler {
+func Handler(svc app.Services, tokens AccessTokens, version string) http.Handler {
 	srv := mcp.NewServer(&mcp.Implementation{Name: "byname", Version: version}, &mcp.ServerOptions{Instructions: instructions})
 	addTools(srv, svc)
 	h := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server { return srv },
@@ -109,11 +111,11 @@ func readOnly() *mcp.ToolAnnotations {
 // that ignore structured content. Errors reach the agent through
 // toolError. Every tool registers here.
 func addTool[In, Out any](srv *mcp.Server, scope core.Scope, t *mcp.Tool, run func(context.Context, core.Actor, In) (Out, error)) {
-	in, err := jsonschema.For[In](nil)
+	in, err := jsonschema.For[In](schemaOptions)
 	if err != nil {
 		panic(err)
 	}
-	out, err := jsonschema.For[Out](nil)
+	out, err := jsonschema.For[Out](schemaOptions)
 	if err != nil {
 		panic(err)
 	}
@@ -162,9 +164,22 @@ func requestID() string {
 
 type noInput struct{}
 
-func addTools(srv *mcp.Server, svc *instance.Service) {
+// schemaOptions lets a raw provider response, kept as json.RawMessage, be
+// any JSON value rather than the array of bytes its Go type suggests.
+var schemaOptions = &jsonschema.ForOptions{TypeSchemas: map[reflect.Type]*jsonschema.Schema{
+	reflect.TypeFor[json.RawMessage](): {},
+}}
+
+// mutates marks a tool that changes Byname's configuration or starts work.
+func mutates(destructive, idempotent bool) *mcp.ToolAnnotations {
+	return &mcp.ToolAnnotations{DestructiveHint: new(destructive), IdempotentHint: idempotent, OpenWorldHint: new(false)}
+}
+
+func addTools(srv *mcp.Server, svc app.Services) {
 	addTool(srv, core.ResultsRead, &mcp.Tool{Name: "status", Annotations: readOnly(), Description: "Byname's version and whether onboarding is done. GET /v1/status returns the same."},
 		func(ctx context.Context, _ core.Actor, _ noInput) (instance.Status, error) {
-			return svc.Status(ctx)
+			return svc.Instance.Status(ctx)
 		})
+	addConfigTools(srv, svc)
+	addResultTools(srv, svc)
 }

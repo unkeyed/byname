@@ -34,6 +34,6 @@ func (s *server) openapi(w http.ResponseWriter, r *http.Request, _ core.Actor) e
 }
 
 func (s *server) status(w http.ResponseWriter, r *http.Request, _ core.Actor) error {
-	st, err := s.svc.Status(r.Context())
+	st, err := s.svc.Instance.Status(r.Context())
 	return respond(w, http.StatusOK, st, err)
 }

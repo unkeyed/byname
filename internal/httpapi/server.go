@@ -18,9 +18,9 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/unkeyed/byname/internal/app"
 	"github.com/unkeyed/byname/internal/auth"
 	"github.com/unkeyed/byname/internal/core"
-	"github.com/unkeyed/byname/internal/instance"
 )
 
 // access is who may call a route: one of the classes below, or the one
@@ -57,6 +57,35 @@ var routes = []route{
 
 	{"GET /v1/status", needs(core.ResultsRead), (*server).status},
 
+	{"GET /v1/settings", needs(core.ResultsRead), (*server).getSettings},
+	{"PUT /v1/settings", needs(core.ConfigWrite), (*server).putSettings},
+	{"GET /v1/brands", needs(core.ResultsRead), (*server).listBrands},
+	{"POST /v1/brands", needs(core.ConfigWrite), (*server).upsertBrand},
+	{"PUT /v1/brands/{id}", needs(core.ConfigWrite), (*server).updateBrand},
+	{"DELETE /v1/brands/{id}", needs(core.ConfigWrite), (*server).deleteBrand},
+	{"GET /v1/questions", needs(core.ResultsRead), (*server).getQuestions},
+	{"PUT /v1/questions", needs(core.ConfigWrite), (*server).putQuestions},
+	{"GET /v1/question-sets", needs(core.ResultsRead), (*server).listQuestionSets},
+	{"GET /v1/question-sets/{id}", needs(core.ResultsRead), (*server).getQuestionSet},
+	{"GET /v1/surfaces", needs(core.ResultsRead), (*server).listSurfaces},
+	{"PUT /v1/surfaces/{key}", needs(core.ConfigWrite), (*server).putSurface},
+	{"GET /v1/surfaces/{key}/models", needs(core.ResultsRead), (*server).listSurfaceModels},
+
+	{"POST /v1/runs", needs(core.RunsWrite), (*server).runNow},
+	{"POST /v1/checks/pause", needs(core.RunsWrite), (*server).pauseChecks},
+	{"POST /v1/checks/resume", needs(core.RunsWrite), (*server).resumeChecks},
+
+	{"GET /v1/runs", needs(core.ResultsRead), (*server).listRuns},
+	{"GET /v1/runs/{id}", needs(core.ResultsRead), (*server).getRun},
+	{"GET /v1/runs/{id}/answers", needs(core.ResultsRead), (*server).listRunAnswers},
+	{"GET /v1/answers/{id}", needs(core.ResultsRead), (*server).getAnswer},
+	{"GET /v1/compare", needs(core.ResultsRead), (*server).compareRuns},
+	{"GET /v1/questions/{id}/history", needs(core.ResultsRead), (*server).questionHistory},
+	{"GET /v1/metrics/rates", needs(core.ResultsRead), (*server).mentionRates},
+	{"GET /v1/metrics/share", needs(core.ResultsRead), (*server).shareOfMentions},
+	{"GET /v1/gaps", needs(core.ResultsRead), (*server).listGaps},
+	{"GET /v1/jobs", needs(core.ResultsRead), (*server).listJobs},
+
 	{"GET /v1/keys", admin, (*server).listKeys},
 	{"POST /v1/keys", admin, (*server).createKey},
 	{"DELETE /v1/keys/{id}", admin, (*server).revokeKey},
@@ -67,6 +96,9 @@ var routes = []route{
 	{"PATCH /v1/users/{id}", admin, (*server).setUserRole},
 	{"DELETE /v1/users/{id}", admin, (*server).removeUser},
 	{"POST /v1/invites", admin, (*server).createInvite},
+	{"GET /v1/credentials", admin, (*server).listCredentials},
+	{"PUT /v1/credentials/treg", admin, (*server).setTregToken},
+	{"POST /v1/credentials/treg/test", admin, (*server).testTregToken},
 
 	{"GET /v1/oauth/requests/{id}", session, (*server).consentRequest},
 	{"POST /v1/oauth/requests/{id}", session, (*server).decideConsent},
@@ -108,7 +140,7 @@ var routes = []route{
 var openapiYAML []byte
 
 type server struct {
-	svc   *instance.Service
+	svc   app.Services
 	authn *auth.Authenticator
 	keys  auth.KeyStore
 	users *auth.Users
@@ -122,7 +154,7 @@ type server struct {
 // through to the UI. Browser-reachable routes are wrapped in
 // http.CrossOriginProtection, which rejects cross-site unsafe requests and
 // lets non-browser clients (no Sec-Fetch-Site / Origin) through.
-func NewMux(svc *instance.Service, authn *auth.Authenticator, log *slog.Logger) *http.ServeMux {
+func NewMux(svc app.Services, authn *auth.Authenticator, log *slog.Logger) *http.ServeMux {
 	s := &server{svc: svc, authn: authn, keys: authn.Keys, users: authn.Users, oauth: authn.OAuth, log: log}
 	csrf := http.NewCrossOriginProtection()
 	mux := http.NewServeMux()

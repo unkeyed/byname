@@ -45,8 +45,20 @@ servers:
 tags:
   - name: system
     description: Health, status and this document.
+  - name: config
+    description: Your brand, competitors, questions, surfaces and schedule. results:read reads them and config:write changes them.
+  - name: runs
+    description: Run a check now, and pause or resume scheduled checks. Needs runs:write.
+  - name: results
+    description: >-
+      What checks recorded. Runs, answers, compare, question history, rates,
+      share of mentions, gaps and the jobs log. Plot everything by run, not by
+      day. A series is one surface and model pair on one endpoint at one
+      fidelity. Changing the endpoint or the fidelity starts a new series, and
+      no number averages across series. A mention (the answer names you) and a
+      citation (it links to one of your domains) are counted separately.
   - name: settings
-    description: Keys, apps and the team, for signed-in admins, and the consent page.
+    description: Keys, apps, the team and the Treg token, for signed-in admins, and the consent page.
   - name: auth
     description: Sign-in for people. Agents use API keys instead.
   - name: account
@@ -89,6 +101,756 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Status"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /v1/settings:
+    get:
+      tags: [config]
+      operationId: getSettings
+      summary: Your brand, market, schedule, spend caps and call limits, with whether checks are paused and when the next one is due.
+      security:
+        - apiKey: [results:read]
+        - session: [results:read]
+      responses:
+        "200":
+          description: The settings.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SettingsView"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+    put:
+      tags: [config]
+      operationId: putSettings
+      summary: Replace the settings and your own brand.
+      description: >-
+        Send every field as GET returns them, leaving out the schedule's state.
+        spend_cap_month_usd and raw_retention_days take null for none. A
+        schedule change moves the next check to the next scheduled time and
+        never makes a check due at once.
+      security:
+        - apiKey: [config:write]
+        - session: [config:write]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/Settings"
+              unevaluatedProperties: false
+      responses:
+        "200":
+          description: The settings as saved.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SettingsView"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /v1/brands:
+    get:
+      tags: [config]
+      operationId: listBrands
+      summary: Every brand Byname looks for in answers, your own first, then competitors and technologies by name.
+      security:
+        - apiKey: [results:read]
+        - session: [results:read]
+      responses:
+        "200":
+          description: Brands.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Brand"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+    post:
+      tags: [config]
+      operationId: upsertBrand
+      summary: Add a competitor or technology, or replace the one with the same name ignoring case.
+      description: Your own brand is set with PUT /v1/settings. Naming it here is 409.
+      security:
+        - apiKey: [config:write]
+        - session: [config:write]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BrandInput"
+      responses:
+        "200":
+          description: The brand as saved.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Brand"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /v1/brands/{id}:
+    parameters:
+      - $ref: "#/components/parameters/id"
+    put:
+      tags: [config]
+      operationId: updateBrand
+      summary: Replace a competitor or technology by id, which can rename it.
+      security:
+        - apiKey: [config:write]
+        - session: [config:write]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BrandInput"
+      responses:
+        "200":
+          description: The brand as saved.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Brand"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+    delete:
+      tags: [config]
+      operationId: deleteBrand
+      summary: Delete a competitor or technology and its recorded mentions.
+      description: Your own brand cannot be deleted. Its id is 404 here.
+      security:
+        - apiKey: [config:write]
+        - session: [config:write]
+      responses:
+        "204":
+          description: Deleted.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /v1/questions:
+    get:
+      tags: [config]
+      operationId: getQuestions
+      summary: The current question set, with how it carries on the version before it.
+      security:
+        - apiKey: [results:read]
+        - session: [results:read]
+      responses:
+        "200":
+          description: The current question set.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuestionSet"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          description: No question set exists yet. Create the first with PUT /v1/questions.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+    put:
+      tags: [config]
+      operationId: putQuestions
+      summary: Replace the questions, creating a new version on any change.
+      description: >-
+        Send the whole set. Sending the current set again changes nothing and
+        returns it. Any other change creates the next version. A question whose
+        text matches a current question, ignoring case and punctuation, carries
+        that question on by itself. Every other current question, changed or
+        removed, must be named in some question's replaces or in retired, or
+        the request is 400 and names them. History follows each question
+        through every version it carries on.
+      security:
+        - apiKey: [config:write]
+        - session: [config:write]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QuestionsInput"
+      responses:
+        "200":
+          description: The current question set, new or unchanged.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuestionSet"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /v1/question-sets:
+    get:
+      tags: [config]
+      operationId: listQuestionSets
+      summary: Every version of the questions, newest first.
+      security:
+        - apiKey: [results:read]
+        - session: [results:read]
+      responses:
+        "200":
+          description: Question set versions.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/QuestionSetSummary"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /v1/question-sets/{id}:
+    parameters:
+      - $ref: "#/components/parameters/id"
+    get:
+      tags: [config]
+      operationId: getQuestionSet
+      summary: One version of the questions, with how it carries on the version before it.
+      security:
+        - apiKey: [results:read]
+        - session: [results:read]
+      responses:
+        "200":
+          description: The question set.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuestionSet"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /v1/surfaces:
+    get:
+      tags: [config]
+      operationId: listSurfaces
+      summary: Every surface Byname can ask, configured or not, with its model pairs.
+      security:
+        - apiKey: [results:read]
+        - session: [results:read]
+      responses:
+        "200":
+          description: Surfaces in registry order.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Surface"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /v1/surfaces/{key}:
+    parameters:
+      - $ref: "#/components/parameters/surfaceKey"
+    put:
+      tags: [config]
+      operationId: putSurface
+      summary: Turn a surface on or off and, when models is present, set which of its models are enabled.
+      description: >-
+        Listed models are enabled and the surface's other models disabled.
+        Listing a paused model unpauses it. Each model must be on the
+        endpoint's live model list, which Byname reads through Treg, so the
+        Treg token must be set first. App surfaces take no models. Turning a
+        surface on needs at least one enabled model.
+      security:
+        - apiKey: [config:write]
+        - session: [config:write]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SurfaceInput"
+      responses:
+        "200":
+          description: The surface as saved, with every model pair it has had.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Surface"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "502":
+          $ref: "#/components/responses/BadGateway"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /v1/surfaces/{key}/models:
+    parameters:
+      - $ref: "#/components/parameters/surfaceKey"
+    get:
+      tags: [config]
+      operationId: listSurfaceModels
+      summary: The models the surface's endpoint offers now, read live through Treg at no cost.
+      description: 400 for an app surface, which takes no model, and when no Treg token is set.
+      security:
+        - apiKey: [results:read]
+        - session: [results:read]
+      responses:
+        "200":
+          description: The live model list.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Model"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "502":
+          $ref: "#/components/responses/BadGateway"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /v1/runs:
+    post:
+      tags: [runs]
+      operationId: runNow
+      summary: Queue a check now without moving the schedule.
+      description: >-
+        Never starts a second run while one is queued or running. It returns
+        that run instead, with 200, so pressing Run now twice is safe. Works
+        while scheduled checks are paused. 400 until your brand, questions, an
+        enabled surface and the Treg token are all set.
+      security:
+        - apiKey: [runs:write]
+        - session: [runs:write]
+      responses:
+        "200":
+          description: A run was already queued or running. This is that run.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QueuedRun"
+        "201":
+          description: The run this request queued.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QueuedRun"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+    get:
+      tags: [results]
+      operationId: listRuns
+      summary: Runs newest first, with what each spent and how each endpoint did.
+      security:
+        - apiKey: [results:read]
+        - session: [results:read]
+      parameters:
+        - $ref: "#/components/parameters/limit"
+        - name: before
+          in: query
+          description: List only runs older than this run id. Send the last id of the previous page to page back.
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        "200":
+          description: Runs.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Run"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /v1/checks/pause:
+    post:
+      tags: [runs]
+      operationId: pauseChecks
+      summary: Pause scheduled checks.
+      description: Run now still works while checks are paused.
+      security:
+        - apiKey: [runs:write]
+        - session: [runs:write]
+      responses:
+        "200":
+          description: The settings, with checks_paused true.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SettingsView"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /v1/checks/resume:
+    post:
+      tags: [runs]
+      operationId: resumeChecks
+      summary: Resume scheduled checks without starting one.
+      description: A check that fell due while paused moves to the next scheduled time, so resuming never starts a check by itself.
+      security:
+        - apiKey: [runs:write]
+        - session: [runs:write]
+      responses:
+        "200":
+          description: The settings, with checks_paused false.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SettingsView"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /v1/runs/{id}:
+    parameters:
+      - $ref: "#/components/parameters/id"
+    get:
+      tags: [results]
+      operationId: getRun
+      summary: One run, with what it spent and how each endpoint did.
+      security:
+        - apiKey: [results:read]
+        - session: [results:read]
+      responses:
+        "200":
+          description: The run.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Run"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /v1/runs/{id}/answers:
+    parameters:
+      - $ref: "#/components/parameters/id"
+    get:
+      tags: [results]
+      operationId: listRunAnswers
+      summary: A run's answers in question order, without their text.
+      description: GET /v1/answers/{id} returns one answer with its text, raw response and citations.
+      security:
+        - apiKey: [results:read]
+        - session: [results:read]
+      responses:
+        "200":
+          description: Answers.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AnswerSummary"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /v1/answers/{id}:
+    parameters:
+      - $ref: "#/components/parameters/id"
+    get:
+      tags: [results]
+      operationId: getAnswer
+      summary: One answer in full, with its text, raw response and citations.
+      security:
+        - apiKey: [results:read]
+        - session: [results:read]
+      responses:
+        "200":
+          description: The answer.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Answer"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /v1/compare:
+    get:
+      tags: [results]
+      operationId: compareRuns
+      summary: How each question and pair changed from one run to a later one.
+      description: >-
+        Put the older run in before. Across question set versions, questions
+        follow the versions they carry on. A pair whose endpoint or fidelity
+        changed between the runs is a new series and counts as not_comparable.
+        Outcomes follow mentions, not citations.
+      security:
+        - apiKey: [results:read]
+        - session: [results:read]
+      parameters:
+        - name: before
+          in: query
+          required: true
+          description: The earlier run's id.
+          schema:
+            type: integer
+            minimum: 1
+        - name: after
+          in: query
+          required: true
+          description: The later run's id.
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        "200":
+          description: The comparison.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Comparison"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /v1/questions/{id}/history:
+    parameters:
+      - $ref: "#/components/parameters/id"
+    get:
+      tags: [results]
+      operationId: getQuestionHistory
+      summary: One question's answers run by run, one series per pair, endpoint and fidelity.
+      description: The history follows the question back through the earlier versions it carries on, so a point's question_id can be an older version's.
+      security:
+        - apiKey: [results:read]
+        - session: [results:read]
+      parameters:
+        - $ref: "#/components/parameters/since"
+      responses:
+        "200":
+          description: The history.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/History"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /v1/metrics/rates:
+    get:
+      tags: [results]
+      operationId: getMentionRates
+      summary: The mention rate and the citation rate per run for each series.
+      security:
+        - apiKey: [results:read]
+        - session: [results:read]
+      parameters:
+        - $ref: "#/components/parameters/since"
+      responses:
+        "200":
+          description: One entry per series.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RateSeries"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /v1/metrics/share:
+    get:
+      tags: [results]
+      operationId: getShareOfMentions
+      summary: Each brand's share of mentions against your competitors, per run for each series.
+      description: Technologies are left out.
+      security:
+        - apiKey: [results:read]
+        - session: [results:read]
+      parameters:
+        - $ref: "#/components/parameters/since"
+      responses:
+        "200":
+          description: One entry per series.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ShareSeries"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /v1/gaps:
+    get:
+      tags: [results]
+      operationId: listGaps
+      summary: The questions some pair did not name you on in one run, highest opportunity first.
+      security:
+        - apiKey: [results:read]
+        - session: [results:read]
+      parameters:
+        - name: run
+          in: query
+          description: The run to rank. Omit for the latest run with answers.
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        "200":
+          description: The gaps.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Gaps"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /v1/jobs:
+    get:
+      tags: [results]
+      operationId: listJobs
+      summary: The jobs log newest first, with each check and each daily model list refresh.
+      security:
+        - apiKey: [results:read]
+        - session: [results:read]
+      parameters:
+        - $ref: "#/components/parameters/limit"
+      responses:
+        "200":
+          description: Jobs.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Job"
+        "400":
+          $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
@@ -434,6 +1196,91 @@ paths:
           $ref: "#/components/responses/Reauth"
         "409":
           $ref: "#/components/responses/Conflict"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /v1/credentials:
+    get:
+      tags: [settings]
+      operationId: listCredentials
+      summary: Each credential Byname stores, whether it is set and how its last test went.
+      description: No response ever carries a credential's secret.
+      security:
+        - session: [admin]
+      responses:
+        "200":
+          description: Credentials.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Credential"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /v1/credentials/treg:
+    put:
+      tags: [settings]
+      operationId: setTregToken
+      summary: Store the Treg token, sealed with ENCRYPTION_KEY, replacing any token stored before.
+      description: Needs a recent sign-in. Replacing the token clears its last test. The response never carries the token.
+      security:
+        - session: [admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              additionalProperties: false
+              properties:
+                token:
+                  type: string
+                  maxLength: 512
+                  description: The Treg token as Treg shows it, with no spaces.
+                org:
+                  type: string
+                  description: Treg's X-Treg-Org. Only a personal token needs it.
+      responses:
+        "200":
+          description: The credential, without its secret.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Credential"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Reauth"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /v1/credentials/treg/test:
+    post:
+      tags: [settings]
+      operationId: testTregToken
+      summary: Test the stored Treg token with one free call and record how it went.
+      description: A failed test is a result, not an error. last_test_status says why it failed. 400 when no token is set.
+      security:
+        - session: [admin]
+      responses:
+        "200":
+          description: The credential with this test's outcome, without its secret.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Credential"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "503":
           $ref: "#/components/responses/Unavailable"
   /v1/me:
@@ -1204,6 +2051,27 @@ components:
       schema:
         type: integer
         minimum: 1
+    surfaceKey:
+      name: key
+      in: path
+      required: true
+      schema:
+        $ref: "#/components/schemas/SurfaceKey"
+    limit:
+      name: limit
+      in: query
+      description: How many to return, 1 to 200.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 200
+        default: 50
+    since:
+      name: since
+      in: query
+      description: Only runs started at or after this time, as a date such as 2026-11-01 (midnight UTC) or an RFC 3339 time. Omit for all time.
+      schema:
+        type: string
   responses:
     BadRequest:
       description: The request is malformed. The message says which field.
@@ -1224,20 +2092,20 @@ components:
           schema:
             $ref: "#/components/schemas/Error"
     NotFound:
-      description: No such key, app, user, invite or sign-in request.
+      description: No such key, app, user, invite, sign-in request, brand, question, question set, surface, run or answer.
       content:
         application/json:
           schema:
             $ref: "#/components/schemas/Error"
     Conflict:
-      description: That email already has an account, or the change would leave no admin.
+      description: That email already has an account, the change would leave no admin, or another brand already has that name.
       content:
         application/json:
           schema:
             $ref: "#/components/schemas/Error"
     Reauth:
       description: >-
-        This change (how you sign in, API keys, connected apps or the team)
+        This change (how you sign in, API keys, connected apps, the team or the Treg token)
         needs a sign-in within the last 15 minutes (code reauth_required).
         Confirm with POST /v1/account/reauth/*, or the reauth OAuth intent, and
         retry. Also 403 for a caller the route is not for, as Forbidden.
@@ -1268,16 +2136,12 @@ components:
         application/json:
           schema:
             $ref: "#/components/schemas/Error"
-  schemas:
-    Error:
-      type: object
-      required: [error]
-      properties:
-        error:
-          type: string
-        request_id:
-          type: string
-          description: Present on 5xx; the server log carries the same id.
+    BadGateway:
+      description: Treg did not answer a call Byname made for this request. The message says which call. Retry later.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
   schemas:
     Error:
       type: object
@@ -1583,3 +2447,916 @@ components:
         created_at:
           type: string
           format: date-time
+    MatchMode:
+      type: string
+      enum: [whole_word, self_anywhere]
+      description: whole_word matches every brand's name and aliases as whole words, case-sensitive. self_anywhere also counts your brand's name anywhere in the text, ignoring case, and keeps other brands whole-word.
+    BrandKind:
+      type: string
+      enum: [self, competitor, technology]
+      description: self is your own brand, set with PUT /v1/settings. A technology is found in answers but never gets a position and never counts toward share of mentions.
+    SurfaceKey:
+      type: string
+      enum: [chatgpt_app, gemini_app, google_ai_mode, google_ai_overview, copilot, bing_ai_mode, brave, claude_code, gemini_cli, codex_cli, claude_app, perplexity_app]
+      description: A surface in Byname's registry. GET /v1/surfaces lists each with its title.
+    Fidelity:
+      type: string
+      enum: [app, model_match, approximation]
+      description: How closely a pair stands in for what people see. app is the real app or search page, read by a scraping provider. model_match is an API call with the model the team uses and the same web search, standing in for a developer tool. approximation is the closest option when neither holds, such as the Claude API standing in for the Claude app.
+    SearchControl:
+      type: string
+      enum: [by_app, forceable, enable_only, always]
+      description: How the endpoint searches the web. by_app means the scraped app decides for itself. forceable means force_web_search makes the model search, on the models that accept it. enable_only means search is on but cannot be forced. always means the model searches on every call.
+    AnswerStatus:
+      type: string
+      enum: [ok, no_answer, failed]
+      description: ok is an answer. no_answer means the surface showed no AI answer, such as a Google search with no AI Overview. It is a valid result that names nobody. failed means the provider gave no usable answer, and error says why.
+    RunStatus:
+      type: string
+      enum: [queued, running, completed, capped, refused, failed]
+      description: A run moves from queued to running, then ends completed, capped, refused or failed. capped means the run or month spend cap stopped it queueing calls. refused means Treg refused a call on its own behalf, such as for an insufficient balance, and the run stopped.
+    Trigger:
+      type: string
+      enum: [scheduled, run_now]
+    Outcome:
+      type: string
+      enum: [gained, lost, moved, unchanged, not_comparable]
+      description: gained means the after run named you and the before run did not, and lost the reverse. moved means both named you at different positions. not_comparable means the pair is missing from one run, failed in either, changed endpoint or fidelity, or its question has no successor in the newer set.
+    SelfBrand:
+      type: object
+      description: Your own brand.
+      required: [name, aliases, domains]
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 80
+        aliases:
+          type: array
+          items:
+            type: string
+          description: Other names that count as a mention of you.
+        domains:
+          type: array
+          minItems: 1
+          items:
+            type: string
+          description: Hostnames, the first your primary domain. A link to any of them or their subdomains is a citation of you.
+    Settings:
+      type: object
+      description: Your brand, market, schedule, spend caps and call limits.
+      required: [brand, match_mode, market, language, time_zone, check_every_days, check_time, spend_cap_run_usd, spend_cap_month_usd, concurrency, retries, timeout_s, raw_retention_days]
+      properties:
+        brand:
+          $ref: "#/components/schemas/SelfBrand"
+        match_mode:
+          $ref: "#/components/schemas/MatchMode"
+        market:
+          type: string
+          pattern: "^[A-Z]{2}$"
+          description: ISO 3166-1 alpha-2 country, such as US.
+        language:
+          type: string
+          pattern: "^[a-z]{2}$"
+          description: ISO 639-1 language, such as en.
+        time_zone:
+          type: string
+          description: IANA time zone, such as Europe/Berlin. check_time is in it.
+        check_every_days:
+          type: integer
+          minimum: 1
+          maximum: 30
+        check_time:
+          type: string
+          pattern: "^[0-9]{2}:[0-9]{2}$"
+          description: HH:MM in time_zone, such as 06:00.
+        spend_cap_run_usd:
+          type: number
+          exclusiveMinimum: 0
+          description: A check stops queueing calls once it has spent this much.
+        spend_cap_month_usd:
+          type: [number, "null"]
+          exclusiveMinimum: 0
+          description: Once the calendar month's checks have spent this much, no check starts and a running check queues no more calls. Null for no cap.
+        concurrency:
+          type: integer
+          minimum: 1
+          maximum: 32
+          description: Calls in flight at once.
+        retries:
+          type: integer
+          minimum: 0
+          maximum: 3
+          description: Retries per failed call.
+        timeout_s:
+          type: integer
+          minimum: 30
+          maximum: 600
+          description: Seconds per call.
+        raw_retention_days:
+          type: [integer, "null"]
+          minimum: 1
+          description: Days to keep raw responses. Null keeps them forever.
+    SettingsView:
+      description: The settings with the schedule's state.
+      allOf:
+        - $ref: "#/components/schemas/Settings"
+        - type: object
+          required: [checks_paused, next_check_at, last_check_at, updated_at]
+          properties:
+            checks_paused:
+              type: boolean
+              description: Scheduled checks are paused. Run now still works.
+            next_check_at:
+              type: [string, "null"]
+              format: date-time
+              description: When the next scheduled check is due. Null until the schedule is first saved.
+            last_check_at:
+              type: [string, "null"]
+              format: date-time
+              description: When the schedule last fired, even when that check was skipped. Null before the first.
+            updated_at:
+              type: string
+              format: date-time
+    Brand:
+      type: object
+      required: [id, name, aliases, domains, kind]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        aliases:
+          type: array
+          items:
+            type: string
+        domains:
+          type: array
+          items:
+            type: string
+          description: Hostnames, the first the primary domain. A link to any of them or their subdomains is a citation of the brand.
+        kind:
+          $ref: "#/components/schemas/BrandKind"
+    BrandInput:
+      type: object
+      description: A competitor or technology. Names are unique ignoring case.
+      required: [name]
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 80
+        aliases:
+          type: array
+          items:
+            type: string
+          description: Other names that count as a mention of the brand.
+        domains:
+          type: array
+          items:
+            type: string
+          description: Hostnames only, such as example.com, without a scheme or path.
+        kind:
+          type: string
+          enum: [competitor, technology]
+          default: competitor
+    Question:
+      type: object
+      required: [id, group, text]
+      properties:
+        id:
+          type: integer
+          description: Unique to this version. A question carried on into the next version gets a new id there.
+        group:
+          type: string
+          description: A label that groups related questions. A question can be a group of one.
+        text:
+          type: string
+          description: Sent to every surface as written.
+    QuestionLink:
+      type: object
+      required: [from, to]
+      properties:
+        from:
+          type: integer
+          description: A question of the previous version.
+        to:
+          type: integer
+          description: The question of this version that carries it on.
+    QuestionSet:
+      type: object
+      description: One version of the questions. carried and retired account for every question of the previous version, and both are empty for the first version.
+      required: [id, version, notes, created_at, questions, carried, retired]
+      properties:
+        id:
+          type: integer
+        version:
+          type: integer
+          description: 1 for the first set, then one more for each change.
+        notes:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        questions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Question"
+        carried:
+          type: array
+          items:
+            $ref: "#/components/schemas/QuestionLink"
+          description: Which question of the previous version each question carries on.
+        retired:
+          type: array
+          items:
+            type: integer
+          description: Questions of the previous version that ended with this version.
+    QuestionSetSummary:
+      type: object
+      required: [id, version, notes, created_at, questions]
+      properties:
+        id:
+          type: integer
+        version:
+          type: integer
+        notes:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        questions:
+          type: integer
+          description: How many questions the version has.
+    QuestionInput:
+      type: object
+      required: [group, text]
+      additionalProperties: false
+      properties:
+        group:
+          type: string
+          minLength: 1
+          maxLength: 80
+        text:
+          type: string
+          minLength: 10
+          maxLength: 300
+          description: Sent to every surface as written. Unique in the set, ignoring case and punctuation.
+        replaces:
+          type: array
+          items:
+            type: integer
+          description: Current question ids this question carries on, when their text changed. A current question carries on into at most one question.
+    QuestionsInput:
+      type: object
+      description: The whole new set. A question whose text matches a current question, ignoring case and punctuation, carries that one on by itself. Every other current question must be named in some question's replaces or in retired, so history never breaks silently.
+      required: [questions]
+      additionalProperties: false
+      properties:
+        notes:
+          type: string
+          description: Why this version changed, shown in the version list.
+        questions:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/QuestionInput"
+        retired:
+          type: array
+          items:
+            type: integer
+          description: Current question ids that end with this version.
+    Pair:
+      type: object
+      description: A surface and model pair. Each pair is its own series with its own fidelity.
+      required: [id, surface, model, fidelity, force_web_search, enabled, paused_reason, last_tested_at]
+      properties:
+        id:
+          type: integer
+        surface:
+          $ref: "#/components/schemas/SurfaceKey"
+        model:
+          type: string
+          description: Empty on app surfaces, where the app picks the model.
+        fidelity:
+          $ref: "#/components/schemas/Fidelity"
+        force_web_search:
+          type: boolean
+        enabled:
+          type: boolean
+        paused_reason:
+          type: string
+          description: Set when the model left the endpoint's live model list, and empty otherwise. A paused pair is skipped until the model is back.
+        last_tested_at:
+          type: [string, "null"]
+          format: date-time
+    Surface:
+      type: object
+      description: One registry surface with how this instance uses it.
+      required: [key, title, endpoint, fidelity, takes_model, search, enabled, pairs]
+      properties:
+        key:
+          $ref: "#/components/schemas/SurfaceKey"
+        title:
+          type: string
+        endpoint:
+          type: string
+          description: The pinned Treg tool id.
+        fidelity:
+          allOf:
+            - $ref: "#/components/schemas/Fidelity"
+          description: The surface's default label. Each pair carries its own.
+        takes_model:
+          type: boolean
+          description: False on app surfaces, where the app picks the model.
+        search:
+          $ref: "#/components/schemas/SearchControl"
+        enabled:
+          type: boolean
+        pairs:
+          type: array
+          items:
+            $ref: "#/components/schemas/Pair"
+          description: Every model pair the surface has had, enabled or not.
+    PairInput:
+      type: object
+      required: [model]
+      additionalProperties: false
+      properties:
+        model:
+          type: string
+          description: A name on the endpoint's live model list, from GET /v1/surfaces/{key}/models.
+        force_web_search:
+          type: [boolean, "null"]
+          description: Omit or send null for the default, which is true where the endpoint can force search. Only a forceable endpoint takes true.
+    SurfaceInput:
+      type: object
+      required: [enabled]
+      additionalProperties: false
+      properties:
+        enabled:
+          type: boolean
+        models:
+          type: array
+          items:
+            $ref: "#/components/schemas/PairInput"
+          description: The models to enable. The surface's other models are disabled. Omit to keep its models as they are. App surfaces take none.
+    Model:
+      type: object
+      description: One name on an endpoint's live model list.
+      required: [name, web_search]
+      properties:
+        name:
+          type: string
+        web_search:
+          type: boolean
+          description: The model can search the web on this endpoint.
+    Credential:
+      type: object
+      description: What Byname shows about a stored secret. No response ever carries the secret itself.
+      required: [kind, set, org, last_tested_at, last_test_status, updated_at]
+      properties:
+        kind:
+          type: string
+          enum: [treg]
+        set:
+          type: boolean
+        org:
+          type: string
+          description: Treg's X-Treg-Org, empty unless a personal token needs it.
+        last_tested_at:
+          type: [string, "null"]
+          format: date-time
+          description: Null until tested, and again after the token is replaced.
+        last_test_status:
+          type: string
+          description: ok, or why the last test failed. Empty until tested.
+        updated_at:
+          type: [string, "null"]
+          format: date-time
+          description: Null while no token is set.
+    QueuedRun:
+      type: object
+      description: A queued or running check, as Run now reports it. GET /v1/runs/{id} has its progress and spend.
+      required: [id, status, trigger, question_set_id, queued_at]
+      properties:
+        id:
+          type: integer
+        status:
+          $ref: "#/components/schemas/RunStatus"
+        trigger:
+          $ref: "#/components/schemas/Trigger"
+        question_set_id:
+          type: integer
+          description: The question set version the run asks.
+        queued_at:
+          type: string
+          format: date-time
+    EndpointStats:
+      type: object
+      description: One endpoint's calls in a run, so a flaky provider shows up as a provider problem, not a visibility drop.
+      required: [endpoint, calls, succeeded, success_rate, cost_usd, missing_cost, cost_per_call]
+      properties:
+        endpoint:
+          type: string
+        calls:
+          type: integer
+        succeeded:
+          type: integer
+          description: Calls that did not fail.
+        success_rate:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: succeeded over calls.
+        cost_usd:
+          type: number
+          description: What the calls that reported a cost spent. missing_cost counts the ones that did not.
+        missing_cost:
+          type: integer
+          description: Answered calls that reported no cost. Their cost is unknown, not $0.
+        cost_per_call:
+          type: [number, "null"]
+          description: Over calls that reported a cost. Null when none did.
+    Run:
+      type: object
+      description: One check with what it cost and how each endpoint did.
+      required: [id, status, trigger, question_set_id, question_set_version, queued_at, started_at, finished_at, spend_usd, spend_missing_calls, calls, succeeded, mentioned, cited, error, refusal_code, endpoints]
+      properties:
+        id:
+          type: integer
+        status:
+          $ref: "#/components/schemas/RunStatus"
+        trigger:
+          $ref: "#/components/schemas/Trigger"
+        question_set_id:
+          type: integer
+        question_set_version:
+          type: integer
+        queued_at:
+          type: string
+          format: date-time
+        started_at:
+          type: [string, "null"]
+          format: date-time
+        finished_at:
+          type: [string, "null"]
+          format: date-time
+        spend_usd:
+          type: number
+          description: What the calls that reported a cost spent. spend_missing_calls counts the ones that did not.
+        spend_missing_calls:
+          type: integer
+          description: Answered calls that reported no cost. Their cost is unknown, not $0.
+        calls:
+          type: integer
+          description: Answers stored, failed ones included.
+        succeeded:
+          type: integer
+          description: Answers that did not fail.
+        mentioned:
+          type: integer
+          description: Question and pair answers that named you.
+        cited:
+          type: integer
+          description: Question and pair answers that cited one of your domains. Counted apart from mentioned.
+        error:
+          type: string
+          description: Why the run stopped early, if it did. Empty otherwise.
+        refusal_code:
+          type: string
+          description: Treg's error code when it refused a call. Empty otherwise.
+        endpoints:
+          type: array
+          items:
+            $ref: "#/components/schemas/EndpointStats"
+    QuestionRef:
+      type: object
+      required: [id, group, text]
+      properties:
+        id:
+          type: integer
+        group:
+          type: string
+        text:
+          type: string
+    PairRef:
+      type: object
+      description: Names a surface and model pair.
+      required: [id, surface, model]
+      properties:
+        id:
+          type: integer
+        surface:
+          $ref: "#/components/schemas/SurfaceKey"
+        model:
+          type: string
+          description: Empty on app surfaces.
+    Mention:
+      type: object
+      description: A brand an answer named.
+      required: [brand_id, name, kind, position]
+      properties:
+        brand_id:
+          type: integer
+        name:
+          type: string
+        kind:
+          $ref: "#/components/schemas/BrandKind"
+        position:
+          type: [integer, "null"]
+          minimum: 1
+          description: The order of first mention among brands that are not technologies, 1 first. Null for a technology.
+    Citation:
+      type: object
+      required: [url, domain, is_self]
+      properties:
+        url:
+          type: string
+        domain:
+          type: string
+        is_self:
+          type: boolean
+          description: The link is on one of your domains or their subdomains.
+    AnswerSummary:
+      type: object
+      description: One answer as the answers list shows it.
+      required: [id, run_id, question, pair, endpoint, fidelity, reported_model, status, error, attempts, mentioned, cited, position, cost_usd, citation_count, mentions, answered_at]
+      properties:
+        id:
+          type: integer
+        run_id:
+          type: integer
+        question:
+          $ref: "#/components/schemas/QuestionRef"
+        pair:
+          $ref: "#/components/schemas/PairRef"
+        endpoint:
+          type: string
+        fidelity:
+          $ref: "#/components/schemas/Fidelity"
+        reported_model:
+          type: string
+          description: The exact model name the endpoint reported. Empty when it reported none.
+        status:
+          $ref: "#/components/schemas/AnswerStatus"
+        error:
+          type: string
+          description: Why the call failed. Empty otherwise.
+        attempts:
+          type: integer
+        mentioned:
+          type: boolean
+          description: The answer names you.
+        cited:
+          type: boolean
+          description: The answer links to one of your domains. Independent of mentioned.
+        position:
+          type: [integer, "null"]
+          minimum: 1
+          description: Your position among the brands named, 1 first. Null when the answer does not name you.
+        cost_usd:
+          type: [number, "null"]
+          description: Null when the call reported no cost, which means unknown, never $0.
+        citation_count:
+          type: integer
+        mentions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Mention"
+          description: Every brand named, in order of first mention.
+        answered_at:
+          type: string
+          format: date-time
+    Answer:
+      description: One answer in full, with its text, raw response and citations.
+      allOf:
+        - $ref: "#/components/schemas/AnswerSummary"
+        - type: object
+          required: [text, raw, fan_out, citations, call_id]
+          properties:
+            text:
+              type: string
+            raw:
+              description: The provider's response body as any JSON value. Null once past raw_retention_days.
+            fan_out:
+              type: array
+              items:
+                type: string
+              description: The engine's own web searches, where the endpoint exposes them.
+            citations:
+              type: array
+              items:
+                $ref: "#/components/schemas/Citation"
+              description: Cited URLs in answer order.
+            call_id:
+              type: string
+              description: Treg's id for the call.
+    Series:
+      type: object
+      description: One line on a chart. A series is one surface and model pair on one endpoint at one fidelity. Changing the endpoint or the fidelity starts a new series, and no number averages across series.
+      required: [pair, endpoint, fidelity]
+      properties:
+        pair:
+          $ref: "#/components/schemas/PairRef"
+        endpoint:
+          type: string
+        fidelity:
+          $ref: "#/components/schemas/Fidelity"
+    Standing:
+      type: object
+      description: One pair's answer in one run, as compare shows it.
+      required: [answer_id, status, mentioned, cited, position]
+      properties:
+        answer_id:
+          type: integer
+        status:
+          $ref: "#/components/schemas/AnswerStatus"
+        mentioned:
+          type: boolean
+        cited:
+          type: boolean
+        position:
+          type: [integer, "null"]
+          minimum: 1
+          description: Your position, 1 first. Null when not named.
+    PairChange:
+      type: object
+      required: [question_id, pair_id, outcome, before, after]
+      properties:
+        question_id:
+          type: integer
+          description: In the after run's question set, except for an older question with no successor, which keeps its own id.
+        pair_id:
+          type: integer
+        outcome:
+          $ref: "#/components/schemas/Outcome"
+        before:
+          oneOf:
+            - $ref: "#/components/schemas/Standing"
+            - type: "null"
+          description: Null when the pair has no answer in the before run.
+        after:
+          oneOf:
+            - $ref: "#/components/schemas/Standing"
+            - type: "null"
+          description: Null when the pair has no answer in the after run.
+    Comparison:
+      type: object
+      description: Every question and pair across two runs, with counts per outcome and the net change.
+      required: [before, after, counts, net, pairs]
+      properties:
+        before:
+          type: integer
+          description: The before run's id.
+        after:
+          type: integer
+          description: The after run's id.
+        counts:
+          type: object
+          description: How many question and pair entries had each outcome.
+          required: [gained, lost, moved, unchanged, not_comparable]
+          additionalProperties: false
+          properties:
+            gained:
+              type: integer
+            lost:
+              type: integer
+            moved:
+              type: integer
+            unchanged:
+              type: integer
+            not_comparable:
+              type: integer
+        net:
+          type: integer
+          description: gained minus lost.
+        pairs:
+          type: array
+          items:
+            $ref: "#/components/schemas/PairChange"
+          description: Ordered by question, then pair.
+    Point:
+      type: object
+      description: One pair's answer to a question in one run. Plot points by run, not by day.
+      required: [run_id, run_started_at, answer_id, question_id, status, mentioned, cited, position, reported_model, summary]
+      properties:
+        run_id:
+          type: integer
+        run_started_at:
+          type: string
+          format: date-time
+          description: When the run started, or was queued if it never started.
+        answer_id:
+          type: integer
+        question_id:
+          type: integer
+          description: The question as that run asked it, which may be an earlier version's.
+        status:
+          $ref: "#/components/schemas/AnswerStatus"
+        mentioned:
+          type: boolean
+        cited:
+          type: boolean
+        position:
+          type: [integer, "null"]
+          minimum: 1
+          description: Your position, 1 first. Null when not named.
+        reported_model:
+          type: string
+        summary:
+          type: string
+          description: 'The change since this series''s previous run, such as "Gained mention at #1 · Northwind cited · Dropped: Contoso".'
+    HistorySeries:
+      allOf:
+        - $ref: "#/components/schemas/Series"
+        - type: object
+          required: [points]
+          properties:
+            points:
+              type: array
+              items:
+                $ref: "#/components/schemas/Point"
+              description: Oldest run first.
+    History:
+      type: object
+      required: [question_id, series]
+      properties:
+        question_id:
+          type: integer
+        series:
+          type: array
+          items:
+            $ref: "#/components/schemas/HistorySeries"
+          description: One per pair, endpoint and fidelity. A pair's series stay in the order they began, oldest first.
+    RatePoint:
+      type: object
+      description: One series in one run. Rates are over answered calls, failed ones excluded.
+      required: [run_id, run_started_at, calls, answered, mentioned, cited, mention_rate, citation_rate]
+      properties:
+        run_id:
+          type: integer
+        run_started_at:
+          type: string
+          format: date-time
+          description: When the run started, or was queued if it never started.
+        calls:
+          type: integer
+        answered:
+          type: integer
+          description: Calls that did not fail, no_answer included.
+        mentioned:
+          type: integer
+        cited:
+          type: integer
+        mention_rate:
+          type: [number, "null"]
+          minimum: 0
+          maximum: 1
+          description: mentioned over answered. Null when none answered.
+        citation_rate:
+          type: [number, "null"]
+          minimum: 0
+          maximum: 1
+          description: cited over answered, counted apart from mentions. Null when none answered.
+    RateSeries:
+      allOf:
+        - $ref: "#/components/schemas/Series"
+        - type: object
+          required: [points]
+          properties:
+            points:
+              type: array
+              items:
+                $ref: "#/components/schemas/RatePoint"
+              description: One per run, oldest first. Plot by run, not by day.
+    BrandShare:
+      type: object
+      description: One brand's share of the brand mentions in a series' run.
+      required: [brand_id, name, kind, mentions, share]
+      properties:
+        brand_id:
+          type: integer
+        name:
+          type: string
+        kind:
+          type: string
+          enum: [self, competitor]
+          description: Technologies never count.
+        mentions:
+          type: integer
+          description: How many answers named the brand.
+        share:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: mentions over the point's mentions.
+    SharePoint:
+      type: object
+      required: [run_id, run_started_at, answered, mentions, brands]
+      properties:
+        run_id:
+          type: integer
+        run_started_at:
+          type: string
+          format: date-time
+          description: When the run started, or was queued if it never started.
+        answered:
+          type: integer
+        mentions:
+          type: integer
+          description: Mentions of you and your competitors, the share's denominator.
+        brands:
+          type: array
+          items:
+            $ref: "#/components/schemas/BrandShare"
+          description: Most mentioned first.
+    ShareSeries:
+      allOf:
+        - $ref: "#/components/schemas/Series"
+        - type: object
+          required: [points]
+          properties:
+            points:
+              type: array
+              items:
+                $ref: "#/components/schemas/SharePoint"
+              description: One per run, oldest first. Plot by run, not by day.
+    Gap:
+      type: object
+      description: A question where at least one pair did not name you in the run.
+      required: [question, engines, named, competitors, opportunity, demand, named_on_miss, fan_out]
+      properties:
+        question:
+          $ref: "#/components/schemas/QuestionRef"
+        engines:
+          type: integer
+          description: How many pairs answered.
+        named:
+          type: integer
+          description: How many of those named you.
+        competitors:
+          type: integer
+          description: Distinct competitors the answers named.
+        opportunity:
+          type: integer
+          minimum: 0
+          maximum: 5
+          description: The share of pairs that did not name you times 3, plus up to 2 for search demand, which no source provides yet.
+        demand:
+          type: [integer, "null"]
+          description: Monthly searches. Null until a demand source is configured.
+        named_on_miss:
+          type: array
+          items:
+            type: string
+          description: Competitors named by the answers that did not name you, most often first.
+        fan_out:
+          type: array
+          items:
+            type: string
+          description: The web searches the engines ran for the question, where exposed.
+    Gaps:
+      type: object
+      required: [run_id, gaps]
+      properties:
+        run_id:
+          type: integer
+          description: The run ranked. 0 when no run has answers yet.
+        gaps:
+          type: array
+          items:
+            $ref: "#/components/schemas/Gap"
+          description: Highest opportunity first.
+    Job:
+      type: object
+      description: One entry of the jobs log.
+      required: [id, job, trigger, run_id, status, started_at, finished_at, error, spend_usd]
+      properties:
+        id:
+          type: integer
+        job:
+          type: string
+          enum: [ai_check, model_refresh]
+        trigger:
+          $ref: "#/components/schemas/Trigger"
+        run_id:
+          type: [integer, "null"]
+          description: The run, for an AI check.
+        status:
+          type: string
+          enum: [queued, running, completed, capped, refused, failed, skipped]
+          description: A run's statuses, plus skipped for a scheduled check that did not start, with error saying why.
+        started_at:
+          type: string
+          format: date-time
+        finished_at:
+          type: [string, "null"]
+          format: date-time
+        error:
+          type: string
+        spend_usd:
+          type: [number, "null"]
+          description: The run's spend, for an AI check. Null for any other job.

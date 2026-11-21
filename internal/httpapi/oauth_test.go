@@ -551,6 +551,35 @@ var mcpExclusions = map[string]string{
 // the same, so the two surfaces cannot drift apart unnoticed.
 var mcpTools = map[string]string{
 	"GET /v1/status": "status",
+
+	"GET /v1/settings":              "get_settings",
+	"PUT /v1/settings":              "update_settings",
+	"GET /v1/brands":                "list_brands",
+	"POST /v1/brands":               "upsert_brand",
+	"PUT /v1/brands/{id}":           "update_brand",
+	"DELETE /v1/brands/{id}":        "delete_brand",
+	"GET /v1/questions":             "get_questions",
+	"PUT /v1/questions":             "update_questions",
+	"GET /v1/question-sets":         "list_question_sets",
+	"GET /v1/question-sets/{id}":    "get_question_set",
+	"GET /v1/surfaces":              "list_surfaces",
+	"PUT /v1/surfaces/{key}":        "update_surface",
+	"GET /v1/surfaces/{key}/models": "list_surface_models",
+
+	"POST /v1/runs":          "run_now",
+	"POST /v1/checks/pause":  "pause_checks",
+	"POST /v1/checks/resume": "resume_checks",
+
+	"GET /v1/runs":                   "list_runs",
+	"GET /v1/runs/{id}":              "get_run",
+	"GET /v1/runs/{id}/answers":      "list_run_answers",
+	"GET /v1/answers/{id}":           "get_answer",
+	"GET /v1/compare":                "compare_runs",
+	"GET /v1/questions/{id}/history": "question_history",
+	"GET /v1/metrics/rates":          "mention_rates",
+	"GET /v1/metrics/share":          "share_of_mentions",
+	"GET /v1/gaps":                   "gaps",
+	"GET /v1/jobs":                   "list_jobs",
 }
 
 // TestEveryAPIKeyRouteHasAnMCPTool fails when a route an API key can call

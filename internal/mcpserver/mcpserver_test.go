@@ -13,6 +13,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/unkeyed/byname/internal/app"
 	"github.com/unkeyed/byname/internal/auth"
 	"github.com/unkeyed/byname/internal/core"
 	"github.com/unkeyed/byname/internal/instance"
@@ -22,7 +23,7 @@ func listTools(t *testing.T) []*mcp.Tool {
 	t.Helper()
 	ctx := context.Background()
 	srv := mcp.NewServer(&mcp.Implementation{Name: "byname", Version: "test"}, nil)
-	addTools(srv, instance.New("test"))
+	addTools(srv, app.Services{Instance: instance.New("test")})
 	st, ct := mcp.NewInMemoryTransports()
 	if _, err := srv.Connect(ctx, st, nil); err != nil {
 		t.Fatal(err)
@@ -128,11 +129,11 @@ func connect(ctx context.Context, url, token string) (*mcp.ClientSession, error)
 
 func TestStatusNeedsResultsRead(t *testing.T) {
 	ctx := context.Background()
-	app := core.Actor{Via: core.ViaOAuth, ID: "1", UserID: 1, Name: "Claude Code (via Ada)", Role: core.Admin}
-	reader, writer := app, app
+	client := core.Actor{Via: core.ViaOAuth, ID: "1", UserID: 1, Name: "Claude Code (via Ada)", Role: core.Admin}
+	reader, writer := client, client
 	reader.Scopes = []core.Scope{core.ResultsRead}
 	writer.Scopes = []core.Scope{core.RunsWrite}
-	srv := httptest.NewServer(Handler(instance.New("v1.2.3"), tokens{"byn_at_reader": reader, "byn_at_writer": writer}, "test"))
+	srv := httptest.NewServer(Handler(app.Services{Instance: instance.New("v1.2.3")}, tokens{"byn_at_reader": reader, "byn_at_writer": writer}, "test"))
 	t.Cleanup(srv.Close)
 
 	cs, err := connect(ctx, srv.URL, "byn_at_reader")

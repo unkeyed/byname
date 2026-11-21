@@ -18,11 +18,16 @@ import (
 	"testing"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/unkeyed/byname/internal/app"
 	"github.com/unkeyed/byname/internal/auth"
 	"github.com/unkeyed/byname/internal/authtest"
+	"github.com/unkeyed/byname/internal/checks"
+	"github.com/unkeyed/byname/internal/config"
 	"github.com/unkeyed/byname/internal/core"
+	"github.com/unkeyed/byname/internal/engines/tregtest"
 	"github.com/unkeyed/byname/internal/instance"
 	"github.com/unkeyed/byname/internal/mcpserver"
+	"github.com/unkeyed/byname/internal/results"
 	"github.com/unkeyed/byname/internal/testdb"
 )
 
@@ -43,6 +48,8 @@ type client struct {
 	setupToken string
 	passkey    *authtest.Passkey
 	db         *pgxpool.Pool
+	svc        app.Services
+	treg       *tregtest.Server
 }
 
 type reply struct {
@@ -164,13 +171,15 @@ func serve(t *testing.T, srv *httptest.Server, publicURL string, mod ...func(*au
 		t.Fatal(err)
 	}
 	authn := &auth.Authenticator{Keys: auth.NewKeyStore(pool, auth.UnkeyConfig{}), Users: users, OAuth: auth.NewOAuthServer(pool, u)}
-	svc := instance.New("test")
+	treg := tregtest.New(t)
+	settings := config.New(pool, config.Options{Secrets: cfg.Secrets, TregBaseURL: treg.URL})
+	svc := app.Services{Instance: instance.New("test"), Config: settings, Checks: checks.New(pool, settings, checks.Options{}), Results: results.New(pool)}
 	mux := NewMux(svc, authn, slog.New(slog.DiscardHandler))
 	mux.Handle("/mcp", mcpserver.Handler(svc, authn.OAuth, "test"))
 	srv.Config.Handler = mux
 	srv.Start()
 	t.Cleanup(srv.Close)
-	return client{t: t, base: srv.URL, origin: publicURL, setupToken: token, db: pool}
+	return client{t: t, base: srv.URL, origin: publicURL, setupToken: token, db: pool, svc: svc, treg: treg}
 }
 
 func cookieValue(r reply, name string) string {
@@ -587,7 +596,7 @@ func TestKeyStoreOutageIs503(t *testing.T) {
 		t.Fatal(err)
 	}
 	authn := &auth.Authenticator{Keys: downKeys{}, Users: users, OAuth: auth.NewOAuthServer(pool, u)}
-	srv := httptest.NewServer(NewMux(instance.New("test"), authn, slog.New(slog.DiscardHandler)))
+	srv := httptest.NewServer(NewMux(app.Services{Instance: instance.New("test")}, authn, slog.New(slog.DiscardHandler)))
 	t.Cleanup(srv.Close)
 	r := client{t: t, base: srv.URL, key: "byn_whatever"}.do("GET", "/v1/status", nil)
 	var e struct {
@@ -631,7 +640,7 @@ func TestSecurityHeaders(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		mux := NewMux(nil, &auth.Authenticator{Users: users, OAuth: auth.NewOAuthServer(nil, u)}, slog.New(slog.DiscardHandler))
+		mux := NewMux(app.Services{}, &auth.Authenticator{Users: users, OAuth: auth.NewOAuthServer(nil, u)}, slog.New(slog.DiscardHandler))
 		mux.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = io.WriteString(w, "<!doctype html>") }))
 		srv := httptest.NewServer(SecurityHeaders(u, mux))
 		t.Cleanup(srv.Close)
