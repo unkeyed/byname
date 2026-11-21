@@ -47,48 +47,48 @@ function MissingCost({ run }: { run: Run }) {
   );
 }
 
-const runGrid = "md:grid md:grid-cols-[5.5rem_10rem_6rem_3.5rem_7rem_11rem_minmax(0,1fr)_1rem] md:items-center md:gap-x-3";
+const runGrid = "lg:grid lg:grid-cols-[4.5rem_8.5rem_5rem_3rem_6.5rem_10.5rem_minmax(0,1fr)_1rem] lg:items-center lg:gap-x-3";
 
 function RunRow({ run: r, title }: { run: Run; title: (endpoint: string) => string }) {
   return (
     <details className="group">
       <summary className={cx("cursor-pointer list-none px-4 py-2.5 hover:bg-subtle [&::-webkit-details-marker]:hidden", runGrid)}>
-        <div className="flex items-start justify-between gap-3 md:contents">
+        <div className="flex items-start justify-between gap-3 lg:contents">
           <div>
             <span className="font-medium">#{r.id}</span>
-            <span className="text-xs text-muted md:block">
-              <span className="md:hidden"> · </span>
+            <span className="text-xs text-muted lg:block">
+              <span className="lg:hidden"> · </span>
               <RelativeTime iso={runTime(r)} />
             </span>
           </div>
-          <div className="md:order-none">
+          <div className="lg:order-none">
             <RunStatusBadge run={r} />
           </div>
         </div>
-        <div className="mt-1 text-xs text-muted md:contents">
+        <div className="mt-1 text-xs text-muted lg:contents">
           <span>{triggerLabel(r.trigger)}</span>
-          <span className="md:hidden"> · took </span>
+          <span className="lg:hidden"> · took </span>
           <span className="tabular-nums">{duration(r)}</span>
         </div>
-        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 md:contents">
-          <span className="tabular-nums md:text-right">
+        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 lg:contents">
+          <span className="tabular-nums lg:text-right">
             {r.succeeded} <span className="text-faint">of {r.calls}</span>
-            <span className="text-xs text-muted md:hidden"> answered</span>
+            <span className="text-xs text-muted lg:hidden"> answered</span>
           </span>
-          <span className="flex flex-wrap items-center gap-1.5 tabular-nums md:justify-end">
+          <span className="flex flex-wrap items-center gap-1.5 tabular-nums lg:justify-end">
             {usd(r.spend_usd)}
             <MissingCost run={r} />
           </span>
         </div>
-        <div className="mt-1 flex items-center justify-between gap-2 text-xs md:contents">
+        <div className="mt-1 flex items-center justify-between gap-2 text-xs lg:contents">
           <EndpointSummary run={r} title={title} />
           <span className="flex items-center gap-1 text-muted">
-            <span className="md:sr-only">Endpoints</span>
+            <span className="lg:sr-only">Endpoints</span>
             <Icon name="down" className="size-3.5 transition-transform group-open:rotate-180" />
           </span>
         </div>
       </summary>
-      <div className="px-4 pb-3 md:pl-[calc(1rem+5.5rem+0.75rem)]">
+      <div className="px-4 pb-3 lg:pl-[calc(1rem+4.5rem+0.75rem)]">
         {r.error && <p className="mb-2 text-xs text-danger [overflow-wrap:anywhere]">{r.error}</p>}
         <table className="w-full max-w-xl text-xs">
           <caption className="sr-only">Check #{r.id} by endpoint</caption>
@@ -169,7 +169,7 @@ export function Runs() {
         scope={false}
         action={canRun && runs.data?.length ? <RunNowButton /> : undefined}
       />
-      <div className="relative min-h-0 flex-1 overflow-auto px-3 py-4 md:px-5 md:py-5">
+      <div className="relative min-h-0 flex-1 overflow-auto px-3 py-4 lg:px-5 lg:py-5">
         <div className="mx-auto max-w-6xl space-y-6">
           {body}
           <Jobs />
