@@ -29,6 +29,7 @@ type Scheduler struct {
 	now       func() time.Time
 	lastPrune time.Time
 	sources   *sources.Service
+	changes   SiteChanges
 }
 
 type Options struct {
@@ -40,12 +41,21 @@ type Options struct {
 	Sources *sources.Service
 	// Search is the daily Search Console sync, nil when not wired.
 	Search SearchSync
+	// Changes is site changes, nil when not wired.
+	Changes SiteChanges
 }
 
 // SearchSync is internal/gsc's daily sync: it does nothing until it is due
 // and holds its own advisory lock.
 type SearchSync interface {
 	SyncIfDue(ctx context.Context) error
+}
+
+// SiteChanges is internal/changes: the hourly GitHub poll, and recrawl
+// watch and verdicts once a Search Console sync has completed. It decides
+// itself what is due and holds its own advisory locks.
+type SiteChanges interface {
+	Tick(ctx context.Context) error
 }
 
 func New(c *checks.Service, cfg *config.Service, o Options) *Scheduler {
@@ -55,7 +65,7 @@ func New(c *checks.Service, cfg *config.Service, o Options) *Scheduler {
 	if o.Log == nil {
 		o.Log = slog.Default()
 	}
-	return &Scheduler{checks: c, config: cfg, log: o.Log, ticks: o.Ticks, now: o.Now, sources: o.Sources, search: o.Search}
+	return &Scheduler{checks: c, config: cfg, log: o.Log, ticks: o.Ticks, now: o.Now, sources: o.Sources, search: o.Search, changes: o.Changes}
 }
 
 // Run ticks once at start, which resumes a run a previous process left
@@ -98,13 +108,20 @@ func (s *Scheduler) Tick(ctx context.Context) {
 			s.log.Info("pruned raw responses past their retention", "answers", n)
 		}
 	}
-	// Search Console: the daily sync, on its own goroutine so a long
-	// backfill never holds up checks.
-	if s.search != nil && s.busy.CompareAndSwap(false, true) {
+	// Search Console: the daily sync, then site changes, which follow it,
+	// on their own goroutine so a long backfill never holds up checks.
+	if (s.search != nil || s.changes != nil) && s.busy.CompareAndSwap(false, true) {
 		s.searching.Go(func() {
 			defer s.busy.Store(false)
-			if err := s.search.SyncIfDue(ctx); err != nil && ctx.Err() == nil {
-				s.log.Warn("Search Console sync failed", "err", err)
+			if s.search != nil {
+				if err := s.search.SyncIfDue(ctx); err != nil && ctx.Err() == nil {
+					s.log.Warn("Search Console sync failed", "err", err)
+				}
+			}
+			if s.changes != nil {
+				if err := s.changes.Tick(ctx); err != nil && ctx.Err() == nil {
+					s.log.Warn("site changes failed", "err", err)
+				}
 			}
 		})
 	}

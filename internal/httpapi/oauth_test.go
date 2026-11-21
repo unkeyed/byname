@@ -606,6 +606,20 @@ var mcpTools = map[string]string{
 	"DELETE /v1/goals/{id}":          "delete_goal",
 	"PUT /v1/settings/branded-terms": "update_branded_terms",
 	"GET /v1/gsc":                    "search_console_status",
+
+	// Site changes.
+	"GET /v1/changes":               "list_changes",
+	"POST /v1/changes":              "log_change",
+	"GET /v1/changes/markers":       "change_markers",
+	"GET /v1/changes/settings":      "change_settings",
+	"PUT /v1/changes/settings":      "update_change_settings",
+	"GET /v1/changes/{id}":          "get_change",
+	"DELETE /v1/changes/{id}":       "delete_change",
+	"GET /v1/control-pages":         "list_control_pages",
+	"POST /v1/control-pages":        "upsert_control_page",
+	"DELETE /v1/control-pages/{id}": "delete_control_page",
+	"GET /v1/repo":                  "repo_status",
+	"PUT /v1/repo/rules":            "update_path_rules",
 }
 
 // TestEveryAPIKeyRouteHasAnMCPTool fails when a route an API key can call

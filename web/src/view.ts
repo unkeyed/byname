@@ -42,6 +42,8 @@ const params = {
   before: "",
   after: "",
   show: "",
+  /** The change drawer's change id. */
+  chg: "",
   /** The Search page's chart span, in days or "all". */
   span: "90",
 } as const;

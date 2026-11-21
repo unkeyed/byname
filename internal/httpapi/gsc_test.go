@@ -233,4 +233,33 @@ func TestSearchToolsOverMCP(t *testing.T) {
 	}
 }
 
+// TestGoogleSignInReturnsWhereItStarted: the callback sends the browser
+// back to the page named when the sign-in started, from a fixed set, and
+// never to a URL the request carries.
+func TestGoogleSignInReturnsWhereItStarted(t *testing.T) {
+	c := newServer(t)
+	person, _ := login(t, c)
+	c.google.AddSite("sc-domain:northwind.example", "siteOwner")
+	for _, bad := range []string{"https://evil.example/", "//evil.example", "/settings/search-console"} {
+		person.call("POST", "/v1/gsc/oauth/start", map[string]string{"return_to": bad}, http.StatusBadRequest, nil)
+	}
+	var start struct{ URL string }
+	person.call("POST", "/v1/gsc/oauth/start", map[string]string{"return_to": "onboarding"}, http.StatusOK, &start)
+	callback := callbackHere(t, c, start.URL)
+	if _, loc := returnFromGoogle(t, person, strings.Replace(callback, "code=", "code=x", 1)); !strings.HasPrefix(loc, "/onboarding/search_console?error=") {
+		t.Fatalf("a failed sign-in from onboarding redirected to %q", loc)
+	}
+	if code, loc := returnFromGoogle(t, person, callback); code != http.StatusSeeOther || loc != "/onboarding/search_console?connected=google" {
+		t.Fatalf("a sign-in from onboarding = %d to %q", code, loc)
+	}
+	forged := "/auth/gsc/callback?state=" + url.QueryEscape(`{"r":"https://evil.example/"}`) + "&code=x"
+	if _, loc := returnFromGoogle(t, person, forged); !strings.HasPrefix(loc, "/settings/search-console?error=") {
+		t.Fatalf("a callback with a state this instance did not seal redirected to %q", loc)
+	}
+	person.call("POST", "/v1/gsc/oauth/start", nil, http.StatusOK, &start)
+	if _, loc := returnFromGoogle(t, person, callbackHere(t, c, start.URL)); loc != "/settings/search-console?connected=google" {
+		t.Fatalf("a sign-in started without return_to redirected to %q", loc)
+	}
+}
+
 func itoa(n int64) string { return strconv.FormatInt(n, 10) }

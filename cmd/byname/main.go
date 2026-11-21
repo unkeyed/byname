@@ -23,6 +23,7 @@ import (
 
 	"github.com/unkeyed/byname/internal/app"
 	"github.com/unkeyed/byname/internal/auth"
+	"github.com/unkeyed/byname/internal/changes"
 	"github.com/unkeyed/byname/internal/checks"
 	instconfig "github.com/unkeyed/byname/internal/config"
 	"github.com/unkeyed/byname/internal/db"
@@ -74,6 +75,10 @@ type config struct {
 	// only: sends every Google call the Search Console connection makes to
 	// a fake Google at this URL. Never set it in production.
 	GSCBaseURL string
+	// GITHUB_API_BASE_URL, optional and for tests and local development
+	// only: sends every GitHub call site changes makes to a fake GitHub at
+	// this URL. Never set it in production.
+	GitHubBaseURL string
 }
 
 // providerURLEnv names each provider's base URL override.
@@ -178,6 +183,9 @@ func loadConfig() (config, error) {
 		c.ResendBaseURL = raw
 	}
 	if c.GSCBaseURL, err = baseURLEnv("GSC_GOOGLE_BASE_URL"); err != nil {
+		return c, err
+	}
+	if c.GitHubBaseURL, err = baseURLEnv("GITHUB_API_BASE_URL"); err != nil {
 		return c, err
 	}
 	c.GSCClient = gsc.OAuthClient{ID: os.Getenv("GSC_GOOGLE_CLIENT_ID"), Secret: os.Getenv("GSC_GOOGLE_CLIENT_SECRET")}
@@ -371,9 +379,10 @@ func run(log *slog.Logger) error {
 	runs := checks.New(pool, settings, checks.Options{Log: log, Alerts: alerts})
 	search := gsc.New(pool, gsc.Options{
 		Secrets: cfg.Secrets, Endpoints: gsc.GoogleEndpoints(cfg.GSCBaseURL), Client: cfg.GSCClient,
-		PublicURL: cfg.Auth.PublicURL, Terms: settings,
+		PublicURL: cfg.Auth.PublicURL, Terms: settings, Alerts: alerts,
 	})
-	if err := sealSecrets(ctx, log, users, settings, alerts, search); err != nil {
+	site := changes.New(pool, search, changes.Options{Secrets: cfg.Secrets, Alerts: alerts, GitHubBaseURL: cfg.GitHubBaseURL})
+	if err := sealSecrets(ctx, log, users, settings, alerts, search, site); err != nil {
 		return err
 	}
 	if err := announceSetup(ctx, log, users, cfg.SetupToken); err != nil {
@@ -381,7 +390,7 @@ func run(log *slog.Logger) error {
 	}
 	authn := &auth.Authenticator{Keys: auth.NewKeyStore(pool, cfg.Unkey), Users: users, OAuth: auth.NewOAuthServer(pool, cfg.Auth.PublicURL)}
 
-	services := app.Services{Instance: instance.New(version, settings), Config: settings, Checks: runs, Results: res, Notify: alerts, GSC: search}
+	services := app.Services{Instance: instance.New(version, settings), Config: settings, Checks: runs, Results: res, Notify: alerts, GSC: search, Changes: site}
 	mux := httpapi.NewMux(services, authn, log)
 	mux.Handle("/mcp", mcpserver.Handler(services, authn.OAuth, version))
 	mux.Handle("/", web.Handler())
@@ -400,6 +409,9 @@ func run(log *slog.Logger) error {
 			log.Warn(providerURLEnv[kind]+" is set: calls go to it, not to the provider. Use it only in tests and local development", "url", u)
 		}
 	}
+	if cfg.GitHubBaseURL != "" {
+		log.Warn("GITHUB_API_BASE_URL is set: site changes call it, not GitHub. Use it only in tests and local development", "github_api_base_url", cfg.GitHubBaseURL)
+	}
 	if cfg.GSCBaseURL != "" {
 		log.Warn("GSC_GOOGLE_BASE_URL is set: Search Console calls go to it, not to Google. Use it only in tests and local development", "gsc_google_base_url", cfg.GSCBaseURL)
 	}
@@ -409,7 +421,7 @@ func run(log *slog.Logger) error {
 	}
 	cited := sources.New(pool, settings, sources.Options{AllowPrivate: cfg.SourcesAllowPrivate, UserAgent: "Byname/" + version, Log: log})
 	jobs.Go(func() {
-		scheduler.New(runs, settings, scheduler.Options{Log: log, Sources: cited, Search: search}).Run(ctx)
+		scheduler.New(runs, settings, scheduler.Options{Log: log, Sources: cited, Search: search, Changes: site}).Run(ctx)
 	})
 	jobs.Go(func() { alerts.Run(ctx) })
 	log.Info("Byname listening", "port", cfg.Port, "version", version, "keys", authn.Keys.Mode(),
@@ -444,7 +456,7 @@ func run(log *slog.Logger) error {
 // sealSecrets reseals TOTP seeds and credentials sealed under
 // ENCRYPTION_KEY_PREVIOUS with ENCRYPTION_KEY, so a rotation finishes with
 // one restart.
-func sealSecrets(ctx context.Context, log *slog.Logger, users *auth.Users, settings *instconfig.Service, alerts *notify.Service, search *gsc.Service) error {
+func sealSecrets(ctx context.Context, log *slog.Logger, users *auth.Users, settings *instconfig.Service, alerts *notify.Service, search *gsc.Service, site *changes.Service) error {
 	totp, err := users.SealTOTPSecrets(ctx)
 	if err != nil {
 		return fmt.Errorf("encrypt TOTP seeds with ENCRYPTION_KEY: %w", err)
@@ -458,6 +470,11 @@ func sealSecrets(ctx context.Context, log *slog.Logger, users *auth.Users, setti
 		return fmt.Errorf("encrypt the Search Console credential with ENCRYPTION_KEY: %w", err)
 	}
 	creds += gscCreds
+	repoCreds, err := site.SealSecrets(ctx)
+	if err != nil {
+		return fmt.Errorf("encrypt the GitHub token with ENCRYPTION_KEY: %w", err)
+	}
+	creds += repoCreds
 	channels, err := alerts.SealChannels(ctx)
 	if err != nil {
 		return fmt.Errorf("encrypt notification channel secrets with ENCRYPTION_KEY: %w", err)

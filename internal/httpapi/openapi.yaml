@@ -65,6 +65,14 @@ tags:
       Console, picks the property and disconnects. Dates are Search Console's
       Pacific Time days, and windows end on the latest day Google has
       finalized.
+  - name: changes
+    description: >-
+      Site changes. Merged pull requests from a connected GitHub repo, or
+      changes logged by hand, with Google's first crawl after each and the
+      interim and final difference-in-differences reads against control
+      pages. results:read reads them; config:write logs changes and edits
+      control pages, path rules and the read settings; a signed-in admin
+      connects the repo.
   - name: settings
     description: Keys, apps, the team and the Treg token, for signed-in admins, and the consent page.
   - name: auth
@@ -1718,9 +1726,22 @@ paths:
       tags: [search]
       operationId: startSearchConsoleOAuth
       summary: Start connecting Search Console with Google sign-in, read-only.
-      description: Needs a recent sign-in and GSC_GOOGLE_CLIENT_ID. Open the returned URL in the browser; Google sends it back to /auth/gsc/callback, which stores the refresh token sealed and redirects to Settings > Search Console.
+      description: Needs a recent sign-in and GSC_GOOGLE_CLIENT_ID. Open the returned URL in the browser; Google sends it back to /auth/gsc/callback, which stores the refresh token sealed and redirects to the page return_to names, Settings > Search Console by default.
       security:
         - session: [admin]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                return_to:
+                  type: string
+                  enum: [settings, onboarding]
+                  default: settings
+                  description: Where the browser goes after Google. One of these names, never a URL.
       responses:
         "200":
           description: Google's consent page.
@@ -1738,6 +1759,413 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Reauth"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /v1/changes:
+    get:
+      tags: [changes]
+      operationId: listChanges
+      summary: Every site change, the latest merge first, with its first crawl, read days, before-period numbers and reads.
+      security:
+        - apiKey: [results:read]
+        - session: [results:read]
+      responses:
+        "200":
+          description: Changes.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Change"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+    post:
+      tags: [changes]
+      operationId: logChange
+      summary: Log a change made outside GitHub, so recrawl watch and verdicts follow it.
+      security:
+        - apiKey: [config:write]
+        - session: [config:write]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ManualChange"
+      responses:
+        "201":
+          description: The change with its timeline.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChangeDetail"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /v1/changes/markers:
+    get:
+      tags: [changes]
+      operationId: changeMarkers
+      summary: One marker per merged pull request or logged change from from to to, for a daily chart.
+      description: Days are Search Console's Pacific Time days, at most 500 apart.
+      security:
+        - apiKey: [results:read]
+        - session: [results:read]
+      parameters:
+        - name: from
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: Markers, oldest first.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ChangeMarker"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /v1/changes/settings:
+    get:
+      tags: [changes]
+      operationId: getChangeSettings
+      summary: When a change's interim and final reads fall, and the thresholds a move must pass against the control pages.
+      security:
+        - apiKey: [results:read]
+        - session: [results:read]
+      responses:
+        "200":
+          description: The settings.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChangeSettings"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+    put:
+      tags: [changes]
+      operationId: putChangeSettings
+      summary: Replace the read days and thresholds. Changes already crawled keep their days.
+      security:
+        - apiKey: [config:write]
+        - session: [config:write]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangeSettings"
+      responses:
+        "200":
+          description: The settings as saved.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChangeSettings"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /v1/changes/{id}:
+    parameters:
+      - $ref: "#/components/parameters/id"
+    get:
+      tags: [changes]
+      operationId: getChange
+      summary: One change with its timeline and the URL inspections behind it.
+      security:
+        - apiKey: [results:read]
+        - session: [results:read]
+      responses:
+        "200":
+          description: The change.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChangeDetail"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+    delete:
+      tags: [changes]
+      operationId: deleteChange
+      summary: Delete a change logged by hand.
+      description: A change from GitHub follows the repo and its path rules, so deleting one is 409.
+      security:
+        - apiKey: [config:write]
+        - session: [config:write]
+      responses:
+        "204":
+          description: Deleted.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /v1/control-pages:
+    get:
+      tags: [changes]
+      operationId: listControlPages
+      summary: The control pages verdicts compare against, by URL.
+      description: A page past its hold date, in the instance's time zone, is inactive and drops out of the control set.
+      security:
+        - apiKey: [results:read]
+        - session: [results:read]
+      responses:
+        "200":
+          description: Control pages.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ControlPage"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+    post:
+      tags: [changes]
+      operationId: upsertControlPage
+      summary: Add a control page, or change the hold date and note of the one with the same URL.
+      security:
+        - apiKey: [config:write]
+        - session: [config:write]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [url, hold_until]
+              additionalProperties: false
+              properties:
+                url:
+                  type: string
+                hold_until:
+                  type: string
+                  format: date
+                note:
+                  type: string
+      responses:
+        "200":
+          description: The control page.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ControlPage"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /v1/control-pages/{id}:
+    parameters:
+      - $ref: "#/components/parameters/id"
+    delete:
+      tags: [changes]
+      operationId: deleteControlPage
+      summary: Remove a control page.
+      security:
+        - apiKey: [config:write]
+        - session: [config:write]
+      responses:
+        "204":
+          description: Removed.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /v1/repo:
+    get:
+      tags: [changes]
+      operationId: getRepo
+      summary: The GitHub repo site changes come from, its token's expiry, the path rules and the last poll. Never the token.
+      security:
+        - apiKey: [results:read]
+        - session: [results:read]
+      responses:
+        "200":
+          description: The repo connection.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RepoStatus"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+    put:
+      tags: [changes]
+      operationId: connectRepo
+      summary: Connect a GitHub repo with a fine-grained, read-only token, stored sealed with ENCRYPTION_KEY.
+      description: Needs a recent sign-in. Byname checks that the token reads the repo first, and records the expiry GitHub reports. Reconnecting the same repo keeps its rules. The response never carries the token.
+      security:
+        - session: [admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [repo, token]
+              additionalProperties: false
+              properties:
+                repo:
+                  type: string
+                  description: owner/name, such as northwind/site.
+                token:
+                  type: string
+                  description: A fine-grained personal access token with read access to the repo's contents and pull requests.
+      responses:
+        "200":
+          description: The repo connection.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RepoStatus"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Reauth"
+        "502":
+          $ref: "#/components/responses/BadGateway"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+    delete:
+      tags: [changes]
+      operationId: disconnectRepo
+      summary: Delete the token and stop polling. The repo, its rules and the changes found stay.
+      security:
+        - session: [admin]
+      responses:
+        "204":
+          description: Disconnected.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /v1/repo/test:
+    post:
+      tags: [changes]
+      operationId: testRepo
+      summary: Call GitHub with the stored token and record the expiry it reports.
+      security:
+        - session: [admin]
+      responses:
+        "200":
+          description: The repo connection.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RepoStatus"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "502":
+          $ref: "#/components/responses/BadGateway"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /v1/repo/rules:
+    put:
+      tags: [changes]
+      operationId: putRepoRules
+      summary: Replace the rules that map a pull request's changed files to page URLs.
+      description: The first glob a file matches gives its page. In a glob, * matches within one path segment and ** across any number. In the URL, {1}, {2} are what each wildcard matched. Changed rules make the next poll read the last 30 days of merges again with them.
+      security:
+        - apiKey: [config:write]
+        - session: [config:write]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [rules]
+              additionalProperties: false
+              properties:
+                rules:
+                  type: array
+                  maxItems: 50
+                  items:
+                    $ref: "#/components/schemas/PathRule"
+      responses:
+        "200":
+          description: The repo connection.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RepoStatus"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
         "503":
           $ref: "#/components/responses/Unavailable"
   /v1/keys:
@@ -5591,3 +6019,322 @@ components:
               type: array
               items:
                 $ref: "#/components/schemas/EnginePrompt"
+    ChangeOutcome:
+      type: string
+      enum: [improved, worsened, no_change, insufficient_data]
+    ChangeWindow:
+      type: object
+      description: One side of a read. The page's and the control set's numbers over the same final days.
+      required: [from, to, days, page, control]
+      properties:
+        from:
+          type: string
+          format: date
+        to:
+          type: string
+          format: date
+        days:
+          type: integer
+        page:
+          $ref: "#/components/schemas/SearchTotals"
+        control:
+          $ref: "#/components/schemas/SearchTotals"
+    ChangeRead:
+      type: object
+      description: >-
+        One difference-in-differences read. The after window runs from the day
+        after the first crawl for the read's length (interim or verdict days),
+        cut at the latest final day; the before window is as many days ending
+        the day before the merge. Each delta is the page's change minus the
+        control set's.
+      required: [kind, read_on, outcome, reason, before, after, deltas, signals, controls, thresholds]
+      properties:
+        kind:
+          type: string
+          enum: [interim, final]
+        read_on:
+          type: string
+          format: date
+        outcome:
+          $ref: "#/components/schemas/ChangeOutcome"
+        reason:
+          type: string
+          description: Why the data was insufficient; empty otherwise.
+        before:
+          $ref: "#/components/schemas/ChangeWindow"
+        after:
+          $ref: "#/components/schemas/ChangeWindow"
+        deltas:
+          oneOf:
+            - type: "null"
+            - type: object
+              required: [position, ctr_points, impressions_ratio]
+              properties:
+                position:
+                  type: number
+                  description: In places; negative means the page moved up.
+                ctr_points:
+                  type: number
+                  description: In percentage points.
+                impressions_ratio:
+                  type: number
+                  description: Above 1 means the page gained on the controls.
+        signals:
+          type: array
+          items:
+            type: object
+            required: [metric, way]
+            properties:
+              metric:
+                type: string
+                enum: [position, ctr, impressions]
+              way:
+                type: string
+                enum: [improved, worsened]
+        controls:
+          type: array
+          items:
+            type: string
+        thresholds:
+          $ref: "#/components/schemas/ChangeThresholds"
+    ChangeThresholds:
+      type: object
+      required: [position, ctr_points, impressions_ratio]
+      properties:
+        position:
+          type: number
+          default: 2.5
+        ctr_points:
+          type: number
+          default: 0.8
+        impressions_ratio:
+          type: number
+          default: 2.7
+    ChangeSettings:
+      type: object
+      required: [interim_days, verdict_days, position, ctr_points, impressions_ratio]
+      additionalProperties: false
+      properties:
+        interim_days:
+          type: integer
+          minimum: 7
+          maximum: 90
+          default: 17
+        verdict_days:
+          type: integer
+          minimum: 14
+          maximum: 180
+          default: 31
+          description: More than interim_days.
+        position:
+          type: number
+          default: 2.5
+          description: Places of average position against the controls.
+        ctr_points:
+          type: number
+          default: 0.8
+          description: Percentage points of CTR against the controls.
+        impressions_ratio:
+          type: number
+          default: 2.7
+          description: Impressions ratio against the controls; its inverse counts as worse.
+    Change:
+      type: object
+      required: [id, url, kind, source, repo, pr_number, pr_title, pr_url, merged_at, notes, stage, first_crawl_at, interim_on, verdict_on, before, interim, final, verdict]
+      properties:
+        id:
+          type: integer
+        url:
+          type: string
+        kind:
+          type: string
+          enum: [new_page, edit, removed]
+        source:
+          type: string
+          enum: [github, manual]
+        repo:
+          type: string
+          description: owner/name; empty for a manual change.
+        pr_number:
+          type: integer
+          description: 0 for a manual change.
+        pr_title:
+          type: string
+        pr_url:
+          type: string
+        merged_at:
+          type: string
+          format: date-time
+        notes:
+          type: string
+        stage:
+          type: string
+          enum: [awaiting_crawl, awaiting_interim, awaiting_verdict, decided]
+        first_crawl_at:
+          type: [string, "null"]
+          format: date-time
+          description: Google's first crawl seen after the merge.
+        interim_on:
+          type: [string, "null"]
+          format: date
+          description: The interim read's day in the instance's time zone.
+        verdict_on:
+          type: [string, "null"]
+          format: date
+          description: The final read's day in the instance's time zone.
+        before:
+          description: The page's numbers over the verdict-length window that ends the day before the merge. Null until those days are final.
+          oneOf:
+            - type: "null"
+            - allOf:
+                - $ref: "#/components/schemas/SearchTotals"
+                - type: object
+                  required: [from, to]
+                  properties:
+                    from:
+                      type: string
+                      format: date
+                    to:
+                      type: string
+                      format: date
+        interim:
+          oneOf:
+            - type: "null"
+            - $ref: "#/components/schemas/ChangeRead"
+        final:
+          oneOf:
+            - type: "null"
+            - $ref: "#/components/schemas/ChangeRead"
+        verdict:
+          oneOf:
+            - type: "null"
+            - $ref: "#/components/schemas/ChangeOutcome"
+    ChangeDetail:
+      allOf:
+        - $ref: "#/components/schemas/Change"
+        - type: object
+          required: [timeline, inspections]
+          properties:
+            timeline:
+              type: array
+              items:
+                type: object
+                required: [kind, at, done, detail]
+                properties:
+                  kind:
+                    type: string
+                    enum: [merged, inspected, crawled, interim, verdict]
+                  at:
+                    type: string
+                    description: A date-time, or for interim and verdict a date.
+                  done:
+                    type: boolean
+                  detail:
+                    type: string
+            inspections:
+              type: array
+              items:
+                type: object
+                required: [checked_at, verdict, coverage_state, last_crawl_at, error]
+                properties:
+                  checked_at:
+                    type: string
+                    format: date-time
+                  verdict:
+                    type: string
+                  coverage_state:
+                    type: string
+                  last_crawl_at:
+                    type: [string, "null"]
+                    format: date-time
+                  error:
+                    type: string
+    ManualChange:
+      type: object
+      required: [url, kind, merged_at]
+      additionalProperties: false
+      properties:
+        url:
+          type: string
+          description: The page's full URL, as Search Console reports it.
+        kind:
+          type: string
+          enum: [new_page, edit, removed]
+        merged_at:
+          type: string
+          description: When it went live, a date-time or a date (midnight in the instance's time zone).
+        notes:
+          type: string
+    ChangeMarker:
+      type: object
+      required: [date, label, change_ids]
+      properties:
+        date:
+          type: string
+          format: date
+        label:
+          type: string
+        change_ids:
+          type: array
+          items:
+            type: integer
+    ControlPage:
+      type: object
+      required: [id, url, hold_until, note, active]
+      properties:
+        id:
+          type: integer
+        url:
+          type: string
+        hold_until:
+          type: string
+          format: date
+        note:
+          type: string
+        active:
+          type: boolean
+          description: False once hold_until has passed, when the page drops out of the control set.
+    PathRule:
+      type: object
+      required: [glob, url]
+      additionalProperties: false
+      properties:
+        glob:
+          type: string
+          description: A repo path pattern such as content/blog/*.mdx or app/**/page.tsx.
+        url:
+          type: string
+          description: The page URL, with {1}, {2} for what each wildcard matched.
+    RepoStatus:
+      type: object
+      description: The repo connection as anyone with results:read sees it. Never the token.
+      required: [connected, provider, repo, default_branch, token_expires_at, expiring_soon, rules, connected_at, last_poll_at, last_poll_error]
+      properties:
+        connected:
+          type: boolean
+          description: A token is stored.
+        provider:
+          type: string
+          description: github, empty before a repo was ever connected.
+        repo:
+          type: string
+        default_branch:
+          type: string
+        token_expires_at:
+          type: [string, "null"]
+          format: date-time
+        expiring_soon:
+          type: boolean
+          description: The token expires within 14 days.
+        rules:
+          type: array
+          items:
+            $ref: "#/components/schemas/PathRule"
+        connected_at:
+          type: [string, "null"]
+          format: date-time
+        last_poll_at:
+          type: [string, "null"]
+          format: date-time
+        last_poll_error:
+          type: string

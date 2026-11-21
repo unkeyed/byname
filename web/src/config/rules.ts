@@ -176,6 +176,11 @@ export const numberFields = {
   retries: { label: "Retries", unit: "per call", min: 0, max: 3, int: true },
   timeout_s: { label: "Timeout", unit: "seconds per call", min: 30, max: 600, int: true },
   raw_retention_days: { label: "Keep raw responses for", unit: "days", min: 1, int: true, optional: true },
+  interim_days: { label: "Interim read", unit: "days after the first crawl", min: 7, max: 90, int: true },
+  verdict_days: { label: "Final read", unit: "days after the first crawl", min: 14, max: 180, int: true },
+  position: { label: "Position", unit: "places", above: 0, max: 50 },
+  ctr_points: { label: "CTR", unit: "percentage points", above: 0, max: 50 },
+  impressions_ratio: { label: "Impressions", unit: "times, against the controls", above: 1, max: 100 },
 } satisfies Record<string, NumberRule>;
 
 interface NumberRule {
@@ -196,7 +201,11 @@ export function parseNumber(key: NumberKey, raw: string): { value: number | null
   if (s === "") return r.optional ? { value: null } : { error: "Required." };
   const n = Number(s);
   const range =
-    r.above !== undefined ? `more than ${r.above}` : r.max !== undefined ? `${r.min} to ${r.max}` : `at least ${r.min}`;
+    r.above !== undefined
+      ? `more than ${r.above}${r.max !== undefined ? ` and at most ${r.max}` : ""}`
+      : r.max !== undefined
+        ? `${r.min} to ${r.max}`
+        : `at least ${r.min}`;
   if (!Number.isFinite(n) || (r.int && !Number.isInteger(n))) return { error: `Must be ${r.int ? "a whole number, " : "a number, "}${range}.` };
   if ((r.above !== undefined && !(n > r.above)) || (r.min !== undefined && n < r.min) || (r.max !== undefined && n > r.max)) return { error: `Must be ${range}.` };
   return { value: n };

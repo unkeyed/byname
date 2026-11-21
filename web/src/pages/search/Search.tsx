@@ -1,14 +1,15 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router";
-import type { GscStatus, SearchPeriod } from "../../api";
-import { useGsc, useMe } from "../../queries";
+import { useQuery } from "@tanstack/react-query";
+import { api, type GscStatus, type SearchPeriod } from "../../api";
+import { keys, useGsc, useMe } from "../../queries";
 import { buttonClass, Card, CardHeader, cx, EmptyState, ErrorNote, Icon, PageSpinner, RelativeTime, Spinner } from "../../ui";
 import { useView } from "../../view";
 import { Segmented, ViewHeader } from "../results/Header";
 import { BrandCard } from "./BrandCard";
 import { DailyChart } from "./DailyChart";
 import { GoalsCard } from "./Goals";
-import { change, dayList, dayRange, fullDay, headline, searchState, spanFrom, spans, useSearchDaily, useSearchSummary, type SearchState } from "./model";
+import { change, dayList, dayRange, fullDay, headline, lastDay, searchState, spanFrom, spans, useSearchDaily, useSearchSummary, type SearchState } from "./model";
 import { TopPages, TopQueries } from "./Tops";
 
 export const settingsPath = "/settings/search-console";
@@ -102,7 +103,7 @@ function Ready({ status, canEdit, admin }: { status: GscStatus; canEdit: boolean
   );
 }
 
-function Note({ tone, icon, children }: { tone: "info" | "warn" | "danger"; icon: "alert" | "refresh" | "note"; children: ReactNode }) {
+export function Note({ tone, icon, children }: { tone: "info" | "warn" | "danger"; icon: "alert" | "refresh" | "note"; children: ReactNode }) {
   return (
     <div className={cx("flex items-start gap-2 rounded-surface px-3 py-2 text-xs", { info: "bg-info-soft text-info", warn: "bg-warn-soft text-warn", danger: "bg-danger-soft text-danger" }[tone])}>
       <Icon name={icon} className={cx("mt-px size-3.5", icon === "refresh" && "animate-spin")} />
@@ -211,18 +212,20 @@ function Change({ cur, prev, h }: { cur: SearchPeriod; prev: SearchPeriod | null
 
 function DailyCard({ status, from }: { status: GscStatus; from: string }) {
   const daily = useSearchDaily(status, from);
+  const to = lastDay(status);
+  const markers = useQuery({ queryKey: keys.changeMarkers(from, to), queryFn: () => api.changes.markers(from, to), placeholderData: (p) => p });
   let body;
   if (daily.isPending) body = <PageSpinner />;
   else if (daily.isError) body = <div className="px-4 pb-4"><ErrorNote error={daily.error} /></div>;
   else
     body = (
       <div className={cx(daily.isPlaceholderData && "opacity-60")}>
-        <DailyChart days={daily.data.days} from={from} latestFinal={daily.data.latest_final_day} />
+        <DailyChart days={daily.data.days} from={from} latestFinal={daily.data.latest_final_day} markers={markers.data} />
       </div>
     );
   return (
     <Card>
-      <CardHeader title="Clicks and impressions per day" description="Each on its own scale. Impression swings are often demand, not rank." />
+      <CardHeader title="Clicks and impressions per day" description={`Each on its own scale. Impression swings are often demand, not rank.${markers.data?.length ? " Each line with a dot is a site change." : ""}`} />
       {body}
     </Card>
   );

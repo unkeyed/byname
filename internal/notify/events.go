@@ -214,7 +214,18 @@ func (p PairPausedPayload) message() Message {
 	return Message{Title: fmt.Sprintf("Paused %s on %s", p.Model, title), Lines: []string{p.Reason}, Path: "/settings/surfaces"}
 }
 
-// GoalReachedPayload is declared for the Search Console workstream to emit.
+// metricLabels names Search Console metrics in messages.
+var metricLabels = map[string]string{"clicks": "Clicks", "impressions": "Impressions", "non_brand_clicks": "Non-brand clicks"}
+
+func metricLabel(m string) string {
+	if l, ok := metricLabels[m]; ok {
+		return l
+	}
+	return m
+}
+
+// GoalReachedPayload is a search goal whose progress first met its target
+// (internal/gsc).
 type GoalReachedPayload struct {
 	GoalID     int64   `json:"goal_id"`
 	Metric     string  `json:"metric"`
@@ -228,13 +239,14 @@ func (GoalReachedPayload) Kind() Kind { return GoalReached }
 
 func (p GoalReachedPayload) message() Message {
 	return Message{
-		Title: fmt.Sprintf("Goal reached: %s", p.Metric),
+		Title: fmt.Sprintf("Goal reached: %s", strings.ToLower(metricLabel(p.Metric))),
 		Lines: []string{fmt.Sprintf("%g over %d days, against a target of %g due %s.", p.Value, p.WindowDays, p.Target, p.DueOn)},
 		Path:  "/search",
 	}
 }
 
-// SearchMovedPayload is declared for the Search Console workstream to emit.
+// SearchMovedPayload is a 28-day Search Console metric that moved against
+// the 28 days before (internal/gsc).
 type SearchMovedPayload struct {
 	Metric     string  `json:"metric"`
 	WindowDays int     `json:"window_days"`
@@ -245,27 +257,38 @@ type SearchMovedPayload struct {
 func (SearchMovedPayload) Kind() Kind { return SearchMoved }
 
 func (p SearchMovedPayload) message() Message {
+	way := "rose"
+	if p.After < p.Before {
+		way = "fell"
+	}
 	return Message{
-		Title: fmt.Sprintf("Search %s moved", p.Metric),
-		Lines: []string{fmt.Sprintf("%g to %g over the last %d days.", p.Before, p.After, p.WindowDays)},
+		Title: fmt.Sprintf("%s %s over the last %d days", metricLabel(p.Metric), way, p.WindowDays),
+		Lines: []string{fmt.Sprintf("%g, against %g in the %d days before.", p.After, p.Before, p.WindowDays)},
 		Path:  "/search",
 	}
 }
 
-// ChangeVerdictPayload is declared for the site changes workstream to emit.
+// ChangeVerdictPayload is a change's final read against the control pages
+// (internal/changes). Detail is the read in one line.
 type ChangeVerdictPayload struct {
 	ChangeID int64  `json:"change_id"`
 	URL      string `json:"url"`
 	Verdict  string `json:"verdict"`
+	Detail   string `json:"detail"`
 }
 
 func (ChangeVerdictPayload) Kind() Kind { return ChangeVerdict }
 
 func (p ChangeVerdictPayload) message() Message {
-	return Message{Title: fmt.Sprintf("Change verdict: %s", p.Verdict), Lines: []string{p.URL}, Path: "/changes"}
+	lines := []string{p.URL}
+	if p.Detail != "" {
+		lines = append(lines, p.Detail)
+	}
+	return Message{Title: fmt.Sprintf("Change verdict: %s", strings.ReplaceAll(p.Verdict, "_", " ")), Lines: lines, Path: "/changes"}
 }
 
-// TokenExpiringPayload is declared for the site changes workstream to emit.
+// TokenExpiringPayload is the GitHub token for site changes nearing its
+// expiry (internal/changes).
 type TokenExpiringPayload struct {
 	Provider  string    `json:"provider"`
 	Repo      string    `json:"repo"`
@@ -277,8 +300,8 @@ func (TokenExpiringPayload) Kind() Kind { return TokenExpiring }
 func (p TokenExpiringPayload) message() Message {
 	return Message{
 		Title: fmt.Sprintf("The %s token for %s expires %s", p.Provider, p.Repo, p.ExpiresAt.UTC().Format(time.DateOnly)),
-		Lines: []string{"Paste a new token under Settings before it expires, or site changes stop updating."},
-		Path:  "/settings",
+		Lines: []string{"Paste a new token under Settings > Site changes before it expires, or site changes stop updating."},
+		Path:  "/settings/site-changes",
 	}
 }
 

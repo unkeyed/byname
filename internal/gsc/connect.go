@@ -156,31 +156,70 @@ func (s *Service) oauthConfig() *oauth2.Config {
 	}
 }
 
+// Return is the page the browser goes back to after Google's consent page:
+// one of a fixed set, never a URL, so the callback cannot be made into an
+// open redirect.
+type Return string
+
+const (
+	ReturnSettings   Return = "settings"   // Settings > Search Console
+	ReturnOnboarding Return = "onboarding" // onboarding's Search Console step
+)
+
+// ParseReturn reads a Return at the boundary; "" is ReturnSettings.
+func ParseReturn(s string) (Return, error) {
+	switch r := Return(s); r {
+	case "":
+		return ReturnSettings, nil
+	case ReturnSettings, ReturnOnboarding:
+		return r, nil
+	}
+	return "", fmt.Errorf("%w: return_to must be settings or onboarding, got %q", core.ErrInvalid, s)
+}
+
 // oauthState is what the state parameter carries through Google's consent
 // page, sealed so nobody else can mint or read one: who started the
-// connection, the PKCE verifier, and when it stops being accepted.
+// connection, the PKCE verifier, when it stops being accepted, and where
+// the browser goes back to.
 type oauthState struct {
 	UserID   int64  `json:"u"`
 	Verifier string `json:"v"`
 	Expires  int64  `json:"e"`
+	Return   Return `json:"r,omitempty"`
 }
 
 const stateSeal = "gsc:oauth-state"
 
 // StartOAuth returns Google's consent page URL for the admin a, asking for
 // read-only Search Console access with offline access, so Google returns a
-// refresh token. The browser comes back to /auth/gsc/callback.
-func (s *Service) StartOAuth(a core.Actor) (string, error) {
+// refresh token. The browser comes back to /auth/gsc/callback, which sends
+// it on to back.
+func (s *Service) StartOAuth(a core.Actor, back Return) (string, error) {
 	if !s.client.set() {
 		return "", fmt.Errorf("%w: Sign in with Google needs this instance's own Google OAuth client; set GSC_GOOGLE_CLIENT_ID and GSC_GOOGLE_CLIENT_SECRET, or connect a service account instead", core.ErrInvalid)
 	}
-	st := oauthState{UserID: a.UserID, Verifier: oauth2.GenerateVerifier(), Expires: s.now().Add(15 * time.Minute).Unix()}
+	st := oauthState{UserID: a.UserID, Verifier: oauth2.GenerateVerifier(), Expires: s.now().Add(15 * time.Minute).Unix(), Return: back}
 	raw, err := json.Marshal(st)
 	if err != nil {
 		return "", err
 	}
 	state := s.secrets.Seal(string(raw), stateSeal)
 	return s.oauthConfig().AuthCodeURL(state, oauth2.AccessTypeOffline, oauth2.ApprovalForce, oauth2.S256ChallengeOption(st.Verifier)), nil
+}
+
+// OAuthReturn is where the sign-in that state belongs to sends the browser
+// back: the Return sealed in it, or ReturnSettings when state is not one
+// this instance sealed.
+func (s *Service) OAuthReturn(state string) Return {
+	var st oauthState
+	raw, err := s.secrets.Open(state, stateSeal)
+	if err != nil || json.Unmarshal([]byte(raw), &st) != nil {
+		return ReturnSettings
+	}
+	if r, err := ParseReturn(string(st.Return)); err == nil {
+		return r
+	}
+	return ReturnSettings
 }
 
 // OAuthCallback is what Google sends the browser back with.

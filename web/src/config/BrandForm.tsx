@@ -1,7 +1,8 @@
 import { useState, type FormEvent } from "react";
-import type { MatchMode, Settings, SettingsView } from "../api";
-import { useCan, useSettings } from "../queries";
-import { cx, ErrorNote, Field, inputClass, labelClass, PageSpinner, selectClass } from "../ui";
+import { useQueryClient } from "@tanstack/react-query";
+import { api, type MatchMode, type Settings, type SettingsView } from "../api";
+import { keys, useCan, useSettings } from "../queries";
+import { Button, cx, ErrorNote, Field, Icon, inputClass, labelClass, PageSpinner, selectClass } from "../ui";
 import { defaultFooter, FieldNote, NumberField, ReadOnlyNote, SubmitButton, useSaveSettings, type Footer } from "./forms";
 import { browserTimeZone, commonWordAliases, formatNumber, languages, markets, parseHost, parseHosts, parseNumber, splitList, timeZones } from "./rules";
 
@@ -17,6 +18,9 @@ const matchModes: { mode: MatchMode; title: string; detail: string }[] = [
     detail: "Also counts your brand name inside other words and in any case, such as “northwind-cli”. Use it when answers write your name in many ways. It applies to your own brand only, never to competitors.",
   },
 ];
+
+/** An edit to the branded terms: back to following the name and aliases, or terms typed. null sends nothing. */
+type TermsEdit = null | { follow: true } | { text: string };
 
 /**
  * Your brand, domains, matching, market and time zone: onboarding step 1
@@ -42,8 +46,9 @@ function BrandFormBody({ initial, retention, footer, onSaved, submitLabel }: { i
   const [timeZone, setTimeZone] = useState(initial.brand.name ? initial.time_zone : browserTimeZone());
   const [keepForever, setKeepForever] = useState(initial.raw_retention_days == null);
   const [retentionDays, setRetentionDays] = useState(formatNumber(initial.raw_retention_days ?? 90));
+  const [termsEdit, setTermsEdit] = useState<TermsEdit>(null);
   const [tried, setTried] = useState(false);
-  const save = useSaveSettings(onSaved);
+  const qc = useQueryClient();
 
   const nameError = name.trim().length < 2 || name.trim().length > 80 ? "Brand name must be 2 to 80 characters." : null;
   const primaryParse = primary.trim() ? parseHost(primary) : { error: "Your primary domain is required, such as northwind.com." };
@@ -53,7 +58,21 @@ function BrandFormBody({ initial, retention, footer, onSaved, submitLabel }: { i
   const retentionParse = keepForever ? { value: null } : parseNumber("raw_retention_days", retentionDays);
   const otherHosts = "hosts" in othersParse && "host" in primaryParse ? othersParse.hosts.filter((h) => h !== primaryParse.host) : [];
   const repeated = "hosts" in othersParse && "host" in primaryParse && othersParse.hosts.includes(primaryParse.host);
-  const invalid = !!nameError || "error" in primaryParse || "error" in othersParse || "error" in retentionParse;
+  const defaultTerms = [...new Set([name.trim().replace(/\s+/g, " "), ...aliasList].filter(Boolean).map((t) => t.toLowerCase()))];
+  const following = termsEdit === null ? initial.branded_terms_default : "follow" in termsEdit;
+  const shownTerms = termsEdit && "text" in termsEdit ? termsEdit.text : (following ? defaultTerms : initial.branded_terms).join(", ");
+  const termList = [...new Set(splitList(shownTerms).map((t) => t.toLowerCase()))];
+  const termsError =
+    termsEdit === null ? null : termList.length > 50 ? "At most 50 terms." : termList.some((t) => t.length < 2 || t.length > 80) ? "Each term must be 2 to 80 characters." : null;
+  const invalid = !!nameError || "error" in primaryParse || "error" in othersParse || "error" in retentionParse || !!termsError;
+  const save = useSaveSettings(async () => {
+    if (termsEdit !== null) {
+      const backToDefault = following || termList.length === 0 || termList.join() === defaultTerms.join();
+      qc.setQueryData(keys.settings, await api.setBrandedTerms(backToDefault ? [] : termList));
+      void qc.invalidateQueries({ queryKey: keys.search });
+    }
+    return onSaved?.();
+  });
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -115,6 +134,27 @@ function BrandFormBody({ initial, retention, footer, onSaved, submitLabel }: { i
               {common.map((c) => `“${c}”`).join(", ")} {common.length === 1 ? "is an everyday word" : "are everyday words"}, so answers that are not about you would count as
               mentions. Prefer a longer alias, such as “{common[0]} by {name.trim() || "Northwind"}”.
             </FieldNote>
+          )}
+        </div>
+
+        <div>
+          <Field
+            label="Branded search terms"
+            hint={
+              !termsError &&
+              (following
+                ? "Comma separated. A Search Console query containing one counts as brand. These follow your name and aliases until you change them."
+                : "Comma separated, saved lowercased. A Search Console query containing one counts as brand.")
+            }
+          >
+            <input className={inputClass} value={shownTerms} onChange={(e) => setTermsEdit({ text: e.target.value })} placeholder={defaultTerms.join(", ") || "northwind"} autoCapitalize="none" spellCheck={false} />
+          </Field>
+          {termsError && <FieldNote tone="error">{termsError}</FieldNote>}
+          {!following && (
+            <Button size="sm" variant="ghost" className="mt-1 -ml-2" onClick={() => setTermsEdit({ follow: true })}>
+              <Icon name="reset" className="size-3.5" />
+              Use name and aliases
+            </Button>
           )}
         </div>
 
