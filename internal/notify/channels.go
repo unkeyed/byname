@@ -19,6 +19,7 @@ import (
 	"net/mail"
 	"net/smtp"
 	"net/url"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -461,8 +462,18 @@ func address(field, raw string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("%s must be an email address, such as Byname <alerts@example.com>", field)
 	}
+	switch {
+	case a.Name == "":
+		return a.Address, nil
+	case plainName.MatchString(a.Name):
+		// String() quotes every name; a plain one reads better bare and
+		// parses back the same.
+		return a.Name + " <" + a.Address + ">", nil
+	}
 	return a.String(), nil
 }
+
+var plainName = regexp.MustCompile(`^[A-Za-z0-9 ]+$`)
 
 func recipients(in []string) ([]string, error) {
 	out := []string{}
