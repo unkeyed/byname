@@ -65,6 +65,15 @@ type surfaceKey struct {
 	Surface engines.Surface `json:"surface" jsonschema:"a surface key from list_surfaces, such as claude_code"`
 }
 
+type surfaceModelsInput struct {
+	Surface engines.Surface `json:"surface" jsonschema:"a surface key from list_surfaces, such as claude_code"`
+	config.ModelsQuery
+}
+
+type stepInput struct {
+	Step config.StepKey `json:"step" jsonschema:"brand, competitors, questions, surfaces, search_console or schedule"`
+}
+
 type updateSurfaceInput struct {
 	Surface engines.Surface `json:"surface" jsonschema:"a surface key from list_surfaces, such as claude_code"`
 	config.SurfaceInput
@@ -167,21 +176,46 @@ func addConfigTools(srv *mcp.Server, svc app.Services) {
 		})
 
 	addTool(srv, core.ResultsRead, &mcp.Tool{Name: "list_surfaces", Annotations: readOnly(),
-		Description: "Every surface Byname can ask on, its pinned Treg endpoint and fidelity, whether it is on, and its surface and model pairs. GET /v1/surfaces."},
+		Description: "Every surface Byname can ask on: its current route (Treg, a scraping provider's own key, a direct provider key, or a gateway) and endpoint, the routes it can take with the fidelity each gives, whether it is on, and its surface and model pairs with their last test. GET /v1/surfaces."},
 		func(ctx context.Context, _ core.Actor, _ noInput) (surfaceList, error) {
 			v, err := c.Surfaces(ctx)
 			return surfaceList{v}, err
 		})
 	addTool(srv, core.ConfigWrite, &mcp.Tool{Name: "update_surface", Annotations: mutates(false, true),
-		Description: "Turn a surface on or off and, when models is given, set its models (each checked against the endpoint's live list). App surfaces take no models. PUT /v1/surfaces/{key}."},
+		Description: "Turn a surface on or off, move it to another route, and, when models is given, set its models (each checked against the route's live list). App surfaces read by Treg or a scraping key take no models; on a provider or gateway route they need one. Moving route resets each pair's test. Keys are set by an admin in the UI. PUT /v1/surfaces/{key}."},
 		func(ctx context.Context, _ core.Actor, in updateSurfaceInput) (config.Surface, error) {
 			return c.PutSurface(ctx, in.Surface, in.SurfaceInput)
 		})
 	addTool(srv, core.ResultsRead, &mcp.Tool{Name: "list_surface_models", Annotations: readOnly(),
-		Description: "A surface's live model list, read through Treg for free. GET /v1/surfaces/{key}/models."},
-		func(ctx context.Context, _ core.Actor, in surfaceKey) (modelList, error) {
-			v, err := c.LiveModels(ctx, in.Surface)
+		Description: "A surface's live model list on its current route, or on another route given in route, read for free. GET /v1/surfaces/{key}/models."},
+		func(ctx context.Context, _ core.Actor, in surfaceModelsInput) (modelList, error) {
+			v, err := c.LiveModels(ctx, in.Surface, in.ModelsQuery)
 			return modelList{v}, err
+		})
+	addTool(srv, core.ResultsRead, &mcp.Tool{Name: "get_onboarding", Annotations: readOnly(),
+		Description: "How far onboarding has come: each step and whether it is saved, when it was finished, and what still blocks finishing. GET /v1/onboarding."},
+		func(ctx context.Context, _ core.Actor, _ noInput) (config.Onboarding, error) {
+			return c.Onboarding(ctx)
+		})
+	addTool(srv, core.ConfigWrite, &mcp.Tool{Name: "save_onboarding_step", Annotations: mutates(false, true),
+		Description: "Mark an onboarding step saved, after saving its data with the matching tool, or to skip an optional step (competitors, search_console). PUT /v1/onboarding/steps/{step}."},
+		func(ctx context.Context, _ core.Actor, in stepInput) (config.Onboarding, error) {
+			return c.SaveStep(ctx, in.Step)
+		})
+	addTool(srv, core.ConfigWrite, &mcp.Tool{Name: "finish_onboarding", Annotations: mutates(false, true),
+		Description: "Finish onboarding once the required steps are saved and every enabled pair has passed test_pair. Sets the first scheduled check; queue one now with run_now. POST /v1/onboarding/finish."},
+		func(ctx context.Context, _ core.Actor, _ noInput) (config.Onboarding, error) {
+			return c.FinishOnboarding(ctx)
+		})
+	addTool(srv, core.ConfigWrite, &mcp.Tool{Name: "test_pair", Annotations: &mcp.ToolAnnotations{DestructiveHint: new(false), IdempotentHint: true, OpenWorldHint: new(true)},
+		Description: "Make one short paid call for a surface and model pair through its route. Reports the status, the reported cost, whether it searched and cited, and sets the pair's fidelity from what it showed. POST /v1/pairs/{id}/test."},
+		func(ctx context.Context, _ core.Actor, in byID) (config.PairTest, error) {
+			return c.TestPair(ctx, in.ID)
+		})
+	addTool(srv, core.ResultsRead, &mcp.Tool{Name: "estimate_cost", Annotations: readOnly(),
+		Description: "The estimated cost of one check: calls (questions times enabled pairs) and each pair's cost per call from its endpoint's past answers or the sampled cost, with pairs that have neither counted as unknown. GET /v1/estimate."},
+		func(ctx context.Context, _ core.Actor, _ noInput) (config.Estimate, error) {
+			return c.Estimate(ctx)
 		})
 
 	addTool(srv, core.RunsWrite, &mcp.Tool{Name: "run_now", Annotations: &mcp.ToolAnnotations{DestructiveHint: new(false), IdempotentHint: true, OpenWorldHint: new(true)},

@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/unkeyed/byname/internal/config"
+	"github.com/unkeyed/byname/internal/core"
 	"github.com/unkeyed/byname/internal/engines"
 	"github.com/unkeyed/byname/internal/panel"
 )
@@ -31,7 +32,6 @@ type plan struct {
 	runID    int64
 	settings config.SettingsView
 	brands   []panel.Brand
-	treg     engines.Treg
 	calls    []call
 	// monthBase is what the month's other runs have spent.
 	monthBase float64
@@ -40,7 +40,9 @@ type plan struct {
 type call struct {
 	question config.Question
 	pair     config.Pair
-	spec     engines.Spec
+	// via is the pair's surface on its route: the adapter that asks and the
+	// endpoint stored on the answer.
+	via config.Binding
 }
 
 // outcome is why a run stopped queueing calls, the first reason wins.
@@ -143,8 +145,12 @@ func (s *Service) plan(ctx context.Context, runID, setID int64) (plan, *outcome,
 	if len(pairs) == 0 {
 		return p, &outcome{status: Failed, message: "no surface and model pair is enabled"}, nil
 	}
-	if p.treg, err = s.config.Treg(ctx); err != nil {
+	bindings, err := s.config.Bindings(ctx)
+	if errors.Is(err, core.ErrInvalid) {
 		return p, &outcome{status: Failed, message: err.Error()}, nil
+	}
+	if err != nil {
+		return p, nil, err
 	}
 	rows, err := s.db.Query(ctx, `SELECT question_id, surface_model_id FROM answer WHERE run_id = $1`, runID)
 	if err != nil {
@@ -163,9 +169,8 @@ func (s *Service) plan(ctx context.Context, runID, setID int64) (plan, *outcome,
 	}
 	for _, q := range questions {
 		for _, pair := range pairs {
-			spec, _ := engines.Lookup(pair.Surface)
 			if !done[panel.Key{Question: panel.QuestionID(q.ID), SurfaceModel: panel.SurfaceModelID(pair.ID)}] {
-				p.calls = append(p.calls, call{question: q, pair: pair, spec: spec})
+				p.calls = append(p.calls, call{question: q, pair: pair, via: bindings[pair.Surface]})
 			}
 		}
 	}
@@ -219,8 +224,8 @@ func (s *Service) execute(ctx context.Context, p plan, out *outcome) {
 	wg.Wait()
 }
 
-// ask makes one call with retries and stores its answer. A Treg refusal
-// is not an answer: it backs off when Treg asks to wait, and otherwise
+// ask makes one call with retries through the pair's route and stores its
+// answer. A Treg refusal is not an answer: it backs off when Treg asks to wait, and otherwise
 // stops the run. When ctx ends mid-call nothing is stored, so a resumed run
 // asks again with the same idempotency key and Treg replays the answer.
 func (s *Service) ask(ctx context.Context, p plan, c call, out *outcome) error {
@@ -235,7 +240,7 @@ func (s *Service) ask(ctx context.Context, p plan, c call, out *outcome) error {
 	for {
 		req.IdempotencyKey = fmt.Sprintf("byname/run-%d/q-%d/sm-%d/%d", p.runID, c.question.ID, c.pair.ID, attempt)
 		callCtx, cancel := context.WithTimeout(ctx, timeout)
-		res, err = p.treg.Call(callCtx, req)
+		res, err = c.via.Adapter.Call(callCtx, req)
 		cancel()
 		if ctx.Err() != nil {
 			return nil
@@ -295,7 +300,7 @@ func (s *Service) store(ctx context.Context, p plan, c call, res engines.Result,
 				position = excluded.position, cost_usd = excluded.cost_usd, text = excluded.text, raw = excluded.raw,
 				fan_out = excluded.fan_out, call_id = excluded.call_id, answered_at = now()
 			RETURNING id`,
-			p.runID, c.question.ID, c.pair.ID, c.spec.Endpoint.ID, c.pair.Fidelity, res.ReportedModel,
+			p.runID, c.question.ID, c.pair.ID, c.via.Endpoint, c.pair.Fidelity, res.ReportedModel,
 			res.Status, res.Error, attempts, scored.Mentioned, scored.Cited, nullPosition(scored.Position), res.CostUSD,
 			res.Text, rawJSON(res.Raw), append([]string{}, res.FanOut...), res.CallID).Scan(&answerID)
 		if err != nil {

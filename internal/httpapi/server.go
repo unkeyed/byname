@@ -70,6 +70,12 @@ var routes = []route{
 	{"GET /v1/surfaces", needs(core.ResultsRead), (*server).listSurfaces},
 	{"PUT /v1/surfaces/{key}", needs(core.ConfigWrite), (*server).putSurface},
 	{"GET /v1/surfaces/{key}/models", needs(core.ResultsRead), (*server).listSurfaceModels},
+	// Onboarding, pair tests and the cost estimate.
+	{"GET /v1/onboarding", needs(core.ResultsRead), (*server).getOnboarding},
+	{"PUT /v1/onboarding/steps/{step}", needs(core.ConfigWrite), (*server).saveOnboardingStep},
+	{"POST /v1/onboarding/finish", needs(core.ConfigWrite), (*server).finishOnboarding},
+	{"POST /v1/pairs/{id}/test", needs(core.ConfigWrite), (*server).testPair},
+	{"GET /v1/estimate", needs(core.ResultsRead), (*server).estimate},
 
 	{"POST /v1/runs", needs(core.RunsWrite), (*server).runNow},
 	{"POST /v1/checks/pause", needs(core.RunsWrite), (*server).pauseChecks},
@@ -107,8 +113,9 @@ var routes = []route{
 	{"DELETE /v1/users/{id}", admin, (*server).removeUser},
 	{"POST /v1/invites", admin, (*server).createInvite},
 	{"GET /v1/credentials", admin, (*server).listCredentials},
-	{"PUT /v1/credentials/treg", admin, (*server).setTregToken},
-	{"POST /v1/credentials/treg/test", admin, (*server).testTregToken},
+	{"PUT /v1/credentials/{kind}", admin, (*server).setCredential},
+	{"POST /v1/credentials/{kind}/test", admin, (*server).testCredential},
+	{"DELETE /v1/credentials/{kind}", admin, (*server).deleteCredential},
 	// Notifications: channels and the delivery log.
 	{"GET /v1/notification-channels", admin, (*server).listChannels},
 	{"POST /v1/notification-channels", admin, (*server).createChannel},

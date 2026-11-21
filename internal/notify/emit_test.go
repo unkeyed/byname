@@ -27,7 +27,7 @@ func TestRunsAndPausesRaiseTheirEvents(t *testing.T) {
 	treg := tregtest.New(t)
 	alerts := notify.New(db, results.New(db), notify.Options{Secrets: secretbox.ForTest(), PublicURL: &url.URL{Scheme: "https", Host: "byname.example"}})
 	cfg := config.New(db, config.Options{Secrets: secretbox.ForTest(), TregBaseURL: treg.URL, Alerts: alerts})
-	checkstest.Seed(t, cfg, func(s *config.Settings) { s.SpendCapRunUSD = 0.025 })
+	checkstest.Seed(t, cfg, treg, func(s *config.Settings) { s.SpendCapRunUSD = 0.025 })
 	runs := checks.New(db, cfg, checks.Options{Alerts: alerts})
 	check := func() {
 		t.Helper()

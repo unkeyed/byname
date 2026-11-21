@@ -8,6 +8,7 @@ import (
 
 	"github.com/unkeyed/byname/internal/config"
 	"github.com/unkeyed/byname/internal/engines"
+	"github.com/unkeyed/byname/internal/engines/tregtest"
 	"github.com/unkeyed/byname/internal/panel"
 )
 
@@ -39,8 +40,10 @@ var Pairs = map[engines.Surface]string{
 }
 
 // Seed configures cfg with Settings (changed by mod), the brands Contoso
-// (competitor) and Redis (technology), the Treg token, Questions and Pairs.
-func Seed(t testing.TB, cfg *config.Service, mod func(*config.Settings)) {
+// (competitor) and Redis (technology), the Treg token, Questions and Pairs,
+// tests every pair through treg and finishes onboarding, then forgets the
+// test calls so treg counts only what the test does next.
+func Seed(t testing.TB, cfg *config.Service, treg *tregtest.Server, mod func(*config.Settings)) {
 	t.Helper()
 	ctx := context.Background()
 	s := Settings()
@@ -56,7 +59,7 @@ func Seed(t testing.TB, cfg *config.Service, mod func(*config.Settings)) {
 	must(cfg.PutSettings(ctx, s))
 	must(cfg.UpsertBrand(ctx, config.BrandInput{Name: "Contoso", Aliases: []string{"Contoso Gateway"}, Domains: []string{"contoso.example"}, Kind: panel.KindCompetitor}))
 	must(cfg.UpsertBrand(ctx, config.BrandInput{Name: "Redis", Kind: panel.KindTechnology}))
-	must(cfg.SetTregToken(ctx, "treg_test_token", ""))
+	must(cfg.SetCredential(ctx, "treg", "treg_test_token", ""))
 	must(cfg.PutQuestions(ctx, config.QuestionsInput{Questions: Questions}))
 	for _, spec := range engines.All() {
 		model, ok := Pairs[spec.Surface]
@@ -69,4 +72,22 @@ func Seed(t testing.TB, cfg *config.Service, mod func(*config.Settings)) {
 		}
 		must(cfg.PutSurface(ctx, spec.Surface, in))
 	}
+	surfaces, err := cfg.Surfaces(ctx)
+	must(nil, err)
+	for _, s := range surfaces {
+		for _, p := range s.Pairs {
+			if p.Enabled {
+				res, err := cfg.TestPair(ctx, p.ID)
+				must(nil, err)
+				if res.Pair.TestStatus != "ok" {
+					t.Fatalf("seeding: the test of %s %s failed: %s", s.Key, p.Model, res.Pair.TestStatus)
+				}
+			}
+		}
+	}
+	for _, step := range []config.StepKey{config.StepBrand, config.StepCompetitors, config.StepQuestions, config.StepSurfaces, config.StepSearchConsole, config.StepSchedule} {
+		must(cfg.SaveStep(ctx, step))
+	}
+	must(cfg.FinishOnboarding(ctx))
+	treg.Reset()
 }

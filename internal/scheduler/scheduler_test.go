@@ -28,7 +28,7 @@ type env struct {
 func setup(t *testing.T) *env {
 	t.Helper()
 	e := &env{db: testdb.New(t), treg: tregtest.New(t)}
-	checkstest.Seed(t, e.process(nil).cfg, nil)
+	checkstest.Seed(t, e.process(nil).cfg, e.treg, nil)
 	return e
 }
 

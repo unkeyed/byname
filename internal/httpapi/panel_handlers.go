@@ -107,7 +107,37 @@ func (s *server) putSurface(w http.ResponseWriter, r *http.Request, _ core.Actor
 }
 
 func (s *server) listSurfaceModels(w http.ResponseWriter, r *http.Request, _ core.Actor) error {
-	v, err := s.svc.Config.LiveModels(r.Context(), engines.Surface(r.PathValue("key")))
+	q := config.ModelsQuery{Route: engines.Route(r.URL.Query().Get("route")), BaseURL: r.URL.Query().Get("base_url")}
+	v, err := s.svc.Config.LiveModels(r.Context(), engines.Surface(r.PathValue("key")), q)
+	return respond(w, http.StatusOK, v, err)
+}
+
+func (s *server) getOnboarding(w http.ResponseWriter, r *http.Request, _ core.Actor) error {
+	v, err := s.svc.Config.Onboarding(r.Context())
+	return respond(w, http.StatusOK, v, err)
+}
+
+func (s *server) saveOnboardingStep(w http.ResponseWriter, r *http.Request, _ core.Actor) error {
+	v, err := s.svc.Config.SaveStep(r.Context(), config.StepKey(r.PathValue("step")))
+	return respond(w, http.StatusOK, v, err)
+}
+
+func (s *server) finishOnboarding(w http.ResponseWriter, r *http.Request, _ core.Actor) error {
+	v, err := s.svc.Config.FinishOnboarding(r.Context())
+	return respond(w, http.StatusOK, v, err)
+}
+
+func (s *server) testPair(w http.ResponseWriter, r *http.Request, _ core.Actor) error {
+	id, err := pathID(r, "surface and model pair")
+	if err != nil {
+		return err
+	}
+	v, err := s.svc.Config.TestPair(r.Context(), id)
+	return respond(w, http.StatusOK, v, err)
+}
+
+func (s *server) estimate(w http.ResponseWriter, r *http.Request, _ core.Actor) error {
+	v, err := s.svc.Config.Estimate(r.Context())
 	return respond(w, http.StatusOK, v, err)
 }
 
@@ -141,25 +171,31 @@ func (s *server) listCredentials(w http.ResponseWriter, r *http.Request, _ core.
 	return respond(w, http.StatusOK, v, err)
 }
 
-// setTregToken body {"token": "...", "org": "..."}; org only for a
+// setCredential body {"secret": "...", "org": "..."}; org only for a
 // personal Treg token.
-func (s *server) setTregToken(w http.ResponseWriter, r *http.Request, _ core.Actor) error {
+func (s *server) setCredential(w http.ResponseWriter, r *http.Request, _ core.Actor) error {
 	var b struct {
-		Token string `json:"token"`
-		Org   string `json:"org"`
+		Secret string `json:"secret"`
+		Org    string `json:"org"`
 	}
 	if err := readJSON(r, &b); err != nil {
 		return err
 	}
 	return s.recentOnly(r, func() error {
-		v, err := s.svc.Config.SetTregToken(r.Context(), b.Token, b.Org)
+		v, err := s.svc.Config.SetCredential(r.Context(), r.PathValue("kind"), b.Secret, b.Org)
 		return respond(w, http.StatusOK, v, err)
 	})
 }
 
-func (s *server) testTregToken(w http.ResponseWriter, r *http.Request, _ core.Actor) error {
-	v, err := s.svc.Config.TestTregToken(r.Context())
+func (s *server) testCredential(w http.ResponseWriter, r *http.Request, _ core.Actor) error {
+	v, err := s.svc.Config.TestCredential(r.Context(), r.PathValue("kind"))
 	return respond(w, http.StatusOK, v, err)
+}
+
+func (s *server) deleteCredential(w http.ResponseWriter, r *http.Request, _ core.Actor) error {
+	return s.recentOnly(r, func() error {
+		return noContent(w, s.svc.Config.DeleteCredential(r.Context(), r.PathValue("kind")))
+	})
 }
 
 // Results: results:read.

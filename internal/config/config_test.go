@@ -2,6 +2,7 @@ package config_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"strings"
 	"testing"
@@ -58,6 +59,14 @@ func TestSettingsScheduleTheNextCheck(t *testing.T) {
 	}
 	if got.Brand.Name != "Northwind" || len(got.Brand.Aliases) != 1 || len(got.Brand.Domains) != 1 || got.Brand.Domains[0] != "northwind.example" {
 		t.Errorf("brand = %+v, want aliases and domains normalized and deduplicated", got.Brand)
+	}
+	if got.NextCheckAt != nil {
+		t.Fatalf("next check = %v before onboarding is finished, want none", got.NextCheckAt)
+	}
+	onboard(t, svc)
+	got, err = svc.Settings(ctx)
+	if err != nil {
+		t.Fatal(err)
 	}
 	berlin, _ := time.LoadLocation("Europe/Berlin")
 	want := time.Date(2026, 11, 22, 6, 0, 0, 0, berlin)
@@ -246,7 +255,7 @@ func TestSurfacesCheckModelsAgainstTheLiveList(t *testing.T) {
 	_, err = svc.PutSurface(ctx, "myspace", config.SurfaceInput{Enabled: true})
 	is(t, err, core.ErrNotFound)
 
-	if _, err := svc.SetTregToken(ctx, "treg_test_token", ""); err != nil {
+	if _, err := svc.SetCredential(ctx, "treg", "treg_test_token", ""); err != nil {
 		t.Fatal(err)
 	}
 	_, err = svc.PutSurface(ctx, engines.ClaudeCode, config.SurfaceInput{Enabled: true, Models: []config.PairInput{{Model: "claude-opus"}}})
@@ -301,20 +310,29 @@ func TestSurfacesCheckModelsAgainstTheLiveList(t *testing.T) {
 	}
 }
 
-func TestTregTokenIsNeverReturned(t *testing.T) {
+func TestCredentialsAreNeverReturned(t *testing.T) {
 	svc, treg := newService(t, time.Now())
 	creds, err := svc.Credentials(ctx)
-	if err != nil || len(creds) != 1 || creds[0].Set {
-		t.Fatalf("before: %+v %v", creds, err)
+	if err != nil || len(creds) != len(engines.CredentialKinds) || creds[0].Kind != engines.CredentialTreg || creds[0].Set {
+		t.Fatalf("before: %+v %v, want every kind unset, Treg first", creds, err)
 	}
-	_, err = svc.TestTregToken(ctx)
+	_, err = svc.TestCredential(ctx, "treg")
 	is(t, err, core.ErrInvalid)
+	_, err = svc.SetCredential(ctx, "dataforseo", "no-colon", "")
+	is(t, err, core.ErrInvalid)
+	_, err = svc.SetCredential(ctx, "openai", "sk-live", "an-org")
+	is(t, err, core.ErrInvalid)
+	_, err = svc.SetCredential(ctx, "keyring", "x", "")
+	is(t, err, core.ErrNotFound)
 
-	c, err := svc.SetTregToken(ctx, "treg_live_secret", "")
+	c, err := svc.SetCredential(ctx, "treg", "treg_live_secret", "")
 	if err != nil || !c.Set {
 		t.Fatalf("set: %+v %v", c, err)
 	}
-	c, err = svc.TestTregToken(ctx)
+	if _, err := svc.SetCredential(ctx, "anthropic", "sk-ant-live-secret", ""); err != nil {
+		t.Fatal(err)
+	}
+	c, err = svc.TestCredential(ctx, "treg")
 	if err != nil || c.LastTestStatus != "ok" || c.LastTestedAt == nil {
 		t.Fatalf("test: %+v %v", c, err)
 	}
@@ -322,8 +340,22 @@ func TestTregTokenIsNeverReturned(t *testing.T) {
 		t.Fatalf("test call = %+v, want a free model list call with the stored token", calls[len(calls)-1])
 	}
 	treg.Before(func(tregtest.Call) *tregtest.Refusal { return &tregtest.Refusal{Status: 401, Code: "invalid_token"} })
-	c, err = svc.TestTregToken(ctx)
+	c, err = svc.TestCredential(ctx, "treg")
 	if err != nil || !strings.Contains(c.LastTestStatus, "invalid_token") {
 		t.Fatalf("failed test: %+v %v, want the refusal recorded", c, err)
 	}
+	creds, err = svc.Credentials(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, _ := json.Marshal(creds)
+	for _, secret := range []string{"treg_live_secret", "sk-ant-live-secret"} {
+		if strings.Contains(string(raw), secret) {
+			t.Fatalf("credentials carry a secret: %s", raw)
+		}
+	}
+	if err := svc.DeleteCredential(ctx, "anthropic"); err != nil {
+		t.Fatal(err)
+	}
+	is(t, svc.DeleteCredential(ctx, "anthropic"), core.ErrNotFound)
 }

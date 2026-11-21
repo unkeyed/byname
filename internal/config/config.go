@@ -24,11 +24,13 @@ import (
 )
 
 type Service struct {
-	db      *pgxpool.Pool
-	secrets *secretbox.Box
-	treg    engines.Treg
-	now     func() time.Time
-	alerts  Alerts
+	db       *pgxpool.Pool
+	secrets  *secretbox.Box
+	client   *http.Client
+	resolve  engines.Resolver
+	baseURLs map[engines.CredentialKind]string
+	now      func() time.Time
+	alerts   Alerts
 }
 
 // Alerts hears when a model leaves its surface's live list and its pair is
@@ -38,12 +40,14 @@ type Alerts interface {
 }
 
 type Options struct {
-	// Secrets seals the Treg token.
+	// Secrets seals the Treg token and provider keys.
 	Secrets *secretbox.Box
 	// TregBaseURL replaces https://treg.to, for tests and local development
 	// against a fake Treg.
 	TregBaseURL string
-	HTTPClient  *http.Client
+	// BaseURLs replace providers' public URLs the same way, per key kind.
+	BaseURLs   map[engines.CredentialKind]string
+	HTTPClient *http.Client
 	// Resolve follows redirect links in citations. Nil keeps them as sent.
 	Resolve engines.Resolver
 	Now     func() time.Time
@@ -55,28 +59,49 @@ func New(db *pgxpool.Pool, o Options) *Service {
 	if o.Now == nil {
 		o.Now = time.Now
 	}
-	return &Service{
-		db:      db,
-		secrets: o.Secrets,
-		treg:    engines.Treg{Client: o.HTTPClient, BaseURL: o.TregBaseURL, Resolve: o.Resolve},
-		now:     o.Now,
-		alerts:  o.Alerts,
+	urls := map[engines.CredentialKind]string{engines.CredentialTreg: o.TregBaseURL}
+	for k, v := range o.BaseURLs {
+		urls[k] = v
 	}
+	return &Service{db: db, secrets: o.Secrets, client: o.HTTPClient, resolve: o.Resolve, baseURLs: urls, now: o.Now, alerts: o.Alerts}
 }
 
-// Ready says what is missing before a check can run: the brand, a
-// question set, an enabled surface and model pair, and the Treg token.
-// It returns nil when nothing is.
+// Ready says what is missing before a check can run: everything
+// readiness lists, and a finished onboarding. It returns nil when nothing is.
 func (s *Service) Ready(ctx context.Context) error {
+	missing, err := s.readiness(ctx)
+	if err != nil {
+		return err
+	}
+	var onboarded bool
+	if err := s.db.QueryRow(ctx, `SELECT onboarded_at IS NOT NULL FROM instance_settings`).Scan(&onboarded); err != nil {
+		return err
+	}
+	if !onboarded {
+		missing = append(missing, "finish onboarding (POST /v1/onboarding/finish)")
+	}
+	if len(missing) > 0 {
+		return fmt.Errorf("%w: set %s before a check can run", core.ErrInvalid, strings.Join(missing, ", "))
+	}
+	return nil
+}
+
+// readiness lists what a check needs and the instance lacks: the brand, a
+// question set, an enabled surface and model pair, and the Treg token when
+// an enabled surface uses the Treg route. Other routes cannot lack their
+// key: a surface cannot move to a route whose key is unset, and a key in
+// use cannot be deleted.
+func (s *Service) readiness(ctx context.Context) ([]string, error) {
 	var brand, questions, pairs, token bool
 	err := s.db.QueryRow(ctx, `SELECT
 		EXISTS (SELECT 1 FROM brand WHERE kind = 'self'),
 		EXISTS (SELECT 1 FROM question_set),
 		EXISTS (SELECT 1 FROM surface_model m JOIN surface s ON s.key = m.surface_key
 		        WHERE s.enabled AND m.enabled AND m.paused_reason IS NULL),
-		EXISTS (SELECT 1 FROM credential WHERE kind = 'treg')`).Scan(&brand, &questions, &pairs, &token)
+		EXISTS (SELECT 1 FROM credential WHERE kind = 'treg')
+		OR NOT EXISTS (SELECT 1 FROM surface WHERE enabled AND route = 'treg')`).Scan(&brand, &questions, &pairs, &token)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	var missing []string
 	for _, m := range []struct {
@@ -86,16 +111,13 @@ func (s *Service) Ready(ctx context.Context) error {
 		{brand, "your brand (PUT /v1/settings)"},
 		{questions, "questions (PUT /v1/questions)"},
 		{pairs, "an enabled surface (PUT /v1/surfaces/{key})"},
-		{token, "the Treg token (an admin sets it under Settings)"},
+		{token, "the Treg token, or move every surface off the Treg route (an admin sets the token under Settings > Credentials)"},
 	} {
 		if !m.ok {
 			missing = append(missing, m.what)
 		}
 	}
-	if len(missing) > 0 {
-		return fmt.Errorf("%w: set %s before a check can run", core.ErrInvalid, strings.Join(missing, ", "))
-	}
-	return nil
+	return missing, nil
 }
 
 var hostname = regexp.MustCompile(`^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$`)

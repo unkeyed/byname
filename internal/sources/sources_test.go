@@ -33,8 +33,9 @@ type env struct {
 func setup(t *testing.T) *env {
 	t.Helper()
 	e := &env{db: testdb.New(t), now: time.Date(2026, 11, 20, 9, 0, 0, 0, time.UTC)}
-	e.config = config.New(e.db, config.Options{Secrets: secretbox.ForTest(), TregBaseURL: tregtest.New(t).URL})
-	checkstest.Seed(t, e.config, nil)
+	treg := tregtest.New(t)
+	e.config = config.New(e.db, config.Options{Secrets: secretbox.ForTest(), TregBaseURL: treg.URL})
+	checkstest.Seed(t, e.config, treg, nil)
 	return e
 }
 

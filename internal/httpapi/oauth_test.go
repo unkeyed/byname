@@ -565,6 +565,12 @@ var mcpTools = map[string]string{
 	"GET /v1/surfaces":              "list_surfaces",
 	"PUT /v1/surfaces/{key}":        "update_surface",
 	"GET /v1/surfaces/{key}/models": "list_surface_models",
+	// Onboarding, pair tests and the cost estimate.
+	"GET /v1/onboarding":              "get_onboarding",
+	"PUT /v1/onboarding/steps/{step}": "save_onboarding_step",
+	"POST /v1/onboarding/finish":      "finish_onboarding",
+	"POST /v1/pairs/{id}/test":        "test_pair",
+	"GET /v1/estimate":                "estimate_cost",
 
 	"POST /v1/runs":          "run_now",
 	"POST /v1/checks/pause":  "pause_checks",

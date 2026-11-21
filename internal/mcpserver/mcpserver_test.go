@@ -23,7 +23,7 @@ func listTools(t *testing.T) []*mcp.Tool {
 	t.Helper()
 	ctx := context.Background()
 	srv := mcp.NewServer(&mcp.Implementation{Name: "byname", Version: "test"}, nil)
-	addTools(srv, app.Services{Instance: instance.New("test")})
+	addTools(srv, app.Services{Instance: instance.New("test", notOnboarded{})})
 	st, ct := mcp.NewInMemoryTransports()
 	if _, err := srv.Connect(ctx, st, nil); err != nil {
 		t.Fatal(err)
@@ -133,7 +133,7 @@ func TestStatusNeedsResultsRead(t *testing.T) {
 	reader, writer := client, client
 	reader.Scopes = []core.Scope{core.ResultsRead}
 	writer.Scopes = []core.Scope{core.RunsWrite}
-	srv := httptest.NewServer(Handler(app.Services{Instance: instance.New("v1.2.3")}, tokens{"byn_at_reader": reader, "byn_at_writer": writer}, "test"))
+	srv := httptest.NewServer(Handler(app.Services{Instance: instance.New("v1.2.3", notOnboarded{})}, tokens{"byn_at_reader": reader, "byn_at_writer": writer}, "test"))
 	t.Cleanup(srv.Close)
 
 	cs, err := connect(ctx, srv.URL, "byn_at_reader")
@@ -184,3 +184,7 @@ func TestStatusNeedsResultsRead(t *testing.T) {
 		t.Fatalf("no token: %d %q, want 401 with the resource metadata challenge", r.StatusCode, r.Header.Get("WWW-Authenticate"))
 	}
 }
+
+type notOnboarded struct{}
+
+func (notOnboarded) Onboarded(context.Context) (bool, error) { return false, nil }

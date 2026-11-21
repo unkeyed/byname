@@ -62,6 +62,32 @@ type config struct {
 	// sends email API channels to a fake Resend at this URL instead of
 	// https://api.resend.com.
 	ResendBaseURL string
+	// OPENAI_BASE_URL and the rest of providerURLEnv do the same for
+	// surfaces routed to a provider's own key.
+	ProviderURLs map[engines.CredentialKind]string
+}
+
+// providerURLEnv names each provider's base URL override.
+var providerURLEnv = map[engines.CredentialKind]string{
+	engines.CredentialOpenAI:     "OPENAI_BASE_URL",
+	engines.CredentialAnthropic:  "ANTHROPIC_BASE_URL",
+	engines.CredentialPerplexity: "PERPLEXITY_BASE_URL",
+	engines.CredentialGoogle:     "GEMINI_BASE_URL",
+	engines.CredentialDataForSEO: "DATAFORSEO_BASE_URL",
+	engines.CredentialCloro:      "CLORO_BASE_URL",
+	engines.CredentialSerpApi:    "SERPAPI_BASE_URL",
+}
+
+func baseURLEnv(name string) (string, error) {
+	raw := os.Getenv(name)
+	if raw == "" {
+		return "", nil
+	}
+	u, err := url.Parse(raw)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+		return "", fmt.Errorf("%s must be an http(s) URL such as http://localhost:9999, got %q", name, raw)
+	}
+	return raw, nil
 }
 
 // loadSecrets reads ENCRYPTION_KEY and the optional ENCRYPTION_KEY_PREVIOUS.
@@ -121,12 +147,14 @@ func loadConfig() (config, error) {
 	if c.Secrets, err = loadSecrets(); err != nil {
 		return c, err
 	}
-	if raw := os.Getenv("TREG_BASE_URL"); raw != "" {
-		u, err := url.Parse(raw)
-		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
-			return c, fmt.Errorf("TREG_BASE_URL must be an http(s) URL such as http://localhost:9999, got %q", raw)
+	if c.TregBaseURL, err = baseURLEnv("TREG_BASE_URL"); err != nil {
+		return c, err
+	}
+	c.ProviderURLs = map[engines.CredentialKind]string{}
+	for kind, name := range providerURLEnv {
+		if c.ProviderURLs[kind], err = baseURLEnv(name); err != nil {
+			return c, err
 		}
-		c.TregBaseURL = raw
 	}
 	if v := os.Getenv("SOURCES_ALLOW_PRIVATE_IPS"); v != "" {
 		if c.SourcesAllowPrivate, err = strconv.ParseBool(v); err != nil {
@@ -311,7 +339,6 @@ func run(log *slog.Logger) error {
 		return err
 	}
 
-	svc := instance.New(version)
 	users, err := auth.NewUsers(pool, cfg.Auth)
 	if err != nil {
 		return err
@@ -321,7 +348,7 @@ func run(log *slog.Logger) error {
 		Secrets: cfg.Secrets, PublicURL: cfg.Auth.PublicURL, HTTPClient: &http.Client{}, ResendBaseURL: cfg.ResendBaseURL, Log: log,
 	})
 	settings := instconfig.New(pool, instconfig.Options{
-		Secrets: cfg.Secrets, TregBaseURL: cfg.TregBaseURL,
+		Secrets: cfg.Secrets, TregBaseURL: cfg.TregBaseURL, BaseURLs: cfg.ProviderURLs,
 		HTTPClient: &http.Client{}, Resolve: engines.HeadResolver(&http.Client{Timeout: 10 * time.Second}),
 		Alerts: alerts,
 	})
@@ -334,7 +361,7 @@ func run(log *slog.Logger) error {
 	}
 	authn := &auth.Authenticator{Keys: auth.NewKeyStore(pool, cfg.Unkey), Users: users, OAuth: auth.NewOAuthServer(pool, cfg.Auth.PublicURL)}
 
-	services := app.Services{Instance: svc, Config: settings, Checks: runs, Results: res, Notify: alerts}
+	services := app.Services{Instance: instance.New(version, settings), Config: settings, Checks: runs, Results: res, Notify: alerts}
 	mux := httpapi.NewMux(services, authn, log)
 	mux.Handle("/mcp", mcpserver.Handler(services, authn.OAuth, version))
 	mux.Handle("/", web.Handler())
@@ -347,6 +374,11 @@ func run(log *slog.Logger) error {
 	}
 	if cfg.ResendBaseURL != "" {
 		log.Warn("RESEND_BASE_URL is set: email API channels send to it, not to Resend. Use it only in tests and local development", "resend_base_url", cfg.ResendBaseURL)
+	}
+	for kind, u := range cfg.ProviderURLs {
+		if u != "" {
+			log.Warn(providerURLEnv[kind]+" is set: calls go to it, not to the provider. Use it only in tests and local development", "url", u)
+		}
 	}
 	var jobs sync.WaitGroup
 	if cfg.SourcesAllowPrivate {

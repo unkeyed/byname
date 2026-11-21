@@ -7,18 +7,25 @@ import "context"
 // Status is what GET /v1/status and the status tool return.
 type Status struct {
 	Version string `json:"version"`
-	// Onboarded is whether someone has finished setting up the brand,
-	// surfaces and questions. Until then there is nothing to check.
+	// Onboarded is whether someone has finished onboarding. Until then
+	// nothing runs on schedule and Run now refuses.
 	Onboarded bool `json:"onboarded"`
 }
 
-type Service struct {
-	version string
+// Onboarding reports whether onboarding is finished. *config.Service
+// implements it.
+type Onboarding interface {
+	Onboarded(context.Context) (bool, error)
 }
 
-func New(version string) *Service { return &Service{version: version} }
+type Service struct {
+	version    string
+	onboarding Onboarding
+}
 
-// Status reports Onboarded as false: no onboarding step exists to finish.
-func (s *Service) Status(context.Context) (Status, error) {
-	return Status{Version: s.version}, nil
+func New(version string, o Onboarding) *Service { return &Service{version: version, onboarding: o} }
+
+func (s *Service) Status(ctx context.Context) (Status, error) {
+	done, err := s.onboarding.Onboarded(ctx)
+	return Status{Version: s.version, Onboarded: done}, err
 }

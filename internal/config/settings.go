@@ -43,15 +43,18 @@ type SelfBrand struct {
 // SettingsView is the settings with the schedule's state.
 type SettingsView struct {
 	Settings
-	ChecksPaused bool       `json:"checks_paused"`
-	NextCheckAt  *time.Time `json:"next_check_at"`
-	LastCheckAt  *time.Time `json:"last_check_at"`
-	UpdatedAt    time.Time  `json:"updated_at"`
+	ChecksPaused bool `json:"checks_paused"`
+	// NextCheckAt stays null until onboarding is finished, so nothing runs
+	// on schedule before setup is done.
+	NextCheckAt *time.Time `json:"next_check_at"`
+	LastCheckAt *time.Time `json:"last_check_at"`
+	UpdatedAt   time.Time  `json:"updated_at"`
+	OnboardedAt *time.Time `json:"onboarded_at" jsonschema:"when onboarding was finished, null before"`
 }
 
 const settingsColumns = `match_mode, market, language, time_zone, check_every_days,
 	to_char(check_time, 'HH24:MI'), spend_cap_run_usd::float8, spend_cap_month_usd::float8, concurrency, retries,
-	timeout_s, raw_retention_days, checks_paused, next_check_at, last_check_at, updated_at`
+	timeout_s, raw_retention_days, checks_paused, next_check_at, last_check_at, updated_at, onboarded_at`
 
 func (s *Service) Settings(ctx context.Context) (SettingsView, error) {
 	return getSettings(ctx, s.db)
@@ -62,7 +65,7 @@ func getSettings(ctx context.Context, q querier) (SettingsView, error) {
 	err := q.QueryRow(ctx, `SELECT `+settingsColumns+` FROM instance_settings`).Scan(
 		&v.MatchMode, &v.Market, &v.Language, &v.TimeZone, &v.CheckEveryDays, &v.CheckTime,
 		&v.SpendCapRunUSD, &v.SpendCapMonthUSD, &v.Concurrency, &v.Retries, &v.TimeoutS,
-		&v.RawRetentionDays, &v.ChecksPaused, &v.NextCheckAt, &v.LastCheckAt, &v.UpdatedAt)
+		&v.RawRetentionDays, &v.ChecksPaused, &v.NextCheckAt, &v.LastCheckAt, &v.UpdatedAt, &v.OnboardedAt)
 	if err != nil {
 		return v, err
 	}
@@ -117,8 +120,8 @@ func (in *Settings) validate() error {
 	return nil
 }
 
-// PutSettings replaces the settings and the instance's own brand. When the
-// schedule changes, or has never been set, it recomputes the next check.
+// PutSettings replaces the settings and the instance's own brand. Once
+// onboarding is finished, a schedule change recomputes the next check.
 func (s *Service) PutSettings(ctx context.Context, in Settings) (SettingsView, error) {
 	if err := in.validate(); err != nil {
 		return SettingsView{}, err
@@ -140,7 +143,8 @@ func (s *Service) PutSettings(ctx context.Context, in Settings) (SettingsView, e
 			return err
 		}
 		next := old.NextCheckAt
-		if next == nil || old.CheckEveryDays != in.CheckEveryDays || old.CheckTime != in.CheckTime || old.TimeZone != in.TimeZone {
+		changed := old.CheckEveryDays != in.CheckEveryDays || old.CheckTime != in.CheckTime || old.TimeZone != in.TimeZone
+		if old.OnboardedAt != nil && (next == nil || changed) {
 			n := NextCheck(s.now(), old.LastCheckAt, in.Schedule())
 			next = &n
 		}

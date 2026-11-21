@@ -35,7 +35,7 @@ func setup(t *testing.T, mod func(*config.Settings)) *env {
 	t.Helper()
 	e := &env{db: testdb.New(t), treg: tregtest.New(t)}
 	e.config = config.New(e.db, config.Options{Secrets: secretbox.ForTest(), TregBaseURL: e.treg.URL})
-	checkstest.Seed(t, e.config, mod)
+	checkstest.Seed(t, e.config, e.treg, mod)
 	e.checks = e.restart()
 	return e
 }

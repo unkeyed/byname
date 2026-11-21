@@ -179,7 +179,7 @@ func serve(t *testing.T, srv *httptest.Server, publicURL string, mod ...func(*au
 	res := results.New(pool)
 	resend, resendSrv := notifytest.NewResend(t, resendKey)
 	alerts := notify.New(pool, res, notify.Options{Secrets: cfg.Secrets, PublicURL: u, ResendBaseURL: resendSrv.URL})
-	svc := app.Services{Instance: instance.New("test"), Config: settings, Checks: checks.New(pool, settings, checks.Options{Alerts: alerts}), Results: res, Notify: alerts}
+	svc := app.Services{Instance: instance.New("test", settings), Config: settings, Checks: checks.New(pool, settings, checks.Options{Alerts: alerts}), Results: res, Notify: alerts}
 	mux := NewMux(svc, authn, slog.New(slog.DiscardHandler))
 	mux.Handle("/mcp", mcpserver.Handler(svc, authn.OAuth, "test"))
 	srv.Config.Handler = mux
@@ -602,7 +602,7 @@ func TestKeyStoreOutageIs503(t *testing.T) {
 		t.Fatal(err)
 	}
 	authn := &auth.Authenticator{Keys: downKeys{}, Users: users, OAuth: auth.NewOAuthServer(pool, u)}
-	srv := httptest.NewServer(NewMux(app.Services{Instance: instance.New("test")}, authn, slog.New(slog.DiscardHandler)))
+	srv := httptest.NewServer(NewMux(app.Services{Instance: instance.New("test", nil)}, authn, slog.New(slog.DiscardHandler)))
 	t.Cleanup(srv.Close)
 	r := client{t: t, base: srv.URL, key: "byn_whatever"}.do("GET", "/v1/status", nil)
 	var e struct {

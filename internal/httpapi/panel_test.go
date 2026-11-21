@@ -16,17 +16,63 @@ import (
 
 const tregSecret = "treg_secret_never_returned"
 
-// configure sets an instance up through REST the way the UI will: the
-// token as a signed-in admin, everything else with config:write.
+// configure sets an instance up through REST the way onboarding does: the
+// token as a signed-in admin, everything else with config:write, then a
+// test of every pair and Finish. Run now refuses until Finish.
 func configure(t *testing.T, person, editor client) {
 	t.Helper()
-	person.call("PUT", "/v1/credentials/treg", map[string]string{"token": tregSecret}, http.StatusOK, nil)
+	person.call("PUT", "/v1/credentials/treg", map[string]string{"secret": tregSecret}, http.StatusOK, nil)
 	editor.call("PUT", "/v1/settings", checkstest.Settings(), http.StatusOK, nil)
 	editor.call("POST", "/v1/brands", map[string]any{"name": "Contoso", "aliases": []string{"Contoso Gateway"}, "kind": "competitor"}, http.StatusOK, nil)
 	editor.call("POST", "/v1/brands", map[string]any{"name": "Redis", "kind": "technology"}, http.StatusOK, nil)
 	editor.call("PUT", "/v1/questions", map[string]any{"questions": checkstest.Questions}, http.StatusOK, nil)
 	editor.call("PUT", "/v1/surfaces/claude_code", map[string]any{"enabled": true, "models": []map[string]string{{"model": "claude-sonnet-5-5"}}}, http.StatusOK, nil)
 	editor.call("PUT", "/v1/surfaces/google_ai_overview", map[string]any{"enabled": true}, http.StatusOK, nil)
+	for _, step := range []string{"brand", "competitors", "questions", "surfaces", "search_console", "schedule"} {
+		editor.call("PUT", "/v1/onboarding/steps/"+step, nil, http.StatusOK, nil)
+	}
+	if r := editor.do("POST", "/v1/runs", nil); r.code != http.StatusBadRequest && r.code != http.StatusForbidden {
+		t.Fatalf("POST /v1/runs before onboarding finished = %d %s, want a refusal", r.code, r.body)
+	}
+	editor.call("POST", "/v1/onboarding/finish", nil, http.StatusBadRequest, nil)
+	var surfaces []struct {
+		Enabled bool `json:"enabled"`
+		Pairs   []struct {
+			ID      int64 `json:"id"`
+			Enabled bool  `json:"enabled"`
+		} `json:"pairs"`
+	}
+	person.call("GET", "/v1/surfaces", nil, http.StatusOK, &surfaces)
+	for _, s := range surfaces {
+		for _, p := range s.Pairs {
+			if !s.Enabled || !p.Enabled {
+				continue
+			}
+			var res struct {
+				Status string `json:"status"`
+				Pair   struct {
+					TestStatus string `json:"test_status"`
+				} `json:"pair"`
+			}
+			editor.call("POST", fmt.Sprintf("/v1/pairs/%d/test", p.ID), nil, http.StatusOK, &res)
+			if res.Pair.TestStatus != "ok" {
+				t.Fatalf("pair %d test = %+v, want ok", p.ID, res)
+			}
+		}
+	}
+	var state struct {
+		FinishedAt *string  `json:"finished_at"`
+		Missing    []string `json:"missing"`
+	}
+	editor.call("POST", "/v1/onboarding/finish", nil, http.StatusOK, &state)
+	if state.FinishedAt == nil || len(state.Missing) != 0 {
+		t.Fatalf("finish = %+v", state)
+	}
+	var status struct{ Onboarded bool }
+	person.call("GET", "/v1/status", nil, http.StatusOK, &status)
+	if !status.Onboarded {
+		t.Fatal("status says not onboarded after finishing")
+	}
 }
 
 func (c client) withKey(t *testing.T, person client, scopes ...core.Scope) client {
@@ -42,7 +88,7 @@ func (c client) withKey(t *testing.T, person client, scopes ...core.Scope) clien
 func TestConfigureAndReadAChecksResults(t *testing.T) {
 	c := newServer(t)
 	person, agent := login(t, c)
-	agent.call("PUT", "/v1/credentials/treg", map[string]string{"token": "x"}, http.StatusForbidden, nil)
+	agent.call("PUT", "/v1/credentials/treg", map[string]string{"secret": "x"}, http.StatusForbidden, nil)
 	agent.call("POST", "/v1/runs", nil, http.StatusBadRequest, nil)
 	configure(t, person, agent)
 
@@ -124,13 +170,14 @@ func TestConfigureAndReadAChecksResults(t *testing.T) {
 		"/v1/metrics/competitors?by=surface", fmt.Sprintf("/v1/runs/%d/questions?surface=claude_code", run.ID),
 		"/v1/prompts?since=2026-01-01", "/v1/sources?surface=claude_code", "/v1/gaps?surface=claude_code",
 		"/v1/metrics/engine?surface=claude_code&endpoint=dataforseo.x.ai-optimization-claude-llm-responses-live&fidelity=model_match",
+		"/v1/onboarding", "/v1/estimate", "/v1/surfaces", "/v1/settings",
 	} {
 		get(path, nil)
 	}
 	var creds []map[string]any
 	r := person.call("GET", "/v1/credentials", nil, http.StatusOK, &creds)
 	bodies = append(bodies, string(r.body))
-	if len(creds) != 1 || creds[0]["set"] != true {
+	if len(creds) != 9 || creds[0]["kind"] != "treg" || creds[0]["set"] != true || creds[1]["set"] != false {
 		t.Fatalf("credentials = %v", creds)
 	}
 	for _, b := range bodies {

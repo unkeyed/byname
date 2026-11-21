@@ -43,7 +43,7 @@ func setup(t *testing.T) *env {
 	t.Helper()
 	e := &env{db: testdb.New(t), treg: tregtest.New(t)}
 	e.config = config.New(e.db, config.Options{Secrets: secretbox.ForTest(), TregBaseURL: e.treg.URL})
-	checkstest.Seed(t, e.config, nil)
+	checkstest.Seed(t, e.config, e.treg, nil)
 	e.checks = checks.New(e.db, e.config, checks.Options{})
 	e.results = results.New(e.db)
 	e.treg.SetCost(perplexityLive, nil)

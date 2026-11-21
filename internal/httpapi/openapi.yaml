@@ -413,12 +413,15 @@ paths:
     put:
       tags: [config]
       operationId: putSurface
-      summary: Turn a surface on or off and, when models is present, set which of its models are enabled.
+      summary: Turn a surface on or off, move it to another route, and, when models is present, set which of its models are enabled.
       description: >-
         Listed models are enabled and the surface's other models disabled.
         Listing a paused model unpauses it. Each model must be on the
-        endpoint's live model list, which Byname reads through Treg, so the
-        Treg token must be set first. App surfaces take no models. Turning a
+        route's live model list, so the route's key must be set first.
+        App surfaces read by Treg or a scraping provider's key take no
+        models; on a provider or gateway route they need at least one.
+        Moving to another route needs its key set by an admin, resets every
+        pair's test, and gives each pair the new route's label. Turning a
         surface on needs at least one enabled model.
       security:
         - apiKey: [config:write]
@@ -454,11 +457,22 @@ paths:
     get:
       tags: [config]
       operationId: listSurfaceModels
-      summary: The models the surface's endpoint offers now, read live through Treg at no cost.
-      description: 400 for an app surface, which takes no model, and when no Treg token is set.
+      summary: The models a route offers the surface now, read live at no cost.
+      description: 400 where the surface takes no model on the route (an app read by Treg or a scraping key), and when the route's key is not set.
       security:
         - apiKey: [results:read]
         - session: [results:read]
+      parameters:
+        - name: route
+          in: query
+          description: The route whose list to read. Omit for the surface's current route.
+          schema:
+            $ref: "#/components/schemas/Route"
+        - name: base_url
+          in: query
+          description: A gateway's base URL, for the gateway route.
+          schema:
+            type: string
       responses:
         "200":
           description: The live model list.
@@ -478,6 +492,145 @@ paths:
           $ref: "#/components/responses/NotFound"
         "502":
           $ref: "#/components/responses/BadGateway"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /v1/onboarding:
+    get:
+      tags: [config]
+      operationId: getOnboarding
+      summary: How far onboarding has come, and what still blocks finishing it.
+      security:
+        - apiKey: [results:read]
+        - session: [results:read]
+      responses:
+        "200":
+          description: The onboarding state.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Onboarding"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /v1/onboarding/steps/{step}:
+    parameters:
+      - name: step
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/StepKey"
+    put:
+      tags: [config]
+      operationId: saveOnboardingStep
+      summary: Mark an onboarding step saved.
+      description: Call it after saving the step's data with its own route, or to skip an optional step. Marking a step twice changes nothing. review is finished with POST /v1/onboarding/finish.
+      security:
+        - apiKey: [config:write]
+        - session: [config:write]
+      responses:
+        "200":
+          description: The onboarding state.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Onboarding"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /v1/onboarding/finish:
+    post:
+      tags: [config]
+      operationId: finishOnboarding
+      summary: Finish onboarding and set the first scheduled check.
+      description: >-
+        Needs every required step saved, the instance ready to check, and a
+        passing test for every enabled pair; 400 lists what is missing.
+        Until it succeeds nothing runs on schedule and Run now refuses.
+        Finishing again changes nothing. Queue the first check with POST
+        /v1/runs.
+      security:
+        - apiKey: [config:write]
+        - session: [config:write]
+      responses:
+        "200":
+          description: The finished onboarding state.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Onboarding"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /v1/pairs/{id}/test:
+    parameters:
+      - $ref: "#/components/parameters/id"
+    post:
+      tags: [config]
+      operationId: testPair
+      summary: Make one short call for a surface and model pair through its route, and set its fidelity from what it showed.
+      description: >-
+        Asks the current set's first question. The call is paid. A failed
+        call is a result with status failed, not an error, and leaves the
+        pair's fidelity as it was. A developer tool stays model_match only
+        when the route accepts the model, search was on and the answer
+        searched.
+      security:
+        - apiKey: [config:write]
+        - session: [config:write]
+      responses:
+        "200":
+          description: What the test call showed, and the pair after it.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PairTest"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /v1/estimate:
+    get:
+      tags: [config]
+      operationId: getEstimate
+      summary: The estimated cost of one check.
+      description: >-
+        Calls are questions times enabled pairs. Each pair's cost per call is
+        the mean reported cost of its endpoint's past answers, or else the
+        endpoint's sampled cost. Pairs with neither are counted as unknown,
+        never guessed. Token-billed answers vary, so this is an estimate.
+      security:
+        - apiKey: [results:read]
+        - session: [results:read]
+      responses:
+        "200":
+          description: The estimate.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Estimate"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "503":
           $ref: "#/components/responses/Unavailable"
   /v1/runs:
@@ -1497,12 +1650,14 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "503":
           $ref: "#/components/responses/Unavailable"
-  /v1/credentials/treg:
+  /v1/credentials/{kind}:
+    parameters:
+      - $ref: "#/components/parameters/credentialKind"
     put:
       tags: [settings]
-      operationId: setTregToken
-      summary: Store the Treg token, sealed with ENCRYPTION_KEY, replacing any token stored before.
-      description: Needs a recent sign-in. Replacing the token clears its last test. The response never carries the token.
+      operationId: setCredential
+      summary: Store a key, sealed with ENCRYPTION_KEY, replacing any key of that kind stored before.
+      description: Needs a recent sign-in. Replacing a key clears its last test. The response never carries the key.
       security:
         - session: [admin]
       requestBody:
@@ -1511,16 +1666,16 @@ paths:
           application/json:
             schema:
               type: object
-              required: [token]
+              required: [secret]
               additionalProperties: false
               properties:
-                token:
+                secret:
                   type: string
-                  maxLength: 512
-                  description: The Treg token as Treg shows it, with no spaces.
+                  maxLength: 1024
+                  description: The key as the provider shows it, with no spaces. DataForSEO takes login:password.
                 org:
                   type: string
-                  description: Treg's X-Treg-Org. Only a personal token needs it.
+                  description: Treg's X-Treg-Org. Only a personal Treg token needs it.
       responses:
         "200":
           description: The credential, without its secret.
@@ -1534,14 +1689,38 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Reauth"
+        "404":
+          $ref: "#/components/responses/NotFound"
         "503":
           $ref: "#/components/responses/Unavailable"
-  /v1/credentials/treg/test:
+    delete:
+      tags: [settings]
+      operationId: deleteCredential
+      summary: Remove a key no surface uses.
+      description: Needs a recent sign-in. 409 while a surface's route still calls with it.
+      security:
+        - session: [admin]
+      responses:
+        "204":
+          description: Removed.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Reauth"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /v1/credentials/{kind}/test:
+    parameters:
+      - $ref: "#/components/parameters/credentialKind"
     post:
       tags: [settings]
-      operationId: testTregToken
-      summary: Test the stored Treg token with one free call and record how it went.
-      description: A failed test is a result, not an error. last_test_status says why it failed. 400 when no token is set.
+      operationId: testCredential
+      summary: Test a stored key with one free call, where the provider has one, and record how it went.
+      description: A failed test is a result, not an error, and last_test_status says why. Providers with no free call record that instead. 400 when no key of that kind is set.
       security:
         - session: [admin]
       responses:
@@ -1557,6 +1736,8 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
         "503":
           $ref: "#/components/responses/Unavailable"
   /v1/notification-channels:
@@ -2664,6 +2845,12 @@ components:
       required: true
       schema:
         $ref: "#/components/schemas/SurfaceKey"
+    credentialKind:
+      name: kind
+      in: path
+      required: true
+      schema:
+        $ref: "#/components/schemas/CredentialKind"
     limit:
       name: limit
       in: query
@@ -3092,8 +3279,18 @@ components:
       description: How closely a pair stands in for what people see. app is the real app or search page, read by a scraping provider. model_match is an API call with the model the team uses and the same web search, standing in for a developer tool. approximation is the closest option when neither holds, such as the Claude API standing in for the Claude app.
     SearchControl:
       type: string
-      enum: [by_app, forceable, enable_only, always]
-      description: How the endpoint searches the web. by_app means the scraped app decides for itself. forceable means force_web_search makes the model search, on the models that accept it. enable_only means search is on but cannot be forced. always means the model searches on every call.
+      enum: [by_app, forceable, enable_only, always, by_model]
+      description: How the route searches the web. by_app means the scraped app decides for itself. forceable means force_web_search makes the model search, on the models that accept it. enable_only means search is on but cannot be forced. always means the model searches on every call. by_model means a gateway passes no search option and the model decides.
+    Route:
+      type: string
+      enum: [treg, scraper, provider, gateway]
+      description: How a surface's calls reach a provider. treg calls the pinned endpoint through Treg with the one Treg token. scraper calls the same endpoint at its own provider (DataForSEO, cloro or SerpApi) with that provider's key, so an app surface stays app. provider calls a model API directly (OpenAI, Anthropic, Google or Perplexity), and gateway an OpenAI-compatible gateway; on either an app surface is only an approximation.
+    CredentialKind:
+      type: string
+      enum: [treg, openai, anthropic, perplexity, google, dataforseo, cloro, serpapi, gateway]
+    StepKey:
+      type: string
+      enum: [brand, competitors, questions, surfaces, search_console, schedule, review]
     AnswerStatus:
       type: string
       enum: [ok, no_answer, failed]
@@ -3190,7 +3387,7 @@ components:
       allOf:
         - $ref: "#/components/schemas/Settings"
         - type: object
-          required: [checks_paused, next_check_at, last_check_at, updated_at]
+          required: [checks_paused, next_check_at, last_check_at, updated_at, onboarded_at]
           properties:
             checks_paused:
               type: boolean
@@ -3198,7 +3395,7 @@ components:
             next_check_at:
               type: [string, "null"]
               format: date-time
-              description: When the next scheduled check is due. Null until the schedule is first saved.
+              description: When the next scheduled check is due. Null until onboarding is finished, so nothing runs on schedule before.
             last_check_at:
               type: [string, "null"]
               format: date-time
@@ -3206,6 +3403,10 @@ components:
             updated_at:
               type: string
               format: date-time
+            onboarded_at:
+              type: [string, "null"]
+              format: date-time
+              description: When onboarding was finished. Null before.
     Brand:
       type: object
       required: [id, name, aliases, domains, kind]
@@ -3358,7 +3559,7 @@ components:
     Pair:
       type: object
       description: A surface and model pair. Each pair is its own series with its own fidelity.
-      required: [id, surface, model, fidelity, force_web_search, enabled, paused_reason, last_tested_at]
+      required: [id, surface, model, fidelity, force_web_search, enabled, paused_reason, last_tested_at, test_status, test_searched]
       properties:
         id:
           type: integer
@@ -3366,7 +3567,7 @@ components:
           $ref: "#/components/schemas/SurfaceKey"
         model:
           type: string
-          description: Empty on app surfaces, where the app picks the model.
+          description: Empty where the app picks the model.
         fidelity:
           $ref: "#/components/schemas/Fidelity"
         force_web_search:
@@ -3375,38 +3576,83 @@ components:
           type: boolean
         paused_reason:
           type: string
-          description: Set when the model left the endpoint's live model list, and empty otherwise. A paused pair is skipped until the model is back.
+          description: Set when the model left the route's live model list, and empty otherwise. A paused pair is skipped until the model is back.
         last_tested_at:
           type: [string, "null"]
           format: date-time
+          description: Null until tested, and again after the surface moves to another route.
+        test_status:
+          type: string
+          description: Empty until tested, ok after a test call that answered, or why the last test failed.
+        test_searched:
+          type: [boolean, "null"]
+          description: Whether the last test call's answer searched the web. Null until tested.
     Surface:
       type: object
-      description: One registry surface with how this instance uses it.
-      required: [key, title, endpoint, fidelity, takes_model, search, enabled, pairs]
+      description: One registry surface with how this instance uses it. endpoint, fidelity, takes_model and search are on the current route.
+      required: [key, title, group, endpoint, fidelity, takes_model, search, route, credential, base_url, routes, enabled, default_on, pairs]
       properties:
         key:
           $ref: "#/components/schemas/SurfaceKey"
         title:
           type: string
+        group:
+          type: string
+          enum: [apps, developer_tools, approximations]
+          description: How onboarding groups surfaces.
         endpoint:
           type: string
-          description: The pinned Treg tool id.
+          description: The endpoint id answers on the current route store. Changing it starts a new series.
         fidelity:
           allOf:
             - $ref: "#/components/schemas/Fidelity"
-          description: The surface's default label. Each pair carries its own.
+          description: The label on the current route before a test. Each pair carries its own.
         takes_model:
           type: boolean
-          description: False on app surfaces, where the app picks the model.
+          description: False on app surfaces read by Treg or a scraping key, where the app picks the model.
         search:
           $ref: "#/components/schemas/SearchControl"
+        route:
+          $ref: "#/components/schemas/Route"
+        credential:
+          allOf:
+            - $ref: "#/components/schemas/CredentialKind"
+          description: The key the current route calls with.
+        base_url:
+          type: string
+          description: The gateway's base URL, empty off the gateway route.
+        routes:
+          type: array
+          items:
+            $ref: "#/components/schemas/RouteOption"
+          description: Every route the surface can take, Treg first.
         enabled:
           type: boolean
+        default_on:
+          type: boolean
+          description: Ticked by default in onboarding.
         pairs:
           type: array
           items:
             $ref: "#/components/schemas/Pair"
           description: Every model pair the surface has had, enabled or not.
+    RouteOption:
+      type: object
+      description: One way a surface can be asked, with the label its pairs get there before a test.
+      required: [route, credential, provider, fidelity, takes_model, search]
+      properties:
+        route:
+          $ref: "#/components/schemas/Route"
+        credential:
+          $ref: "#/components/schemas/CredentialKind"
+        provider:
+          type: string
+        fidelity:
+          $ref: "#/components/schemas/Fidelity"
+        takes_model:
+          type: boolean
+        search:
+          $ref: "#/components/schemas/SearchControl"
     PairInput:
       type: object
       required: [model]
@@ -3414,7 +3660,7 @@ components:
       properties:
         model:
           type: string
-          description: A name on the endpoint's live model list, from GET /v1/surfaces/{key}/models.
+          description: A name on the route's live model list, from GET /v1/surfaces/{key}/models.
         force_web_search:
           type: [boolean, "null"]
           description: Omit or send null for the default, which is true where the endpoint can force search. Only a forceable endpoint takes true.
@@ -3425,11 +3671,18 @@ components:
       properties:
         enabled:
           type: boolean
+        route:
+          allOf:
+            - $ref: "#/components/schemas/Route"
+          description: Omit to keep the current route.
+        base_url:
+          type: string
+          description: The gateway's base URL, such as https://openrouter.ai/api/v1. Gateway route only.
         models:
           type: array
           items:
             $ref: "#/components/schemas/PairInput"
-          description: The models to enable. The surface's other models are disabled. Omit to keep its models as they are. App surfaces take none.
+          description: The models to enable. The surface's other models are disabled. Omit to keep its models as they are, except when moving to a route that takes models. App surfaces read by Treg or a scraping key take none.
     Model:
       type: object
       description: One name on an endpoint's live model list.
@@ -3442,12 +3695,16 @@ components:
           description: The model can search the web on this endpoint.
     Credential:
       type: object
-      description: What Byname shows about a stored secret. No response ever carries the secret itself.
-      required: [kind, set, org, last_tested_at, last_test_status, updated_at]
+      description: What Byname shows about a stored key. No response ever carries the key itself.
+      required: [kind, title, hint, set, org, last_tested_at, last_test_status, updated_at, used_by]
       properties:
         kind:
+          $ref: "#/components/schemas/CredentialKind"
+        title:
           type: string
-          enum: [treg]
+        hint:
+          type: string
+          description: What to paste.
         set:
           type: boolean
         org:
@@ -3456,14 +3713,117 @@ components:
         last_tested_at:
           type: [string, "null"]
           format: date-time
-          description: Null until tested, and again after the token is replaced.
+          description: Null until tested, and again after the key is replaced.
         last_test_status:
           type: string
-          description: ok, or why the last test failed. Empty until tested.
+          description: ok, why the last test failed, or that the provider has no free call to test with. Empty until tested.
         updated_at:
           type: [string, "null"]
           format: date-time
-          description: Null while no token is set.
+          description: Null while no key is set.
+        used_by:
+          type: array
+          items:
+            $ref: "#/components/schemas/SurfaceKey"
+          description: Surfaces whose route calls with this key.
+    Onboarding:
+      type: object
+      required: [steps, finished_at, missing]
+      properties:
+        steps:
+          type: array
+          items:
+            type: object
+            required: [key, title, saved, required]
+            properties:
+              key:
+                $ref: "#/components/schemas/StepKey"
+              title:
+                type: string
+              saved:
+                type: boolean
+              required:
+                type: boolean
+        finished_at:
+          type: [string, "null"]
+          format: date-time
+        missing:
+          type: array
+          items:
+            type: string
+          description: What still blocks finishing, in plain words. Empty once finished.
+    PairTest:
+      type: object
+      required: [pair, status, error, cost_usd, cost_reported, searched, cited, citations, reported_model]
+      properties:
+        pair:
+          $ref: "#/components/schemas/Pair"
+        status:
+          $ref: "#/components/schemas/AnswerStatus"
+        error:
+          type: string
+        cost_usd:
+          type: [number, "null"]
+          description: Null when the route reported no cost, as token-billed APIs do. Never estimated.
+        cost_reported:
+          type: boolean
+        searched:
+          type: boolean
+        cited:
+          type: boolean
+        citations:
+          type: integer
+        reported_model:
+          type: string
+    Estimate:
+      type: object
+      required: [questions, pairs, calls, known_usd, unknown_pairs, rows]
+      properties:
+        questions:
+          type: integer
+        pairs:
+          type: integer
+        calls:
+          type: integer
+          description: Questions times enabled pairs.
+        known_usd:
+          type: number
+          description: The sum over pairs with a cost per call.
+        unknown_pairs:
+          type: integer
+        rows:
+          type: array
+          items:
+            type: object
+            required: [pair_id, surface, title, model, fidelity, route, endpoint, calls, cost_per_call_usd, source, samples, cost_usd]
+            properties:
+              pair_id:
+                type: integer
+              surface:
+                $ref: "#/components/schemas/SurfaceKey"
+              title:
+                type: string
+              model:
+                type: string
+              fidelity:
+                $ref: "#/components/schemas/Fidelity"
+              route:
+                $ref: "#/components/schemas/Route"
+              endpoint:
+                type: string
+              calls:
+                type: integer
+              cost_per_call_usd:
+                type: [number, "null"]
+              source:
+                type: string
+                enum: [history, sample, unknown]
+                description: history is the mean reported cost of the endpoint's past answers, sample the endpoint's sampled cost.
+              samples:
+                type: integer
+                description: Past answers averaged, for history.
+              cost_usd:
+                type: [number, "null"]
     QueuedRun:
       type: object
       description: A queued or running check, as Run now reports it. GET /v1/runs/{id} has its progress and spend.
