@@ -13,7 +13,7 @@ import { Avatar, Button, buttonClass, Crumbs, cx, EmptyState, ErrorNote, Icon, L
 export const nav: { to: string; label: string; icon: IconName; soon?: string }[] = [
   { to: "/", label: "Overview", icon: "chart" },
   { to: "/prompts", label: "Prompts", icon: "message", soon: "Every question Byname asks, in its groups, with whether each surface and model named or cited you." },
-  { to: "/competitors", label: "Competitors", icon: "users", soon: "Who gets named instead of you, on which surfaces, and how that moves." },
+  { to: "/competitors", label: "Competitors", icon: "users" },
   { to: "/gaps", label: "Gaps", icon: "alert", soon: "The questions where competitors are named and you are not." },
   { to: "/compare", label: "Compare", icon: "layers" },
   { to: "/search", label: "Search", icon: "globe", soon: "Google Search Console clicks, impressions and position, with your goals." },
