@@ -28,7 +28,7 @@ func TestParseScopes(t *testing.T) {
 	if err != nil || !slices.Equal(got, []Scope{ResultsRead, ConfigWrite}) {
 		t.Fatalf("got %v, %v; want [results:read config:write] once each, in Scopes order", got, err)
 	}
-	if got, err := ParseScopes(nil); err != nil || got == nil || len(got) != 0 {
+	if got, err := ParseScopes([]string(nil)); err != nil || got == nil || len(got) != 0 {
 		t.Errorf("no scopes: got %#v, %v; want an empty list", got, err)
 	}
 	if _, err := ParseScopes([]string{"results:read", "admin"}); !errors.Is(err, ErrInvalid) {

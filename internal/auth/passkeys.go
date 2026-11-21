@@ -1,0 +1,398 @@
+package auth
+
+import (
+	"context"
+	"crypto/rand"
+	"encoding/base64"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"strings"
+	"time"
+
+	"github.com/go-webauthn/webauthn/protocol"
+	"github.com/go-webauthn/webauthn/webauthn"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/unkeyed/byname/internal/core"
+)
+
+// Passkeys are discoverable WebAuthn credentials with user verification
+// required, so the authenticator itself checked a PIN or biometric and a
+// passkey sign-in is complete on its own. Attestation is not requested: the
+// relying party trusts any authenticator that verifies its user.
+//
+// Every ceremony is a begin request that stores a ceremony challenge and a
+// finish request that takes it. The purpose says what the finish may do.
+
+type Passkey struct {
+	ID         string     `json:"id"` // base64url credential ID
+	Name       string     `json:"name"`
+	CreatedAt  time.Time  `json:"created_at"`
+	LastUsedAt *time.Time `json:"last_used_at"`
+}
+
+type purpose string
+
+const (
+	purposeLogin        purpose = "login"
+	purposeSecondFactor purpose = "second_factor"
+	purposeReauth       purpose = "reauth"
+	purposeAdd          purpose = "add"
+	purposeSignup       purpose = "signup"
+)
+
+type ceremony struct {
+	Purpose purpose              `json:"purpose"`
+	Session webauthn.SessionData `json:"session"`
+	UserID  int64                `json:"user_id,omitempty"`
+	Signup  *newUser             `json:"signup,omitempty"`
+}
+
+type newUser struct {
+	Via       string `json:"via"` // "setup" or "invite"
+	TokenHash []byte `json:"token_hash"`
+	Email     string `json:"email"`
+	Name      string `json:"name"`
+	Handle    []byte `json:"handle"`
+}
+
+type passkeyUser struct {
+	id          int64
+	handle      []byte
+	email, name string
+	creds       []webauthn.Credential
+}
+
+func (p *passkeyUser) WebAuthnID() []byte                         { return p.handle }
+func (p *passkeyUser) WebAuthnName() string                       { return p.email }
+func (p *passkeyUser) WebAuthnCredentials() []webauthn.Credential { return p.creds }
+func (p *passkeyUser) WebAuthnDisplayName() string {
+	if p.name != "" {
+		return p.name
+	}
+	return p.email
+}
+
+var errNoPasskeyUser = fmt.Errorf("%w: this passkey is not registered on this Byname", core.ErrInvalid)
+
+func passkeyUserByID(ctx context.Context, db dbtx, id int64) (*passkeyUser, error) {
+	return loadPasskeyUser(ctx, db, db.QueryRow(ctx, `SELECT id, webauthn_handle, email, name FROM users WHERE id = $1`, id))
+}
+
+func passkeyUserByHandle(ctx context.Context, db dbtx, handle []byte) (*passkeyUser, error) {
+	return loadPasskeyUser(ctx, db, db.QueryRow(ctx, `SELECT id, webauthn_handle, email, name FROM users WHERE webauthn_handle = $1`, handle))
+}
+
+func loadPasskeyUser(ctx context.Context, db dbtx, user pgx.Row) (*passkeyUser, error) {
+	p := &passkeyUser{}
+	err := user.Scan(&p.id, &p.handle, &p.email, &p.name)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, errNoPasskeyUser
+	}
+	if err != nil {
+		return nil, err
+	}
+	rows, err := db.Query(ctx, `SELECT credential FROM passkeys WHERE user_id = $1`, p.id)
+	if err != nil {
+		return nil, err
+	}
+	p.creds, err = pgx.CollectRows(rows, func(row pgx.CollectableRow) (webauthn.Credential, error) {
+		var c webauthn.Credential
+		var raw []byte
+		if err := row.Scan(&raw); err != nil {
+			return c, err
+		}
+		return c, json.Unmarshal(raw, &c)
+	})
+	return p, err
+}
+
+func passkeyErr(err error) error {
+	var pe *protocol.Error
+	if errors.As(err, &pe) {
+		return fmt.Errorf("%w: the passkey was not accepted: %s", core.ErrInvalid, pe.Details)
+	}
+	return err
+}
+
+var userVerified = webauthn.WithUserVerification(protocol.VerificationRequired)
+
+func (u *Users) beginAssertion(ctx context.Context, c ceremony, user *passkeyUser) (string, *protocol.CredentialAssertion, error) {
+	var opts *protocol.CredentialAssertion
+	var sd *webauthn.SessionData
+	var err error
+	if user == nil {
+		opts, sd, err = u.webauthn.BeginDiscoverableLogin(userVerified)
+	} else {
+		opts, sd, err = u.webauthn.BeginLogin(user, userVerified)
+	}
+	if err != nil {
+		return "", nil, passkeyErr(err)
+	}
+	c.Session = *sd
+	handle, err := putChallenge(ctx, u.db, kindPasskey, c)
+	return handle, opts, err
+}
+
+func (u *Users) finishAssertion(ctx context.Context, want purpose, handle string, credential json.RawMessage) (ceremony, *passkeyUser, error) {
+	var c ceremony
+	if err := takeChallenge(ctx, u.db, kindPasskey, handle, &c); err != nil {
+		return c, nil, err
+	}
+	if c.Purpose != want {
+		return c, nil, errChallenge
+	}
+	parsed, err := protocol.ParseCredentialRequestResponseBytes(credential)
+	if err != nil {
+		return c, nil, passkeyErr(err)
+	}
+	var user *passkeyUser
+	var cred *webauthn.Credential
+	if c.UserID == 0 {
+		var wu webauthn.User
+		wu, cred, err = u.webauthn.ValidatePasskeyLogin(func(_, userHandle []byte) (webauthn.User, error) {
+			return passkeyUserByHandle(ctx, u.db, userHandle)
+		}, c.Session, parsed)
+		if err == nil {
+			user = wu.(*passkeyUser)
+		}
+	} else {
+		if user, err = passkeyUserByID(ctx, u.db, c.UserID); err != nil {
+			return c, nil, err
+		}
+		cred, err = u.webauthn.ValidateLogin(user, c.Session, parsed)
+	}
+	if err != nil {
+		return c, nil, passkeyErr(err)
+	}
+	if cred.Authenticator.CloneWarning {
+		return c, nil, fmt.Errorf("%w: this passkey's signature counter went backwards, which suggests a copy of it exists; remove it and register a new one", core.ErrInvalid)
+	}
+	raw, err := json.Marshal(cred)
+	if err != nil {
+		return c, nil, err
+	}
+	if _, err := u.db.Exec(ctx, `UPDATE passkeys SET credential = $2, last_used_at = now() WHERE id = $1`, cred.ID, raw); err != nil {
+		return c, nil, err
+	}
+	return c, user, nil
+}
+
+func (u *Users) BeginPasskeyLogin(ctx context.Context) (string, *protocol.CredentialAssertion, error) {
+	return u.beginAssertion(ctx, ceremony{Purpose: purposeLogin}, nil)
+}
+
+func (u *Users) FinishPasskeyLogin(ctx context.Context, handle string, credential json.RawMessage, c Client) (SignIn, error) {
+	_, user, err := u.finishAssertion(ctx, purposeLogin, handle, credential)
+	if err != nil {
+		return SignIn{}, err
+	}
+	return u.signIn(ctx, user.id, MethodPasskey, c)
+}
+
+func (u *Users) BeginSecondFactorPasskey(ctx context.Context, pending string) (string, *protocol.CredentialAssertion, error) {
+	var p pendingLogin
+	if err := peekChallenge(ctx, u.db, kindSecondFactor, pending, &p); err != nil {
+		return "", nil, err
+	}
+	user, err := passkeyUserByID(ctx, u.db, p.UserID)
+	if err != nil {
+		return "", nil, err
+	}
+	return u.beginAssertion(ctx, ceremony{Purpose: purposeSecondFactor, UserID: p.UserID}, user)
+}
+
+func (u *Users) FinishSecondFactorPasskey(ctx context.Context, pending, handle string, credential json.RawMessage, c Client) (SignIn, error) {
+	var p pendingLogin
+	if err := peekChallenge(ctx, u.db, kindSecondFactor, pending, &p); err != nil {
+		return SignIn{}, err
+	}
+	cer, _, err := u.finishAssertion(ctx, purposeSecondFactor, handle, credential)
+	if err != nil {
+		return SignIn{}, err
+	}
+	if cer.UserID != p.UserID {
+		return SignIn{}, errChallenge
+	}
+	return u.completePending(ctx, pending, p, MethodPasskey, c)
+}
+
+func (u *Users) BeginReauthPasskey(ctx context.Context, cur Current) (string, *protocol.CredentialAssertion, error) {
+	user, err := passkeyUserByID(ctx, u.db, cur.UserID)
+	if err != nil {
+		return "", nil, err
+	}
+	return u.beginAssertion(ctx, ceremony{Purpose: purposeReauth, UserID: cur.UserID}, user)
+}
+
+func (u *Users) FinishReauthPasskey(ctx context.Context, cur Current, handle string, credential json.RawMessage) error {
+	cer, _, err := u.finishAssertion(ctx, purposeReauth, handle, credential)
+	if err != nil {
+		return err
+	}
+	if cer.UserID != cur.UserID {
+		return errChallenge
+	}
+	return u.reauthenticated(ctx, cur)
+}
+
+func (u *Users) beginRegistration(ctx context.Context, c ceremony, user *passkeyUser) (string, *protocol.CredentialCreation, error) {
+	required := true
+	opts, sd, err := u.webauthn.BeginRegistration(user,
+		webauthn.WithAuthenticatorSelection(protocol.AuthenticatorSelection{
+			ResidentKey:        protocol.ResidentKeyRequirementRequired,
+			RequireResidentKey: &required,
+			UserVerification:   protocol.VerificationRequired,
+		}),
+		webauthn.WithConveyancePreference(protocol.PreferNoAttestation),
+		webauthn.WithExclusions(webauthn.Credentials(user.creds).CredentialDescriptors()),
+	)
+	if err != nil {
+		return "", nil, passkeyErr(err)
+	}
+	c.Session = *sd
+	handle, err := putChallenge(ctx, u.db, kindPasskey, c)
+	return handle, opts, err
+}
+
+func (u *Users) finishRegistration(ctx context.Context, want purpose, handle string, credential json.RawMessage) (ceremony, *webauthn.Credential, error) {
+	var c ceremony
+	if err := takeChallenge(ctx, u.db, kindPasskey, handle, &c); err != nil {
+		return c, nil, err
+	}
+	if c.Purpose != want {
+		return c, nil, errChallenge
+	}
+	parsed, err := protocol.ParseCredentialCreationResponseBytes(credential)
+	if err != nil {
+		return c, nil, passkeyErr(err)
+	}
+	cred, err := u.webauthn.CreateCredential(&passkeyUser{handle: c.Session.UserID}, c.Session, parsed)
+	if err != nil {
+		return c, nil, passkeyErr(err)
+	}
+	return c, cred, nil
+}
+
+func insertPasskey(ctx context.Context, tx pgx.Tx, userID int64, name string, cred *webauthn.Credential) (Passkey, error) {
+	raw, err := json.Marshal(cred)
+	if err != nil {
+		return Passkey{}, err
+	}
+	name = strings.TrimSpace(name)
+	if name == "" {
+		name = "Passkey"
+	}
+	p := Passkey{ID: base64.RawURLEncoding.EncodeToString(cred.ID), Name: name}
+	err = tx.QueryRow(ctx, `INSERT INTO passkeys (id, user_id, name, credential) VALUES ($1, $2, $3, $4) RETURNING created_at`,
+		cred.ID, userID, name, raw).Scan(&p.CreatedAt)
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+		return Passkey{}, fmt.Errorf("%w: this passkey is already registered", core.ErrConflict)
+	}
+	return p, err
+}
+
+func (u *Users) BeginAddPasskey(ctx context.Context, cur Current) (string, *protocol.CredentialCreation, error) {
+	if !cur.Recent {
+		return "", nil, ErrReauth
+	}
+	user, err := passkeyUserByID(ctx, u.db, cur.UserID)
+	if err != nil {
+		return "", nil, err
+	}
+	return u.beginRegistration(ctx, ceremony{Purpose: purposeAdd, UserID: cur.UserID}, user)
+}
+
+func (u *Users) FinishAddPasskey(ctx context.Context, cur Current, handle string, credential json.RawMessage, name string) (Passkey, error) {
+	if !cur.Recent {
+		return Passkey{}, ErrReauth
+	}
+	c, cred, err := u.finishRegistration(ctx, purposeAdd, handle, credential)
+	if err != nil {
+		return Passkey{}, err
+	}
+	if c.UserID != cur.UserID {
+		return Passkey{}, errChallenge
+	}
+	var p Passkey
+	err = pgx.BeginFunc(ctx, u.db, func(tx pgx.Tx) error {
+		p, err = insertPasskey(ctx, tx, cur.UserID, name, cred)
+		return err
+	})
+	return p, err
+}
+
+type Signup struct {
+	SetupToken  string `json:"setup_token"`
+	InviteToken string `json:"invite_token"`
+	Email       string `json:"email"`
+	Name        string `json:"name"`
+}
+
+func (u *Users) BeginPasskeySignup(ctx context.Context, s Signup) (string, *protocol.CredentialCreation, error) {
+	n := newUser{Name: strings.TrimSpace(s.Name), Handle: make([]byte, 32)}
+	_, _ = rand.Read(n.Handle)
+	switch {
+	case s.SetupToken != "" && s.InviteToken == "":
+		n.Via, n.TokenHash, n.Email = "setup", hashToken(s.SetupToken), normalizeEmail(s.Email)
+		if err := checkEmail(n.Email); err != nil {
+			return "", nil, err
+		}
+		g, err := u.checkSetup(ctx, u.db, n.TokenHash)
+		if err != nil {
+			return "", nil, err
+		}
+		if g.userID != 0 {
+			if n.Email != g.email {
+				return "", nil, fmt.Errorf("%w: this recovery link is for another account; enter the email it was issued for", core.ErrInvalid)
+			}
+			// Keep the user's WebAuthn handle so their other passkeys
+			// still sign them in.
+			if g.handle != nil {
+				n.Handle = g.handle
+			}
+		}
+	case s.InviteToken != "" && s.SetupToken == "":
+		inv, err := u.Invitation(ctx, s.InviteToken)
+		if err != nil {
+			return "", nil, err
+		}
+		n.Via, n.TokenHash, n.Email = "invite", hashToken(s.InviteToken), inv.Email
+	default:
+		return "", nil, fmt.Errorf("%w: give exactly one of setup_token and invite_token", core.ErrInvalid)
+	}
+	user := &passkeyUser{handle: n.Handle, email: n.Email, name: n.Name}
+	return u.beginRegistration(ctx, ceremony{Purpose: purposeSignup, Signup: &n}, user)
+}
+
+func (u *Users) FinishPasskeySignup(ctx context.Context, handle string, credential json.RawMessage, c Client) (SignIn, error) {
+	cer, cred, err := u.finishRegistration(ctx, purposeSignup, handle, credential)
+	if err != nil {
+		return SignIn{}, err
+	}
+	n := cer.Signup
+	var token string
+	err = pgx.BeginFunc(ctx, u.db, func(tx pgx.Tx) error {
+		var id int64
+		var err error
+		if n.Via == "setup" {
+			id, err = u.claimSetup(ctx, tx, n.TokenHash, n.Email, n.Name, n.Handle)
+		} else {
+			var inv Invitation
+			if inv, err = claimInvite(ctx, tx, n.TokenHash); err == nil {
+				id, err = createUser(ctx, tx, inv.Email, n.Name, inv.Role, n.Handle)
+			}
+		}
+		if err != nil {
+			return err
+		}
+		if _, err := insertPasskey(ctx, tx, id, "", cred); err != nil {
+			return err
+		}
+		token, err = u.newSession(ctx, tx, id, MethodPasskey, c)
+		return err
+	})
+	return SignIn{Session: token}, err
+}

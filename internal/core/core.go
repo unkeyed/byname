@@ -70,13 +70,13 @@ func joinRoles() string {
 
 // ParseScopes accepts names from Scopes and returns them once each, in
 // Scopes order. An unknown name is ErrInvalid.
-func ParseScopes(names []string) ([]Scope, error) {
+func ParseScopes[S ~string](names []S) ([]Scope, error) {
 	for _, n := range names {
 		if !slices.Contains(Scopes, Scope(n)) {
-			return nil, fmt.Errorf("%w: unknown scope %q; scopes are %s", ErrInvalid, n, strings.Join(scopeNames(Scopes), ", "))
+			return nil, fmt.Errorf("%w: unknown scope %q; scopes are %s", ErrInvalid, n, joinScopes())
 		}
 	}
-	return canonical(func(s Scope) bool { return slices.Contains(names, string(s)) }), nil
+	return canonical(func(s Scope) bool { return slices.Contains(names, S(s)) }), nil
 }
 
 // Grant checks that role can hand out every scope in want, for a new API
@@ -106,12 +106,12 @@ func canonical(keep func(Scope) bool) []Scope {
 	return out
 }
 
-func scopeNames(scopes []Scope) []string {
-	out := make([]string, len(scopes))
-	for i, s := range scopes {
-		out[i] = string(s)
+func joinScopes() string {
+	names := make([]string, len(Scopes))
+	for i, s := range Scopes {
+		names[i] = string(s)
 	}
-	return out
+	return strings.Join(names, ", ")
 }
 
 // Via is how a request authenticated.
