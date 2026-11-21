@@ -4,13 +4,14 @@ import { Link, Navigate, NavLink, Outlet, useLocation, useNavigate } from "react
 import { api, ApiError } from "./api";
 import { useMe } from "./queries";
 import { Toaster } from "./components/Toaster";
+import { QuestionDrawer } from "./pages/results/QuestionDrawer";
 import { useView } from "./view";
 import { useTheme, type ThemeMode } from "./theme";
 import { Avatar, Button, buttonClass, Crumbs, cx, EmptyState, ErrorNote, Icon, Logo, NavMenu, PageHeader, Spinner, useModal, useWide, type IconName } from "./ui";
 
 /** The app's pages. soon is what a page will show, for those not built yet. */
 export const nav: { to: string; label: string; icon: IconName; soon?: string }[] = [
-  { to: "/", label: "Overview", icon: "chart", soon: "Mention rate, citation rate and share of mentions on every surface, next to your Search Console clicks." },
+  { to: "/", label: "Overview", icon: "chart" },
   { to: "/prompts", label: "Prompts", icon: "message", soon: "Every question Byname asks, in its groups, with whether each surface and model named or cited you." },
   { to: "/competitors", label: "Competitors", icon: "users", soon: "Who gets named instead of you, on which surfaces, and how that moves." },
   { to: "/gaps", label: "Gaps", icon: "alert", soon: "The questions where competitors are named and you are not." },
@@ -70,6 +71,7 @@ export function Layout() {
           <Outlet />
         </main>
       </div>
+      <QuestionDrawer />
       </Toaster>
     </NavMenu.Provider>
   );

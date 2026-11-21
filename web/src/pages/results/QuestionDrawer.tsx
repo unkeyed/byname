@@ -1,0 +1,290 @@
+import { useQuery } from "@tanstack/react-query";
+import type { ReactNode } from "react";
+import { api, type Answer, type BrandEntry, type HistoryPoint, type HistorySeries } from "../../api";
+import { fidelityInfo, lineKey, shortDay, usd, useLabels } from "../../lines";
+import { keys, useBrands, useSettings, useSurfaces } from "../../queries";
+import { Badge, Button, cx, ErrorNote, Icon, PageSpinner, selectClass, useModal } from "../../ui";
+import { useFilter, useView } from "../../view";
+
+/** The question view: open wherever ?q= names a question, with ?qa= naming the answer shown. */
+export function QuestionDrawer() {
+  const view = useView();
+  const q = Number(view.get("q")) || 0;
+  const ref = useModal(q > 0);
+  const close = () => view.set({ q: null, qa: null });
+  return (
+    <dialog
+      ref={ref}
+      onClose={close}
+      onClick={(e) => e.target === ref.current && close()}
+      aria-label="Question"
+      data-drawer
+      className="m-0 ml-auto h-dvh max-h-none w-full max-w-3xl border-0 border-l border-line bg-bg p-0 text-fg shadow-floating"
+    >
+      {q > 0 && <Body question={q} onClose={close} />}
+    </dialog>
+  );
+}
+
+function Mark({ point, onClick, selected }: { point: HistoryPoint | undefined; onClick?: () => void; selected?: boolean }) {
+  let body: ReactNode;
+  let title: string;
+  if (!point) return <span className="text-faint">–</span>;
+  if (point.status === "failed") [body, title] = [<span className="text-faint">Failed</span>, "The call failed"];
+  else if (point.status === "no_answer") [body, title] = [<span className="text-faint">No answer</span>, "The surface showed no AI answer"];
+  else if (point.mentioned) [body, title] = [<span className="font-semibold text-success">#{point.position ?? "?"}</span>, `Named you at #${point.position}`];
+  else if (point.cited) [body, title] = [<span className="text-info">Cited</span>, "Cited you without naming you"];
+  else [body, title] = [<span className="text-faint">Not named</span>, "Did not name you"];
+  return (
+    <button type="button" onClick={onClick} title={`${title}. Show this answer.`} className={cx("rounded-inner px-1.5 py-0.5 text-xs tabular-nums hover:bg-subtle-strong", selected && "bg-subtle-strong ring-1 ring-line-hover")}>
+      {body}
+    </button>
+  );
+}
+
+function Body({ question, onClose }: { question: number; onClose: () => void }) {
+  const view = useView();
+  const { filter } = useFilter();
+  const surfaces = useSurfaces();
+  const labels = useLabels(surfaces.data);
+  const history = useQuery({ queryKey: keys.history(question, filter.since), queryFn: () => api.history(question, filter.since) });
+
+  if (history.isPending) return <PageSpinner />;
+  if (history.isError)
+    return (
+      <div className="space-y-3 p-4">
+        <ErrorNote error={history.error} />
+        <Button onClick={onClose}>Close</Button>
+      </div>
+    );
+  const series = history.data.series.filter((s) => (!filter.surface || s.pair.surface === filter.surface) && (!filter.model || s.pair.model === filter.model));
+  const runs = [...new Map(series.flatMap((s) => s.points.map((p) => [p.run_id, p.run_started_at] as const))).entries()].sort((a, b) => a[0] - b[0]);
+  const qa = Number(view.get("qa")) || 0;
+  const selSeries = series.find((s) => s.points.some((p) => p.answer_id === qa)) ?? series[0];
+  const selPoint = selSeries?.points.find((p) => p.answer_id === qa) ?? selSeries?.points[selSeries.points.length - 1];
+  const pick = (answer: number) => view.set({ qa: answer });
+  const newest = history.data.series.flatMap((s) => s.points).sort((a, b) => b.run_id - a.run_id)[0];
+
+  return (
+    <div className="flex h-full flex-col">
+      <div className="flex shrink-0 items-start gap-3 border-b border-line px-4 py-3">
+        <div className="min-w-0 flex-1">
+          <QuestionTitle answer={newest?.answer_id} />
+        </div>
+        <Button variant="ghost" size="sm" onClick={onClose} aria-label="Close" className="w-7 px-0">
+          <Icon name="x" />
+        </Button>
+      </div>
+      <div className="min-h-0 flex-1 space-y-6 overflow-auto px-4 py-4">
+        {series.length === 0 ? (
+          <p className="text-sm text-muted">No answers to this question in this range.</p>
+        ) : (
+          <>
+            <section>
+              <h3 className="mb-2 text-sm font-semibold">Your position per check</h3>
+              <div className="overflow-x-auto rounded-surface border border-line bg-surface">
+                <table className="w-full min-w-max text-sm">
+                  <thead className="border-b border-line text-xs text-muted">
+                    <tr>
+                      <th scope="col" className="px-3 py-2 text-left font-medium">
+                        Surface and model
+                      </th>
+                      {runs.map(([id, at]) => (
+                        <th key={id} scope="col" className="px-2 py-2 text-left font-medium" title={shortDay(at)}>
+                          #{id}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-line">
+                    {series.map((s) => (
+                      <tr key={lineKey(s)}>
+                        <th scope="row" className="px-3 py-1.5 text-left text-xs font-medium whitespace-nowrap">
+                          {labels.line(s.pair)}
+                          {s.fidelity === "approximation" && <span className="font-normal text-warn"> · approx.</span>}
+                        </th>
+                        {runs.map(([id]) => {
+                          const p = s.points.find((x) => x.run_id === id);
+                          return (
+                            <td key={id} className="px-1 py-1">
+                              <Mark point={p} selected={p?.answer_id === selPoint?.answer_id} onClick={p && (() => pick(p.answer_id))} />
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            <section>
+              <h3 className="mb-2 text-sm font-semibold">Per model</h3>
+              <ul className="grid gap-2 sm:grid-cols-2">
+                {series.map((s) => (
+                  <SeriesSummary key={lineKey(s)} s={s} label={labels.line(s.pair)} />
+                ))}
+              </ul>
+            </section>
+
+            {selSeries && selPoint && (
+              <>
+                <section>
+                  <div className="mb-2 flex flex-wrap items-center gap-2">
+                    <h3 className="flex-1 text-sm font-semibold">Answer</h3>
+                    <select
+                      aria-label="Model"
+                      className={cx(selectClass, "text-xs")}
+                      value={lineKey(selSeries)}
+                      onChange={(e) => {
+                        const s = series.find((x) => lineKey(x) === e.target.value)!;
+                        pick((s.points.find((p) => p.run_id === selPoint.run_id) ?? s.points[s.points.length - 1]).answer_id);
+                      }}
+                    >
+                      {series.map((s) => (
+                        <option key={lineKey(s)} value={lineKey(s)}>
+                          {labels.line(s.pair)} ({fidelityInfo[s.fidelity].label})
+                        </option>
+                      ))}
+                    </select>
+                    <select aria-label="Check" className={cx(selectClass, "text-xs")} value={selPoint.answer_id} onChange={(e) => pick(Number(e.target.value))}>
+                      {[...selSeries.points].reverse().map((p) => (
+                        <option key={p.answer_id} value={p.answer_id}>
+                          Check #{p.run_id}, {shortDay(p.run_started_at)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <AnswerView id={selPoint.answer_id} />
+                </section>
+
+                <section>
+                  <h3 className="mb-2 text-sm font-semibold">Run history · {labels.line(selSeries.pair)}</h3>
+                  <ol className="divide-y divide-line rounded-surface border border-line bg-surface">
+                    {[...selSeries.points].reverse().map((p) => (
+                      <li key={p.answer_id}>
+                        <button type="button" onClick={() => pick(p.answer_id)} className={cx("flex w-full items-start gap-3 px-3 py-2 text-left hover:bg-subtle", p.answer_id === selPoint.answer_id && "bg-subtle")}>
+                          <span className="w-24 shrink-0 text-xs text-muted">
+                            #{p.run_id} · {shortDay(p.run_started_at)}
+                          </span>
+                          <span className="min-w-0 flex-1 text-xs">{p.summary || "No change"}</span>
+                          <Mark point={p} />
+                        </button>
+                      </li>
+                    ))}
+                  </ol>
+                </section>
+              </>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** The question as the newest answer asked it, since its wording can change between versions. */
+function QuestionTitle({ answer }: { answer: number | undefined }) {
+  const a = useQuery({ queryKey: keys.answer(answer ?? 0), queryFn: () => api.answer(answer!), enabled: !!answer });
+  return (
+    <>
+      <div className="text-xs text-muted">{a.data?.question.group ?? "Question"}</div>
+      <h2 className="text-base font-semibold">{a.data?.question.text ?? (answer ? "…" : "No answers yet")}</h2>
+    </>
+  );
+}
+
+function SeriesSummary({ s, label }: { s: HistorySeries; label: string }) {
+  const latest = s.points[s.points.length - 1];
+  return (
+    <li className="rounded-surface border border-line bg-surface px-3 py-2">
+      <div className="flex items-center gap-2">
+        <span className="min-w-0 flex-1 truncate text-sm font-medium">{label}</span>
+        <Badge tone={s.fidelity === "approximation" ? "warn" : "outline"} title={fidelityInfo[s.fidelity].detail}>
+          {fidelityInfo[s.fidelity].label}
+        </Badge>
+      </div>
+      <p className="mt-1 text-xs text-muted">
+        Named you in {s.named} of {s.answered} {s.answered === 1 ? "check" : "checks"}
+        {s.best_position ? `, best #${s.best_position}` : ""}. Cited you in {s.cited}.
+      </p>
+      <p className="text-xs text-faint">Latest: {latest.summary || (latest.mentioned ? `named at #${latest.position}` : "not named")}</p>
+    </li>
+  );
+}
+
+const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+function AnswerView({ id }: { id: number }) {
+  const answer = useQuery({ queryKey: keys.answer(id), queryFn: () => api.answer(id) });
+  const brands = useBrands();
+  const settings = useSettings();
+  if (answer.isPending) return <PageSpinner />;
+  if (answer.isError) return <ErrorNote error={answer.error} />;
+  const a: Answer = answer.data;
+  const names = new Map<string, "self" | "competitor">();
+  const add = (b: Pick<BrandEntry, "name" | "aliases">, kind: "self" | "competitor") => [b.name, ...(b.aliases ?? [])].filter(Boolean).forEach((n) => names.set(n, kind));
+  for (const b of brands.data ?? []) if (b.kind === "competitor") add(b, "competitor");
+  for (const b of brands.data ?? []) if (b.kind === "self") add(b, "self");
+  if (settings.data) add(settings.data.brand, "self");
+  const pattern = [...names.keys()].sort((x, y) => y.length - x.length).map(escape).join("|");
+  const parts = pattern ? a.text.split(new RegExp(`\\b(${pattern})\\b`, "g")) : [a.text];
+
+  return (
+    <div className="rounded-surface border border-line bg-surface">
+      <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2 text-xs text-muted">
+        {a.mentioned ? <Badge tone="success">Named you at #{a.position}</Badge> : <Badge>Not named</Badge>}
+        {a.cited && <Badge tone="info">Cited you</Badge>}
+        {a.reported_model && <span>Model {a.reported_model}</span>}
+        <span>{a.cost_usd == null ? <span className="text-warn">No cost reported</span> : usd(a.cost_usd)}</span>
+        <span className="ml-auto flex items-center gap-2">
+          <mark className="rounded-inner bg-[color-mix(in_oklab,var(--series-1)_24%,transparent)] px-1 text-fg">You</mark>
+          <mark className="rounded-inner bg-subtle-strong px-1 text-fg">Competitor</mark>
+        </span>
+      </div>
+      {a.status === "failed" ? (
+        <p className="px-3 py-3 text-sm text-danger">The call failed: {a.error || "no reason given"}.</p>
+      ) : a.status === "no_answer" ? (
+        <p className="px-3 py-3 text-sm text-muted">The surface showed no AI answer for this question.</p>
+      ) : (
+        <div className="max-h-[28rem] overflow-auto px-3 py-3 text-sm leading-relaxed whitespace-pre-wrap [overflow-wrap:anywhere]">
+          {parts.map((p, i) =>
+            i % 2 === 1 ? (
+              <mark key={i} className={cx("rounded-inner px-0.5 text-fg", names.get(p) === "self" ? "bg-[color-mix(in_oklab,var(--series-1)_24%,transparent)] font-semibold" : "bg-subtle-strong")}>
+                {p}
+              </mark>
+            ) : (
+              p
+            ),
+          )}
+        </div>
+      )}
+      {a.citations.length > 0 && (
+        <div className="border-t border-line px-3 py-2">
+          <h4 className="mb-1 text-xs font-medium text-muted">Cited</h4>
+          <ol className="space-y-0.5 text-xs">
+            {a.citations.map((c, i) => (
+              <li key={i} className="flex items-center gap-2">
+                <span className="text-faint tabular-nums">{i + 1}</span>
+                <a href={c.url} target="_blank" rel="noreferrer noopener" className={cx("min-w-0 truncate hover:underline", c.is_self && "font-semibold")}>
+                  {c.url}
+                </a>
+                {c.is_self && <Badge tone="info">Yours</Badge>}
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
+      {a.fan_out && a.fan_out.length > 0 && (
+        <div className="border-t border-line px-3 py-2 text-xs">
+          <span className="text-muted">The engine searched for </span>
+          {a.fan_out.map((f, i) => (
+            <span key={i}>
+              {i > 0 && ", "}“{f}”
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
