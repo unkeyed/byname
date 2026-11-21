@@ -27,6 +27,7 @@ import (
 	instconfig "github.com/unkeyed/byname/internal/config"
 	"github.com/unkeyed/byname/internal/db"
 	"github.com/unkeyed/byname/internal/engines"
+	"github.com/unkeyed/byname/internal/gsc"
 	"github.com/unkeyed/byname/internal/httpapi"
 	"github.com/unkeyed/byname/internal/instance"
 	"github.com/unkeyed/byname/internal/mcpserver"
@@ -52,6 +53,14 @@ type config struct {
 	// sends every Treg call to a fake Treg at this URL instead of
 	// https://treg.to. Never set it in production.
 	TregBaseURL string
+	// GSC_GOOGLE_CLIENT_ID + GSC_GOOGLE_CLIENT_SECRET, both or neither: the
+	// instance's own Google OAuth client for Sign in with Google on the
+	// Search Console connection.
+	GSCClient gsc.OAuthClient
+	// GSC_GOOGLE_BASE_URL, optional and for tests and local development
+	// only: sends every Google call the Search Console connection makes to
+	// a fake Google at this URL. Never set it in production.
+	GSCBaseURL string
 }
 
 // loadSecrets reads ENCRYPTION_KEY and the optional ENCRYPTION_KEY_PREVIOUS.
@@ -111,12 +120,21 @@ func loadConfig() (config, error) {
 	if c.Secrets, err = loadSecrets(); err != nil {
 		return c, err
 	}
-	if raw := os.Getenv("TREG_BASE_URL"); raw != "" {
-		u, err := url.Parse(raw)
-		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
-			return c, fmt.Errorf("TREG_BASE_URL must be an http(s) URL such as http://localhost:9999, got %q", raw)
+	for _, base := range []struct {
+		name string
+		dst  *string
+	}{{"TREG_BASE_URL", &c.TregBaseURL}, {"GSC_GOOGLE_BASE_URL", &c.GSCBaseURL}} {
+		if raw := os.Getenv(base.name); raw != "" {
+			u, err := url.Parse(raw)
+			if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+				return c, fmt.Errorf("%s must be an http(s) URL such as http://localhost:9999, got %q", base.name, raw)
+			}
+			*base.dst = raw
 		}
-		c.TregBaseURL = raw
+	}
+	c.GSCClient = gsc.OAuthClient{ID: os.Getenv("GSC_GOOGLE_CLIENT_ID"), Secret: os.Getenv("GSC_GOOGLE_CLIENT_SECRET")}
+	if (c.GSCClient.ID == "") != (c.GSCClient.Secret == "") {
+		return c, errors.New("set both GSC_GOOGLE_CLIENT_ID and GSC_GOOGLE_CLIENT_SECRET to connect Search Console with Google sign-in, or neither to connect it with a service account only")
 	}
 	c.Auth, err = loadAuthConfig(c.Port)
 	c.Auth.Secrets = c.Secrets
@@ -299,7 +317,11 @@ func run(log *slog.Logger) error {
 		HTTPClient: &http.Client{}, Resolve: engines.HeadResolver(&http.Client{Timeout: 10 * time.Second}),
 	})
 	runs := checks.New(pool, settings, checks.Options{Log: log})
-	if err := sealSecrets(ctx, log, users, settings); err != nil {
+	search := gsc.New(pool, gsc.Options{
+		Secrets: cfg.Secrets, Endpoints: gsc.GoogleEndpoints(cfg.GSCBaseURL), Client: cfg.GSCClient,
+		PublicURL: cfg.Auth.PublicURL, Terms: settings,
+	})
+	if err := sealSecrets(ctx, log, users, settings, search); err != nil {
 		return err
 	}
 	if err := announceSetup(ctx, log, users, cfg.SetupToken); err != nil {
@@ -307,7 +329,7 @@ func run(log *slog.Logger) error {
 	}
 	authn := &auth.Authenticator{Keys: auth.NewKeyStore(pool, cfg.Unkey), Users: users, OAuth: auth.NewOAuthServer(pool, cfg.Auth.PublicURL)}
 
-	services := app.Services{Instance: svc, Config: settings, Checks: runs, Results: results.New(pool)}
+	services := app.Services{Instance: svc, Config: settings, Checks: runs, Results: results.New(pool), GSC: search}
 	mux := httpapi.NewMux(services, authn, log)
 	mux.Handle("/mcp", mcpserver.Handler(services, authn.OAuth, version))
 	mux.Handle("/", web.Handler())
@@ -318,8 +340,11 @@ func run(log *slog.Logger) error {
 	if cfg.TregBaseURL != "" {
 		log.Warn("TREG_BASE_URL is set: Treg calls go to it, not to Treg. Use it only in tests and local development", "treg_base_url", cfg.TregBaseURL)
 	}
+	if cfg.GSCBaseURL != "" {
+		log.Warn("GSC_GOOGLE_BASE_URL is set: Search Console calls go to it, not to Google. Use it only in tests and local development", "gsc_google_base_url", cfg.GSCBaseURL)
+	}
 	var jobs sync.WaitGroup
-	jobs.Go(func() { scheduler.New(runs, settings, scheduler.Options{Log: log}).Run(ctx) })
+	jobs.Go(func() { scheduler.New(runs, settings, scheduler.Options{Log: log, Search: search}).Run(ctx) })
 	log.Info("Byname listening", "port", cfg.Port, "version", version, "keys", authn.Keys.Mode(),
 		"public_url", cfg.Auth.PublicURL.String(), "password_login", cfg.Auth.PasswordLogin, "providers", len(cfg.Auth.Providers))
 
@@ -352,7 +377,7 @@ func run(log *slog.Logger) error {
 // sealSecrets reseals TOTP seeds and credentials sealed under
 // ENCRYPTION_KEY_PREVIOUS with ENCRYPTION_KEY, so a rotation finishes with
 // one restart.
-func sealSecrets(ctx context.Context, log *slog.Logger, users *auth.Users, settings *instconfig.Service) error {
+func sealSecrets(ctx context.Context, log *slog.Logger, users *auth.Users, settings *instconfig.Service, search *gsc.Service) error {
 	totp, err := users.SealTOTPSecrets(ctx)
 	if err != nil {
 		return fmt.Errorf("encrypt TOTP seeds with ENCRYPTION_KEY: %w", err)
@@ -361,6 +386,11 @@ func sealSecrets(ctx context.Context, log *slog.Logger, users *auth.Users, setti
 	if err != nil {
 		return fmt.Errorf("encrypt credentials with ENCRYPTION_KEY: %w", err)
 	}
+	gscCreds, err := search.SealSecrets(ctx)
+	if err != nil {
+		return fmt.Errorf("encrypt the Search Console credential with ENCRYPTION_KEY: %w", err)
+	}
+	creds += gscCreds
 	if totp+creds > 0 {
 		log.Info("encrypted stored secrets with the current ENCRYPTION_KEY", "totp_seeds", totp, "credentials", creds)
 	}

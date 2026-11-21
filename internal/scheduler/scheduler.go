@@ -18,6 +18,7 @@ import (
 type Scheduler struct {
 	checks    *checks.Service
 	config    *config.Service
+	search    SearchSync
 	log       *slog.Logger
 	ticks     <-chan time.Time
 	now       func() time.Time
@@ -29,6 +30,14 @@ type Options struct {
 	Ticks <-chan time.Time
 	Now   func() time.Time
 	Log   *slog.Logger
+	// Search is the daily Search Console sync, nil when not wired.
+	Search SearchSync
+}
+
+// SearchSync is internal/gsc's daily sync: it does nothing until it is due
+// and holds its own advisory lock.
+type SearchSync interface {
+	SyncIfDue(ctx context.Context) error
 }
 
 func New(c *checks.Service, cfg *config.Service, o Options) *Scheduler {
@@ -38,7 +47,7 @@ func New(c *checks.Service, cfg *config.Service, o Options) *Scheduler {
 	if o.Log == nil {
 		o.Log = slog.Default()
 	}
-	return &Scheduler{checks: c, config: cfg, log: o.Log, ticks: o.Ticks, now: o.Now}
+	return &Scheduler{checks: c, config: cfg, search: o.Search, log: o.Log, ticks: o.Ticks, now: o.Now}
 }
 
 // Run ticks once at start, which resumes a run a previous process left
@@ -77,6 +86,12 @@ func (s *Scheduler) Tick(ctx context.Context) {
 			s.log.Warn("raw response pruning failed", "err", err)
 		} else if n > 0 {
 			s.log.Info("pruned raw responses past their retention", "answers", n)
+		}
+	}
+	// Search Console: the daily sync.
+	if s.search != nil {
+		if err := s.search.SyncIfDue(ctx); err != nil && ctx.Err() == nil {
+			s.log.Warn("Search Console sync failed", "err", err)
 		}
 	}
 	if id, err := s.checks.ClaimDue(ctx); err != nil && ctx.Err() == nil {

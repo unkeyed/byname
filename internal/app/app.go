@@ -5,6 +5,7 @@ package app
 import (
 	"github.com/unkeyed/byname/internal/checks"
 	"github.com/unkeyed/byname/internal/config"
+	"github.com/unkeyed/byname/internal/gsc"
 	"github.com/unkeyed/byname/internal/instance"
 	"github.com/unkeyed/byname/internal/results"
 )
@@ -14,4 +15,5 @@ type Services struct {
 	Config   *config.Service
 	Checks   *checks.Service
 	Results  *results.Service
+	GSC      *gsc.Service
 }
