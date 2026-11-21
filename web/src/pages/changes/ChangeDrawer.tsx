@@ -191,6 +191,9 @@ export function ReadCard({ read }: { read: ChangeRead }) {
         <h4 className="text-sm font-semibold">{interim ? "Interim read" : "Final read"}</h4>
         {interim && <Badge tone="outline">Provisional</Badge>}
         <Badge tone={o.tone}>{o.label}</Badge>
+        <Badge tone="outline" title="The method is new. Check a surprising verdict against the page's numbers in Search before acting on it.">
+          Experimental
+        </Badge>
         <span className="ml-auto text-xs text-muted">Taken {fullDay(read.read_on)}</span>
       </div>
       <div className="space-y-4 px-4 pt-2 pb-4">

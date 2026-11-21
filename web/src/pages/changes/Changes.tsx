@@ -176,6 +176,7 @@ function ChangesCard({
               </>
             ) : null}
             {s && `Reads come ${s.interim_days} days (interim) and ${s.verdict_days} days (final) after Google's first crawl. `}
+            Verdicts are experimental: check a surprising one against Search before acting on it.{" "}
             Times are in {zone.zone}.
           </>
         }
