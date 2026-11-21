@@ -12,13 +12,13 @@ Every API key and every MCP connection carries one or more of three scopes. Each
 
 | Scope | Allows |
 |---|---|
-| `results:read` | Read runs, answers, raw responses, questions, brands, Search Console data, goals and settings. Never a secret. |
+| `results:read` | Read runs, answers, raw responses, questions, brands, Search Console data, goals, site changes, control pages, the repo connection and settings. Never a secret. |
 | `runs:write` | Queue a check, and pause and resume scheduled checks. |
-| `config:write` | Edit the brand, competitors, questions and question sets, surfaces and models, the schedule and limits, goals and branded search terms. |
+| `config:write` | Edit the brand, competitors, questions and question sets, surfaces and models, the schedule and limits, goals, branded search terms, site changes logged by hand, control pages, path rules, and when change reads fall and what counts as a move. |
 
 A key or connection never carries a scope its creator's role lacks. An Admin or Editor can grant all three. A Viewer can grant only `results:read`. If the creator's role later loses a scope, so do their keys and connections. [Sign-in](sign-in.md#roles-and-what-they-allow) describes the roles.
 
-Some things no key or MCP connection can do, whatever its scopes. The Treg token, provider keys, Search Console connections, notification channels, API keys, connected apps and teammates are managed only by a signed-in Admin in the UI. A key that tries gets `403`.
+Some things no key or MCP connection can do, whatever its scopes. The Treg token, provider keys, Search Console connections, the GitHub repo connection for site changes, notification channels, API keys, connected apps and teammates are managed only by a signed-in Admin in the UI. A key that tries gets `403`.
 
 ## Connect an MCP client
 
@@ -117,12 +117,24 @@ Keys live in Postgres by default, or in Unkey when `UNKEY_ROOT_KEY` and `UNKEY_A
 
 ## MCP tools
 
-Byname's MCP server has 51 tools. Every REST route an API key can call has one with the same scope, except `DELETE /v1/keys/current`, since MCP clients sign in with OAuth instead of a key. A test keeps the two in step. Read tools are marked read-only, and `delete_brand` and `delete_goal` are marked destructive, so a client can ask before it runs them.
+Byname's MCP server has 63 tools. Every REST route an API key can call has one with the same scope, except `DELETE /v1/keys/current`, since MCP clients sign in with OAuth instead of a key. A test keeps the two in step. Read tools are marked read-only, and `delete_brand`, `delete_goal`, `delete_change` and `delete_control_page` are marked destructive, so a client can ask before it runs them.
 
 | Tool | Scope | REST | What it does |
 |---|---|---|---|
+| `list_changes` | `results:read` | `GET /v1/changes` | Every site change, the latest merge first: the page, the pull request or manual log, Google's first crawl after the merge, the interim and verdict days, the page's before-period numbers, and the interim and final difference-in-differences reads against the control pages. |
+| `get_change` | `results:read` | `GET /v1/changes/{id}` | One site change with its timeline (merge, URL inspections, first crawl, interim and verdict days) and the full reads. |
+| `change_markers` | `results:read` | `GET /v1/changes/markers` | One marker per merged pull request or logged change between the from and to dates, on Search Console (Pacific Time) days, for marking a daily chart. |
+| `change_settings` | `results:read` | `GET /v1/changes/settings` | When a change's interim and final reads fall, in days after the first crawl, and the thresholds a move must pass against the control pages. |
+| `list_control_pages` | `results:read` | `GET /v1/control-pages` | The control pages verdicts compare against, each with its hold date; a page past it is inactive and drops out of the control set. |
+| `repo_status` | `results:read` | `GET /v1/repo` | The GitHub repo site changes come from: whether a token is stored, its expiry, the path rules and the last hourly poll. |
+| `log_change` | `config:write` | `POST /v1/changes` | Log a change to one page made outside GitHub, so recrawl watch and verdicts follow it. |
+| `delete_change` | `config:write` | `DELETE /v1/changes/{id}` | Delete a change logged by hand. |
+| `update_change_settings` | `config:write` | `PUT /v1/changes/settings` | Replace the interim and verdict days and the thresholds. |
+| `upsert_control_page` | `config:write` | `POST /v1/control-pages` | Add a control page, or change the hold date and note of the one with the same URL. |
+| `delete_control_page` | `config:write` | `DELETE /v1/control-pages/{id}` | Remove a control page. |
+| `update_path_rules` | `config:write` | `PUT /v1/repo/rules` | Replace the rules that map a pull request's changed files to page URLs. |
 | `status` | `results:read` | `GET /v1/status` | Byname's version and whether onboarding is done. |
-| `list_alerts` | `results:read` | `GET /v1/alerts` | Alerts newest first: finished checks with what was gained and lost, refused or failed checks, spend caps reached and paused models, each with whether the person this connection acts for has read it, and the unread count. |
+| `list_alerts` | `results:read` | `GET /v1/alerts` | Alerts newest first: finished checks with what was gained and lost, refused or failed checks, spend caps reached, paused models, search goals reached, search moves, change verdicts and an expiring GitHub token, each with whether the person this connection acts for has read it, and the unread count. |
 | `mark_alerts_read` | `results:read` | `POST /v1/alerts/read` | Mark alerts read for the person this connection acts for, by id or all at once. |
 | `prompts` | `results:read` | `GET /v1/prompts` | Every question of the latest run in range: the pairs that named you there, your best position, the competitors named instead, and per run whether some pair named you, only cited you, did not, or every call failed. |
 | `cited_sources` | `results:read` | `GET /v1/sources` | The domains and pages answers cited most over the runs in range, whether each page's HTML names you and which brands it names. |

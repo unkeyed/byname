@@ -32,7 +32,7 @@ Every person has one of three roles. A role grants scopes, and the same scopes a
 
 | Role | Scopes | Also manages |
 |---|---|---|
-| Admin | `results:read`, `runs:write`, `config:write` | The Treg token and provider keys, Search Console, notification channels, API keys, connected apps and the team |
+| Admin | `results:read`, `runs:write`, `config:write` | The Treg token and provider keys, Search Console, the GitHub repo for site changes, notification channels, API keys, connected apps and the team |
 | Editor | `results:read`, `runs:write`, `config:write` | Nothing beyond the scopes |
 | Viewer | `results:read` | Nothing beyond the scope |
 
@@ -40,9 +40,9 @@ The scopes mean:
 
 | Scope | Allows |
 |---|---|
-| `results:read` | Read runs, answers, raw responses, questions, brands, Search Console data, goals and settings. Never a secret. |
+| `results:read` | Read runs, answers, raw responses, questions, brands, Search Console data, goals, site changes, control pages, the repo connection and settings. Never a secret. |
 | `runs:write` | Queue a check with **Run now**, and pause and resume scheduled checks. |
-| `config:write` | Edit the brand, competitors, questions and question sets, surfaces and models, the schedule, spend caps and run limits, goals and branded search terms. |
+| `config:write` | Edit the brand, competitors, questions and question sets, surfaces and models, the schedule, spend caps and run limits, goals, branded search terms, site changes logged by hand, control pages, path rules, and when change reads fall and what counts as a move. |
 
 The admin-only parts are never reachable with a key or an MCP token, whatever its scopes. Only a signed-in Admin can set them, and Byname never returns a stored secret through any API. Viewers see no write actions in the UI, and the API refuses them with `403`.
 

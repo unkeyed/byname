@@ -1816,7 +1816,7 @@ paths:
     get:
       tags: [changes]
       operationId: changeMarkers
-      summary: One marker per merged pull request or logged change from from to to, for a daily chart.
+      summary: One marker per merged pull request or logged change between the from and to dates, for a daily chart.
       description: Days are Search Console's Pacific Time days, at most 500 apart.
       security:
         - apiKey: [results:read]

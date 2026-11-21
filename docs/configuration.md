@@ -2,12 +2,12 @@
 
 Byname reads its configuration from environment variables when it starts. `cmd/byname/main.go` reads them all in `loadConfig`, and this page lists every one. A change takes effect on the next start.
 
-Environment variables hold only secrets and infrastructure. Everything about your brand, questions, surfaces, schedule, provider keys, Search Console and notifications lives in Postgres. You set those in onboarding, in **Settings**, or through the REST API and MCP, so there are no schedule or provider-key variables.
+Environment variables hold only secrets and infrastructure. Everything about your brand, questions, surfaces, schedule, provider keys, Search Console, site changes and notifications lives in Postgres. You set those in onboarding, in **Settings**, or through the REST API and MCP, so there are no schedule or provider-key variables.
 
 | Variable | Required | Default | What it does |
 |---|---|---|---|
 | `DATABASE_URL` | Yes | none | The Postgres connection URL, for example `postgres://user:pass@host:5432/byname`. |
-| `ENCRYPTION_KEY` | Yes | none | 32 random bytes as base64 or hex, from `openssl rand -base64 32`. Encrypts provider keys, the Search Console credential, notification channel secrets and TOTP seeds in the database. |
+| `ENCRYPTION_KEY` | Yes | none | 32 random bytes as base64 or hex, from `openssl rand -base64 32`. Encrypts provider keys, the Search Console credential, the GitHub token for site changes, notification channel secrets and TOTP seeds in the database. |
 | `ENCRYPTION_KEY_PREVIOUS` | No | none | The key you are rotating away from. Set it for one restart after changing `ENCRYPTION_KEY`. |
 | `MIGRATION_DATABASE_URL` | No | `DATABASE_URL` | A connection URL for a role that can create tables. Byname applies migrations through it, so `DATABASE_URL` can be a role that only reads and writes data. |
 | `PORT` | No | `8080` | The port the HTTP server listens on. |
@@ -72,6 +72,7 @@ Byname hashes the tokens it only compares, such as session cookies, API keys, OA
 
 - the Treg token and every provider key under **Settings > Credentials**
 - the Search Console credential: the Google refresh token or the service account key
+- the GitHub token for site changes
 - each notification channel's secret: an SMTP password, an email API key, a Slack webhook URL or a webhook signing secret
 - each person's TOTP seed
 
@@ -83,11 +84,12 @@ Generate the key once and store it with your other secrets:
 openssl rand -base64 32
 ```
 
-If you lose the key, Byname cannot read those secrets and exits at start, naming the first one it could not read. To start again without them, delete the encrypted rows, then re-enter the keys under **Settings > Credentials**, reconnect Search Console and the notification channels, and have each person set up their authenticator app again:
+If you lose the key, Byname cannot read those secrets and exits at start, naming the first one it could not read. To start again without them, delete the encrypted rows, then re-enter the keys under **Settings > Credentials**, reconnect Search Console, the GitHub repository under **Settings > Site changes** and the notification channels, and have each person set up their authenticator app again:
 
 ```sql
 DELETE FROM credential;
 DELETE FROM gsc_connection;
+UPDATE repo_connection SET ciphertext = NULL, token_expires_at = NULL;
 DELETE FROM notification_channel;
 DELETE FROM totp;
 ```
@@ -146,6 +148,7 @@ Never set these in production. Each one sends Byname's outbound calls, or lets i
 | `CLORO_BASE_URL` | Sends calls with your own cloro key to this URL instead of `https://api.cloro.dev`. |
 | `SERPAPI_BASE_URL` | Sends calls with your own SerpApi key to this URL instead of `https://serpapi.com`. |
 | `GSC_GOOGLE_BASE_URL` | Sends every Google call the Search Console connection makes, sign-in included, to this URL. |
+| `GITHUB_API_BASE_URL` | Sends every GitHub call that site changes make to this URL instead of `https://api.github.com`, such as a fake GitHub on localhost. |
 | `RESEND_BASE_URL` | Sends email API notification channels to this URL instead of `https://api.resend.com`. |
 | `SOURCES_ALLOW_PRIVATE_IPS` | `true` lets cited-source fetching reach private and loopback addresses, such as a fake site on localhost. Off by default, so a cited link cannot make Byname fetch from your internal network. |
 

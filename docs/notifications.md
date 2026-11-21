@@ -1,6 +1,6 @@
 # Notifications
 
-Byname tells people when something moves: a check finished with gains and losses, a check stopped, a spend cap was reached, or a model was paused. Every event shows in the app under **Alerts**. To also get it by email, in Slack or at your own endpoint, an Admin adds notification channels under **Settings > Notifications**, or in onboarding's **Schedule, limits and alerts** step. With no channel, alerts stay in the app.
+Byname tells people when something moves: a check finished with gains and losses, a check stopped, a spend cap was reached, a model was paused, a search goal was reached, search clicks moved, a site change got its verdict, or the GitHub token for site changes is about to expire. Every event shows in the app under **Alerts**. To also get it by email, in Slack or at your own endpoint, an Admin adds notification channels under **Settings > Notifications**, or in onboarding's **Schedule, limits and alerts** step. With no channel, alerts stay in the app.
 
 ## Channels
 
@@ -26,14 +26,19 @@ Webhook and Slack URLs must use `https`, or `http` to `localhost` for a receiver
 | Check failed | `check_failed` | A check could not run or could not store its answers. | Anyone with `results:read` |
 | Spend cap reached | `spend_cap_reached` | A check stopped queueing calls at the per-check or monthly spend cap. | Anyone with `results:read` |
 | Model paused | `pair_paused` | A model left its surface's live model list, so Byname stopped asking it. | Anyone with `results:read` |
-| Goal reached | `goal_reached` | A search goal reached its target. | Anyone with `results:read` |
-| Search moved | `search_moved` | Clicks, impressions or position moved notably in Search Console. | Anyone with `results:read` |
-| Change verdict | `change_verdict` | A site change got its interim read or final verdict against the control pages. See [Changes](changes.md). | Anyone with `results:read` |
-| Token expiring | `token_expiring` | The GitHub token for site changes expires soon. | Admins only |
+| Goal reached | `goal_reached` | After a Search Console sync, a search goal's progress over its window first meets its target. | Anyone with `results:read` |
+| Search moved | `search_moved` | After a Search Console sync, 28-day clicks or 28-day non-brand clicks differ from the 28 days before by at least 25% of the earlier number and by at least 20 clicks. Both 28-day windows must have data for every day. | Anyone with `results:read` |
+| Change verdict | `change_verdict` | A site change got its final read against the control pages, 31 days after Google's first crawl by default. The interim read raises nothing. See [Changes](changes.md). | Anyone with `results:read` |
+| Token expiring | `token_expiring` | The hourly GitHub poll, or **Test** under **Settings > Site changes**, finds that the token expires within 14 days. | Admins only |
 
-In this version, Byname raises the first five. A channel can subscribe to the other four now, and gets them once the jobs that raise them ship.
+Each event has a natural key, its kind and what it happened to, such as one run. Raising the same event twice stores and sends it once. For the four events that do not come from a check, the key decides how often each one fires:
 
-Each event has a natural key, its kind and what it happened to, such as one run. Raising the same event twice stores and sends it once.
+| Event | Fires once per |
+|---|---|
+| `goal_reached` | Goal and target. Raising a goal's target lets it fire again. |
+| `search_moved` | Metric and the last day of the 28-day window. While the move holds, the next day's sync raises it again. |
+| `change_verdict` | Change. |
+| `token_expiring` | Repository and token expiry date. A new token with a new expiry date warns again. |
 
 ## Delivery and retries
 

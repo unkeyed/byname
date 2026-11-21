@@ -85,8 +85,8 @@ var registry = []KindInfo{
 	kind[SpendCapReachedPayload](SpendCapReached, "Spend cap reached", "A check stopped queueing calls at the per-check or monthly spend cap.", Readers),
 	kind[PairPausedPayload](PairPaused, "Model paused", "A model left its surface's live model list, so Byname stopped asking it.", Readers),
 	kind[GoalReachedPayload](GoalReached, "Goal reached", "A search goal reached its target.", Readers),
-	kind[SearchMovedPayload](SearchMoved, "Search moved", "Clicks, impressions or position moved notably in Search Console.", Readers),
-	kind[ChangeVerdictPayload](ChangeVerdict, "Change verdict", "A site change got its interim read or final verdict against the control pages.", Readers),
+	kind[SearchMovedPayload](SearchMoved, "Search moved", "28-day clicks or non-brand clicks moved by at least a quarter and at least 20 clicks against the 28 days before.", Readers),
+	kind[ChangeVerdictPayload](ChangeVerdict, "Change verdict", "A site change got its final verdict against the control pages.", Readers),
 	kind[TokenExpiringPayload](TokenExpiring, "Token expiring", "The GitHub token for site changes expires soon.", Admins),
 }
 

@@ -6,10 +6,10 @@ This page covers running Byname from source, the checks a change has to pass, th
 
 - One Go binary, `cmd/byname`, serves the React UI, the REST API under `/v1`, the MCP server at `/mcp` and `/healthz`, and runs the scheduler. `byname migrate` and `byname recover` are subcommands of the same binary.
 - Postgres holds all state. Byname applies its migrations from `internal/db/migrations` when it starts.
-- The service packages do every read and write: `internal/config` (settings, brands, questions, surfaces, credentials, onboarding), `internal/checks` (queueing and running checks), `internal/results` (everything the result pages read), `internal/gsc` (Search Console), `internal/notify` (alerts and channels), `internal/sources` (cited pages) and `internal/auth` (people, keys and OAuth).
+- The service packages do every read and write: `internal/config` (settings, brands, questions, surfaces, credentials, onboarding), `internal/checks` (queueing and running checks), `internal/results` (everything the result pages read), `internal/gsc` (Search Console), `internal/changes` (site changes, recrawl watch and verdicts), `internal/notify` (alerts and channels), `internal/sources` (cited pages) and `internal/auth` (people, keys and OAuth).
 - `internal/httpapi/server.go` holds the one route table. `internal/mcpserver` registers each MCP tool. Both call the same service methods, so REST, MCP and the UI see the same thing.
 - `internal/engines` asks one question on one surface. `registry.go` is the one list of surfaces and their pinned endpoints, and `routes.go` the one list of routes and adapters.
-- `internal/scheduler` runs every minute: due checks, the daily Search Console sync, the daily model list refresh, raw response pruning and cited-source fetching.
+- `internal/scheduler` runs every minute: due checks, the daily Search Console sync with the site changes follow-up after it, the hourly GitHub poll, the daily model list refresh, raw response pruning and cited-source fetching.
 
 ## Run Byname from source
 

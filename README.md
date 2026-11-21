@@ -55,7 +55,7 @@ Not using Treg? Any surface can call DataForSEO, cloro or SerpApi with your key 
 
 ## Connect Search Console
 
-Open **Settings > Search Console** and click **Sign in with Google**, or paste a service account's JSON key. Byname asks Google for read-only access, syncs once a day, and backfills about 16 months on the first sync. Sign in with Google needs your own Google OAuth client in `GSC_GOOGLE_CLIENT_ID` and `GSC_GOOGLE_CLIENT_SECRET`. [Search Console](docs/search-console.md) shows how to create one, and covers branded search terms and goals.
+In onboarding's **Search Console** step, or later under **Settings > Search Console**, click **Sign in with Google**, or paste a service account's JSON key. Byname asks Google for read-only access, syncs once a day, and backfills about 16 months on the first sync. Sign in with Google needs your own Google OAuth client in `GSC_GOOGLE_CLIENT_ID` and `GSC_GOOGLE_CLIENT_SECRET`. [Search Console](docs/search-console.md) shows how to create one, and covers branded search terms and goals.
 
 ## Connect your agents
 

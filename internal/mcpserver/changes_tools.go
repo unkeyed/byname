@@ -42,7 +42,7 @@ func addChangeTools(srv *mcp.Server, svc app.Services) {
 			return svc.Changes.Get(ctx, in.ID)
 		})
 	addTool(srv, core.ResultsRead, &mcp.Tool{Name: "change_markers", Annotations: readOnly(),
-		Description: "One marker per merged pull request or logged change from from to to, on Search Console (Pacific Time) days, for marking a daily chart. GET /v1/changes/markers."},
+		Description: "One marker per merged pull request or logged change between the from and to dates, on Search Console (Pacific Time) days, for marking a daily chart. GET /v1/changes/markers."},
 		func(ctx context.Context, _ core.Actor, in changes.MarkerRange) (markerList, error) {
 			v, err := svc.Changes.Markers(ctx, in)
 			return markerList{v}, err

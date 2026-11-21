@@ -93,7 +93,7 @@ The container contract is short:
 - Byname listens on `$PORT`, which defaults to `8080`.
 - One process serves the web UI, the REST API under `/v1`, the MCP server at `/mcp` and `/healthz`, and runs the scheduler.
 - On `SIGTERM`, Byname stops taking new requests and waits up to 20 seconds for open requests to finish. A check in progress stops queueing calls and resumes on the next start.
-- Byname keeps no state on disk. You can run several replicas against one database. Migrations, the setup link, scheduled checks and the Search Console sync each take a Postgres advisory lock, so a second replica never starts the same check or sync twice.
+- Byname keeps no state on disk. You can run several replicas against one database. Migrations, the setup link, scheduled checks, the Search Console sync and the site changes jobs each take a Postgres advisory lock, so a second replica never starts the same check, sync or poll twice.
 - Byname writes JSON logs to stdout.
 
 ## How the schedule works
@@ -101,7 +101,8 @@ The container contract is short:
 The scheduler runs inside the container, so you need no cron service. Every minute it does each of these that is due:
 
 - Starts the AI check when its time comes. You set "run AI checks every N days" and the time of day under **Settings > Schedule**, with **Pause** and **Run now**. A check missed while no process was running starts on the next start. A check missed while paused does not.
-- Syncs Search Console once a day, and retries an hour after a failed sync.
+- Syncs Search Console once a day, and retries an hour after a failed sync. After a sync that succeeds, it raises **Goal reached** and **Search moved** alerts and runs the site changes jobs `recrawl_watch` and `verdicts`. See [Changes](changes.md#recrawl-watch).
+- Polls the connected GitHub repository for merged pull requests once an hour, as the `site_changes` job.
 - Refreshes each surface's model list once a day.
 - Deletes raw provider responses past the retention set under **Settings > General**, once a day.
 - Fetches pages that answers newly cited, to see whether they name you.
@@ -123,7 +124,7 @@ If `DATABASE_URL` cannot create tables, run `byname migrate` with `MIGRATION_DAT
 
 ## Back up
 
-All state is in Postgres: settings, questions, every answer with its raw response, Search Console data, people and keys. Back it up as you would any Postgres database, for example with `pg_dump`. With Docker Compose:
+All state is in Postgres: settings, questions, every answer with its raw response, Search Console data, site changes, people and keys. Back it up as you would any Postgres database, for example with `pg_dump`. With Docker Compose:
 
 ```sh
 docker compose exec -T db pg_dump -U byname byname > byname-backup.sql
