@@ -33,8 +33,8 @@ type SourcePage struct {
 	Answers   int    `json:"answers" jsonschema:"answers that cited it"`
 	// Check is null until the page has been fetched.
 	Check *PageCheck `json:"check"`
-	// Outreach marks a page on another site that names a competitor and
-	// not you.
+	// Outreach marks a page that names a competitor and not you, on a site
+	// that is neither yours nor a competitor's.
 	Outreach bool `json:"outreach"`
 }
 
@@ -90,6 +90,16 @@ func (s *Service) Sources(ctx context.Context, since *time.Time, sc Scope) (Sour
 	if err != nil {
 		return out, err
 	}
+	brands, err := s.brands(ctx)
+	if err != nil {
+		return out, err
+	}
+	var rivals []string
+	for _, b := range brands {
+		if b.Kind == panel.KindCompetitor {
+			rivals = append(rivals, b.Domains...)
+		}
+	}
 	pages, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (SourcePage, error) {
 		var p SourcePage
 		var status *string
@@ -102,7 +112,7 @@ func (s *Service) Sources(ctx context.Context, since *time.Time, sc Scope) (Sour
 			check.Status, check.FetchedAt = *status, *fetched
 			check.Competitors = competitorsIn(check.Brands, kinds)
 			p.Check = &check
-			p.Outreach = !p.IsSelf && check.SelfPresent != nil && !*check.SelfPresent && len(check.Competitors) > 0
+			p.Outreach = !p.IsSelf && !onDomains(p.Domain, rivals) && check.SelfPresent != nil && !*check.SelfPresent && len(check.Competitors) > 0
 		}
 		return p, nil
 	})
@@ -175,4 +185,16 @@ func competitorsIn(names []string, kinds map[string]panel.BrandKind) []string {
 		}
 	}
 	return out
+}
+
+// onDomains reports whether host is one of domains or a subdomain of one.
+// Citations store their host lowercased and without "www.".
+func onDomains(host string, domains []string) bool {
+	for _, d := range domains {
+		d = strings.TrimPrefix(strings.ToLower(d), "www.")
+		if d != "" && (host == d || strings.HasSuffix(host, "."+d)) {
+			return true
+		}
+	}
+	return false
 }

@@ -26,7 +26,7 @@ func addPageTools(srv *mcp.Server, svc app.Services) {
 			return r.Prompts(ctx, in.Since, in.Scope)
 		})
 	addTool(srv, core.ResultsRead, &mcp.Tool{Name: "cited_sources", Annotations: readOnly(),
-		Description: "The domains and pages answers cited most over the runs in range, whether each page's HTML names you and which brands it names. Pages on other sites that name a competitor but not you are flagged as outreach targets. Filter by surface and model. GET /v1/sources."},
+		Description: "The domains and pages answers cited most over the runs in range, whether each page's HTML names you and which brands it names. Pages that name a competitor but not you, on sites neither yours nor a competitor's, are flagged as outreach targets. Filter by surface and model. GET /v1/sources."},
 		func(ctx context.Context, _ core.Actor, in scopedInput) (results.Sources, error) {
 			return r.Sources(ctx, in.Since, in.Scope)
 		})

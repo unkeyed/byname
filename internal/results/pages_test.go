@@ -161,8 +161,14 @@ func TestCitedSources(t *testing.T) {
 	if err := e.db.QueryRow(ctx, `SELECT (SELECT url FROM citation WHERE NOT is_self ORDER BY url LIMIT 1), (SELECT url FROM citation WHERE is_self ORDER BY url LIMIT 1)`).Scan(&other, &own); err != nil {
 		t.Fatal(err)
 	}
+	// A cited site that becomes Contoso's own.
+	var rival string
+	if err := e.db.QueryRow(ctx, `WITH c AS (SELECT url, domain FROM citation WHERE NOT is_self AND domain <> (SELECT domain FROM citation WHERE url = $1 LIMIT 1) ORDER BY url LIMIT 1),
+			b AS (UPDATE brand SET domains = domains || (SELECT domain FROM c) WHERE name = 'Contoso') SELECT url FROM c`, other).Scan(&rival); err != nil {
+		t.Fatalf("no second cited site: %v", err)
+	}
 	if _, err := e.db.Exec(ctx, `INSERT INTO source_page (url, domain, status, fetched_at, self_present, brands_present) VALUES
-		($1, 'x', 'ok', now(), false, '{Contoso,Redis}'), ($2, 'y', 'ok', now(), false, '{Contoso}')`, other, own); err != nil {
+		($1, 'x', 'ok', now(), false, '{Contoso,Redis}'), ($2, 'y', 'ok', now(), false, '{Contoso}'), ($3, 'z', 'ok', now(), false, '{Contoso}')`, other, own, rival); err != nil {
 		t.Fatal(err)
 	}
 	var citations, answered int
@@ -187,8 +193,11 @@ func TestCitedSources(t *testing.T) {
 	if p := pages[own]; p.Check == nil || p.Outreach || !p.IsSelf {
 		t.Errorf("%s = %+v; want your own page, never an outreach target", own, p)
 	}
+	if p := pages[rival]; p.Check == nil || p.Outreach {
+		t.Errorf("%s = %+v; want a competitor's own page, never an outreach target", rival, p)
+	}
 	for _, p := range got.Pages {
-		if p.URL != other && p.URL != own && p.Check != nil {
+		if p.URL != other && p.URL != own && p.URL != rival && p.Check != nil {
 			t.Errorf("%s has a check before it was fetched", p.URL)
 		}
 	}
@@ -215,7 +224,7 @@ func TestCitedSources(t *testing.T) {
 			t.Fatal(err)
 		}
 		for _, c := range full.Citations {
-			if (c.URL == other || c.URL == own) != (c.Page != nil) {
+			if (c.URL == other || c.URL == own || c.URL == rival) != (c.Page != nil) {
 				t.Errorf("answer %d cites %s with page %+v; want the page check exactly where one was stored", a.ID, c.URL, c.Page)
 			}
 		}

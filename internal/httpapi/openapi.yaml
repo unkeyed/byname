@@ -3936,7 +3936,7 @@ components:
           description: Null until the page has been fetched.
         outreach:
           type: boolean
-          description: A page on another site that names a competitor and not you.
+          description: A page that names a competitor and not you, on a site neither yours nor a competitor's.
     SourceDomain:
       type: object
       required: [domain, is_self, citations, answers, pages, outreach]
