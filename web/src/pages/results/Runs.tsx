@@ -47,7 +47,7 @@ function MissingCost({ run }: { run: Run }) {
   );
 }
 
-const runGrid = "lg:grid lg:grid-cols-[4.5rem_8.5rem_5rem_3rem_6.5rem_10.5rem_minmax(0,1fr)_1rem] lg:items-center lg:gap-x-3";
+const runGrid = "lg:grid lg:grid-cols-[7.5rem_7rem_5rem_3rem_6.5rem_11.5rem_minmax(0,1fr)_1rem] lg:items-center lg:gap-x-3";
 
 function RunRow({ run: r, title }: { run: Run; title: (endpoint: string) => string }) {
   return (
