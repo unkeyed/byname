@@ -934,6 +934,178 @@ export interface GscProperty {
   suggested: boolean;
 }
 
+/** internal/changes: what happened to the page. */
+export type ChangeKind = "new_page" | "edit" | "removed";
+
+/** Where a change is in its life, derived from what is stored. */
+export type ChangeStage = "awaiting_crawl" | "awaiting_interim" | "awaiting_verdict" | "decided";
+
+/** What a read concluded. */
+export type ChangeOutcome = "improved" | "worsened" | "no_change" | "insufficient_data";
+
+export type ChangeMetric = "position" | "ctr" | "impressions";
+
+/** How far a page must move against the control pages for a metric to count. */
+export interface ChangeThresholds {
+  /** Places of average position. */
+  position: number;
+  /** Percentage points of CTR. */
+  ctr_points: number;
+  /** Impressions ratio against the controls; its inverse counts as worse. */
+  impressions_ratio: number;
+}
+
+export interface ChangeSettings extends ChangeThresholds {
+  /** Days after the first crawl for the interim read, 7 to 90. */
+  interim_days: number;
+  /** Days after the first crawl for the final read, 14 to 180 and more than interim_days. */
+  verdict_days: number;
+}
+
+/** One side of a read: the page's totals and the control set's over the same final days. */
+export interface ChangeWindow {
+  from: Day;
+  to: Day;
+  days: number;
+  page: SearchTotals;
+  control: SearchTotals;
+}
+
+/** Differences in differences: the page's move minus the control set's. */
+export interface ChangeDeltas {
+  /** In places; negative means the page moved up. */
+  position: number;
+  /** In percentage points. */
+  ctr_points: number;
+  /** Page after/before over controls after/before; above 1 means it gained on them. */
+  impressions_ratio: number;
+}
+
+export interface ChangeRead {
+  kind: "interim" | "final";
+  /** The day the read was taken, in the instance's time zone. */
+  read_on: Day;
+  outcome: ChangeOutcome;
+  /** Why the data was insufficient; empty otherwise. */
+  reason: string;
+  before: ChangeWindow;
+  after: ChangeWindow;
+  deltas: ChangeDeltas | null;
+  signals: { metric: ChangeMetric; way: "improved" | "worsened" }[] | null;
+  controls: string[] | null;
+  thresholds: ChangeThresholds;
+}
+
+/** One page changed once, with where it is in the watch. */
+export interface Change {
+  id: number;
+  url: string;
+  kind: ChangeKind;
+  source: "github" | "manual";
+  /** owner/name; empty for a manual change. */
+  repo: string;
+  /** 0 for a manual change. */
+  pr_number: number;
+  pr_title: string;
+  pr_url: string;
+  merged_at: Timestamp;
+  notes: string;
+  stage: ChangeStage;
+  /** Google's first crawl seen after the merge. */
+  first_crawl_at: Timestamp | null;
+  /** Days in the instance's time zone, null until the first crawl. */
+  interim_on: Day | null;
+  verdict_on: Day | null;
+  /** The page over the verdict-length window ending the day before the merge; null until those days are final. */
+  before: (SearchTotals & { from: Day; to: Day }) | null;
+  interim: ChangeRead | null;
+  final: ChangeRead | null;
+  verdict: ChangeOutcome | null;
+}
+
+export type ChangeStepKind = "merged" | "inspected" | "crawled" | "interim" | "verdict";
+
+export interface ChangeStep {
+  kind: ChangeStepKind;
+  /** RFC 3339, or a day for interim and verdict (in the future while due). */
+  at: string;
+  done: boolean;
+  detail: string;
+}
+
+export interface UrlInspection {
+  checked_at: Timestamp;
+  /** Google's verdict: PASS, PARTIAL, FAIL or NEUTRAL. */
+  verdict: string;
+  coverage_state: string;
+  last_crawl_at: Timestamp | null;
+  /** Why Google refused the inspection; empty when it answered. */
+  error: string;
+}
+
+export interface ChangeDetail extends Change {
+  timeline: ChangeStep[];
+  /** Newest first. */
+  inspections: UrlInspection[];
+}
+
+/** A change logged by hand. merged_at is RFC 3339, or a day meaning midnight in the instance's time zone. */
+export interface ManualChange {
+  url: string;
+  kind: ChangeKind;
+  merged_at: string;
+  notes?: string;
+}
+
+/** One merge to mark on a daily chart, on its Search Console (Pacific) day. */
+export interface ChangeMarker {
+  date: Day;
+  label: string;
+  change_ids: number[];
+}
+
+/** A page held unchanged as the verdicts' baseline. */
+export interface ControlPage {
+  id: number;
+  url: string;
+  /** The last day it counts as a control. */
+  hold_until: Day;
+  note: string;
+  /** False once hold_until has passed in the instance's time zone. */
+  active: boolean;
+}
+
+export interface ControlInput {
+  url: string;
+  hold_until: Day;
+  note?: string;
+}
+
+/** A changed file whose repo path matches glob is the page url, with {1}, {2} replaced by what each wildcard matched. */
+export interface PathRule {
+  glob: string;
+  url: string;
+}
+
+/** The repo connection. It never carries the token. */
+export interface RepoStatus {
+  /** A token is stored. */
+  connected: boolean;
+  /** Empty before a repo was ever connected. */
+  provider: "github" | "";
+  /** owner/name. */
+  repo: string;
+  default_branch: string;
+  /** Null for a token without expiry. */
+  token_expires_at: Timestamp | null;
+  /** The token expires within 14 days. */
+  expiring_soon: boolean;
+  rules: PathRule[];
+  connected_at: Timestamp | null;
+  last_poll_at: Timestamp | null;
+  last_poll_error: string;
+}
+
 /** Which pairs a results read covers, and since when. */
 export interface ResultsFilter {
   since?: Timestamp;
@@ -1261,7 +1433,7 @@ export const api = {
   },
 
   /** An empty list goes back to the brand's name and aliases. */
-  setBrandedTerms: (terms: string[]) => request<Settings>("PUT", "/v1/settings/branded-terms", { body: { terms } }),
+  setBrandedTerms: (terms: string[]) => request<SettingsView>("PUT", "/v1/settings/branded-terms", { body: { terms } }),
 
   /** Everything but status is admin-only; connecting can fail with reauth_required. */
   gsc: {
@@ -1269,10 +1441,40 @@ export const api = {
     properties: () => request<GscProperty[]>("GET", "/v1/gsc/properties"),
     setProperty: (property: string, backfill: boolean) => request<GscStatus>("PUT", "/v1/gsc/property", { body: { property, backfill } }),
     serviceAccount: (key: string) => request<GscStatus>("PUT", "/v1/gsc/service-account", { body: { key } }),
-    /** Google's consent page; it sends the browser back to /auth/gsc/callback. */
-    oauthStart: () => request<{ url: string }>("POST", "/v1/gsc/oauth/start"),
+    /** Google's consent page. The callback returns the browser to the page named by returnTo, with ?connected=google or ?error=. */
+    oauthStart: (returnTo: "settings" | "onboarding" = "settings") => request<{ url: string }>("POST", "/v1/gsc/oauth/start", { body: { return_to: returnTo } }),
     /** Keeps the synced data. */
     disconnect: () => request<void>("DELETE", "/v1/gsc"),
+  },
+
+  changes: {
+    /** The latest merge first. */
+    list: () => request<Change[]>("GET", "/v1/changes"),
+    get: (id: number) => request<ChangeDetail>("GET", `/v1/changes/${id}`),
+    log: (body: ManualChange) => request<ChangeDetail>("POST", "/v1/changes", { body }),
+    /** Manual changes only; one from GitHub is 409. */
+    remove: (id: number) => request<void>("DELETE", `/v1/changes/${id}`),
+    /** Search Console days, at most 500 apart, oldest first. */
+    markers: (from: Day, to: Day) => request<ChangeMarker[]>("GET", `/v1/changes/markers${qs({ from, to })}`),
+    settings: () => request<ChangeSettings>("GET", "/v1/changes/settings"),
+    putSettings: (body: ChangeSettings) => request<ChangeSettings>("PUT", "/v1/changes/settings", { body }),
+  },
+  controlPages: {
+    /** By URL. */
+    list: () => request<ControlPage[]>("GET", "/v1/control-pages"),
+    /** Upserts on URL. */
+    upsert: (body: ControlInput) => request<ControlPage>("POST", "/v1/control-pages", { body }),
+    remove: (id: number) => request<void>("DELETE", `/v1/control-pages/${id}`),
+  },
+  /** Connecting, testing and disconnecting are admin-only; connecting can fail with reauth_required. */
+  repo: {
+    get: () => request<RepoStatus>("GET", "/v1/repo"),
+    connect: (repo: string, token: string) => request<RepoStatus>("PUT", "/v1/repo", { body: { repo, token } }),
+    test: () => request<RepoStatus>("POST", "/v1/repo/test"),
+    /** Keeps the repo, its rules and the changes found. */
+    disconnect: () => request<void>("DELETE", "/v1/repo"),
+    /** 404 before a repo was ever connected. */
+    putRules: (rules: PathRule[]) => request<RepoStatus>("PUT", "/v1/repo/rules", { body: { rules } }),
   },
 
   invites: {

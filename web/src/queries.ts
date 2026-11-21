@@ -57,6 +57,14 @@ export const keys = {
   searchPages: (limit: number, v: string) => ["search", "pages", limit, v] as const,
   searchQueries: (limit: number, nonBrand: boolean, v: string) => ["search", "queries", limit, nonBrand, v] as const,
   goals: (v: string) => ["search", "goals", v] as const,
+  /** Site changes, control pages, the repo and the read settings sit under this prefix. */
+  changes: ["changes"] as const,
+  changeList: ["changes", "list"] as const,
+  change: (id: number) => ["changes", "detail", id] as const,
+  changeMarkers: (from: string, to: string) => ["changes", "markers", from, to] as const,
+  changeSettings: ["changes", "settings"] as const,
+  controlPages: ["changes", "control-pages"] as const,
+  repo: ["changes", "repo"] as const,
 };
 
 /** Changes whenever a sync or a disconnect changes what the read API returns. */
@@ -72,6 +80,11 @@ export const useGsc = () =>
     queryFn: api.gsc.status,
     refetchInterval: (q) => (q.state.data && awaitingSync(q.state.data) ? 4000 : false),
   });
+
+export const useChanges = () => useQuery({ queryKey: keys.changeList, queryFn: api.changes.list });
+export const useChangeSettings = () => useQuery({ queryKey: keys.changeSettings, queryFn: api.changes.settings, staleTime: 60_000 });
+export const useControlPages = () => useQuery({ queryKey: keys.controlPages, queryFn: api.controlPages.list });
+export const useRepo = () => useQuery({ queryKey: keys.repo, queryFn: api.repo.get });
 
 export const useMe = () => useQuery({ queryKey: keys.me, queryFn: api.me.get, staleTime: Infinity });
 

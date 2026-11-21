@@ -8,6 +8,7 @@ import { ApiKeys } from "./ApiKeys";
 import { Notifications } from "./Notifications";
 import { ReauthProvider } from "./Reauth";
 import { SearchConsole } from "./SearchConsole";
+import { SiteChanges } from "./SiteChanges";
 import { Team } from "./Team";
 import { Competitors, Credentials, General, Limits, Questions, Schedule, WherePeopleAsk } from "./SetupTabs";
 
@@ -26,6 +27,7 @@ const tabs: { path: string; label: string; element: ReactNode; admin?: boolean }
   { path: "team", label: "Team", element: <Team />, admin: true },
   { path: "notifications", label: "Notifications", element: <Notifications />, admin: true },
   { path: "search-console", label: "Search Console", element: <SearchConsole />, admin: true },
+  { path: "site-changes", label: "Site changes", element: <SiteChanges />, admin: true },
 ];
 
 export const settingsRoutes: RouteObject[] = [

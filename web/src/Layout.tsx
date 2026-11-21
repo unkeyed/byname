@@ -20,7 +20,7 @@ export const nav: { to: string; label: string; icon: IconName; soon?: string }[]
   { to: "/gaps", label: "Gaps", icon: "alert" },
   { to: "/compare", label: "Compare", icon: "layers" },
   { to: "/search", label: "Search", icon: "globe" },
-  { to: "/changes", label: "Changes", icon: "pencil", soon: "Changes to your site, when Google recrawled them, and what moved after." },
+  { to: "/changes", label: "Changes", icon: "pencil" },
   { to: "/runs", label: "Runs", icon: "refresh" },
   { to: "/settings", label: "Settings", icon: "settings" },
 ];

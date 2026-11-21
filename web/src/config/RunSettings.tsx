@@ -65,7 +65,7 @@ function Body({
   submitLabel?: string;
 }) {
   const canEdit = useCan("config:write");
-  const keysShown: NumberKey[] = [...(schedule ? scheduleKeys : []), ...(limits ? [...capKeys, ...tuningKeys] : [])];
+  const keysShown = [...(schedule ? scheduleKeys : []), ...(limits ? [...capKeys, ...tuningKeys] : [])];
   const [values, setValues] = useState<Record<string, string>>(() => Object.fromEntries(keysShown.map((k) => [k, formatNumber(initial[k])])));
   const [checkTime, setCheckTime] = useState(initial.check_time || "06:00");
   const [tried, setTried] = useState(false);
