@@ -211,6 +211,10 @@ export interface Settings {
   next_check_at: Timestamp | null;
   /** Set when a scheduled check is claimed, even one that was skipped. */
   last_check_at: Timestamp | null;
+  /** Lowercased; a Search Console query containing one is brand. */
+  branded_terms: string[];
+  /** True while the terms are the brand's name and aliases. */
+  branded_terms_default: boolean;
 }
 
 export type BrandKind = "self" | "competitor" | "technology";
@@ -484,6 +488,141 @@ export interface Gap {
   named_on_miss: string[];
 }
 
+/** YYYY-MM-DD. */
+export type Day = string;
+
+export interface SearchTotals {
+  clicks: number;
+  impressions: number;
+  /** Clicks over impressions, 0 to 1. */
+  ctr: number;
+  /** Average position, weighted by impressions; 0 with no impressions. */
+  position: number;
+}
+
+export interface SearchPeriod extends SearchTotals {
+  from: Day;
+  to: Day;
+  brand_clicks: number;
+  /** Anonymized queries are never non-brand. */
+  non_brand_clicks: number;
+  anonymized_clicks: number;
+  days_with_data: number;
+}
+
+/** The latest 28 days, ending on the latest final day, and the 28 before. */
+export interface SearchSummary {
+  property: string;
+  current: SearchPeriod | null;
+  previous: SearchPeriod | null;
+}
+
+export interface SearchDay extends SearchTotals {
+  date: Day;
+  /** False while Google still revises the day. */
+  final: boolean;
+}
+
+export interface SearchDaily {
+  property: string;
+  latest_final_day: Day;
+  /** Oldest first; a day with no row had no impressions. */
+  days: SearchDay[];
+}
+
+/** One trailing 28-day window, named by its last day. */
+export interface BrandPoint {
+  date: Day;
+  clicks: number;
+  brand_clicks: number;
+  non_brand_clicks: number;
+  anonymized_clicks: number;
+}
+
+export interface BrandSeries {
+  property: string;
+  terms: string[];
+  points: BrandPoint[];
+}
+
+export interface PageRow extends SearchTotals {
+  page: string;
+}
+
+export interface QueryRow extends SearchTotals {
+  query: string;
+  branded: boolean;
+}
+
+export interface TopList {
+  property: string;
+  from: Day;
+  to: Day;
+}
+
+export const goalMetrics = ["clicks", "impressions", "non_brand_clicks"] as const;
+export type GoalMetric = (typeof goalMetrics)[number];
+export const goalWindows = [28, 90] as const;
+export type GoalWindow = (typeof goalWindows)[number];
+
+export interface GoalInput {
+  metric: GoalMetric;
+  window_days: GoalWindow;
+  target: number;
+  due_on: Day;
+}
+
+export interface GoalProgress {
+  from: Day;
+  to: Day;
+  value: number;
+  /** Value over target; 1 or more once reached. */
+  fraction: number;
+  reached: boolean;
+  days_with_data: number;
+}
+
+export interface Goal extends GoalInput {
+  id: number;
+  /** Null until Search Console data is synced. */
+  progress: GoalProgress | null;
+}
+
+export type GscMethod = "oauth" | "service_account";
+export type PropertyKind = "domain" | "url_prefix";
+
+/** GET /v1/gsc: the connection and the data stored. Data can outlive a disconnect. */
+export interface GscStatus {
+  connected: boolean;
+  /** The instance has GSC_GOOGLE_CLIENT_ID, which Sign in with Google needs. */
+  oauth_available: boolean;
+  method: GscMethod | "";
+  /** The service account's email; empty for a Google sign-in. */
+  account: string;
+  property: string;
+  property_kind: PropertyKind | "";
+  backfill: boolean;
+  connected_at: Timestamp | null;
+  last_sync_at: Timestamp | null;
+  last_sync_error: string;
+  syncing: boolean;
+  /** The property the stored numbers are for; empty when nothing is stored. */
+  data_property: string;
+  first_day: Day;
+  /** The latest day Google has finalized, which every window ends on. */
+  latest_final_day: Day;
+  /** Stored days Google still revises. */
+  partial_days: Day[];
+}
+
+export interface GscProperty {
+  site_url: string;
+  permission_level: string;
+  kind: PropertyKind;
+  /** Matches the brand's primary domain. */
+  suggested: boolean;
+}
+
 /** Which pairs a results read covers, and since when. */
 export interface ResultsFilter {
   since?: Timestamp;
@@ -641,6 +780,39 @@ export const api = {
     rates: (f: ResultsFilter, by: Grouping) => request<RateSeries[]>("GET", `/v1/metrics/rates${qs({ ...f, by })}`),
     summary: (f: ResultsFilter) => request<RunSummary[]>("GET", `/v1/metrics/summary${qs({ ...f })}`),
     competitors: (f: ResultsFilter, by: Grouping) => request<Competitors>("GET", `/v1/metrics/competitors${qs({ ...f, by })}`),
+  },
+
+  search: {
+    summary: () => request<SearchSummary>("GET", "/v1/search/summary"),
+    /** Defaults to the 90 days up to the latest stored day. */
+    daily: (from?: Day) => request<SearchDaily>("GET", `/v1/search/daily${qs({ from })}`),
+    brand: (from?: Day) => request<BrandSeries>("GET", `/v1/search/brand${qs({ from })}`),
+    pages: (limit: number) => request<TopList & { pages: PageRow[] }>("GET", `/v1/search/pages${qs({ limit })}`),
+    queries: (limit: number, nonBrand: boolean) =>
+      request<TopList & { non_brand: boolean; queries: QueryRow[] }>("GET", `/v1/search/queries${qs({ limit, non_brand: nonBrand ? "true" : undefined })}`),
+  },
+
+  goals: {
+    list: () => request<Goal[]>("GET", "/v1/goals"),
+    /** Upserts on metric, window and due date. */
+    create: (body: GoalInput) => request<Goal>("POST", "/v1/goals", { body }),
+    update: (id: number, body: GoalInput) => request<Goal>("PUT", `/v1/goals/${id}`, { body }),
+    remove: (id: number) => request<void>("DELETE", `/v1/goals/${id}`),
+  },
+
+  /** An empty list goes back to the brand's name and aliases. */
+  setBrandedTerms: (terms: string[]) => request<Settings>("PUT", "/v1/settings/branded-terms", { body: { terms } }),
+
+  /** Everything but status is admin-only; connecting can fail with reauth_required. */
+  gsc: {
+    status: () => request<GscStatus>("GET", "/v1/gsc"),
+    properties: () => request<GscProperty[]>("GET", "/v1/gsc/properties"),
+    setProperty: (property: string, backfill: boolean) => request<GscStatus>("PUT", "/v1/gsc/property", { body: { property, backfill } }),
+    serviceAccount: (key: string) => request<GscStatus>("PUT", "/v1/gsc/service-account", { body: { key } }),
+    /** Google's consent page; it sends the browser back to /auth/gsc/callback. */
+    oauthStart: () => request<{ url: string }>("POST", "/v1/gsc/oauth/start"),
+    /** Keeps the synced data. */
+    disconnect: () => request<void>("DELETE", "/v1/gsc"),
   },
 
   invites: {

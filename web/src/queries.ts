@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { api, type Grouping, type ResultsFilter, type Run } from "./api";
+import { api, type Grouping, type GscStatus, type ResultsFilter, type Run } from "./api";
 
 /** Query keys in one place, so a mutation can invalidate exactly what it touched. */
 export const keys = {
@@ -29,7 +29,34 @@ export const keys = {
   answer: (id: number) => ["answer", id] as const,
   compare: (before: number, after: number) => ["results", "compare", before, after] as const,
   gaps: (run: number) => ["results", "gaps", run] as const,
+  /**
+   * Search Console reads sit under this prefix. Each carries the stored
+   * data's version, so a finished sync refetches them without a timer.
+   */
+  search: ["search"] as const,
+  gsc: ["search", "gsc"] as const,
+  gscProperties: ["search", "gsc", "properties"] as const,
+  searchSummary: (v: string) => ["search", "summary", v] as const,
+  searchDaily: (from: string | undefined, v: string) => ["search", "daily", from, v] as const,
+  searchBrand: (from: string | undefined, v: string) => ["search", "brand", from, v] as const,
+  searchPages: (limit: number, v: string) => ["search", "pages", limit, v] as const,
+  searchQueries: (limit: number, nonBrand: boolean, v: string) => ["search", "queries", limit, nonBrand, v] as const,
+  goals: (v: string) => ["search", "goals", v] as const,
 };
+
+/** Changes whenever a sync or a disconnect changes what the read API returns. */
+export const dataVersion = (s: GscStatus) => [s.data_property, s.last_sync_at, s.latest_final_day, s.partial_days.join()].join("|");
+
+/** A picked property waits for its first sync, which starts within a minute. */
+const awaitingSync = (s: GscStatus) => s.syncing || (s.connected && s.property !== "" && !s.last_sync_at && !s.last_sync_error);
+
+/** The Search Console connection. Polls while a sync is due or running. */
+export const useGsc = () =>
+  useQuery({
+    queryKey: keys.gsc,
+    queryFn: api.gsc.status,
+    refetchInterval: (q) => (q.state.data && awaitingSync(q.state.data) ? 4000 : false),
+  });
 
 export const useMe = () => useQuery({ queryKey: keys.me, queryFn: api.me.get, staleTime: Infinity });
 
