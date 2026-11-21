@@ -252,20 +252,27 @@ func (p SearchMovedPayload) message() Message {
 	}
 }
 
-// ChangeVerdictPayload is declared for the site changes workstream to emit.
+// ChangeVerdictPayload is a change's final read against the control pages
+// (internal/changes). Detail is the read in one line.
 type ChangeVerdictPayload struct {
 	ChangeID int64  `json:"change_id"`
 	URL      string `json:"url"`
 	Verdict  string `json:"verdict"`
+	Detail   string `json:"detail"`
 }
 
 func (ChangeVerdictPayload) Kind() Kind { return ChangeVerdict }
 
 func (p ChangeVerdictPayload) message() Message {
-	return Message{Title: fmt.Sprintf("Change verdict: %s", p.Verdict), Lines: []string{p.URL}, Path: "/changes"}
+	lines := []string{p.URL}
+	if p.Detail != "" {
+		lines = append(lines, p.Detail)
+	}
+	return Message{Title: fmt.Sprintf("Change verdict: %s", strings.ReplaceAll(p.Verdict, "_", " ")), Lines: lines, Path: "/changes"}
 }
 
-// TokenExpiringPayload is declared for the site changes workstream to emit.
+// TokenExpiringPayload is the GitHub token for site changes nearing its
+// expiry (internal/changes).
 type TokenExpiringPayload struct {
 	Provider  string    `json:"provider"`
 	Repo      string    `json:"repo"`
@@ -277,8 +284,8 @@ func (TokenExpiringPayload) Kind() Kind { return TokenExpiring }
 func (p TokenExpiringPayload) message() Message {
 	return Message{
 		Title: fmt.Sprintf("The %s token for %s expires %s", p.Provider, p.Repo, p.ExpiresAt.UTC().Format(time.DateOnly)),
-		Lines: []string{"Paste a new token under Settings before it expires, or site changes stop updating."},
-		Path:  "/settings",
+		Lines: []string{"Paste a new token under Settings > Site changes before it expires, or site changes stop updating."},
+		Path:  "/settings/site-changes",
 	}
 }
 
