@@ -14,6 +14,7 @@ import (
 	"os/signal"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -21,10 +22,14 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/unkeyed/byname/internal/auth"
+	"github.com/unkeyed/byname/internal/checks"
+	instconfig "github.com/unkeyed/byname/internal/config"
 	"github.com/unkeyed/byname/internal/db"
+	"github.com/unkeyed/byname/internal/engines"
 	"github.com/unkeyed/byname/internal/httpapi"
 	"github.com/unkeyed/byname/internal/instance"
 	"github.com/unkeyed/byname/internal/mcpserver"
+	"github.com/unkeyed/byname/internal/scheduler"
 	"github.com/unkeyed/byname/internal/secretbox"
 	"github.com/unkeyed/byname/web"
 )
@@ -41,6 +46,10 @@ type config struct {
 	Auth       auth.Config      // PUBLIC_URL, PASSWORD_LOGIN, ALLOWED_EMAIL_DOMAINS, CLIENT_IP_HEADER, providers
 	SetupToken string           // SETUP_TOKEN, optional: the setup link's token instead of a random one
 	Secrets    *secretbox.Box   // ENCRYPTION_KEY, required, and ENCRYPTION_KEY_PREVIOUS while rotating
+	// TREG_BASE_URL, optional and for tests and local development only:
+	// sends every Treg call to a fake Treg at this URL instead of
+	// https://treg.to. Never set it in production.
+	TregBaseURL string
 }
 
 // loadSecrets reads ENCRYPTION_KEY and the optional ENCRYPTION_KEY_PREVIOUS.
@@ -70,18 +79,18 @@ func loadConfig() (config, error) {
 		Unkey:      auth.UnkeyConfig{RootKey: os.Getenv("UNKEY_ROOT_KEY"), APIID: os.Getenv("UNKEY_API_ID")},
 		SetupToken: os.Getenv("SETUP_TOKEN"),
 	}
-	url := os.Getenv("DATABASE_URL")
-	if url == "" {
+	dbURL := os.Getenv("DATABASE_URL")
+	if dbURL == "" {
 		return c, errors.New("DATABASE_URL is required, e.g. postgres://user:pass@host:5432/byname")
 	}
-	db, err := pgxpool.ParseConfig(url)
+	db, err := pgxpool.ParseConfig(dbURL)
 	if err != nil {
 		// pgx's message can echo the URL, password included, so it is not logged.
 		return c, errors.New("DATABASE_URL is not a Postgres connection string; want postgres://user:pass@host:5432/byname")
 	}
 	c.DB = db
-	if url := os.Getenv("MIGRATION_DATABASE_URL"); url != "" {
-		if c.MigrateDB, err = pgxpool.ParseConfig(url); err != nil {
+	if migrateURL := os.Getenv("MIGRATION_DATABASE_URL"); migrateURL != "" {
+		if c.MigrateDB, err = pgxpool.ParseConfig(migrateURL); err != nil {
 			return c, errors.New("MIGRATION_DATABASE_URL is not a Postgres connection string; want postgres://user:pass@host:5432/byname")
 		}
 	}
@@ -99,6 +108,13 @@ func loadConfig() (config, error) {
 	}
 	if c.Secrets, err = loadSecrets(); err != nil {
 		return c, err
+	}
+	if raw := os.Getenv("TREG_BASE_URL"); raw != "" {
+		u, err := url.Parse(raw)
+		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+			return c, fmt.Errorf("TREG_BASE_URL must be an http(s) URL such as http://localhost:9999, got %q", raw)
+		}
+		c.TregBaseURL = raw
 	}
 	c.Auth, err = loadAuthConfig(c.Port)
 	c.Auth.Secrets = c.Secrets
@@ -276,7 +292,12 @@ func run(log *slog.Logger) error {
 	if err != nil {
 		return err
 	}
-	if err := sealSecrets(ctx, log, users); err != nil {
+	settings := instconfig.New(pool, instconfig.Options{
+		Secrets: cfg.Secrets, TregBaseURL: cfg.TregBaseURL,
+		HTTPClient: &http.Client{}, Resolve: engines.HeadResolver(&http.Client{Timeout: 10 * time.Second}),
+	})
+	runs := checks.New(pool, settings, checks.Options{Log: log})
+	if err := sealSecrets(ctx, log, users, settings); err != nil {
 		return err
 	}
 	if err := announceSetup(ctx, log, users, cfg.SetupToken); err != nil {
@@ -291,6 +312,11 @@ func run(log *slog.Logger) error {
 	srv := &http.Server{Addr: ":" + cfg.Port, Handler: httpapi.SecurityHeaders(cfg.Auth.PublicURL, mux), ReadHeaderTimeout: 10 * time.Second}
 	served := make(chan error, 1)
 	go func() { served <- srv.ListenAndServe() }()
+	if cfg.TregBaseURL != "" {
+		log.Warn("TREG_BASE_URL is set: Treg calls go to it, not to Treg. Use it only in tests and local development", "treg_base_url", cfg.TregBaseURL)
+	}
+	var jobs sync.WaitGroup
+	jobs.Go(func() { scheduler.New(runs, settings, scheduler.Options{Log: log}).Run(ctx) })
 	log.Info("Byname listening", "port", cfg.Port, "version", version, "keys", authn.Keys.Mode(),
 		"public_url", cfg.Auth.PublicURL.String(), "password_login", cfg.Auth.PasswordLogin, "providers", len(cfg.Auth.Providers))
 
@@ -307,18 +333,33 @@ func run(log *slog.Logger) error {
 		return fmt.Errorf("drain HTTP: %w", err)
 	}
 	log.Info("HTTP drained")
+	// The scheduler stops queueing calls when ctx ends; a run in progress
+	// stays running and the next start resumes it.
+	stopped := make(chan struct{})
+	go func() { jobs.Wait(); close(stopped) }()
+	select {
+	case <-stopped:
+		log.Info("scheduler stopped")
+	case <-drain.Done():
+		return errors.New("the scheduler did not stop within the shutdown grace; its run resumes on the next start")
+	}
 	return nil
 }
 
-// sealSecrets reseals TOTP seeds sealed under ENCRYPTION_KEY_PREVIOUS with
-// ENCRYPTION_KEY, so a rotation finishes with one restart.
-func sealSecrets(ctx context.Context, log *slog.Logger, users *auth.Users) error {
+// sealSecrets reseals TOTP seeds and credentials sealed under
+// ENCRYPTION_KEY_PREVIOUS with ENCRYPTION_KEY, so a rotation finishes with
+// one restart.
+func sealSecrets(ctx context.Context, log *slog.Logger, users *auth.Users, settings *instconfig.Service) error {
 	totp, err := users.SealTOTPSecrets(ctx)
 	if err != nil {
 		return fmt.Errorf("encrypt TOTP seeds with ENCRYPTION_KEY: %w", err)
 	}
-	if totp > 0 {
-		log.Info("encrypted stored secrets with the current ENCRYPTION_KEY", "totp_seeds", totp)
+	creds, err := settings.SealCredentials(ctx)
+	if err != nil {
+		return fmt.Errorf("encrypt credentials with ENCRYPTION_KEY: %w", err)
+	}
+	if totp+creds > 0 {
+		log.Info("encrypted stored secrets with the current ENCRYPTION_KEY", "totp_seeds", totp, "credentials", creds)
 	}
 	return nil
 }
