@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { api, type Grouping, type Line, type ResultsFilter, type Run } from "./api";
+import { api, type Grouping, type Line, type ResultsFilter, type Run, type Scope } from "./api";
 
 /** Query keys in one place, so a mutation can invalidate exactly what it touched. */
 export const keys = {
@@ -13,9 +13,16 @@ export const keys = {
   secondFactor: ["second-factor"] as const,
   invite: (token: string) => ["invite", token] as const,
   setup: (token: string) => ["setup", token] as const,
+  status: ["status"] as const,
   settings: ["settings"] as const,
   brands: ["brands"] as const,
   surfaces: ["surfaces"] as const,
+  models: (surface: string, route: string, baseURL: string) => ["models", surface, route, baseURL] as const,
+  questionSet: ["question-set"] as const,
+  questionSets: ["question-sets"] as const,
+  credentials: ["credentials"] as const,
+  onboarding: ["onboarding"] as const,
+  estimate: ["estimate"] as const,
   /** Everything a check changes sits under this prefix, so a finished run refreshes it in one call. */
   results: ["results"] as const,
   runs: ["results", "runs"] as const,
@@ -45,9 +52,25 @@ export const useAuthOptions = () => useQuery({ queryKey: keys.authOptions, query
 
 export const useAccount = () => useQuery({ queryKey: keys.account, queryFn: api.account.get });
 
-export const useSettings = () => useQuery({ queryKey: keys.settings, queryFn: api.settings });
-export const useBrands = () => useQuery({ queryKey: keys.brands, queryFn: api.brands, staleTime: 60_000 });
-export const useSurfaces = () => useQuery({ queryKey: keys.surfaces, queryFn: api.surfaces, staleTime: 60_000 });
+export const useStatus = () => useQuery({ queryKey: keys.status, queryFn: api.status, staleTime: 60_000 });
+export const useSettings = () => useQuery({ queryKey: keys.settings, queryFn: api.settings.get });
+export const useBrands = () => useQuery({ queryKey: keys.brands, queryFn: api.brands.list, staleTime: 60_000 });
+export const useSurfaces = () => useQuery({ queryKey: keys.surfaces, queryFn: api.surfaces.list, staleTime: 60_000 });
+export const useOnboarding = () => useQuery({ queryKey: keys.onboarding, queryFn: api.onboarding.get });
+
+/**
+ * The current question set, or null before the first one is saved. It asks
+ * for the version list first, because the current set is a 404 until then.
+ */
+export const useQuestions = () =>
+  useQuery({
+    queryKey: keys.questionSet,
+    queryFn: async () => ((await api.questions.versions())?.length ? api.questions.current() : null),
+  });
+
+/** Whether the signed-in person holds a scope. Viewers see no write actions. */
+export const useCan = (scope: Scope) => useMe().data?.scopes.includes(scope) ?? false;
+export const useIsAdmin = () => useMe().data?.role === "admin";
 
 /** The alerts list and unread count, checked every minute. */
 export const useAlerts = () => useQuery({ queryKey: keys.alerts, queryFn: () => api.alerts.list({ limit: 100 }), refetchInterval: 60_000 });

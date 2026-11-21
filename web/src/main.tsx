@@ -17,6 +17,7 @@ import { Compare } from "./pages/results/Compare";
 import { Runs } from "./pages/results/Runs";
 import { Alerts } from "./pages/Alerts";
 import { Settings, settingsRoutes } from "./pages/settings/Settings";
+import { Onboarding } from "./pages/onboarding/Onboarding";
 import "@fontsource-variable/geist";
 import "@fontsource-variable/geist-mono";
 import "./index.css";
@@ -26,6 +27,7 @@ const router = createBrowserRouter([
   { path: "/invite/:token", element: <AcceptInvite /> },
   { path: "/setup/:token", element: <Setup /> },
   { path: "/oauth/consent", element: <Consent /> },
+  { path: "/onboarding/:step?", element: <Onboarding /> },
   {
     element: <Layout />,
     children: [

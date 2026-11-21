@@ -198,19 +198,41 @@ export type Fidelity = "app" | "model_match" | "approximation";
 export interface SelfBrand {
   name: string;
   aliases: string[];
+  /** The first is the primary domain; links to it and its subdomains count as citations. */
   domains: string[];
 }
 
+/** How your own name is found: whole word and case-sensitive, or also anywhere ignoring case. */
+export type MatchMode = "whole_word" | "self_anywhere";
+
+/** PUT /v1/settings takes all of it at once. */
 export interface Settings {
   brand: SelfBrand;
-  check_every_days: number;
-  check_time: string;
+  match_mode: MatchMode;
+  /** ISO 3166-1 alpha-2, such as "US". */
+  market: string;
+  /** ISO 639-1, such as "en". */
+  language: string;
+  /** IANA. */
   time_zone: string;
+  check_every_days: number;
+  /** "HH:MM" in time_zone. */
+  check_time: string;
   spend_cap_run_usd: number;
+  spend_cap_month_usd: number | null;
+  concurrency: number;
+  retries: number;
+  timeout_s: number;
+  /** null keeps raw responses forever. */
+  raw_retention_days: number | null;
+}
+
+export interface SettingsView extends Settings {
   checks_paused: boolean;
   next_check_at: Timestamp | null;
   /** Set when a scheduled check is claimed, even one that was skipped. */
   last_check_at: Timestamp | null;
+  updated_at: Timestamp;
 }
 
 export type BrandKind = "self" | "competitor" | "technology";
@@ -223,23 +245,192 @@ export interface BrandEntry {
   kind: BrandKind;
 }
 
+/** POST /v1/brands upserts by name, ignoring case. Your own brand is set through settings. */
+export interface BrandInput {
+  name: string;
+  aliases: string[];
+  domains: string[];
+  kind: Exclude<BrandKind, "self">;
+}
+
+export interface Question {
+  id: number;
+  group: string;
+  text: string;
+}
+
+export interface QuestionSet {
+  id: number;
+  version: number;
+  notes: string;
+  created_at: Timestamp;
+  questions: Question[];
+  /** How this version carries on the previous one's questions. */
+  carried: { from: number; to: number }[];
+  retired: number[];
+}
+
+export interface QuestionSetSummary {
+  id: number;
+  version: number;
+  notes: string;
+  created_at: Timestamp;
+  questions: number;
+}
+
+/**
+ * A question matching a current one ignoring case and punctuation carries it
+ * on by itself; every other current question must be in some replaces or in
+ * retired.
+ */
+export interface QuestionsInput {
+  notes: string;
+  questions: { group: string; text: string; replaces: number[] }[];
+  retired: number[];
+}
+
+/** How a surface is asked: through Treg, a scraping provider's own key, a model provider's key, or an OpenAI-compatible gateway. */
+export type Route = "treg" | "scraper" | "provider" | "gateway";
+
+export type CredentialKind = "treg" | "openai" | "anthropic" | "perplexity" | "google" | "dataforseo" | "cloro" | "serpapi" | "gateway";
+
+/** Whether web search can be forced on a route: the app decides, forceable, only turned on, always on, or per model. */
+export type SearchControl = "by_app" | "forceable" | "enable_only" | "always" | "by_model";
+
+export interface RouteOption {
+  route: Route;
+  /** The key it calls with; "treg" for the Treg route. */
+  credential: CredentialKind;
+  provider: string;
+  /** The label a pair gets on this route before any test. */
+  fidelity: Fidelity;
+  takes_model: boolean;
+  search: SearchControl;
+}
+
+export type SurfaceGroup = "apps" | "developer_tools" | "approximations";
+
 export interface Pair {
   id: number;
   surface: SurfaceKey;
   /** Empty on app surfaces, where the app picks the model. */
   model: string;
   fidelity: Fidelity;
+  force_web_search: boolean;
   enabled: boolean;
+  paused_reason: string;
+  last_tested_at: Timestamp | null;
+  /** "" untested, "ok", or why the test failed. */
+  test_status: string;
+  test_searched: boolean | null;
 }
 
 export interface Surface {
   key: SurfaceKey;
   title: string;
+  group: SurfaceGroup;
+  /** The endpoint id answers on the current route store. */
   endpoint: string;
   fidelity: Fidelity;
   takes_model: boolean;
+  search: SearchControl;
+  route: Route;
+  credential: CredentialKind;
+  /** Gateway routes only. */
+  base_url: string;
+  /** Every route this surface can take, Treg first. */
+  routes: RouteOption[];
   enabled: boolean;
+  /** Ticked at the start of onboarding. */
+  default_on: boolean;
   pairs: Pair[];
+}
+
+export interface SurfaceInput {
+  enabled: boolean;
+  /** Omit to keep the current route. Changing it resets every pair's test. */
+  route?: Route;
+  base_url?: string;
+  /** Omit to keep; at least one when enabling a surface that takes a model. */
+  models?: { model: string; force_web_search?: boolean }[];
+}
+
+export interface ModelOption {
+  name: string;
+  web_search: boolean;
+}
+
+export interface PairTest {
+  pair: Pair;
+  status: AnswerStatus;
+  error: string;
+  cost_usd: number | null;
+  /** False on token-billed APIs that report no cost. */
+  cost_reported: boolean;
+  searched: boolean;
+  cited: boolean;
+  citations: number;
+  reported_model: string;
+}
+
+/** Admin only. No API ever returns the secret. */
+export interface Credential {
+  kind: CredentialKind;
+  title: string;
+  /** What to paste, such as "login:password from DataForSEO's API dashboard". */
+  hint: string;
+  set: boolean;
+  /** Treg personal tokens only. */
+  org: string;
+  last_tested_at: Timestamp | null;
+  /** "ok", or why it failed, or that the provider has no free test call. */
+  last_test_status: string;
+  updated_at: Timestamp | null;
+  used_by: SurfaceKey[];
+}
+
+export type StepKey = "brand" | "competitors" | "questions" | "surfaces" | "search_console" | "schedule" | "review";
+
+export interface OnboardingStep {
+  key: StepKey;
+  title: string;
+  saved: boolean;
+  required: boolean;
+}
+
+export interface Onboarding {
+  steps: OnboardingStep[];
+  finished_at: Timestamp | null;
+  /** What still blocks finishing, in plain words; empty when Finish will work. */
+  missing: string[];
+}
+
+export interface EstimateRow {
+  pair_id: number;
+  surface: SurfaceKey;
+  title: string;
+  model: string;
+  fidelity: Fidelity;
+  route: Route;
+  endpoint: string;
+  calls: number;
+  cost_per_call_usd: number | null;
+  /** history: the mean of this endpoint's past answers; sample: the cost sampled on Nov 21, 2026. */
+  source: "history" | "sample" | "unknown";
+  /** Answers averaged, for history. */
+  samples: number;
+  cost_usd: number | null;
+}
+
+export interface Estimate {
+  questions: number;
+  pairs: number;
+  /** Questions times active pairs. */
+  calls: number;
+  /** Over the pairs with a cost per call. */
+  known_usd: number;
+  unknown_pairs: number;
+  rows: EstimateRow[];
 }
 
 export type RunStatus = "queued" | "running" | "completed" | "capped" | "refused" | "failed";
@@ -837,9 +1028,55 @@ export const api = {
     remove: (id: number) => request<void>("DELETE", `/v1/users/${id}`),
   },
 
-  settings: () => request<Settings>("GET", "/v1/settings"),
-  brands: () => request<BrandEntry[]>("GET", "/v1/brands"),
-  surfaces: () => request<Surface[]>("GET", "/v1/surfaces"),
+  settings: {
+    get: () => request<SettingsView>("GET", "/v1/settings"),
+    put: (body: Settings) => request<SettingsView>("PUT", "/v1/settings", { body }),
+  },
+  brands: {
+    /** Your own brand first, then by name. */
+    list: () => request<BrandEntry[]>("GET", "/v1/brands"),
+    upsert: (body: BrandInput) => request<BrandEntry>("POST", "/v1/brands", { body }),
+    update: (id: number, body: BrandInput) => request<BrandEntry>("PUT", `/v1/brands/${id}`, { body }),
+    remove: (id: number) => request<void>("DELETE", `/v1/brands/${id}`),
+  },
+  questions: {
+    /** 404 before the first set. */
+    current: () => request<QuestionSet>("GET", "/v1/questions"),
+    put: (body: QuestionsInput) => request<QuestionSet>("PUT", "/v1/questions", { body }),
+    /** Newest first. */
+    versions: () => request<QuestionSetSummary[]>("GET", "/v1/question-sets"),
+  },
+  surfaces: {
+    list: () => request<Surface[]>("GET", "/v1/surfaces"),
+    put: (key: SurfaceKey, body: SurfaceInput) => request<Surface>("PUT", `/v1/surfaces/${enc(key)}`, { body }),
+    /** The live list on a route (the current one by default). 400 where the app picks the model, or the route's key is not set. */
+    models: (key: SurfaceKey, route?: Route, baseURL?: string) =>
+      request<ModelOption[]>("GET", `/v1/surfaces/${enc(key)}/models${qs({ route, base_url: baseURL })}`),
+  },
+  pairs: {
+    /** One short call through the pair's route; confirms or lowers its fidelity. */
+    test: (id: number) => request<PairTest>("POST", `/v1/pairs/${id}/test`),
+  },
+  /** Admin only; setting and removing need a recent sign-in. */
+  credentials: {
+    list: () => request<Credential[]>("GET", "/v1/credentials"),
+    set: (kind: CredentialKind, secret: string, org?: string) => request<Credential>("PUT", `/v1/credentials/${kind}`, { body: { secret, org } }),
+    test: (kind: CredentialKind) => request<Credential>("POST", `/v1/credentials/${kind}/test`),
+    /** 409 while a surface uses it. */
+    remove: (kind: CredentialKind) => request<void>("DELETE", `/v1/credentials/${kind}`),
+  },
+  checks: {
+    pause: () => request<SettingsView>("POST", "/v1/checks/pause"),
+    resume: () => request<SettingsView>("POST", "/v1/checks/resume"),
+  },
+  onboarding: {
+    get: () => request<Onboarding>("GET", "/v1/onboarding"),
+    /** After a step's own data saved, or on Skip for an optional step. */
+    markSaved: (step: StepKey) => request<Onboarding>("PUT", `/v1/onboarding/steps/${step}`),
+    /** 400 naming what is missing. Sets the first scheduled check. */
+    finish: () => request<Onboarding>("POST", "/v1/onboarding/finish"),
+  },
+  estimate: () => request<Estimate>("GET", "/v1/estimate"),
 
   runs: {
     /** Newest first. */

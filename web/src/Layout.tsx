@@ -2,7 +2,8 @@ import { useState, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, Navigate, NavLink, Outlet, useLocation, useNavigate } from "react-router";
 import { api, ApiError } from "./api";
-import { useMe } from "./queries";
+import { useCan, useMe, useStatus } from "./queries";
+import { NotSetUp } from "./pages/onboarding/Onboarding";
 import { Toaster } from "./components/Toaster";
 import { QuestionDrawer } from "./pages/results/QuestionDrawer";
 import { EngineDrawer } from "./pages/results/EngineDrawer";
@@ -38,8 +39,12 @@ export function Layout() {
   // Here, not in NavBody: NavBody moves between the rail and the phone menu
   // as the window resizes, and the theme must follow the system throughout.
   const theme = useTheme();
+  const status = useStatus();
+  const canSetUp = useCan("config:write");
+  // Until setup is finished, people who can finish it go to onboarding and everyone else sees why the pages are empty. Settings stays open to all.
+  const notSetUp = status.data?.onboarded === false && !location.pathname.startsWith("/settings");
 
-  if (me.isPending) {
+  if (me.isPending || (status.isPending && !me.isError)) {
     return (
       <div className="grid h-full place-items-center">
         <Spinner />
@@ -58,6 +63,8 @@ export function Layout() {
     );
   }
 
+  if (notSetUp && canSetUp) return <Navigate to="/onboarding" replace />;
+
   return (
     <NavMenu.Provider value={wide ? null : () => setMenuOpen(true)}>
       <Toaster>
@@ -70,7 +77,14 @@ export function Layout() {
           <MenuSheet open={menuOpen} onClose={() => setMenuOpen(false)} label={me.data.name} theme={theme} />
         )}
         <main className="flex min-w-0 flex-1 flex-col overflow-hidden bg-bg">
-          <Outlet />
+          {notSetUp ? (
+            <>
+              <PageHeader title="Byname" />
+              <NotSetUp />
+            </>
+          ) : (
+            <Outlet />
+          )}
         </main>
       </div>
       <EngineDrawer />
