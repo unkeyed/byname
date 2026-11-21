@@ -4,7 +4,7 @@ import { api, type Grouping, type ResultsFilter, type Run, type RunSummary } fro
 import { LineChart, LineKey, Sparkline, type ChartLine } from "../../charts";
 import { fidelityInfo, lineKey, palette, pct, shortDay, usd, useLabels } from "../../lines";
 import { keys, useAnsweredRuns, useRuns, useSettings, useSurfaces } from "../../queries";
-import { Badge, Card, cx, EmptyState, ErrorNote, Icon, PageSpinner, RelativeTime } from "../../ui";
+import { Badge, Card, CardHeader, cx, EmptyState, ErrorNote, Icon, PageSpinner, RelativeTime } from "../../ui";
 import { runTime, useFilter, useView } from "../../view";
 import { Segmented, ViewHeader } from "./Header";
 import { QuestionsTable } from "./QuestionsTable";
@@ -39,10 +39,7 @@ export function Overview() {
         <RatesCard filter={filter} by={by} />
         <ShareCard filter={filter} />
         <Card>
-          <div className="px-4 pt-3">
-            <h2 className="text-sm font-semibold">Questions</h2>
-            <p className="text-xs text-muted">Each question on each surface and model in the latest check. Open a row to see its history and answers.</p>
-          </div>
+          <CardHeader title="Questions" description="Each question on each surface and model in the latest check. Open one to see its history and answers." />
           <QuestionsTable run={answered.data[0]} filter={filter} />
         </Card>
       </div>
@@ -108,21 +105,27 @@ function Delta({ now, before, unit = "pts" }: { now: number | null; before: numb
   const d = Math.round((now - before) * 100);
   if (d === 0) return <span className="text-xs text-faint">No change since the previous check</span>;
   return (
-    <span className={cx("inline-flex items-center gap-0.5 text-xs font-medium", d > 0 ? "text-success" : "text-danger")}>
-      <Icon name={d > 0 ? "up" : "down"} className="size-3" />
-      {Math.abs(d)} {unit} {d > 0 ? "up" : "down"} since the previous check
+    <span className="text-xs text-muted">
+      <span className={cx("inline-flex items-center gap-0.5 font-medium", d > 0 ? "text-success" : "text-danger")}>
+        <Icon name={d > 0 ? "up" : "down"} className="size-3" />
+        {Math.abs(d)} {unit} {d > 0 ? "up" : "down"}
+      </span>
+      <span className="sr-only sm:not-sr-only"> since the previous check</span>
     </span>
   );
 }
 
 function Tile({ label, value, detail, delta, trend }: { label: string; value: string; detail: string; delta?: React.ReactNode; trend?: (number | null)[] }) {
   return (
-    <Card className="flex flex-col gap-1 px-4 py-3">
-      <div className="flex items-start justify-between gap-2">
+    <Card className="flex flex-col gap-1 px-3 py-3 sm:px-4">
+      <div className="flex flex-wrap items-start justify-between gap-x-2 gap-y-1">
         <h3 className="text-xs font-medium text-muted">{label}</h3>
-        {trend && trend.length > 1 && <Sparkline values={trend} />}
+        {trend && trend.length > 1 && <Sparkline values={trend} className="hidden sm:block" />}
       </div>
-      <div className="text-2xl font-semibold">{value}</div>
+      <div className="flex items-end justify-between gap-2">
+        <span className="text-2xl font-semibold">{value}</span>
+        {trend && trend.length > 1 && <Sparkline values={trend} className="mb-1 h-5 w-16 sm:hidden" />}
+      </div>
       <div className="text-xs text-muted">{detail}</div>
       <div className="min-h-4">{delta}</div>
     </Card>
@@ -137,7 +140,7 @@ function Tiles({ filter }: { filter: ResultsFilter }) {
   const cur = all[all.length - 1];
   const prev = all[all.length - 2];
   return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
       {cur ? (
         <>
           <Tile label="Mention rate" value={pct(cur.mention_rate)} detail={`${cur.mentioned} of ${cur.answered} answers named you`} delta={<Delta now={cur.mention_rate} before={prev?.mention_rate} />} trend={all.map((r) => r.mention_rate)} />
@@ -145,14 +148,14 @@ function Tiles({ filter }: { filter: ResultsFilter }) {
           <Tile label="Share of mentions" value={pct(cur.share)} detail={`Of ${cur.mentions} mentions of you and your competitors`} delta={<Delta now={cur.share} before={prev?.share} />} trend={all.map((r) => r.share)} />
         </>
       ) : (
-        <Card className="px-4 py-3 text-sm text-muted sm:col-span-2 xl:col-span-3">No check in this range. Widen the date range to see results.</Card>
+        <Card className="col-span-2 px-4 py-3 text-sm text-muted xl:col-span-3">No check in this range. Widen the date range to see results.</Card>
       )}
-      <Card className="flex flex-col gap-1 px-4 py-3">
+      <Card className="flex flex-col gap-1 px-3 py-3 sm:px-4">
         <h3 className="text-xs font-medium text-muted">Search Console clicks, 28 days</h3>
-        <div className="text-2xl font-semibold text-faint">–</div>
-        <Link to="/search" className="mt-auto inline-flex items-center gap-1 text-xs font-medium text-fg hover:underline">
+        <p className="text-sm text-muted">Not connected</p>
+        <Link to="/search" className="mt-auto inline-flex items-center gap-1 pt-1 text-xs font-medium text-fg hover:underline">
           <Icon name="plug" className="size-3.5" />
-          Connect Search Console
+          Connect
         </Link>
       </Card>
     </div>
@@ -199,7 +202,7 @@ function RatesCard({ filter, by }: { filter: ResultsFilter; by: Grouping }) {
               <li key={l.key} className="flex items-start gap-2" title={l.models.join(", ") || undefined}>
                 <LineKey color={l.color} dashed={l.approx} className="mt-1.5" />
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate font-medium">{l.label}</span>
+                  <span className="block font-medium [overflow-wrap:anywhere]">{l.label}</span>
                   <span className={cx("block", l.approx ? "text-warn" : "text-faint")} title={fidelityInfo[l.fidelity].detail}>
                     {fidelityInfo[l.fidelity].label}
                   </span>
@@ -245,14 +248,10 @@ function RatesCard({ filter, by }: { filter: ResultsFilter; by: Grouping }) {
 
   return (
     <Card>
-      <div className="flex flex-wrap items-center gap-2 px-4 py-3">
-        <div className="min-w-0 flex-1">
-          <h2 className="text-sm font-semibold">{metric === "mention" ? "Mention rate" : "Citation rate"} by check</h2>
-          <p className="text-xs text-muted">Lines of different fidelity are never combined. Approximations are dashed.</p>
-        </div>
+      <CardHeader title={`${metric === "mention" ? "Mention rate" : "Citation rate"} by check`} description="Lines of different fidelity are never combined. Approximations are dashed.">
         <Segmented size="sm" label="Lines" value={by === "surface" ? "surface" : "model"} options={[{ id: "surface", label: "By surface" }, { id: "model", label: "By model" }]} onChange={(v) => view.set(v === "model" ? { by: "model" } : { by: null, model: null })} />
         <Segmented size="sm" label="Metric" value={metric} options={[{ id: "mention", label: "Mentions" }, { id: "citation", label: "Citations" }]} onChange={(v) => view.set({ metric: v })} />
-      </div>
+      </CardHeader>
       {body}
     </Card>
   );
@@ -269,31 +268,25 @@ function ShareCard({ filter }: { filter: ResultsFilter }) {
   const max = Math.max(...top.map((b) => b.share), 0.01);
   return (
     <Card>
-      <div className="flex items-start gap-2 px-4 py-3">
-        <div className="min-w-0 flex-1">
-          <h2 className="text-sm font-semibold">Share of mentions against competitors</h2>
-          <p className="text-xs text-muted">
-            {comp.data.mentions} mentions over {comp.data.runs} {comp.data.runs === 1 ? "check" : "checks"}. Technologies are left out.
-          </p>
-        </div>
+      <CardHeader title="Share of mentions against competitors" description={`${comp.data.mentions} mentions over ${comp.data.runs} ${comp.data.runs === 1 ? "check" : "checks"}. Technologies are left out.`}>
         <Link to={`/competitors${view.filterSearch()}`} className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-muted hover:text-fg">
           Competitors <Icon name="right" className="size-3" />
         </Link>
-      </div>
+      </CardHeader>
       {top.length === 0 ? (
         <p className="px-4 pb-6 text-sm text-muted">No brand was named in this range.</p>
       ) : (
         <ul className="space-y-2 px-4 pb-4">
           {top.map((b) => (
-            <li key={b.brand_id} className="grid grid-cols-[minmax(6rem,10rem)_minmax(0,1fr)_3rem] items-center gap-3 text-xs">
+            <li key={b.brand_id} className="grid grid-cols-[minmax(0,1fr)_3rem] items-center gap-x-3 gap-y-1 text-xs sm:grid-cols-[minmax(6rem,10rem)_minmax(0,1fr)_3rem]">
               <span className={cx("truncate", b.kind === "self" ? "font-semibold" : "text-muted")}>
                 {b.name}
                 {b.kind === "self" && " (you)"}
               </span>
-              <span className="h-2 rounded-full bg-subtle">
-                <span className="block h-2 rounded-full" style={{ width: `${(b.share / max) * 100}%`, background: b.kind === "self" ? "var(--series-1)" : "var(--line-hover)" }} />
+              <span className="col-span-2 row-start-2 h-2 rounded-full bg-subtle sm:col-span-1 sm:row-start-auto">
+                <span className="block h-2 rounded-full" style={{ width: `${(b.share / max) * 100}%`, background: b.kind === "self" ? "var(--you)" : "var(--line-hover)" }} />
               </span>
-              <span className="text-right font-medium tabular-nums">{pct(b.share)}</span>
+              <span className="col-start-2 row-start-1 text-right font-medium tabular-nums sm:col-start-auto sm:row-start-auto">{pct(b.share)}</span>
             </li>
           ))}
         </ul>

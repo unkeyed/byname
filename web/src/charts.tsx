@@ -168,7 +168,7 @@ export function Sparkline({ values, className }: { values: (number | null)[]; cl
   return (
     <svg viewBox={`0 0 ${w} ${h}`} width={w} height={h} className={className} aria-hidden="true">
       <polyline points={pts.map(([px, v]) => `${px.toFixed(1)},${yy(v).toFixed(1)}`).join(" ")} fill="none" stroke="var(--line-hover)" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
-      <circle cx={lx} cy={yy(lv)} r="3" fill="var(--series-1)" stroke="var(--surface)" strokeWidth="1.5" />
+      <circle cx={lx} cy={yy(lv)} r="3" fill="var(--you)" stroke="var(--surface)" strokeWidth="1.5" />
     </svg>
   );
 }
