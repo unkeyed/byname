@@ -6,6 +6,7 @@ import { Account } from "./Account";
 import { Apps } from "./Apps";
 import { ApiKeys } from "./ApiKeys";
 import { ReauthProvider } from "./Reauth";
+import { SearchConsole } from "./SearchConsole";
 import { Team } from "./Team";
 
 /** admin marks the sections only admins can use; the API refuses them to everyone else. */
@@ -14,6 +15,7 @@ const tabs: { path: string; label: string; element: ReactNode; admin?: boolean }
   { path: "keys", label: "API keys", element: <ApiKeys />, admin: true },
   { path: "apps", label: "Apps", element: <Apps />, admin: true },
   { path: "team", label: "Team", element: <Team />, admin: true },
+  { path: "search-console", label: "Search Console", element: <SearchConsole />, admin: true },
 ];
 
 export const settingsRoutes: RouteObject[] = [
