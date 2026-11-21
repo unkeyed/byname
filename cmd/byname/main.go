@@ -33,6 +33,7 @@ import (
 	"github.com/unkeyed/byname/internal/results"
 	"github.com/unkeyed/byname/internal/scheduler"
 	"github.com/unkeyed/byname/internal/secretbox"
+	"github.com/unkeyed/byname/internal/sources"
 	"github.com/unkeyed/byname/web"
 )
 
@@ -52,6 +53,10 @@ type config struct {
 	// sends every Treg call to a fake Treg at this URL instead of
 	// https://treg.to. Never set it in production.
 	TregBaseURL string
+	// SOURCES_ALLOW_PRIVATE_IPS, optional and for tests and local
+	// development only: lets cited-source fetching reach private and
+	// loopback addresses, such as a fake site on localhost.
+	SourcesAllowPrivate bool
 }
 
 // loadSecrets reads ENCRYPTION_KEY and the optional ENCRYPTION_KEY_PREVIOUS.
@@ -117,6 +122,11 @@ func loadConfig() (config, error) {
 			return c, fmt.Errorf("TREG_BASE_URL must be an http(s) URL such as http://localhost:9999, got %q", raw)
 		}
 		c.TregBaseURL = raw
+	}
+	if v := os.Getenv("SOURCES_ALLOW_PRIVATE_IPS"); v != "" {
+		if c.SourcesAllowPrivate, err = strconv.ParseBool(v); err != nil {
+			return c, fmt.Errorf("SOURCES_ALLOW_PRIVATE_IPS must be true or false, got %q", v)
+		}
 	}
 	c.Auth, err = loadAuthConfig(c.Port)
 	c.Auth.Secrets = c.Secrets
@@ -319,7 +329,11 @@ func run(log *slog.Logger) error {
 		log.Warn("TREG_BASE_URL is set: Treg calls go to it, not to Treg. Use it only in tests and local development", "treg_base_url", cfg.TregBaseURL)
 	}
 	var jobs sync.WaitGroup
-	jobs.Go(func() { scheduler.New(runs, settings, scheduler.Options{Log: log}).Run(ctx) })
+	if cfg.SourcesAllowPrivate {
+		log.Warn("SOURCES_ALLOW_PRIVATE_IPS is set: cited-source fetching may reach private and loopback addresses. Use it only in tests and local development")
+	}
+	cited := sources.New(pool, settings, sources.Options{AllowPrivate: cfg.SourcesAllowPrivate, UserAgent: "Byname/" + version, Log: log})
+	jobs.Go(func() { scheduler.New(runs, settings, scheduler.Options{Log: log, Sources: cited}).Run(ctx) })
 	log.Info("Byname listening", "port", cfg.Port, "version", version, "keys", authn.Keys.Mode(),
 		"public_url", cfg.Auth.PublicURL.String(), "password_login", cfg.Auth.PasswordLogin, "providers", len(cfg.Auth.Providers))
 

@@ -111,6 +111,12 @@ func selfBrand(brands []Brand) (Brand, bool) {
 	return Brand{}, false
 }
 
+// Named is every brand text names, in order of first mention, by the rules
+// Score uses for an answer's text.
+func Named(text string, brands []Brand, mode MatchMode) []Mention {
+	return mentions(text, brands, mode)
+}
+
 type span struct{ start, end, brand int }
 
 // mentions finds every brand in text. Where two names overlap ("Northwind"

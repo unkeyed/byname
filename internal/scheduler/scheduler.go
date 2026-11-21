@@ -13,6 +13,7 @@ import (
 
 	"github.com/unkeyed/byname/internal/checks"
 	"github.com/unkeyed/byname/internal/config"
+	"github.com/unkeyed/byname/internal/sources"
 )
 
 type Scheduler struct {
@@ -22,6 +23,7 @@ type Scheduler struct {
 	ticks     <-chan time.Time
 	now       func() time.Time
 	lastPrune time.Time
+	sources   *sources.Service
 }
 
 type Options struct {
@@ -29,6 +31,8 @@ type Options struct {
 	Ticks <-chan time.Time
 	Now   func() time.Time
 	Log   *slog.Logger
+	// Sources fetches the pages answers cite; nil skips it.
+	Sources *sources.Service
 }
 
 func New(c *checks.Service, cfg *config.Service, o Options) *Scheduler {
@@ -38,7 +42,7 @@ func New(c *checks.Service, cfg *config.Service, o Options) *Scheduler {
 	if o.Log == nil {
 		o.Log = slog.Default()
 	}
-	return &Scheduler{checks: c, config: cfg, log: o.Log, ticks: o.Ticks, now: o.Now}
+	return &Scheduler{checks: c, config: cfg, log: o.Log, ticks: o.Ticks, now: o.Now, sources: o.Sources}
 }
 
 // Run ticks once at start, which resumes a run a previous process left
@@ -86,5 +90,14 @@ func (s *Scheduler) Tick(ctx context.Context) {
 	}
 	if err := s.checks.Work(ctx); err != nil && ctx.Err() == nil {
 		s.log.Error("running checks failed", "err", err)
+	}
+	// Cited sources: after the checks above, fetch the pages they newly
+	// cited and refresh stale ones.
+	if s.sources != nil {
+		if n, err := s.sources.Run(ctx); err != nil && ctx.Err() == nil {
+			s.log.Warn("fetching cited sources failed", "err", err)
+		} else if n > 0 {
+			s.log.Info("fetched cited sources", "pages", n)
+		}
 	}
 }

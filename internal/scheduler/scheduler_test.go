@@ -14,6 +14,7 @@ import (
 	"github.com/unkeyed/byname/internal/engines/tregtest"
 	"github.com/unkeyed/byname/internal/scheduler"
 	"github.com/unkeyed/byname/internal/secretbox"
+	"github.com/unkeyed/byname/internal/sources"
 	"github.com/unkeyed/byname/internal/testdb"
 )
 
@@ -166,5 +167,24 @@ func TestStartResumesARunLeftRunning(t *testing.T) {
 	}
 	if n := e.count(t, `SELECT count(*) FROM run`); n != 1 {
 		t.Fatalf("%d runs, want the one resumed", n)
+	}
+}
+
+func TestTickFetchesWhatTheCheckCited(t *testing.T) {
+	e := setup(t)
+	p := e.process(nil)
+	clock := func() time.Time { return now }
+	src := sources.New(e.db, p.cfg, sources.Options{Now: clock, Timeout: time.Second, HostDelay: time.Nanosecond})
+	sched := scheduler.New(p.checks, p.cfg, scheduler.Options{Now: clock, Sources: src})
+	if _, _, err := p.checks.RunNow(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	sched.Tick(context.Background())
+	cited := e.count(t, `SELECT count(DISTINCT url) FROM citation`)
+	if got := e.count(t, `SELECT count(*) FROM source_page`); cited == 0 || got != cited {
+		t.Fatalf("source_page has %d rows, want one per cited URL (%d)", got, cited)
+	}
+	if n := e.count(t, `SELECT count(*) FROM job_run WHERE job = 'source_fetch' AND status = 'completed'`); n != 1 {
+		t.Errorf("completed source_fetch jobs = %d, want 1", n)
 	}
 }
