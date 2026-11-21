@@ -12,7 +12,7 @@ RUN node build.mjs /docs /out/docs
 FROM nginx:1.27-alpine
 COPY site/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --chmod=755 site/analytics.sh /docker-entrypoint.d/40-analytics.sh
-COPY site/index.html site/app.js site/base.css site/favicon.svg site/og.png /usr/share/nginx/html/
+COPY site/index.html site/app.js site/base.css site/home.css site/favicon.svg site/og.png /usr/share/nginx/html/
 COPY site/screens/ /usr/share/nginx/html/screens/
 COPY --from=docs /out/docs /usr/share/nginx/html/docs
 EXPOSE 8080

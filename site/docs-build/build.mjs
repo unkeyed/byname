@@ -137,29 +137,62 @@ function sidebar(active) {
 const github = `<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.65.5.5 5.65.5 12a11.5 11.5 0 0 0 7.86 10.92c.58.1.79-.25.79-.56v-2c-3.2.7-3.87-1.37-3.87-1.37-.52-1.33-1.28-1.68-1.28-1.68-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.19 1.76 1.19 1.03 1.76 2.69 1.25 3.35.96.1-.75.4-1.25.73-1.54-2.55-.29-5.24-1.28-5.24-5.68 0-1.26.45-2.28 1.19-3.09-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.83 1.19 3.09 0 4.41-2.69 5.39-5.25 5.67.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5Z"/></svg>`;
 
 const header = `<header class="nav">
-  <div class="wrap">
-    <a class="brand" href="/" aria-label="Byname home"><span class="brand-mark">B</span>byname</a>
-    <nav class="nav-links" aria-label="Site">
-      <a href="/#features">Features</a>
-      <a href="/#agents">Agents</a>
-      <a href="/#deploy">Deploy on Unkey</a>
-      <a class="keep" href="/docs/" aria-current="page">Docs</a>
-    </nav>
-    <div class="nav-end">
-      <a class="btn btn-primary btn-sm btn-github" href="${repo}">${github}<span>GitHub</span></a>
+  <div class="wrap nav-in">
+    <div class="nav-bar">
+      <a class="brand" href="/" aria-label="Byname home"><span class="brand-mark" aria-hidden="true">B</span>byname</a>
+      <nav class="nav-links" aria-label="Site">
+        <a href="/#panel">Panel</a>
+        <a href="/#surfaces">Surfaces</a>
+        <a href="/#product">Product</a>
+        <a href="/#agents">Agents</a>
+        <a href="/docs/" aria-current="page">Docs</a>
+      </nav>
+      <details class="nav-menu">
+        <summary aria-label="Menu"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M2 4.5h12M2 8h12M2 11.5h12" /></svg></summary>
+        <nav class="nav-sheet" aria-label="Menu">
+          <a href="/#panel">Panel</a>
+          <a href="/#surfaces">Surfaces</a>
+          <a href="/#product">Product</a>
+          <a href="/#agents">Agents</a>
+          <a href="/docs/">Docs</a>
+          <a href="${repo}">GitHub</a>
+          <a href="/#deploy">Deploy on Unkey</a>
+        </nav>
+      </details>
     </div>
+    <a class="nav-box nav-gh" href="${repo}">${github}GitHub</a>
+    <a class="nav-box nav-cta" href="/#deploy">Deploy on Unkey</a>
   </div>
 </header>`;
 
-const footer = `<footer>
-  <div class="wrap">
-    <a class="brand" href="/" aria-label="Byname home"><span class="brand-mark">B</span>byname</a>
-    <nav aria-label="Footer">
-      <a href="${repo}">GitHub</a>
-      <a href="/docs/">Docs</a>
-      <a href="${repo}/blob/main/LICENSE">MIT license</a>
-    </nav>
-    <p class="provided">Provided by <a href="https://www.unkey.com">Unkey</a></p>
+const footer = `<footer class="footer">
+  <div class="wrap footer-grid">
+    <div>
+      <a class="brand" href="/" aria-label="Byname home"><span class="brand-mark" aria-hidden="true">B</span>byname</a>
+      <p class="footer-tag">Find out when AI assistants name you.</p>
+      <p class="footer-meta">MIT licensed. Provided by <a href="https://www.unkey.com">Unkey</a>.</p>
+    </div>
+    <nav aria-labelledby="f-product"><h2 id="f-product">Product</h2><ul>
+      <li><a href="/#panel">The panel</a></li>
+      <li><a href="/#surfaces">Where people ask</a></li>
+      <li><a href="/#product">After every check</a></li>
+      <li><a href="/#agents">Agents</a></li>
+      <li><a href="/#deploy">Deploy on Unkey</a></li>
+    </ul></nav>
+    <nav aria-labelledby="f-docs"><h2 id="f-docs">Docs</h2><ul>
+      <li><a href="/docs/self-hosting">Self-host</a></li>
+      <li><a href="/docs/engines/surfaces">Surfaces and fidelity</a></li>
+      <li><a href="/docs/search-console">Search Console</a></li>
+      <li><a href="/docs/agents">Agents</a></li>
+      <li><a href="/docs/notifications">Notifications</a></li>
+      <li><a href="/docs/changes">Changes</a></li>
+    </ul></nav>
+    <nav aria-labelledby="f-project"><h2 id="f-project">Project</h2><ul>
+      <li><a href="${repo}">GitHub</a></li>
+      <li><a href="${repo}/blob/main/LICENSE">MIT license</a></li>
+      <li><a href="${repo}/issues">Issues</a></li>
+      <li><a href="https://www.unkey.com">Unkey</a></li>
+    </ul></nav>
   </div>
 </footer>`;
 
@@ -171,8 +204,7 @@ function layout({ title, description, url, eyebrow, body, side, toc = "" }) {
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>${escape(title)} · Byname docs</title>
 <meta name="description" content="${escape(description)}" />
-<meta name="theme-color" content="#fbfbfa" media="(prefers-color-scheme: light)" />
-<meta name="theme-color" content="#0b0b0c" media="(prefers-color-scheme: dark)" />
+<meta name="theme-color" content="#040406" />
 <link rel="canonical" href="${origin}${url}" />
 <meta property="og:type" content="article" />
 <meta property="og:site_name" content="Byname" />
@@ -187,7 +219,7 @@ function layout({ title, description, url, eyebrow, body, side, toc = "" }) {
 <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@300..500&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="/base.css" />
 <link rel="stylesheet" href="/docs/docs.css" />
 </head>
@@ -197,7 +229,7 @@ ${header}
   <aside class="docs-side" aria-label="Documentation">${side}</aside>
   <article class="docs-main">
     ${url === "/docs/" ? "" : '<a class="docs-back" href="/docs/">&larr; All docs</a><br />'}
-    <span class="eyebrow"><span class="dot"></span>${escape(eyebrow)}</span>
+    <span class="chip">${escape(eyebrow)}</span>
     ${body}
   </article>
   <aside class="docs-toc" aria-label="On this page">${toc}</aside>
