@@ -2462,9 +2462,8 @@ paths:
       tags: [search]
       operationId: finishSearchConsoleOAuth
       summary: Where Google sends the browser back after Search Console consent.
-      description: Only the admin who started the sign-in can finish it. Always redirects to /settings/search-console, with ?connected=google, or ?error= saying what went wrong.
-      security:
-        - session: [admin]
+      description: Only the admin who started the sign-in can finish it, with their session. Always redirects to /settings/search-console, with ?connected=google, or ?error= saying what went wrong, including a missing or non-admin session.
+      security: []
       parameters:
         - name: state
           in: query
@@ -2481,10 +2480,6 @@ paths:
       responses:
         "303":
           description: Back to Settings > Search Console.
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "403":
-          $ref: "#/components/responses/Forbidden"
   /auth/setup/{token}:
     parameters:
       - name: token

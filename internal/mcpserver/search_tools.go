@@ -2,6 +2,7 @@ package mcpserver
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
@@ -26,7 +27,7 @@ type pagesInput struct {
 }
 
 type brandedTermsInput struct {
-	Terms []string `json:"terms" jsonschema:"the branded search terms; an empty list goes back to your brand's name and aliases"`
+	Terms *[]string `json:"terms" jsonschema:"the branded search terms; an empty list goes back to your brand's name and aliases"`
 }
 
 // addSearchTools registers the Search Console tools. Connecting Search
@@ -83,6 +84,9 @@ func addSearchTools(srv *mcp.Server, svc app.Services) {
 	addTool(srv, core.ConfigWrite, &mcp.Tool{Name: "update_branded_terms", Annotations: mutates(false, true),
 		Description: "Replace the branded search terms. A Search Console query containing one, ignoring case, is brand; an empty list goes back to your brand's name and aliases. PUT /v1/settings/branded-terms."},
 		func(ctx context.Context, _ core.Actor, in brandedTermsInput) (config.SettingsView, error) {
-			return svc.Config.SetBrandedTerms(ctx, in.Terms)
+			if in.Terms == nil {
+				return config.SettingsView{}, fmt.Errorf("%w: terms is required; send [] to go back to your brand's name and aliases", core.ErrInvalid)
+			}
+			return svc.Config.SetBrandedTerms(ctx, *in.Terms)
 		})
 }

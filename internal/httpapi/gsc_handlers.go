@@ -109,12 +109,15 @@ func (s *server) deleteGoal(w http.ResponseWriter, r *http.Request, _ core.Actor
 // brand's name and aliases.
 func (s *server) putBrandedTerms(w http.ResponseWriter, r *http.Request, _ core.Actor) error {
 	var b struct {
-		Terms []string `json:"terms"`
+		Terms *[]string `json:"terms"`
 	}
 	if err := readJSON(r, &b); err != nil {
 		return err
 	}
-	v, err := s.svc.Config.SetBrandedTerms(r.Context(), b.Terms)
+	if b.Terms == nil {
+		return fmt.Errorf("%w: terms is required; send [] to go back to your brand's name and aliases", core.ErrInvalid)
+	}
+	v, err := s.svc.Config.SetBrandedTerms(r.Context(), *b.Terms)
 	return respond(w, http.StatusOK, v, err)
 }
 
@@ -163,12 +166,21 @@ func (s *server) gscOAuthStart(w http.ResponseWriter, r *http.Request, a core.Ac
 // gscBack is the Settings tab the Google sign-in returns to.
 const gscBack = "/settings/search-console"
 
-// gscOAuthCallback is where Google sends the browser back. It always
-// redirects to Settings > Search Console, with ?error= when connecting
-// failed.
-func (s *server) gscOAuthCallback(w http.ResponseWriter, r *http.Request, a core.Actor) error {
+// gscOAuthCallback is where Google sends the browser back. It is public so
+// that it can always redirect to Settings > Search Console, with ?error=
+// when connecting failed, including when the admin's session ended during
+// Google's consent page; it checks for that session itself.
+func (s *server) gscOAuthCallback(w http.ResponseWriter, r *http.Request, _ core.Actor) error {
 	q := r.URL.Query()
-	err := s.svc.GSC.FinishOAuth(r.Context(), a, gsc.OAuthCallback{State: q.Get("state"), Code: q.Get("code"), Error: q.Get("error")})
+	a, err := s.authn.Caller(r)
+	switch {
+	case err != nil && statusOf(callerErr(err)) >= 500:
+		err = callerErr(err)
+	case err != nil || admin.allows(a) != nil:
+		err = fmt.Errorf("%w: sign in to Byname as an admin, then connect Search Console again", core.ErrForbidden)
+	default:
+		err = s.svc.GSC.FinishOAuth(r.Context(), a, gsc.OAuthCallback{State: q.Get("state"), Code: q.Get("code"), Error: q.Get("error")})
+	}
 	if err == nil {
 		http.Redirect(w, r, gscBack+"?connected=google", http.StatusSeeOther)
 		return nil

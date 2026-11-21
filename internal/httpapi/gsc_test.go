@@ -101,6 +101,11 @@ func TestSearchConsoleOverHTTP(t *testing.T) {
 	if _, loc := returnFromGoogle(t, person, callbackHere(t, c, start.URL)+"x"); !strings.HasPrefix(loc, "/settings/search-console?error=") {
 		t.Fatalf("a callback with a bad code redirected to %q, want an error back on the tab", loc)
 	}
+	for _, as := range []client{c, viewer} {
+		if code, loc := returnFromGoogle(t, as, callbackHere(t, c, start.URL)); code != http.StatusSeeOther || !strings.Contains(loc, "sign+in+to+Byname+as+an+admin") {
+			t.Fatalf("a callback without an admin session = %d to %q, want an error back on the tab", code, loc)
+		}
+	}
 
 	var props []struct {
 		SiteURL   string `json:"site_url"`
@@ -157,6 +162,7 @@ func TestSearchConsoleOverHTTP(t *testing.T) {
 	goal["target"] = 90
 	keep(agent.call("PUT", "/v1/goals/"+itoa(g.ID), goal, http.StatusOK, nil))
 	agent.call("PUT", "/v1/settings/branded-terms", map[string]any{"terms": []string{"Northwind", "nw cloud"}}, http.StatusOK, nil)
+	agent.call("PUT", "/v1/settings/branded-terms", map[string]any{}, http.StatusBadRequest, nil)
 	agent.call("DELETE", "/v1/goals/"+itoa(g.ID), nil, http.StatusNoContent, nil)
 	agent.call("DELETE", "/v1/goals/"+itoa(g.ID), nil, http.StatusNotFound, nil)
 

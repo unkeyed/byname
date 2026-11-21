@@ -105,7 +105,7 @@ var routes = []route{
 	{"PUT /v1/gsc/property", admin, (*server).gscSetProperty},
 	{"PUT /v1/gsc/service-account", admin, (*server).gscServiceAccount},
 	{"POST /v1/gsc/oauth/start", admin, (*server).gscOAuthStart},
-	{"GET /auth/gsc/callback", admin, (*server).gscOAuthCallback},
+	{"GET /auth/gsc/callback", public, (*server).gscOAuthCallback},
 	{"DELETE /v1/gsc", admin, (*server).gscDisconnect},
 
 	{"GET /v1/keys", admin, (*server).listKeys},
