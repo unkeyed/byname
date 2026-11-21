@@ -9,6 +9,8 @@ package scheduler
 import (
 	"context"
 	"log/slog"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/unkeyed/byname/internal/checks"
@@ -19,6 +21,8 @@ type Scheduler struct {
 	checks    *checks.Service
 	config    *config.Service
 	search    SearchSync
+	searching sync.WaitGroup
+	busy      atomic.Bool
 	log       *slog.Logger
 	ticks     <-chan time.Time
 	now       func() time.Time
@@ -53,8 +57,10 @@ func New(c *checks.Service, cfg *config.Service, o Options) *Scheduler {
 // Run ticks once at start, which resumes a run a previous process left
 // running and catches up a check missed while nothing was running, then on
 // every tick and whenever Run now queues a run, until ctx ends. A run in
-// progress when ctx ends stays running for the next start to resume.
+// progress when ctx ends stays running for the next start to resume, and
+// Run returns once a Search Console sync in flight has stopped.
 func (s *Scheduler) Run(ctx context.Context) {
+	defer s.searching.Wait()
 	ticks := s.ticks
 	if ticks == nil {
 		t := time.NewTicker(time.Minute)
@@ -88,11 +94,15 @@ func (s *Scheduler) Tick(ctx context.Context) {
 			s.log.Info("pruned raw responses past their retention", "answers", n)
 		}
 	}
-	// Search Console: the daily sync.
-	if s.search != nil {
-		if err := s.search.SyncIfDue(ctx); err != nil && ctx.Err() == nil {
-			s.log.Warn("Search Console sync failed", "err", err)
-		}
+	// Search Console: the daily sync, on its own goroutine so a long
+	// backfill never holds up checks.
+	if s.search != nil && s.busy.CompareAndSwap(false, true) {
+		s.searching.Go(func() {
+			defer s.busy.Store(false)
+			if err := s.search.SyncIfDue(ctx); err != nil && ctx.Err() == nil {
+				s.log.Warn("Search Console sync failed", "err", err)
+			}
+		})
 	}
 	if id, err := s.checks.ClaimDue(ctx); err != nil && ctx.Err() == nil {
 		s.log.Error("claiming the scheduled check failed", "err", err)
