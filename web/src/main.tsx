@@ -13,6 +13,7 @@ import { Overview } from "./pages/results/Overview";
 import { Competitors } from "./pages/results/Competitors";
 import { Compare } from "./pages/results/Compare";
 import { Runs } from "./pages/results/Runs";
+import { Search } from "./pages/search/Search";
 import { Settings, settingsRoutes } from "./pages/settings/Settings";
 import "@fontsource-variable/geist";
 import "@fontsource-variable/geist-mono";
@@ -30,6 +31,7 @@ const router = createBrowserRouter([
       { path: "competitors", element: <Competitors /> },
       { path: "compare", element: <Compare /> },
       { path: "runs", element: <Runs /> },
+      { path: "search", element: <Search /> },
       ...nav.flatMap((n) => (n.soon ? [{ path: n.to === "/" ? undefined : n.to, index: n.to === "/", element: <ComingSoon title={n.label} body={n.soon} /> }] : [])),
       { path: "settings", element: <Settings />, children: settingsRoutes },
       { path: "*", element: <NotFound /> },

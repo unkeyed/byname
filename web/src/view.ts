@@ -36,6 +36,8 @@ const params = {
   before: "",
   after: "",
   show: "",
+  /** The Search page's chart span, in days or "all". */
+  span: "90",
 } as const;
 export type ViewParam = keyof typeof params;
 export const filterParams: ViewParam[] = ["range", "surface", "by", "model"];

@@ -16,7 +16,7 @@ export const nav: { to: string; label: string; icon: IconName; soon?: string }[]
   { to: "/competitors", label: "Competitors", icon: "users" },
   { to: "/gaps", label: "Gaps", icon: "alert", soon: "The questions where competitors are named and you are not." },
   { to: "/compare", label: "Compare", icon: "layers" },
-  { to: "/search", label: "Search", icon: "globe", soon: "Google Search Console clicks, impressions and position, with your goals." },
+  { to: "/search", label: "Search", icon: "globe" },
   { to: "/changes", label: "Changes", icon: "pencil", soon: "Changes to your site, when Google recrawled them, and what moved after." },
   { to: "/runs", label: "Runs", icon: "refresh" },
   { to: "/settings", label: "Settings", icon: "settings" },
