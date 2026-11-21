@@ -4,6 +4,7 @@ import { Link, Navigate, NavLink, Outlet, useLocation, useNavigate } from "react
 import { api, ApiError } from "./api";
 import { useMe } from "./queries";
 import { Toaster } from "./components/Toaster";
+import { useView } from "./view";
 import { useTheme, type ThemeMode } from "./theme";
 import { Avatar, Button, buttonClass, Crumbs, cx, EmptyState, ErrorNote, Icon, Logo, NavMenu, PageHeader, Spinner, useModal, useWide, type IconName } from "./ui";
 
@@ -16,7 +17,7 @@ export const nav: { to: string; label: string; icon: IconName; soon?: string }[]
   { to: "/compare", label: "Compare", icon: "layers", soon: "Two checks side by side: the answers you gained, lost and kept." },
   { to: "/search", label: "Search", icon: "globe", soon: "Google Search Console clicks, impressions and position, with your goals." },
   { to: "/changes", label: "Changes", icon: "pencil", soon: "Changes to your site, when Google recrawled them, and what moved after." },
-  { to: "/runs", label: "Runs", icon: "refresh", soon: "Every check with its spend, cost per call and success rate per endpoint." },
+  { to: "/runs", label: "Runs", icon: "refresh" },
   { to: "/settings", label: "Settings", icon: "settings" },
 ];
 
@@ -101,6 +102,7 @@ type ThemeState = ReturnType<typeof useTheme>;
 function NavBody({ label, theme: [theme, setTheme], rail, onNavigate, close }: { label: string; theme: ThemeState; rail?: boolean; onNavigate?: () => void; close?: ReactNode }) {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const filters = useView().filterSearch();
   const wideOnly = rail ? "hidden lg:block" : "block";
 
   const logout = async () => {
@@ -123,7 +125,7 @@ function NavBody({ label, theme: [theme, setTheme], rail, onNavigate, close }: {
         {nav.map((n) => (
           <NavLink
             key={n.to}
-            to={n.to}
+            to={n.to === "/settings" ? n.to : n.to + filters}
             end={n.to === "/"}
             title={rail ? n.label : undefined}
             onClick={onNavigate}

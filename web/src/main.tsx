@@ -9,6 +9,7 @@ import { AcceptInvite } from "./pages/AcceptInvite";
 import { Setup } from "./pages/Setup";
 import { Consent } from "./pages/Consent";
 import { ComingSoon } from "./pages/ComingSoon";
+import { Runs } from "./pages/results/Runs";
 import { Settings, settingsRoutes } from "./pages/settings/Settings";
 import "@fontsource-variable/geist";
 import "@fontsource-variable/geist-mono";
@@ -22,6 +23,7 @@ const router = createBrowserRouter([
   {
     element: <Layout />,
     children: [
+      { path: "runs", element: <Runs /> },
       ...nav.flatMap((n) => (n.soon ? [{ path: n.to === "/" ? undefined : n.to, index: n.to === "/", element: <ComingSoon title={n.label} body={n.soon} /> }] : [])),
       { path: "settings", element: <Settings />, children: settingsRoutes },
       { path: "*", element: <NotFound /> },

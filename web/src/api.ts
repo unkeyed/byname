@@ -189,6 +189,310 @@ export interface TOTPEnrolment {
   qr: string;
 }
 
+/** engines.Surface: where people ask. Stored keys never change once shipped. */
+export type SurfaceKey = string;
+
+/** How close an answer is to what a person sees; lines of different fidelity are never combined. */
+export type Fidelity = "app" | "model_match" | "approximation";
+
+export interface SelfBrand {
+  name: string;
+  aliases: string[];
+  domains: string[];
+}
+
+export interface Settings {
+  brand: SelfBrand;
+  check_every_days: number;
+  check_time: string;
+  time_zone: string;
+  spend_cap_run_usd: number;
+  checks_paused: boolean;
+  next_check_at: Timestamp | null;
+  /** Set when a scheduled check is claimed, even one that was skipped. */
+  last_check_at: Timestamp | null;
+}
+
+export type BrandKind = "self" | "competitor" | "technology";
+
+export interface BrandEntry {
+  id: number;
+  name: string;
+  aliases: string[];
+  domains: string[];
+  kind: BrandKind;
+}
+
+export interface Pair {
+  id: number;
+  surface: SurfaceKey;
+  /** Empty on app surfaces, where the app picks the model. */
+  model: string;
+  fidelity: Fidelity;
+  enabled: boolean;
+}
+
+export interface Surface {
+  key: SurfaceKey;
+  title: string;
+  endpoint: string;
+  fidelity: Fidelity;
+  takes_model: boolean;
+  enabled: boolean;
+  pairs: Pair[];
+}
+
+export type RunStatus = "queued" | "running" | "completed" | "capped" | "refused" | "failed";
+
+export interface EndpointStats {
+  endpoint: string;
+  calls: number;
+  succeeded: number;
+  success_rate: number;
+  cost_usd: number;
+  /** Answered calls that reported no cost: unknown, not $0. */
+  missing_cost: number;
+  cost_per_call: number | null;
+}
+
+export interface Run {
+  id: number;
+  status: RunStatus;
+  trigger: string;
+  question_set_id: number;
+  question_set_version: number;
+  queued_at: Timestamp;
+  started_at: Timestamp | null;
+  finished_at: Timestamp | null;
+  spend_usd: number;
+  spend_missing_calls: number;
+  calls: number;
+  succeeded: number;
+  mentioned: number;
+  cited: number;
+  error: string;
+  refusal_code: string;
+  endpoints: EndpointStats[];
+}
+
+export interface Job {
+  id: number;
+  job: string;
+  trigger: string;
+  run_id: number | null;
+  status: string;
+  started_at: Timestamp;
+  finished_at: Timestamp | null;
+  error: string;
+  spend_usd: number | null;
+}
+
+export interface PairRef {
+  /** 0 on a line that combines a surface's models. */
+  id: number;
+  surface: SurfaceKey;
+  model: string;
+}
+
+export interface QuestionRef {
+  id: number;
+  group: string;
+  text: string;
+}
+
+/** One line: a pair (or a surface) on one endpoint at one fidelity. */
+export interface Series {
+  pair: PairRef;
+  endpoint: string;
+  fidelity: Fidelity;
+}
+
+export interface RatePoint {
+  run_id: number;
+  run_started_at: Timestamp;
+  calls: number;
+  answered: number;
+  mentioned: number;
+  cited: number;
+  mention_rate: number | null;
+  citation_rate: number | null;
+}
+
+export interface RateSeries extends Series {
+  models: string[];
+  points: RatePoint[];
+}
+
+export interface RunSummary {
+  run_id: number;
+  run_started_at: Timestamp;
+  answered: number;
+  mentioned: number;
+  cited: number;
+  mention_rate: number | null;
+  citation_rate: number | null;
+  mentions: number;
+  share: number | null;
+}
+
+export interface BrandStanding {
+  brand_id: number;
+  name: string;
+  kind: BrandKind;
+  mentions: number;
+  share: number;
+  /** 0 for a brand never named. */
+  rank: number;
+}
+
+export interface HeatColumn extends Series {
+  models: string[];
+  answered: number;
+  /** Only brands this line named; a missing brand was named 0 times. */
+  cells: { brand_id: number; named: number; rate: number }[];
+}
+
+export interface Competitors {
+  runs: number;
+  answered: number;
+  mentions: number;
+  brands_named: number;
+  brands: BrandStanding[];
+  columns: HeatColumn[];
+}
+
+export type AnswerStatus = "ok" | "no_answer" | "failed";
+export type Outcome = "gained" | "lost" | "moved" | "unchanged" | "not_comparable";
+
+export interface Cell {
+  answer_id: number;
+  status: AnswerStatus;
+  mentioned: boolean;
+  cited: boolean;
+  position: number | null;
+  outcome: Outcome;
+}
+
+export interface QuestionRow {
+  question: QuestionRef;
+  /** Lines up with the table's columns; null where the pair has no answer. */
+  cells: (Cell | null)[];
+  answered: number;
+  named: number;
+  cited: number;
+  best_position: number | null;
+  gained: number;
+  lost: number;
+  moved: number;
+}
+
+export interface QuestionTable {
+  run_id: number;
+  previous_run_id: number | null;
+  columns: Series[];
+  rows: QuestionRow[];
+}
+
+export interface Standing {
+  answer_id: number;
+  status: AnswerStatus;
+  mentioned: boolean;
+  cited: boolean;
+  position: number | null;
+}
+
+export interface PairChange {
+  question_id: number;
+  pair_id: number;
+  question: QuestionRef;
+  pair: PairRef;
+  outcome: Outcome;
+  before: Standing | null;
+  after: Standing | null;
+}
+
+export interface Comparison {
+  before: number;
+  after: number;
+  counts: Record<Outcome, number>;
+  net: number;
+  pairs: PairChange[];
+}
+
+export interface HistoryPoint {
+  run_id: number;
+  run_started_at: Timestamp;
+  answer_id: number;
+  question_id: number;
+  status: AnswerStatus;
+  mentioned: boolean;
+  cited: boolean;
+  position: number | null;
+  reported_model: string;
+  /** The change since this series' previous run, such as "Gained mention at #1 · Northwind cited". */
+  summary: string;
+}
+
+export interface HistorySeries extends Series {
+  answered: number;
+  named: number;
+  cited: number;
+  best_position: number | null;
+  points: HistoryPoint[];
+}
+
+export interface History {
+  question_id: number;
+  series: HistorySeries[];
+}
+
+export interface Mention {
+  brand_id: number;
+  name: string;
+  kind: BrandKind;
+  position: number | null;
+}
+
+export interface Answer {
+  id: number;
+  run_id: number;
+  question: QuestionRef;
+  pair: PairRef;
+  endpoint: string;
+  fidelity: Fidelity;
+  reported_model: string;
+  status: AnswerStatus;
+  error: string;
+  mentioned: boolean;
+  cited: boolean;
+  position: number | null;
+  cost_usd: number | null;
+  mentions: Mention[];
+  answered_at: Timestamp;
+  text: string;
+  fan_out: string[] | null;
+  citations: { url: string; domain: string; is_self: boolean }[];
+}
+
+export interface Gap {
+  question: QuestionRef;
+  /** How many pairs answered. These are surface and model pairs, not engines. */
+  engines: number;
+  named: number;
+  competitors: number;
+  opportunity: number;
+  named_on_miss: string[];
+}
+
+/** Which pairs a results read covers, and since when. */
+export interface ResultsFilter {
+  since?: Timestamp;
+  surface?: SurfaceKey;
+  model?: string;
+}
+
+export type Grouping = "pair" | "surface";
+
 /**
  * Error body for every non-2xx: {"error": "<message>"}, plus request_id on a
  * 5xx and code on a 403 that wants a fresh sign-in.
@@ -230,6 +534,13 @@ async function request<T>(method: string, path: string, opts: { body?: unknown }
 }
 
 const enc = encodeURIComponent;
+
+function qs(params: Record<string, string | number | undefined>): string {
+  const q = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== "") q.set(k, String(v));
+  const s = q.toString();
+  return s ? `?${s}` : "";
+}
 
 export const api = {
   auth: {
@@ -306,6 +617,30 @@ export const api = {
     setRole: (id: number, role: Role) => request<void>("PATCH", `/v1/users/${id}`, { body: { role } }),
     /** Ends their sessions too. The last admin cannot be removed (409). */
     remove: (id: number) => request<void>("DELETE", `/v1/users/${id}`),
+  },
+
+  settings: () => request<Settings>("GET", "/v1/settings"),
+  brands: () => request<BrandEntry[]>("GET", "/v1/brands"),
+  surfaces: () => request<Surface[]>("GET", "/v1/surfaces"),
+
+  runs: {
+    /** Newest first. */
+    list: (limit = 50) => request<Run[]>("GET", `/v1/runs${qs({ limit })}`),
+    get: (id: number) => request<Run>("GET", `/v1/runs/${id}`),
+    /** 201 with a new run, or 200 with the run already queued or running. Poll get() for progress. */
+    runNow: () => request<Run>("POST", "/v1/runs"),
+    questions: (id: number, f: ResultsFilter) => request<QuestionTable>("GET", `/v1/runs/${id}/questions${qs({ surface: f.surface, model: f.model })}`),
+  },
+  jobs: (limit = 20) => request<Job[]>("GET", `/v1/jobs${qs({ limit })}`),
+  answer: (id: number) => request<Answer>("GET", `/v1/answers/${id}`),
+  compare: (before: number, after: number) => request<Comparison>("GET", `/v1/compare${qs({ before, after })}`),
+  history: (question: number, since?: Timestamp) => request<History>("GET", `/v1/questions/${question}/history${qs({ since })}`),
+  gaps: (run?: number) => request<{ run_id: number; gaps: Gap[] }>("GET", `/v1/gaps${qs({ run })}`),
+
+  metrics: {
+    rates: (f: ResultsFilter, by: Grouping) => request<RateSeries[]>("GET", `/v1/metrics/rates${qs({ ...f, by })}`),
+    summary: (f: ResultsFilter) => request<RunSummary[]>("GET", `/v1/metrics/summary${qs({ ...f })}`),
+    competitors: (f: ResultsFilter, by: Grouping) => request<Competitors>("GET", `/v1/metrics/competitors${qs({ ...f, by })}`),
   },
 
   invites: {
