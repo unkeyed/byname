@@ -1,0 +1,47 @@
+name: byname
+
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: byname
+      POSTGRES_PASSWORD: byname
+      POSTGRES_DB: byname
+    ports:
+      - "127.0.0.1:${BYNAME_DB_PORT:-5432}:5432"
+    volumes:
+      - db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U byname -d byname"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+  app:
+    build: .
+    environment:
+      DATABASE_URL: postgres://byname:byname@db:5432/byname?sslmode=disable
+      # Encrypts provider keys and TOTP seeds. Put ENCRYPTION_KEY=<openssl rand -base64 32> in .env and keep it:
+      # without it, stored secrets cannot be read.
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
+      ENCRYPTION_KEY_PREVIOUS: ${ENCRYPTION_KEY_PREVIOUS:-}
+      PUBLIC_URL: ${PUBLIC_URL:-http://localhost:${BYNAME_PORT:-8080}}
+      SETUP_TOKEN: ${SETUP_TOKEN:-}
+      PASSWORD_LOGIN: ${PASSWORD_LOGIN:-false}
+      ALLOWED_EMAIL_DOMAINS: ${ALLOWED_EMAIL_DOMAINS:-}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
+      OIDC_ISSUER: ${OIDC_ISSUER:-}
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-}
+      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-}
+      OIDC_NAME: ${OIDC_NAME:-}
+    ports:
+      - "127.0.0.1:${BYNAME_PORT:-8080}:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  db:
