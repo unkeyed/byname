@@ -15,7 +15,7 @@ export const nav: { to: string; label: string; icon: IconName; soon?: string }[]
   { to: "/prompts", label: "Prompts", icon: "message", soon: "Every question Byname asks, in its groups, with whether each surface and model named or cited you." },
   { to: "/competitors", label: "Competitors", icon: "users", soon: "Who gets named instead of you, on which surfaces, and how that moves." },
   { to: "/gaps", label: "Gaps", icon: "alert", soon: "The questions where competitors are named and you are not." },
-  { to: "/compare", label: "Compare", icon: "layers", soon: "Two checks side by side: the answers you gained, lost and kept." },
+  { to: "/compare", label: "Compare", icon: "layers" },
   { to: "/search", label: "Search", icon: "globe", soon: "Google Search Console clicks, impressions and position, with your goals." },
   { to: "/changes", label: "Changes", icon: "pencil", soon: "Changes to your site, when Google recrawled them, and what moved after." },
   { to: "/runs", label: "Runs", icon: "refresh" },
