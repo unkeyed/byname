@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useRef, useState, useSyncExternalStore, type ButtonHTMLAttributes, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type ButtonHTMLAttributes, type ReactNode } from "react";
 import { Link } from "react-router";
 import { ApiError } from "./api";
 import { absoluteTime, initials, relativeTime } from "./format";
@@ -20,6 +20,7 @@ const paths = {
   plus: <path d="M12 5v14M5 12h14" />,
   up: <path d="m18 15-6-6-6 6" />,
   down: <path d="m6 9 6 6 6-6" />,
+  updown: <path d="m7 15 5 5 5-5M7 9l5-5 5 5" />,
   left: <path d="m15 18-6-6 6-6" />,
   right: <path d="m9 18 6-6-6-6" />,
   sun: <><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" /></>,
@@ -386,6 +387,72 @@ export function DialogBody({ children }: { children: ReactNode }) {
 
 export function Card({ children, className }: { children: ReactNode; className?: string }) {
   return <section className={cx("rounded-surface border border-line bg-surface", className)}>{children}</section>;
+}
+
+/** A card's title and description, with its controls beside them on wide screens and beneath them on phones. */
+export function CardHeader({ title, description, children }: { title: ReactNode; description?: ReactNode; children?: ReactNode }) {
+  return (
+    <div className="flex flex-col gap-2 px-4 py-3 md:flex-row md:items-center md:gap-4">
+      <div className="min-w-0 flex-1">
+        <h2 className="text-sm font-semibold">{title}</h2>
+        {description && <p className="text-xs text-muted">{description}</p>}
+      </div>
+      {children && <div className="flex flex-wrap items-center gap-2">{children}</div>}
+    </div>
+  );
+}
+
+/**
+ * Horizontal scrolling for a table wider than its card. An edge that hides
+ * content fades and carries a button that scrolls one view along, so the
+ * overflow shows even where scrollbars are hidden. A cell marked data-sticky
+ * stays put, and the left button sits beside it.
+ */
+export function ScrollX({ children, startAtEnd, label }: { children: ReactNode; startAtEnd?: boolean; label: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [edge, setEdge] = useState({ left: false, right: false, sticky: 0 });
+  useLayoutEffect(() => {
+    const el = ref.current!;
+    if (startAtEnd) el.scrollLeft = el.scrollWidth;
+    const update = () => {
+      const sticky = el.querySelector<HTMLElement>("[data-sticky]")?.offsetWidth ?? 0;
+      const left = el.scrollLeft > 1;
+      const right = el.scrollLeft + el.clientWidth < el.scrollWidth - 1;
+      setEdge((e) => (e.left === left && e.right === right && e.sticky === sticky ? e : { left, right, sticky }));
+    };
+    update();
+    el.addEventListener("scroll", update, { passive: true });
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    if (el.firstElementChild) ro.observe(el.firstElementChild);
+    return () => {
+      el.removeEventListener("scroll", update);
+      ro.disconnect();
+    };
+  }, [startAtEnd]);
+  const by = (dir: 1 | -1) => ref.current?.scrollBy({ left: dir * Math.max(120, (ref.current.clientWidth - edge.sticky) * 0.8), behavior: "smooth" });
+  const nudge = "pointer-events-auto absolute top-1.5 grid size-7 place-items-center rounded-full bg-surface text-muted shadow-floating transition-colors hover:text-fg";
+  return (
+    <div className="relative" data-scrolled={edge.left || undefined}>
+      <div ref={ref} role="region" aria-label={label} tabIndex={0} className="overflow-x-auto overscroll-x-contain">
+        {children}
+      </div>
+      <div aria-hidden={!edge.left} className={cx("pointer-events-none absolute inset-y-0 w-8 bg-gradient-to-r from-surface transition-opacity", edge.left ? "opacity-100" : "opacity-0")} style={{ left: edge.sticky }}>
+        {edge.left && (
+          <button type="button" tabIndex={-1} aria-label={`Scroll ${label} left`} onClick={() => by(-1)} className={cx(nudge, "left-1")}>
+            <Icon name="left" className="size-3.5" />
+          </button>
+        )}
+      </div>
+      <div aria-hidden={!edge.right} className={cx("pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-surface transition-opacity", edge.right ? "opacity-100" : "opacity-0")}>
+        {edge.right && (
+          <button type="button" tabIndex={-1} aria-label={`Scroll ${label} right`} onClick={() => by(1)} className={cx(nudge, "right-1.5")}>
+            <Icon name="right" className="size-3.5" />
+          </button>
+        )}
+      </div>
+    </div>
+  );
 }
 
 export function EmptyState({ icon, title, children, action }: { icon?: IconName; title: string; children?: ReactNode; action?: ReactNode }) {
