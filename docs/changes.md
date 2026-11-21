@@ -75,6 +75,8 @@ The change's timeline in the **Changes** page lists each inspection.
 
 ## How a change gets its verdict
 
+Verdicts are experimental. The method is new and has few real verdicts behind it yet, so the app labels every read **Experimental**. Check a surprising verdict against the page's numbers on the Search page before acting on it.
+
 Each change gets two reads, counted in days from the day of its first crawl:
 
 1. The interim read, after 17 days by default. It is provisional, and the page marks it so.

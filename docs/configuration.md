@@ -14,7 +14,8 @@ Environment variables hold only secrets and infrastructure. Everything about you
 | `PUBLIC_URL` | No | `http://localhost:$PORT` | The URL people open Byname at, such as `https://byname.example.com`. Passkeys, sign-in callbacks, the Search Console callback, links in notifications and MCP sign-in depend on it. |
 | `SETUP_TOKEN` | No | random | The token of the setup link, at least 32 characters. See [The setup link](sign-in.md#the-setup-link). |
 | `PASSWORD_LOGIN` | No | `false` | `true` lets people set a password, which always needs a second step. |
-| `ALLOWED_EMAIL_DOMAINS` | No | none | Comma-separated domains, such as `example.com`, whose addresses can join as Viewers without an invite through Google Workspace or the OIDC issuer. GitHub accounts always need an invite. |
+| `ALLOWED_EMAIL_DOMAINS` | No | none | Comma-separated domains, such as `example.com`, whose addresses can join without an invite through Google Workspace or the OIDC issuer, in the role `ALLOWED_EMAIL_DOMAINS_ROLE` names. GitHub accounts always need an invite. |
+| `ALLOWED_EMAIL_DOMAINS_ROLE` | No | `viewer` | The role of someone who joins through `ALLOWED_EMAIL_DOMAINS`: `viewer` or `editor`. `admin` is refused, because an admin manages credentials and the team; invite admins by name. |
 | `CLIENT_IP_HEADER` | No | none | The header your proxy writes the client IP to, such as `X-Forwarded-For`. Byname throttles failed sign-ins and OAuth requests per client IP. Set it to `X-Forwarded-For` on Unkey Deploy. |
 | `GOOGLE_CLIENT_ID` | No | none | A Google OAuth client ID. Set it with `GOOGLE_CLIENT_SECRET` to offer Google sign-in. |
 | `GOOGLE_CLIENT_SECRET` | No | none | The Google OAuth client secret for sign-in. |
@@ -40,6 +41,7 @@ Byname exits with an error that names the variable when one of these rules fails
 - `PUBLIC_URL` is not an origin, or uses `http` with a host other than `localhost` or `127.0.0.1`.
 - `PASSWORD_LOGIN` is not `true` or `false`.
 - `ALLOWED_EMAIL_DOMAINS` lists an email address instead of a domain.
+- `ALLOWED_EMAIL_DOMAINS_ROLE` is not `viewer` or `editor`.
 - A sign-in provider has some of its variables set but not all.
 - `SETUP_TOKEN` is shorter than 32 characters.
 - One of the development overrides below is set and is not an `http` or `https` URL, or `SOURCES_ALLOW_PRIVATE_IPS` is not `true` or `false`.
@@ -114,7 +116,7 @@ When it is unset, Byname uses `http://localhost:$PORT`, which suits `make dev`. 
 
 ## Sign-in variables
 
-`SETUP_TOKEN`, `PASSWORD_LOGIN`, `ALLOWED_EMAIL_DOMAINS`, `CLIENT_IP_HEADER`, and the `GOOGLE_*`, `GITHUB_*` and `OIDC_*` variables decide how people sign in. [Sign-in](sign-in.md) explains each one.
+`SETUP_TOKEN`, `PASSWORD_LOGIN`, `ALLOWED_EMAIL_DOMAINS`, `ALLOWED_EMAIL_DOMAINS_ROLE`, `CLIENT_IP_HEADER`, and the `GOOGLE_*`, `GITHUB_*` and `OIDC_*` variables decide how people sign in. [Sign-in](sign-in.md) explains each one.
 
 ## `GSC_GOOGLE_CLIENT_ID` and `GSC_GOOGLE_CLIENT_SECRET`
 
