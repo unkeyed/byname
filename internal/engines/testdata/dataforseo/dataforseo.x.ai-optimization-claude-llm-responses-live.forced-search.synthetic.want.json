@@ -1,0 +1,13 @@
+{
+  "status": "ok",
+  "text": "The most common approach is a token bucket enforced at the edge. Managed options include Northwind Cloud and Contoso Gateway.\n\nFor self-hosting, a Redis-backed sliding window works well.",
+  "reported_model": "claude-sonnet-4-5-20250929",
+  "citations": [
+    "https://docs.example.org/rate-limiting",
+    "https://www.northwind.example/docs/ratelimit"
+  ],
+  "fan_out": [
+    "rest api rate limiting best practices",
+    "managed rate limiting service"
+  ]
+}

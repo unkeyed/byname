@@ -1,0 +1,64 @@
+{
+  "version": "0.1.20260717",
+  "status_code": 20000,
+  "status_message": "Ok.",
+  "time": "21.4210 sec.",
+  "cost": 0.055,
+  "tasks_count": 1,
+  "tasks_error": 0,
+  "tasks": [
+    {
+      "id": "11211200-0000-0612-0000-000000000001",
+      "status_code": 20000,
+      "status_message": "Ok.",
+      "time": "21.4102 sec.",
+      "cost": 0.055,
+      "result_count": 1,
+      "path": ["v3", "ai_optimization", "claude", "llm_responses", "live"],
+      "data": {
+        "api": "ai_optimization",
+        "function": "llm_responses",
+        "se": "claude",
+        "model_name": "claude-sonnet-4-5",
+        "web_search": true,
+        "force_web_search": true,
+        "web_search_country_iso_code": "US",
+        "user_prompt": "What's the best way to add rate limiting to a REST API?"
+      },
+      "result": [
+        {
+          "model_name": "claude-sonnet-4-5-20250929",
+          "input_tokens": 9120,
+          "output_tokens": 512,
+          "reasoning_tokens": 0,
+          "web_search": true,
+          "money_spent": 0.0545,
+          "datetime": "2026-11-21 14:02:11 +00:00",
+          "items": [
+            {
+              "type": "message",
+              "sections": [
+                {
+                  "type": "text",
+                  "text": "The most common approach is a token bucket enforced at the edge. Managed options include Northwind Cloud and Contoso Gateway.",
+                  "annotations": [
+                    {"title": "Rate limiting strategies", "url": "https://docs.example.org/rate-limiting", "start_index": null, "end_index": null, "text": null},
+                    {"title": "Northwind Cloud rate limits", "url": "https://www.northwind.example/docs/ratelimit", "start_index": null, "end_index": null, "text": null}
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "For self-hosting, a Redis-backed sliding window works well.",
+                  "annotations": [
+                    {"title": "Rate limiting strategies", "url": "https://docs.example.org/rate-limiting", "start_index": null, "end_index": null, "text": null}
+                  ]
+                }
+              ]
+            }
+          ],
+          "fan_out_queries": ["rest api rate limiting best practices", "managed rate limiting service"]
+        }
+      ]
+    }
+  ]
+}

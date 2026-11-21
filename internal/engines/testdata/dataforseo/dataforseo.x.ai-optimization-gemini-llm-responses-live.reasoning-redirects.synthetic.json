@@ -1,0 +1,63 @@
+{
+  "version": "0.1.20260717",
+  "status_code": 20000,
+  "status_message": "Ok.",
+  "time": "24.8800 sec.",
+  "cost": 0.06,
+  "tasks_count": 1,
+  "tasks_error": 0,
+  "tasks": [
+    {
+      "id": "11211200-0000-0612-0000-000000000004",
+      "status_code": 20000,
+      "status_message": "Ok.",
+      "time": "24.8700 sec.",
+      "cost": 0.06,
+      "result_count": 1,
+      "path": ["v3", "ai_optimization", "gemini", "llm_responses", "live"],
+      "data": {
+        "api": "ai_optimization",
+        "function": "llm_responses",
+        "se": "gemini",
+        "model_name": "gemini-2.5-pro",
+        "web_search": true,
+        "user_prompt": "What's the best way to add rate limiting to a REST API?"
+      },
+      "result": [
+        {
+          "model_name": "gemini-2.5-pro",
+          "input_tokens": 210,
+          "output_tokens": 1450,
+          "reasoning_tokens": 900,
+          "web_search": true,
+          "money_spent": 0.0598,
+          "datetime": "2026-11-21 14:05:02 +00:00",
+          "items": [
+            {
+              "type": "reasoning",
+              "sections": [
+                {"type": "summary_text", "text": "**Weighing the options** I should compare Contoso Gateway first."}
+              ]
+            },
+            {
+              "type": "message",
+              "sections": [
+                {
+                  "type": "text",
+                  "text": "Rate limiting is usually enforced at the gateway. Northwind Cloud offers it as a managed service.",
+                  "annotations": [
+                    {"title": "docs.example.org", "url": "https://www.google.com/url?sa=t&source=web&url=https%3A%2F%2Fdocs.example.org%2Frate-limiting&ved=0", "start_index": null, "end_index": null, "text": null},
+                    {"title": "northwind.example", "url": "https://www.google.com/url?q=https://www.northwind.example/docs/ratelimit&sa=U", "start_index": null, "end_index": null, "text": null},
+                    {"title": "blog.example.net", "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQExampleToken1", "start_index": null, "end_index": null, "text": null},
+                    {"title": "docs.example.org", "url": "https://docs.example.org/rate-limiting", "start_index": null, "end_index": null, "text": null}
+                  ]
+                }
+              ]
+            }
+          ],
+          "fan_out_queries": ["rest api rate limiting", "managed rate limiting service comparison"]
+        }
+      ]
+    }
+  ]
+}

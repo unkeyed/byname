@@ -1,0 +1,8 @@
+{
+  "status": "ok",
+  "text": "**Rate limiting** caps how many requests a client can make.\n\nNorthwind Cloud offers it as a managed service.",
+  "citations": [
+    "https://docs.example.org/rate-limiting",
+    "https://www.northwind.example/docs/ratelimit"
+  ]
+}

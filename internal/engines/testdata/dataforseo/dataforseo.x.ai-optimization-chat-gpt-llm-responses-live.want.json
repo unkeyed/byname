@@ -1,0 +1,9 @@
+{
+  "status": "failed",
+  "error": "response has no answer text",
+  "text": "",
+  "reported_model": "gpt-4.1-mini-2025-04-14",
+  "fan_out": [
+    "current relevance of amusement park business in France 2024"
+  ]
+}

@@ -1,0 +1,5 @@
+{
+  "status": "ok",
+  "text": "Use a token bucket per API key, enforced in your gateway or with Northwind Cloud.",
+  "reported_model": "gpt-5-2025-08-07"
+}

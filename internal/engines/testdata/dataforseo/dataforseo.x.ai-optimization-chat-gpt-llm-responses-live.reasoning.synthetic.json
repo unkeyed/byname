@@ -1,0 +1,59 @@
+{
+  "version": "0.1.20260717",
+  "status_code": 20000,
+  "status_message": "Ok.",
+  "time": "18.2001 sec.",
+  "cost": 0.02,
+  "tasks_count": 1,
+  "tasks_error": 0,
+  "tasks": [
+    {
+      "id": "11211200-0000-0612-0000-000000000002",
+      "status_code": 20000,
+      "status_message": "Ok.",
+      "time": "18.1900 sec.",
+      "cost": 0.02,
+      "result_count": 1,
+      "path": ["v3", "ai_optimization", "chat_gpt", "llm_responses", "live"],
+      "data": {
+        "api": "ai_optimization",
+        "function": "llm_responses",
+        "se": "chat_gpt",
+        "model_name": "gpt-5",
+        "web_search": true,
+        "web_search_country_iso_code": "US",
+        "user_prompt": "What's the best way to add rate limiting to a REST API?"
+      },
+      "result": [
+        {
+          "model_name": "gpt-5-2025-08-07",
+          "input_tokens": 24,
+          "output_tokens": 690,
+          "reasoning_tokens": 384,
+          "web_search": false,
+          "money_spent": 0.0195,
+          "datetime": "2026-11-21 14:03:40 +00:00",
+          "items": [
+            {
+              "type": "reasoning",
+              "sections": [
+                {"type": "summary_text", "text": "Thinking about whether Contoso Gateway fits before answering."}
+              ]
+            },
+            {
+              "type": "message",
+              "sections": [
+                {
+                  "type": "text",
+                  "text": "Use a token bucket per API key, enforced in your gateway or with Northwind Cloud.",
+                  "annotations": []
+                }
+              ]
+            }
+          ],
+          "fan_out_queries": null
+        }
+      ]
+    }
+  ]
+}

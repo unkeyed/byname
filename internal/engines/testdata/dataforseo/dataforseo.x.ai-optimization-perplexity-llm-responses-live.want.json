@@ -1,0 +1,17 @@
+{
+  "status": "ok",
+  "text": "For most small businesses, **HubSpot CRM** is the best starting point: it offers a capable free tier, is easy to use, and can grow into marketing, sales, and customer service tools.[1][5]\n\n| CRM | Best for | Key consideration |\n|---|---|---|\n| **HubSpot CRM** | Best overall and best free option | Strong free entry point; paid features can become expensive as you add marketing and automation.[5] |\n| **Zoho CRM** | Best value and customization | Broad functionality at a relatively affordable price; better suited to businesses willing to configure the system.[7] |\n| **Pipedrive** | Best for straightforward sales pipelines | Simple, visual deal tracking; ideal for sales-focused teams.[7] |\n| **Less Annoying CRM** | Best for simplicity | Minimal learning curve and fewer unnecessary features.[7] |\n| **Salesforce Starter** | Best for future growth | Powerful scaling option, but typically more complex than a small business needs initially; listed at $25 per user monthly.[9] |\n\n**Quick recommendation:**\n- Choose **HubSpot** if you want to start free and may add marketing or support later.\n- Choose **Pipedrive** if your main need is managing leads and sales opportunities.\n- Choose **Zoho** if price, customization, and all-in-one features matter most.\n- Choose **Less Annoying CRM** if you want the simplest possible system.\n\nBefore choosing, confirm pricing for your number of users, email integration, reporting, automation, and data export.",
+  "reported_model": "sonar",
+  "citations": [
+    "https://www.forbes.com/advisor/business/software/best-crm-small-business/",
+    "https://www.pcmag.com/picks/the-best-small-business-crm-software",
+    "https://uk.pcmag.com/crm-software/67398/the-best-crm-software",
+    "https://blog.salesflare.com/best-small-business-crm",
+    "https://www.zdnet.com/article/best-small-business-crm-software/",
+    "https://www.techradar.com/best/best-crm-for-small-business",
+    "https://www.zite.com/blog/best-crm-software-for-small-business",
+    "https://zapier.com/blog/best-crms-for-small-business/",
+    "https://www.salesforce.com/crm/crm-for-small-business/best-crm/?bc=OTH",
+    "https://fitsmallbusiness.com/best-crm-for-small-business/"
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "status": "failed",
+  "error": "response has no answer text",
+  "text": "",
+  "reported_model": "gemini-2.5-flash",
+  "fan_out": [
+    "amusement park business France current relevance"
+  ]
+}

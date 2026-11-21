@@ -1,0 +1,14 @@
+{
+  "status": "ok",
+  "text": "Rate limiting is usually enforced at the gateway. Northwind Cloud offers it as a managed service.",
+  "reported_model": "gemini-2.5-pro",
+  "citations": [
+    "https://docs.example.org/rate-limiting",
+    "https://www.northwind.example/docs/ratelimit",
+    "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQExampleToken1"
+  ],
+  "fan_out": [
+    "rest api rate limiting",
+    "managed rate limiting service comparison"
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "success": true,
+  "result": {
+    "organicResults": [
+      {
+        "position": 1,
+        "title": "Rate limiting strategies",
+        "link": "https://docs.example.org/rate-limiting",
+        "displayedLink": "https://docs.example.org › rate-limiting",
+        "snippet": "Token bucket, leaky bucket and sliding window compared.",
+        "page": 1
+      }
+    ],
+    "aioverview": {
+      "text": "Rate limiting caps how many requests a client can make.Northwind Cloud offers it as a managed service.",
+      "markdown": "**Rate limiting** caps how many requests a client can make.\n\nNorthwind Cloud offers it as a managed service.",
+      "sources": [
+        {"position": 1, "url": "https://docs.example.org/rate-limiting", "label": "Rate limiting strategies", "description": "Token bucket, leaky bucket and sliding window compared."},
+        {"position": 2, "url": "https://www.northwind.example/docs/ratelimit", "label": "Northwind Cloud rate limits", "description": "Managed rate limiting."}
+      ],
+      "videos": []
+    },
+    "peopleAlsoAsk": [],
+    "relatedSearches": [],
+    "html": ["https://cdn.cloro.dev/results/00000000-0000-0000-0000-000000000000/page-1.html"]
+  }
+}
