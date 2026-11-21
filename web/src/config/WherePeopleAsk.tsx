@@ -381,9 +381,13 @@ function SurfaceRow({
 
 function ModelChips({ s, draft, opt, canEdit, onChange }: { s: Surface; draft: Draft; opt: RouteOption; canEdit: boolean; onChange: (models: Draft["models"]) => void }) {
   const creds = useCredentials();
+  const admin = useIsAdmin();
   const cred = creds.data?.find((c) => c.kind === opt.credential);
-  // Admins know whether the route's key is set; asking for models without it is a 400.
-  const keyMissing = cred ? !cred.set : false;
+  // Admins can see whether the route's key is set, so they wait for the
+  // credentials before asking for models: without the key it is a 400.
+  const keyMissing = admin ? !cred?.set : false;
+  // Only Treg's and DataForSEO's lists say which models search; provider and gateway lists do not, so the test call decides there.
+  const listsSearch = draft.route === "treg" || draft.route === "scraper";
   const ready = draft.route !== "gateway" || /^https?:\/\/\S+$/.test(draft.base_url.trim());
   const models = useQuery({
     queryKey: keys.models(s.key, draft.route, draft.route === "gateway" ? draft.base_url.trim() : ""),
@@ -427,7 +431,7 @@ function ModelChips({ s, draft, opt, canEdit, onChange }: { s: Surface; draft: D
                 aria-pressed={on}
                 disabled={!canEdit}
                 onClick={() => toggle(m.name)}
-                title={m.off ? "Not on the route's current list" : m.web_search ? "Supports web search" : "No web search on this model"}
+                title={m.off ? "Not on the route's current list" : !listsSearch ? "The test call shows whether it searches" : m.web_search ? "Supports web search" : "No web search on this model"}
                 className={cx(
                   "inline-flex h-7 items-center gap-1 rounded-full border px-2.5 font-mono text-xs transition-colors disabled:cursor-default",
                   on ? "border-fg bg-fg text-bg" : "border-line-strong text-muted hover:border-line-hover hover:text-fg",
@@ -436,7 +440,7 @@ function ModelChips({ s, draft, opt, canEdit, onChange }: { s: Surface; draft: D
               >
                 {on && <Icon name="check" className="size-3" />}
                 {m.name}
-                {!m.web_search && <span className="font-sans opacity-70">· no search</span>}
+                {listsSearch && !m.web_search && <span className="font-sans opacity-70">· no search</span>}
               </button>
             );
           })}
