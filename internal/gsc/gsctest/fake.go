@@ -88,6 +88,7 @@ type Fake struct {
 	access          map[string]bool
 	queries         []Query
 	tokenCalls      []url.Values
+	failFrom        string
 }
 
 type grant struct {
@@ -137,6 +138,14 @@ func (f *Fake) SetInspection(pageURL string, in Inspection) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.inspections[pageURL] = in
+}
+
+// FailQueriesFrom makes searchAnalytics.query answer 500 for any range
+// ending on or after day; "" stops it.
+func (f *Fake) FailQueriesFrom(day string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.failFrom = day
 }
 
 // Queries returns every searchAnalytics.query request served so far.
@@ -396,6 +405,10 @@ func (f *Fake) query(w http.ResponseWriter, r *http.Request) {
 	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	if f.failFrom != "" && req.EndDate >= f.failFrom {
+		googleError(w, http.StatusInternalServerError, "INTERNAL", "Internal error encountered.")
+		return
+	}
 	if !f.canRead(site) {
 		googleError(w, http.StatusForbidden, "PERMISSION_DENIED", fmt.Sprintf("User does not have sufficient permission for site '%s'. See also: https://support.google.com/webmasters/answer/2451999.", site))
 		return

@@ -10,7 +10,8 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// tables are the dimension sets the sync pulls, each into its own table.
+// tables are the dimension sets the sync pulls, each into its own table,
+// the site totals first.
 // Every set starts with date, so every row belongs to one day and Google
 // reports firstIncompleteDate for it. keys are the remaining dimensions,
 // which are also the table's key columns after property and date.
@@ -33,14 +34,17 @@ const (
 )
 
 // SyncIfDue syncs the connected property once a day, and at once after a
-// property is picked. A failed sync retries an hour later. It returns at
-// once when another process is syncing.
+// property is picked or the credential replaced. A failed sync retries an
+// hour later, unless someone picks a property or reconnects first. It
+// returns at once when another process is syncing.
 func (s *Service) SyncIfDue(ctx context.Context) error {
 	return s.locked(ctx, func() error {
 		var due bool
 		err := s.db.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM gsc_connection
-				WHERE property IS NOT NULL AND (last_sync_at IS NULL OR last_sync_at <= $1::timestamptz - interval '1 day'))
-			AND NOT EXISTS (SELECT 1 FROM job_run WHERE job = 'gsc_sync' AND status = 'failed' AND started_at > $1::timestamptz - interval '1 hour')`,
+			WHERE property IS NOT NULL
+			AND (last_sync_at IS NULL OR last_sync_at <= $1::timestamptz - interval '1 day' OR connected_at > last_sync_at)
+			AND NOT (last_sync_error IS NOT NULL AND EXISTS (SELECT 1 FROM job_run
+				WHERE job = 'gsc_sync' AND status = 'failed' AND started_at > $1::timestamptz - interval '1 hour')))`,
 			s.now()).Scan(&due)
 		if err != nil || !due {
 			return err
@@ -140,75 +144,78 @@ func (s *Service) pull(ctx context.Context, c connection) error {
 	return nil
 }
 
-// windows are the date ranges to pull, oldest first: from the first day
-// that is not stored as final through today, and on a first sync with
-// backfill, every older day Google keeps (16 months). With nothing stored,
-// a first sync without backfill pulls the last 28 days.
+// windows are the date ranges to pull, oldest first. A first sync after
+// connecting, picking a property or turning backfill on pulls every day
+// Google keeps (16 months) with backfill, else the last 28 days, plus
+// anything stored that is not final. Later syncs pull from the first day
+// not stored as final through today. A first sync that stops halfway runs
+// again in full, so a backfill never leaves a hole.
 func (s *Service) windows(ctx context.Context, c connection, today day) ([][2]day, error) {
 	earliest := today.add(-27)
 	if c.backfill {
 		earliest = dayOf(today.t.AddDate(0, -16, 0))
 	}
-	var first, resume *time.Time
-	err := s.db.QueryRow(ctx, `SELECT min(date), least(
-			(SELECT max(date) + 1 FROM gsc_site_daily WHERE property = $1 AND is_final),
-			(SELECT min(date) FROM gsc_site_daily WHERE property = $1 AND NOT is_final))
-		FROM gsc_site_daily WHERE property = $1`, c.property).Scan(&first, &resume)
+	var resume *time.Time
+	err := s.db.QueryRow(ctx, `SELECT coalesce(
+			(SELECT min(date) FROM gsc_site_daily WHERE property = $1 AND NOT is_final),
+			(SELECT max(date) + 1 FROM gsc_site_daily WHERE property = $1))`, c.property).Scan(&resume)
 	if err != nil {
 		return nil, err
 	}
-	if first == nil {
-		return [][2]day{{earliest, today}}, nil
-	}
-	var out [][2]day
-	if f := dayOf(*first); c.lastSync == nil && c.backfill && earliest.before(f) {
-		out = append(out, [2]day{earliest, f.add(-1)})
-	}
-	start := dayOf(*first)
-	if resume != nil {
+	start := earliest
+	if resume != nil && (c.lastSync != nil || !c.backfill) {
 		start = dayOf(*resume)
 	}
-	if !today.before(start) {
-		out = append(out, [2]day{start, today})
+	if today.before(start) {
+		return nil, nil
 	}
-	return out, nil
+	return [][2]day{{start, today}}, nil
 }
 
-// pullChunk fetches every dimension set for from to to, then writes them
-// in one transaction, so readers never see a chunk half replaced. Days on
-// or after the earliest firstIncompleteDate any response reported are
-// stored as partial.
+// pullChunk fetches and writes each dimension set for from to to in turn,
+// so a sync holds one set in memory at a time. Days on or after the
+// earliest firstIncompleteDate a response reported are stored as partial.
+// The site totals are written last: windows resumes from them, so a chunk
+// that fails partway is pulled again in full.
 func (s *Service) pullChunk(ctx context.Context, api googleAPI, property string, from, to day) error {
-	fetched := make([][]queryRow, len(tables))
 	finalBefore := to.add(1).String()
-	for i, t := range tables {
-		rows, first, err := api.queryAll(ctx, property, from, to, append([]string{"date"}, t.keys...))
-		if err != nil {
-			return err
-		}
+	fetch := func(keys []string) ([]queryRow, error) {
+		rows, first, err := api.queryAll(ctx, property, from, to, append([]string{"date"}, keys...))
 		if first != "" && first < finalBefore {
 			finalBefore = first
 		}
-		fetched[i] = rows
+		return rows, err
 	}
-	return pgx.BeginFunc(ctx, s.db, func(tx pgx.Tx) error {
-		for i, t := range tables {
-			if _, err := tx.Exec(ctx, `DELETE FROM `+t.name+` WHERE property = $1 AND date BETWEEN $2 AND $3 AND NOT is_final`,
+	write := func(name string, keys []string, rows []queryRow) error {
+		return pgx.BeginFunc(ctx, s.db, func(tx pgx.Tx) error {
+			if _, err := tx.Exec(ctx, `DELETE FROM `+name+` WHERE property = $1 AND date BETWEEN $2 AND $3 AND NOT is_final`,
 				property, from.date(), to.date()); err != nil {
 				return err
 			}
-			if err := upsert(ctx, tx, t.name, t.keys, property, fetched[i], finalBefore); err != nil {
-				return err
-			}
+			return upsert(ctx, tx, name, keys, property, rows, finalBefore)
+		})
+	}
+	site, err := fetch(nil)
+	if err != nil {
+		return err
+	}
+	for _, t := range tables[1:] {
+		rows, err := fetch(t.keys)
+		if err != nil {
+			return err
 		}
-		return nil
-	})
+		if err := write(t.name, t.keys, rows); err != nil {
+			return err
+		}
+	}
+	return write(tables[0].name, nil, site)
 }
 
 // upsert writes rows into table, rowLimit at a time. A final row is never
 // replaced by a partial one. Rows whose query is empty would be anonymized
 // queries, which never count as a query, so they are dropped; so is a
-// repeat of a key, which paging over fresh data can return.
+// repeat of a key, which paging over fresh data can return, and a key too
+// long for a Postgres index entry.
 func upsert(ctx context.Context, tx pgx.Tx, table string, keys []string, property string, rows []queryRow, finalBefore string) error {
 	cols := append([]string{"date"}, keys...)
 	var b strings.Builder
@@ -231,7 +238,7 @@ func upsert(ctx context.Context, tx pgx.Tx, table string, keys []string, propert
 		var positions []float64
 		var final []bool
 		for _, r := range batch {
-			if len(r.Keys) != len(cols) || anonymized(keys, r.Keys[1:]) {
+			if len(r.Keys) != len(cols) || anonymized(keys, r.Keys[1:]) || oversize(r.Keys) {
 				continue
 			}
 			id := strings.Join(r.Keys, "\x00")
@@ -267,4 +274,15 @@ func anonymized(keys, values []string) bool {
 		}
 	}
 	return false
+}
+
+// maxKeyBytes keeps a row's key inside a btree index entry (about 2.7 kB).
+const maxKeyBytes = 2000
+
+func oversize(keys []string) bool {
+	n := 0
+	for _, k := range keys {
+		n += len(k)
+	}
+	return n > maxKeyBytes
 }

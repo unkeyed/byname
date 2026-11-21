@@ -579,6 +579,101 @@ func TestSyncSchedule(t *testing.T) {
 	}
 }
 
+func TestSyncRecovers(t *testing.T) {
+	e := newEnv(t)
+	for n := 1; n <= 60; n++ {
+		e.fake.SetRows(domainProperty, site(e.day(n), 1, 10))
+	}
+	long := gsctest.Row{Date: e.day(5), Query: "fernhollow docs", Page: prefixProperty + "docs?ref=" + strings.Repeat("x", 2500), Clicks: 1, Impressions: 2, Position: 3}
+	e.fake.SetRows(domainProperty, site(e.day(5), 1, 10), long)
+	if _, err := e.svc.ConnectServiceAccount(e.ctx, e.fake.ServiceAccountKey(t, saEmail)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.svc.SetProperty(e.ctx, gsc.PropertyInput{Property: domainProperty, Backfill: new(false)}); err != nil {
+		t.Fatal(err)
+	}
+	e.sync()
+	days := func() int64 { return e.count(`SELECT count(*) FROM gsc_site_daily`) }
+	if days() != 27 {
+		t.Fatalf("days without backfill = %d, want the 27 stored of the last 28", days())
+	}
+	if n := e.count(`SELECT count(*) FROM gsc_page_daily WHERE length(page) > 2000`); n != 0 {
+		t.Fatal("a key too long for an index entry was stored")
+	}
+
+	// Backfill turned on fails after committing older chunks, then a
+	// property pick waiting on the failure is not held back an hour.
+	if _, err := e.svc.SetProperty(e.ctx, gsc.PropertyInput{Property: domainProperty}); err != nil {
+		t.Fatal(err)
+	}
+	e.fake.FailQueriesFrom(e.day(20))
+	if err := e.svc.SyncIfDue(e.ctx); !errors.Is(err, core.ErrUpstream) {
+		t.Fatalf("a sync Google fails: %v", err)
+	}
+	if days() <= 27 {
+		t.Fatal("the failed backfill committed no older chunk; the test does not cover a partial backfill")
+	}
+	e.fake.FailQueriesFrom("")
+	if err := e.svc.SyncIfDue(e.ctx); err != nil {
+		t.Fatal(err)
+	}
+	if n := e.count(`SELECT count(*) FROM job_run WHERE job = 'gsc_sync'`); n != 2 {
+		t.Fatalf("syncs = %d; a failed sync retried within the hour", n)
+	}
+	if _, err := e.svc.SetProperty(e.ctx, gsc.PropertyInput{Property: domainProperty}); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.svc.SyncIfDue(e.ctx); err != nil {
+		t.Fatal(err)
+	}
+	if n := e.count(`SELECT count(*) FROM job_run WHERE job = 'gsc_sync'`); n != 3 {
+		t.Fatalf("syncs = %d; picking the property again waited out the failure's backoff", n)
+	}
+	if days() != 60 {
+		t.Fatalf("days after the backfill recovered = %d, want 60", days())
+	}
+
+	e.fake.FailQueriesFrom(e.day(0))
+	e.now = e.now.Add(25 * time.Hour)
+	_ = e.svc.SyncIfDue(e.ctx)
+	e.fake.FailQueriesFrom("")
+	if _, err := e.svc.SetProperty(e.ctx, gsc.PropertyInput{Property: prefixProperty}); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.svc.SyncIfDue(e.ctx); err != nil {
+		t.Fatal(err)
+	}
+	if n := e.count(`SELECT count(*) FROM job_run WHERE job = 'gsc_sync'`); n != 5 {
+		t.Fatalf("syncs = %d; picking a property after a failure waited out the backoff", n)
+	}
+
+	e.now = e.now.Add(time.Hour)
+	if _, err := e.svc.ConnectServiceAccount(e.ctx, e.fake.ServiceAccountKey(t, saEmail)); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.svc.SyncIfDue(e.ctx); err != nil {
+		t.Fatal(err)
+	}
+	if n := e.count(`SELECT count(*) FROM job_run WHERE job = 'gsc_sync'`); n != 6 {
+		t.Fatalf("syncs = %d; a new credential was not tried at once", n)
+	}
+}
+
+func TestDefaultBrandedTermsSkipOneLetterAliases(t *testing.T) {
+	e := newEnv(t)
+	v, err := e.cfg.Settings(e.ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	v.Brand.Aliases = []string{"F", "Fern Hollow"}
+	if v, err = e.cfg.PutSettings(e.ctx, v.Settings); err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(v.BrandedTerms, []string{"fernhollow", "fern hollow"}) {
+		t.Fatalf("default branded terms = %v", v.BrandedTerms)
+	}
+}
+
 func TestInspectURL(t *testing.T) {
 	e := newEnv(t)
 	if _, err := e.svc.InspectURL(e.ctx, prefixProperty+"pricing"); !errors.Is(err, core.ErrInvalid) {
