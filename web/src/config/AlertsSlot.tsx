@@ -1,14 +1,21 @@
+import { ChannelPicker } from "../pages/settings/Notifications";
+import { useIsAdmin } from "../queries";
 import { Icon } from "../ui";
 
-/** Where alert channels go once notification channels exist; until then alerts stay in the app. */
+/** Notification channels are admin-only, so other roles see where alerts go instead of a picker they cannot use. */
 export function AlertsSlot() {
+  const admin = useIsAdmin();
   return (
     <div>
       <h3 className="mb-1.5 text-xs font-medium text-muted">Alerts</h3>
-      <p className="flex items-start gap-2 rounded-surface border border-dashed border-line-strong px-3 py-2.5 text-sm text-muted">
-        <Icon name="mail" className="mt-0.5 size-4" />
-        Alerts show in the app until you add a channel in Settings &gt; Notifications.
-      </p>
+      {admin ? (
+        <ChannelPicker />
+      ) : (
+        <p className="flex items-start gap-2 rounded-surface border border-dashed border-line-strong px-3 py-2.5 text-sm text-muted">
+          <Icon name="mail" className="mt-0.5 size-4" />
+          Alerts show in the app. An admin can add email, Slack or webhook channels in Settings &gt; Notifications.
+        </p>
+      )}
     </div>
   );
 }

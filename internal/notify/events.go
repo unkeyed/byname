@@ -211,7 +211,7 @@ func (p PairPausedPayload) message() Message {
 	if spec, ok := engines.Lookup(p.Surface); ok {
 		title = spec.Title
 	}
-	return Message{Title: fmt.Sprintf("Paused %s on %s", p.Model, title), Lines: []string{p.Reason}, Path: "/runs"}
+	return Message{Title: fmt.Sprintf("Paused %s on %s", p.Model, title), Lines: []string{p.Reason}, Path: "/settings/surfaces"}
 }
 
 // GoalReachedPayload is declared for the Search Console workstream to emit.
