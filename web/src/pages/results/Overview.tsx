@@ -178,10 +178,14 @@ function SearchTile() {
         ) : (
           <>
             <p className="text-sm text-muted">{gsc.data?.connected ? "Not synced yet" : "Not connected"}</p>
-            <Link to={me.data?.role === "admin" ? settingsPath : "/search"} className="mt-auto inline-flex items-center gap-1 pt-1 text-xs font-medium text-fg hover:underline">
-              <Icon name="plug" className="size-3.5" />
-              {gsc.data?.connected ? "Search Console" : "Connect Search Console"}
-            </Link>
+            {me.data?.role === "admin" ? (
+              <Link to={settingsPath} className="mt-auto inline-flex items-center gap-1 pt-1 text-xs font-medium text-fg hover:underline">
+                <Icon name="plug" className="size-3.5" />
+                {gsc.data?.connected ? "Search Console settings" : "Connect Search Console"}
+              </Link>
+            ) : (
+              <p className="mt-auto pt-1 text-xs text-faint">{gsc.data?.connected ? "The first sync has not finished." : "An admin can connect it in Settings."}</p>
+            )}
           </>
         )}
       </Card>
