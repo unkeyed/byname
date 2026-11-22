@@ -21,6 +21,7 @@ export const nav: { to: string; label: string; icon: IconName; soon?: string }[]
   { to: "/compare", label: "Compare", icon: "layers" },
   { to: "/search", label: "Search", icon: "globe" },
   { to: "/changes", label: "Changes", icon: "pencil" },
+  { to: "/social", label: "Social", icon: "message" },
   { to: "/runs", label: "Runs", icon: "refresh" },
   { to: "/settings", label: "Settings", icon: "settings" },
 ];

@@ -1106,6 +1106,135 @@ export interface RepoStatus {
   last_poll_error: string;
 }
 
+/** internal/social: the networks searched for posts that mention you. */
+export type SocialNetwork = "x" | "reddit" | "hackernews" | "linkedin" | "youtube" | "threads" | "bluesky";
+
+/** A count the network does not give is null, never 0. */
+export interface Engagement {
+  likes: number | null;
+  replies: number | null;
+  reposts: number | null;
+  /** Points on Hacker News, score on Reddit. */
+  score: number | null;
+  /** Views on X and YouTube. */
+  views: number | null;
+  /** Ranks posts within a network: views on YouTube, elsewhere the other counts added up. */
+  total: number;
+}
+
+export interface SocialCall {
+  id: number;
+  route: "treg" | "direct";
+  treg_call_id: string;
+  /** Null when Treg reported no cost; 0 for a direct call, which is free. */
+  cost_usd: number | null;
+  cost_missing: boolean;
+}
+
+export interface SocialMention {
+  id: number;
+  network: SocialNetwork;
+  post_id: string;
+  url: string;
+  author_handle: string;
+  author_name: string;
+  text: string;
+  posted_at: Timestamp;
+  /** The network gave only an age, as YouTube does. */
+  posted_approx: boolean;
+  engagement: Engagement;
+  term: string;
+  first_seen_at: Timestamp;
+  hidden: boolean;
+  /** The left-out label hiding it, empty when shown. */
+  left_out_as: string;
+  call: SocialCall | null;
+}
+
+export interface SocialMentionList {
+  mentions: SocialMention[];
+  /** Shown mentions that match, which can be more than returned. */
+  total: number;
+  /** Matching mentions by left-out accounts. */
+  hidden: number;
+}
+
+export interface SocialMentionQuery {
+  network?: SocialNetwork;
+  since?: string;
+  include_hidden?: boolean;
+  limit?: number;
+}
+
+export interface SocialDigest {
+  cadence: "daily" | "weekly";
+  from: Day;
+  to: Day;
+  starts_at: Timestamp;
+  ends_at: Timestamp;
+  finished: boolean;
+  mentions: number;
+  hidden: number;
+  networks: { network: SocialNetwork; title: string; mentions: number; top: SocialMention[] }[];
+  new_authors: { network: SocialNetwork; handle: string; name: string; profile: string; mentions: number }[];
+  calls: number;
+  spend_usd: number;
+  /** Treg calls that reported no cost, left out of spend_usd. */
+  spend_missing_calls: number;
+}
+
+export interface SocialNetworkStatus {
+  network: SocialNetwork;
+  title: string;
+  enabled: boolean;
+  route: "treg" | "direct";
+  tool: string;
+  cost_per_call_usd: number;
+  last_call_at: Timestamp | null;
+  last_error: string;
+  /** The latest call found the network's public search asking for sign-in. */
+  unavailable: boolean;
+}
+
+export interface SocialSettings {
+  terms: string[];
+  default_terms: string[];
+  custom_terms: boolean;
+  fetch_every_hours: number;
+  digest_cadence: "daily" | "weekly";
+  /** 0 is Sunday. */
+  digest_weekday: number;
+  time_zone: string;
+  token_set: boolean;
+  networks: SocialNetworkStatus[];
+  last_fetch_at: Timestamp | null;
+  next_fetch_at: Timestamp | null;
+}
+
+export interface SocialSettingsInput {
+  /** [] searches for the brand's name and primary domain. */
+  terms: string[];
+  fetch_every_hours: number;
+  digest_cadence: "daily" | "weekly";
+  digest_weekday: number;
+  networks?: { network: SocialNetwork; enabled: boolean }[];
+}
+
+export interface LeftOut {
+  id: number;
+  network: SocialNetwork;
+  handle: string;
+  label: string;
+  profile: string;
+  mentions: number;
+}
+
+export interface LeftOutInput {
+  network: SocialNetwork;
+  handle: string;
+  label: string;
+}
+
 /** Which pairs a results read covers, and since when. */
 export interface ResultsFilter {
   since?: Timestamp;
@@ -1125,7 +1254,8 @@ export type EventKindName =
   | "goal_reached"
   | "search_moved"
   | "change_verdict"
-  | "token_expiring";
+  | "token_expiring"
+  | "social_digest";
 
 export interface EventKind {
   kind: EventKindName;
@@ -1475,6 +1605,19 @@ export const api = {
     disconnect: () => request<void>("DELETE", "/v1/repo"),
     /** 404 before a repo was ever connected. */
     putRules: (rules: PathRule[]) => request<RepoStatus>("PUT", "/v1/repo/rules", { body: { rules } }),
+  },
+
+  social: {
+    mentions: (q: SocialMentionQuery = {}) =>
+      request<SocialMentionList>("GET", `/v1/social/mentions${qs({ network: q.network, since: q.since, include_hidden: q.include_hidden ? "true" : undefined, limit: q.limit })}`),
+    /** Without a day, the latest period that has ended. */
+    digest: (day?: Day) => request<SocialDigest>("GET", `/v1/social/digest${qs({ day })}`),
+    settings: () => request<SocialSettings>("GET", "/v1/social/settings"),
+    putSettings: (body: SocialSettingsInput) => request<SocialSettings>("PUT", "/v1/social/settings", { body }),
+    leftOut: () => request<LeftOut[]>("GET", "/v1/social/left-out"),
+    /** Upserts on network and handle. */
+    leaveOut: (body: LeftOutInput) => request<LeftOut>("POST", "/v1/social/left-out", { body }),
+    removeLeftOut: (id: number) => request<void>("DELETE", `/v1/social/left-out/${id}`),
   },
 
   invites: {

@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { api, type Grouping, type GscStatus, type Line, type ResultsFilter, type Run, type Scope } from "./api";
+import { api, type Grouping, type GscStatus, type Line, type ResultsFilter, type Run, type Scope, type SocialMentionQuery } from "./api";
 
 /** Query keys in one place, so a mutation can invalidate exactly what it touched. */
 export const keys = {
@@ -65,6 +65,12 @@ export const keys = {
   changeSettings: ["changes", "settings"] as const,
   controlPages: ["changes", "control-pages"] as const,
   repo: ["changes", "repo"] as const,
+  /** Social mentions, digests, settings and the left-out list sit under this prefix. */
+  social: ["social"] as const,
+  socialMentions: (q: SocialMentionQuery) => ["social", "mentions", q] as const,
+  socialDigest: (day?: string) => ["social", "digest", day] as const,
+  socialSettings: ["social", "settings"] as const,
+  leftOut: ["social", "left-out"] as const,
 };
 
 /** Changes whenever a sync or a disconnect changes what the read API returns. */
@@ -85,6 +91,11 @@ export const useChanges = () => useQuery({ queryKey: keys.changeList, queryFn: a
 export const useChangeSettings = () => useQuery({ queryKey: keys.changeSettings, queryFn: api.changes.settings, staleTime: 60_000 });
 export const useControlPages = () => useQuery({ queryKey: keys.controlPages, queryFn: api.controlPages.list });
 export const useRepo = () => useQuery({ queryKey: keys.repo, queryFn: api.repo.get });
+
+export const useSocialMentions = (q: SocialMentionQuery) => useQuery({ queryKey: keys.socialMentions(q), queryFn: () => api.social.mentions(q) });
+export const useSocialDigest = (day?: string) => useQuery({ queryKey: keys.socialDigest(day), queryFn: () => api.social.digest(day) });
+export const useSocialSettings = () => useQuery({ queryKey: keys.socialSettings, queryFn: api.social.settings });
+export const useLeftOut = () => useQuery({ queryKey: keys.leftOut, queryFn: api.social.leftOut });
 
 export const useMe = () => useQuery({ queryKey: keys.me, queryFn: api.me.get, staleTime: Infinity });
 

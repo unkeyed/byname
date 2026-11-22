@@ -18,7 +18,7 @@ function duration(r: Run): string {
 const triggers: Record<string, string> = { run_now: "Run now", scheduled: "Scheduled" };
 const triggerLabel = (t: string) => triggers[t] ?? t.charAt(0).toUpperCase() + t.slice(1).replaceAll("_", " ");
 
-const jobNames: Record<string, string> = { ai_check: "AI check", model_refresh: "Model lists", source_fetch: "Cited pages", gsc_sync: "Search Console sync" };
+const jobNames: Record<string, string> = { ai_check: "AI check", model_refresh: "Model lists", source_fetch: "Cited pages", gsc_sync: "Search Console sync", social_fetch: "Social search" };
 
 /** A job's status in the same words and tones as a run's; only a job can be skipped. */
 const jobStatus = (status: string): { label: string; tone: Tone } =>

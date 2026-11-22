@@ -1,0 +1,68 @@
+import type { Engagement, SocialMention, SocialNetwork } from "../../api";
+import { cx, Icon, type IconName } from "../../ui";
+
+/** How the app shows each network: its name, its mark, and how its authors are written. */
+export const networks: Record<SocialNetwork, { title: string; icon?: IconName; mark?: string; prefix: string; byName?: boolean }> = {
+  x: { title: "X", icon: "xLogo", prefix: "@" },
+  reddit: { title: "Reddit", mark: "r/", prefix: "u/" },
+  hackernews: { title: "Hacker News", mark: "Y", prefix: "" },
+  linkedin: { title: "LinkedIn", icon: "linkedin", prefix: "", byName: true },
+  youtube: { title: "YouTube", icon: "youtube", prefix: "", byName: true },
+  threads: { title: "Threads", mark: "@", prefix: "@" },
+  bluesky: { title: "Bluesky", mark: "bs", prefix: "@" },
+};
+
+export const networkOrder = Object.keys(networks) as SocialNetwork[];
+
+export const settingsPath = "/settings/social";
+
+export function NetworkMark({ network, className }: { network: SocialNetwork; className?: string }) {
+  const n = networks[network];
+  return (
+    <span
+      title={n.title}
+      aria-label={n.title}
+      role="img"
+      className={cx("inline-grid size-6 shrink-0 place-items-center rounded-control border border-line bg-bg text-[0.625rem] leading-none font-semibold text-muted", className)}
+    >
+      {n.icon ? <Icon name={n.icon} className="size-3" /> : n.mark}
+    </span>
+  );
+}
+
+/** "@ada" on X, "u/ada" on Reddit, the name on LinkedIn and YouTube. */
+export function authorLabel(network: SocialNetwork, handle: string, name: string): string {
+  const n = networks[network];
+  if ((n.byName && name) || !handle) return name || "Unknown author";
+  return n.prefix + handle;
+}
+
+const count = new Intl.NumberFormat();
+
+/** The counts the network gave, as "31 likes · 3 replies". A count it did not give is left out, not shown as 0. */
+export function engagementParts(network: SocialNetwork, e: Engagement): string[] {
+  const comments = network === "reddit" || network === "hackernews" || network === "linkedin";
+  const parts: [number | null, string, string][] =
+    network === "youtube"
+      ? [[e.views, "view", "views"]]
+      : [
+          [e.likes, network === "linkedin" ? "reaction" : "like", network === "linkedin" ? "reactions" : "likes"],
+          [e.score, "point", "points"],
+          [e.replies, comments ? "comment" : "reply", comments ? "comments" : "replies"],
+          [e.reposts, "repost", "reposts"],
+        ];
+  return parts.filter(([n]) => n !== null).map(([n, one, many]) => `${count.format(n!)} ${n === 1 ? one : many}`);
+}
+
+export const formatCount = (n: number) => count.format(n);
+
+/** "Nov 16 to Nov 22", or one day for a daily digest. */
+export function periodLabel(from: string, to: string): string {
+  const fmt = (d: string) => new Date(d + "T00:00:00Z").toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: "UTC" });
+  return from === to ? fmt(from) : `${fmt(from)} to ${fmt(to)}`;
+}
+
+/** Where to read the post, and a title for the link. */
+export const postLink = (m: SocialMention) => ({ href: m.url, label: `Open on ${networks[m.network].title}` });
+
+export const weekdays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
