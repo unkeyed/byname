@@ -4,7 +4,8 @@ import { api, type Change, type ChangeOutcome, type ChangeRead, type ChangeStep,
 import { keys } from "../../queries";
 import { Badge, Button, Card, ConfirmButton, cx, ErrorNote, Icon, LoadBoundary, Pending, ScrollX, useModal } from "../../ui";
 import { useView } from "../../view";
-import { count, ctr, dayRange, fullDay, position } from "../search/model";
+import { count, ctr, dayRange, figureInfo, fullDay, position } from "../search/model";
+import { FigureLegend } from "../search/Search";
 import { changeStatus, deltaMetrics, kindInfo, outcomeInfo, stepInfo, useZone, type Zone } from "./model";
 
 /** Opens the drawer on a change, as a link that Back closes. */
@@ -83,14 +84,14 @@ function Body({ id, listed, canEdit, onClose }: { id: number; listed: Change | u
         <Facts c={c} zone={zone} />
         <Before c={c} />
         <section className="space-y-3">
-          <h3 className="text-sm font-semibold">Verdict</h3>
+          <h3 className="text-sm font-semibold">Result</h3>
           {c.final && <ReadCard read={c.final} />}
           {c.interim && <ReadCard read={c.interim} />}
           {!c.interim && !c.final && (
             <p className="text-sm text-muted">
               {c.first_crawl_at && c.interim_on
-                ? `The interim read comes on ${fullDay(c.interim_on)} and the final one on ${fullDay(c.verdict_on ?? c.interim_on)}, each comparing the page with the control pages.`
-                : "The reads are timed from Google's first crawl after the change, so their days are set once Google crawls the page."}
+                ? `The first result comes on ${fullDay(c.interim_on)} and the final one on ${fullDay(c.verdict_on ?? c.interim_on)}, each comparing the page with the comparison pages.`
+                : "Results are timed from when Google first sees the page after the change, so their days are set once it does."}
             </p>
           )}
         </section>
@@ -135,10 +136,10 @@ function Facts({ c, zone }: { c: Change; zone: Zone }) {
   const rows: [string, ReactNode][] = [
     ["Change", c.source === "manual" ? "Logged by hand" : <ChangeSource c={c} className="inline-block min-h-11 py-3 [overflow-wrap:anywhere] md:min-h-0 md:py-0" />],
     ...(c.notes ? [["Notes", <span className="whitespace-pre-wrap [overflow-wrap:anywhere]">{c.notes}</span>] as [string, ReactNode]] : []),
-    [c.source === "manual" ? "Went live" : "Merged", zone.at(c.merged_at)],
-    ["Google's first crawl after", c.first_crawl_at ? zone.at(c.first_crawl_at) : <span className="text-muted">Not yet</span>],
-    ["Interim read", c.interim_on ? fullDay(c.interim_on) : <span className="text-muted">Set by the first crawl</span>],
-    ["Final read", c.verdict_on ? fullDay(c.verdict_on) : <span className="text-muted">Set by the first crawl</span>],
+    ["Went live", zone.at(c.merged_at)],
+    ["Google saw it", c.first_crawl_at ? zone.at(c.first_crawl_at) : <span className="text-muted">Not yet</span>],
+    ["First result", c.interim_on ? fullDay(c.interim_on) : <span className="text-muted">Set once Google sees it</span>],
+    ["Final result", c.verdict_on ? fullDay(c.verdict_on) : <span className="text-muted">Set once Google sees it</span>],
   ];
   return (
     <section>
@@ -152,7 +153,7 @@ function Facts({ c, zone }: { c: Change; zone: Zone }) {
           ))}
         </dl>
       </Card>
-      <p className="mt-1.5 text-xs text-faint">Times are in {zone.zone}, the instance&apos;s time zone. Search Console counts days in Pacific Time.</p>
+      <p className="mt-1.5 text-xs text-faint">Times are in {zone.zone}, the instance&apos;s time zone. Google counts days in Pacific Time.</p>
     </section>
   );
 }
@@ -163,27 +164,30 @@ function Before({ c }: { c: Change }) {
     <section>
       <h3 className="mb-2 text-sm font-semibold">Before the change{b && <span className="font-normal text-muted">, {dayRange(b.from, b.to)}</span>}</h3>
       {b ? (
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          {[
-            ["Clicks", count(b.clicks)],
-            ["Impressions", count(b.impressions)],
-            ["CTR", ctr(b.ctr)],
-            ["Position", position(b.position)],
-          ].map(([label, value]) => (
-            <Card key={label} className="px-3 py-2">
-              <div className="text-xs text-muted">{label}</div>
-              <div className="text-lg font-semibold tabular-nums">{value}</div>
-            </Card>
-          ))}
+        <div className="space-y-2">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {[
+              [figureInfo.clicks.label, count(b.clicks)],
+              [figureInfo.impressions.label, count(b.impressions)],
+              [figureInfo.ctr.label, ctr(b.ctr)],
+              [figureInfo.position.label, position(b.position)],
+            ].map(([label, value]) => (
+              <Card key={label} className="px-3 py-2">
+                <div className="text-xs text-muted">{label}</div>
+                <div className="text-lg font-semibold tabular-nums">{value}</div>
+              </Card>
+            ))}
+          </div>
+          <FigureLegend figures={["impressions", "ctr", "position"]} />
         </div>
       ) : (
-        <p className="text-sm text-muted">Shows once Search Console has final numbers for the days before the change.</p>
+        <p className="text-sm text-muted">Shows once Google has finished counting the days before the change.</p>
       )}
     </section>
   );
 }
 
-/** One read: its outcome, the windows behind it, the three deltas against their thresholds, and the controls used. */
+/** One result: its outcome, the days behind it, the three moves against their margins, and the comparison pages used. */
 export function ReadCard({ read }: { read: ChangeRead }) {
   const o = outcomeInfo[read.outcome];
   const interim = read.kind === "interim";
@@ -192,23 +196,21 @@ export function ReadCard({ read }: { read: ChangeRead }) {
   return (
     <Card className={cx(interim && "border-dashed")}>
       <div className="flex flex-wrap items-center gap-2 px-4 pt-3">
-        <h4 className="text-sm font-semibold">{interim ? "Interim read" : "Final read"}</h4>
-        {interim && <Badge tone="outline">Provisional</Badge>}
+        <h4 className="text-sm font-semibold">{interim ? "First result" : "Final result"}</h4>
+        {interim && <Badge tone="outline">Early</Badge>}
         <Badge tone={o.tone}>{o.label}</Badge>
-        <Badge tone="outline" title="The method is new. Check a surprising verdict against the page's numbers in Search before acting on it.">
-          Experimental
-        </Badge>
+        <Badge tone="outline">Experimental</Badge>
         <span className="ml-auto text-xs text-muted">Taken {fullDay(read.read_on)}</span>
       </div>
       <div className="space-y-4 px-4 pt-2 pb-4">
         <p className="text-xs text-muted">
           {read.outcome === "insufficient_data" ? `${o.detail} The reason: ${read.reason}.` : o.detail}
-          {interim && " A later final read can differ."}
+          {interim && " The final result can differ."} The method is new: check a surprising result against the page&apos;s numbers on Traffic before acting on it.
         </p>
         {read.after.days > 0 && <Windows before={read.before} after={read.after} />}
         {read.deltas && (
           <div>
-            <h5 className="mb-1.5 text-xs font-medium text-muted">Against the control pages</h5>
+            <h5 className="mb-1.5 text-xs font-medium text-muted">Compared with the comparison pages</h5>
             <ul className="divide-y divide-line rounded-surface border border-line">
               {deltaMetrics.map((m) => {
                 const s = signals.find((x) => x.metric === m.metric);
@@ -218,10 +220,10 @@ export function ReadCard({ read }: { read: ChangeRead }) {
                       <span className="font-medium">{m.label}</span>{" "}
                       <span className={cx("tabular-nums", s ? (s.way === "improved" ? "text-success" : "text-danger") : "text-fg")}>{m.format(m.value(read.deltas!))}</span>
                       <span className="block text-xs text-faint">
-                        Counts past {m.threshold(read.thresholds)}. {m.reading}
+                        Counts when it moves more than {m.threshold(read.thresholds)}. {m.reading}
                       </span>
                     </span>
-                    {s ? <Badge tone={outcomeInfo[s.way].tone}>{outcomeInfo[s.way].label}</Badge> : <Badge tone="outline">Under threshold</Badge>}
+                    {s ? <Badge tone={outcomeInfo[s.way].tone}>{outcomeInfo[s.way].label}</Badge> : <Badge tone="outline">Within margin</Badge>}
                   </li>
                 );
               })}
@@ -231,7 +233,7 @@ export function ReadCard({ read }: { read: ChangeRead }) {
         {controls.length > 0 && (
           <details className="text-xs">
             <summary className="cursor-pointer py-3.5 text-muted hover:text-fg md:py-0">
-              Compared against {controls.length} control {controls.length === 1 ? "page" : "pages"}
+              Compared with {controls.length} comparison {controls.length === 1 ? "page" : "pages"}
             </summary>
             <ul className="mt-1.5 space-y-0.5">
               {controls.map((u) => (
@@ -254,17 +256,17 @@ function Windows({ before, after }: { before: ChangeWindow; after: ChangeWindow 
     ["After", after],
   ];
   return (
-    <ScrollX label="read windows">
-      <table className="w-full min-w-[18rem] text-left text-xs tabular-nums">
+    <ScrollX label="days compared">
+      <table className="w-full min-w-[24rem] text-left text-xs tabular-nums">
         <thead className="text-muted">
           <tr>
             <th className="py-1 pr-3 font-medium">
-              <span className="sr-only">Window</span>
+              <span className="sr-only">Pages</span>
             </th>
-            <th className="py-1 pr-3 text-right font-medium">Clicks</th>
-            <th className="py-1 pr-3 text-right font-medium"><span className="sm:hidden">Impr.</span><span className="hidden sm:inline">Impressions</span></th>
-            <th className="py-1 pr-3 text-right font-medium">CTR</th>
-            <th className="py-1 text-right font-medium">Position</th>
+            <th className="py-1 pr-3 text-right font-medium">{figureInfo.clicks.label}</th>
+            <th className="py-1 pr-3 text-right font-medium">{figureInfo.impressions.label}</th>
+            <th className="py-1 pr-3 text-right font-medium">{figureInfo.ctr.label}</th>
+            <th className="py-1 text-right font-medium">{figureInfo.position.label}</th>
           </tr>
         </thead>
         {sides.map(([label, win]) => {
@@ -278,7 +280,7 @@ function Windows({ before, after }: { before: ChangeWindow; after: ChangeWindow 
               {(
                 [
                   ["Page", win.page],
-                  ["Controls", win.control],
+                  ["Comparison pages", win.control],
                 ] as const
               ).map(([who, t]) => (
                 <tr key={who}>
@@ -335,16 +337,16 @@ function Inspections({ rows, zone }: { rows: UrlInspection[]; zone: Zone }) {
   if (rows.length === 0) return null;
   return (
     <details className="text-sm">
-      <summary className="cursor-pointer py-3.5 font-medium text-muted hover:text-fg md:py-0">URL Inspection results ({rows.length})</summary>
+      <summary className="cursor-pointer py-3.5 font-medium text-muted hover:text-fg md:py-0">What Google said about the page ({rows.length})</summary>
       <div className="mt-2">
-        <ScrollX label="URL Inspection results">
+        <ScrollX label="What Google said about the page">
           <table className="w-full min-w-[32rem] text-left text-xs">
             <thead className="text-muted">
               <tr className="border-b border-line">
                 <th className="py-1 pr-3 font-medium">Checked</th>
-                <th className="py-1 pr-3 font-medium">Google&apos;s verdict</th>
-                <th className="py-1 pr-3 font-medium">Coverage</th>
-                <th className="py-1 font-medium">Last crawl</th>
+                <th className="py-1 pr-3 font-medium">Google&apos;s answer</th>
+                <th className="py-1 pr-3 font-medium">Status in Google</th>
+                <th className="py-1 font-medium">Google last saw it</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-line">
