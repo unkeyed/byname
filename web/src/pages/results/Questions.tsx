@@ -39,11 +39,7 @@ export function Questions() {
     <>
       <ViewHeader
         title="Questions"
-        subtitle={
-          tab === "questions"
-            ? `Every question you track, which AI apps name ${brand}, and who they name instead. Open a question to read the answers.`
-            : `Every answer from the latest check: whether it named ${brand}, in what position, and how many links it gave.`
-        }
+        subtitle={`Every question you track, which AI apps name ${brand}, and who they name instead. Open a question to read its answers, or list every answer from the latest check.`}
         range={tab === "questions"}
       />
       <div className="relative min-h-0 flex-1 overflow-auto px-3 py-4 md:px-5 md:py-5">
@@ -178,7 +174,7 @@ function QuestionList({ filter }: { filter: ResultsFilter }) {
                     <div className="tabular-nums">
                       {r.named_by.length} <span className="text-faint">of {r.answered} AI apps</span>
                     </div>
-                    {r.named_by.length > 0 && <div className="text-xs text-muted">{namedBy(r).join(", ")}</div>}
+                    <div className="line-clamp-2 min-h-8 text-xs text-muted">{namedBy(r).join(", ")}</div>
                     <CountAnyway question={r.question} />
                   </td>
                   <td className="px-3 py-2 align-top tabular-nums">{r.best_position ? `#${r.best_position}` : <span className="text-faint">–</span>}</td>

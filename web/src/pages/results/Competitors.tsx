@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api, type BrandStanding, type Competitors as Data } from "../../api";
 import { Donut, type Segment } from "../../charts";
-import { fidelityInfo, lineKey, pct, useLabels } from "../../lines";
+import { lineKey, pct, useLabels } from "../../lines";
 import { keys, useAnsweredRuns, useBrands, useSettings, useSurfaces } from "../../queries";
 import { Badge, Card, CardHeader, cx, EmptyState, ErrorNote, Pending, ScrollX, useLoading } from "../../ui";
 import { useFilter, useView } from "../../view";
@@ -143,10 +143,10 @@ function Heatmap({ data }: { data: Data }) {
                 {data.columns.map((c) => (
                   <th key={lineKey(c)} scope="col" className="px-0.5 pb-1 text-left align-bottom font-medium text-muted">
                     <button type="button" onClick={() => openEngine(c)} title={`${c.models.length ? `${c.models.join(", ")}. ` : ""}Open ${labels.line(c.pair, c.models)}`} className="block w-full rounded-control px-1 py-0.5 text-left hover:bg-subtle">
-                      <span className="block text-fg underline decoration-line-hover underline-offset-2">{labels.surfaceTitle(c.pair.surface)}</span>
-                      {(c.pair.model || c.models.length > 1) && <span className="block font-normal [overflow-wrap:anywhere]">{c.pair.model || `${c.models.length} models`}</span>}
-                      <span className={cx("block", c.fidelity === "approximation" ? "text-warn" : "font-normal")}>{fidelityInfo[c.fidelity].label}</span>
-                      <span className="block font-normal text-faint">{c.answered} answers</span>
+                      <span className="line-clamp-2 h-8 text-fg underline decoration-line-hover underline-offset-2">{labels.surfaceTitle(c.pair.surface)}</span>
+                      <span className={cx("block h-4 truncate", c.fidelity === "approximation" ? "text-warn" : "font-normal")}>
+                        {c.pair.model || (c.models.length > 1 ? `${c.models.length} models` : c.fidelity === "approximation" ? "Stand-in" : "")}
+                      </span>
                     </button>
                   </th>
                 ))}

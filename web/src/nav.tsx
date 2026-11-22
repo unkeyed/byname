@@ -1,9 +1,10 @@
-import { createContext, useContext, useLayoutEffect, useRef } from "react";
+import { createContext, useContext } from "react";
 import { Navigate, NavLink, Outlet, useLocation } from "react-router";
 import { cx, type IconName } from "./ui";
 import { useView } from "./view";
 
-export type SectionTab = { path: string; label: string };
+/** short is the label on a phone, where the full labels would not fit in one row. */
+export type SectionTab = { path: string; label: string; short?: string };
 export type NavItem = { to: string; label: string; icon: IconName; tabs?: SectionTab[]; filters?: boolean };
 
 /**
@@ -22,8 +23,8 @@ export const nav: NavItem[] = [
     tabs: [
       { path: "questions", label: "Questions" },
       { path: "competitors", label: "Competitors" },
-      { path: "missed", label: "Missed questions" },
-      { path: "what-changed", label: "What changed" },
+      { path: "missed", label: "Missed questions", short: "Missed" },
+      { path: "what-changed", label: "What changed", short: "Changes" },
     ],
   },
   {
@@ -72,34 +73,33 @@ export function Section({ item }: { item: NavItem }) {
   );
 }
 
-/**
- * A section's tabs as links, so each tab has its own URL. On a phone the row
- * scrolls sideways rather than wrapping, with the current tab scrolled into view.
- */
+/** A section's tabs as links, so each tab has its own URL. On a phone the tabs take their short labels, so the row fits. */
 export function SectionTabs({ item }: { item: NavItem }) {
   const view = useView();
-  const ref = useRef<HTMLElement>(null);
-  const { pathname } = useLocation();
-  useLayoutEffect(() => {
-    const row = ref.current;
-    const active = row?.querySelector<HTMLElement>("[aria-current=page]");
-    if (row && active && (active.offsetLeft < row.scrollLeft || active.offsetLeft + active.offsetWidth > row.scrollLeft + row.clientWidth)) row.scrollLeft = active.offsetLeft - 12;
-  }, [pathname]);
   const query = item.filters ? view.filterSearch() : "";
   return (
-    <nav ref={ref} aria-label={item.label} data-load-visible className="relative flex shrink-0 gap-4 overflow-x-auto bg-bg px-3 shadow-[inset_0_-1px_0_var(--line)] [scrollbar-width:none] md:gap-5 md:px-5">
+    <nav aria-label={item.label} data-load-visible className="flex shrink-0 gap-4 bg-bg px-3 shadow-[inset_0_-1px_0_var(--line)] md:gap-5 md:px-5">
       {item.tabs!.map((t) => (
         <NavLink
           key={t.path}
           to={`${item.to}/${t.path}${query}`}
           className={({ isActive }) =>
             cx(
-              "inline-flex h-11 shrink-0 items-center border-b-2 text-sm font-medium whitespace-nowrap transition-colors md:h-9",
+              "inline-flex h-11 min-w-11 shrink-0 items-center justify-center border-b-2 text-sm font-medium whitespace-nowrap transition-colors md:h-9 md:min-w-0",
               isActive ? "border-fg text-fg" : "border-transparent text-muted hover:text-fg",
             )
           }
         >
-          {t.label}
+          {t.short ? (
+            <>
+              <span className="md:hidden" aria-hidden="true">
+                {t.short}
+              </span>
+              <span className="sr-only md:not-sr-only">{t.label}</span>
+            </>
+          ) : (
+            t.label
+          )}
         </NavLink>
       ))}
     </nav>

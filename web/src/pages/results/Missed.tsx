@@ -40,11 +40,7 @@ export function Missed() {
     <>
       <ViewHeader
         title="Missed questions"
-        subtitle={
-          tab === "questions"
-            ? `Questions where at least one AI app did not name ${brand} in the latest check, and what you can do about each.`
-            : `The sites and pages AI answers link to, and whether each names ${brand}. Pages to pitch name a competitor and never you.`
-        }
+        subtitle={`Questions where an AI app did not name ${brand} in the latest check, what to do about each, and the pages AI links to that name a competitor and never you.`}
         range={tab === "sources"}
       />
       <div className="relative min-h-0 flex-1 overflow-auto px-3 py-4 md:px-5 md:py-5">
@@ -326,7 +322,7 @@ function PageRow({ page: p }: { page: SourcePage }) {
   return (
     <li className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-start sm:gap-4">
       <div className="min-w-0 flex-1">
-        <a href={p.url} target="_blank" rel="noreferrer noopener" className={cx("block truncate text-sm hover:underline", p.is_self && "font-semibold")} title={p.url}>
+        <a href={p.url} target="_blank" rel="noreferrer noopener" className={cx("block truncate py-3 text-sm hover:underline md:py-0", p.is_self && "font-semibold")}>
           {shortUrl(p.url)}
         </a>
         <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
