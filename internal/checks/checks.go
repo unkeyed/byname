@@ -62,6 +62,15 @@ type Service struct {
 	log    *slog.Logger
 	wake   chan struct{}
 	alerts Alerts
+	finder Finder
+}
+
+// Finder reads each stored answer for the brands it names that nobody
+// tracks (internal/discovery). Find records every outcome itself and
+// never fails the check; its cost counts against the check's spend cap.
+type Finder interface {
+	Ready(ctx context.Context) (bool, error)
+	Find(ctx context.Context, answerID, runID int64, text string) error
 }
 
 // Alerts hears about every finished run, so it can tell people
@@ -77,6 +86,8 @@ type Options struct {
 	Log   *slog.Logger
 	// Alerts, when set, hears about each run as it finishes.
 	Alerts Alerts
+	// Finder, when set, reads each answer for other brands.
+	Finder Finder
 }
 
 func New(db *pgxpool.Pool, cfg *config.Service, o Options) *Service {
@@ -89,7 +100,7 @@ func New(db *pgxpool.Pool, cfg *config.Service, o Options) *Service {
 	if o.Log == nil {
 		o.Log = slog.Default()
 	}
-	return &Service{db: db, config: cfg, now: o.Now, sleep: o.Sleep, log: o.Log, wake: make(chan struct{}, 1), alerts: o.Alerts}
+	return &Service{db: db, config: cfg, now: o.Now, sleep: o.Sleep, log: o.Log, wake: make(chan struct{}, 1), alerts: o.Alerts, finder: o.Finder}
 }
 
 func sleep(ctx context.Context, d time.Duration) error {

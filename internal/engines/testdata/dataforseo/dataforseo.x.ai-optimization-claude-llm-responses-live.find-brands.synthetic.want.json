@@ -1,0 +1,5 @@
+{
+  "status": "ok",
+  "text": "```json\n{\"brands\":[{\"name\":\"Northwind Cloud\",\"kind\":\"brand\",\"domain\":\"northwind.example\"},{\"name\":\"Contoso Gateway\",\"kind\":\"brand\",\"domain\":\"contoso.example\"},{\"name\":\"Litware Cloud, Inc.\",\"kind\":\"brand\",\"domain\":\"litware.example\"},{\"name\":\"Fabrikam Deploy\",\"kind\":\"brand\",\"domain\":\"\"},{\"name\":\"Redis\",\"kind\":\"technology\",\"domain\":\"redis.io\"}]}\n```",
+  "reported_model": "claude-haiku-4-5-20251001"
+}

@@ -234,8 +234,12 @@ func TestEstimate(t *testing.T) {
 			t.Errorf("%s: %+v, want the sampled %v per call times 2 calls", r.Surface, r, want)
 		}
 	}
-	if !near(est.KnownUSD, 2*0.055+2*0.004) {
-		t.Errorf("known = %v, want the sum of both pairs", est.KnownUSD)
+	find := 4 * engines.BrandFinder.SampleCostUSD
+	if est.FindBrands == nil || est.FindBrands.Answers != 4 || !near(est.FindBrands.CostUSD, find) {
+		t.Errorf("find brands = %+v, want 4 answers read at the sampled price", est.FindBrands)
+	}
+	if !near(est.KnownUSD, 2*0.055+2*0.004+find) {
+		t.Errorf("known = %v, want the sum of both pairs and reading their answers", est.KnownUSD)
 	}
 
 	if _, err := db.Exec(ctx, `WITH r AS (INSERT INTO run (question_set_id, trigger, status) SELECT id, 'run_now', 'completed' FROM question_set RETURNING id)
@@ -252,8 +256,15 @@ func TestEstimate(t *testing.T) {
 			t.Errorf("after two answers that reported $0.02 and $0.04: %+v, want their mean $0.03 from history", r)
 		}
 	}
-	if !near(est.KnownUSD, 2*0.03+2*0.004) {
+	if !near(est.KnownUSD, 2*0.03+2*0.004+find) {
 		t.Errorf("known = %v after history", est.KnownUSD)
+	}
+
+	if _, err := db.Exec(ctx, `UPDATE instance_settings SET find_brands = false`); err != nil {
+		t.Fatal(err)
+	}
+	if est, _ = svc.Estimate(ctx); est.FindBrands != nil || !near(est.KnownUSD, 2*0.03+2*0.004) {
+		t.Errorf("with reading answers off: find %+v, known %v, want neither counted", est.FindBrands, est.KnownUSD)
 	}
 }
 
@@ -279,7 +290,7 @@ func TestFinishingSetsADefaultMonthlyCap(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	perCheck := 2*0.055 + 2*0.004
+	perCheck := 2*0.055 + 2*0.004 + 4*engines.BrandFinder.SampleCostUSD
 	if costs.ChecksPerMonth != 365.25/12/3 || math.Abs(costs.MonthUSD-perCheck*costs.ChecksPerMonth) > 1e-9 {
 		t.Fatalf("check costs = %+v, want %v a check about ten times a month", costs, perCheck)
 	}

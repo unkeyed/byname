@@ -27,15 +27,22 @@ const (
 	maxBackoff     = time.Minute
 )
 
+// runSpent is what run $1 has spent, read from its run row: its answers
+// and the calls that read them for other brands, which its spend cap
+// counts.
+const runSpent = `(spend_usd + coalesce((SELECT sum(cost_usd) FROM brand_call WHERE run_id = $1), 0))::float8`
+
 // plan is what one run asks and within which limits.
 type plan struct {
 	runID    int64
 	settings config.SettingsView
 	brands   []panel.Brand
 	calls    []call
-	// monthBase is what the month's other runs and social searches have
-	// spent, since the monthly cap covers both.
+	// monthBase is what the month's other runs, social searches and calls
+	// for other brands have spent, since the monthly cap covers them all.
 	monthBase float64
+	// find is whether each answer is read for other brands.
+	find bool
 }
 
 type call struct {
@@ -90,7 +97,7 @@ func (s *Service) RunCheck(ctx context.Context, runID int64) error {
 	var status Status
 	var setID int64
 	var spent float64
-	err := s.db.QueryRow(ctx, `SELECT status, question_set_id, spend_usd::float8 FROM run WHERE id = $1`, runID).Scan(&status, &setID, &spent)
+	err := s.db.QueryRow(ctx, `SELECT status, question_set_id, `+runSpent+` FROM run WHERE id = $1`, runID).Scan(&status, &setID, &spent)
 	if err != nil {
 		return err
 	}
@@ -143,6 +150,11 @@ func (s *Service) plan(ctx context.Context, runID, setID int64) (plan, *outcome,
 	if err != nil {
 		return p, nil, err
 	}
+	if s.finder != nil {
+		if p.find, err = s.finder.Ready(ctx); err != nil {
+			return p, nil, err
+		}
+	}
 	if len(pairs) == 0 {
 		return p, &outcome{status: Failed, message: "no surface and model pair is enabled"}, nil
 	}
@@ -178,8 +190,7 @@ func (s *Service) plan(ctx context.Context, runID, setID int64) (plan, *outcome,
 	loc := p.settings.Schedule().Location
 	local := s.now().In(loc)
 	monthStart := time.Date(local.Year(), local.Month(), 1, 0, 0, 0, 0, loc)
-	err = s.db.QueryRow(ctx, `SELECT coalesce((SELECT sum(spend_usd) FROM run WHERE id <> $1 AND started_at >= $2), 0)::float8
-		+ coalesce((SELECT sum(cost_usd) FROM social_call WHERE called_at >= $2), 0)::float8`, runID, monthStart).Scan(&p.monthBase)
+	err = s.db.QueryRow(ctx, `SELECT coalesce(sum(usd), 0)::float8 FROM spend WHERE at >= $2 AND run_id IS DISTINCT FROM $1`, runID, monthStart).Scan(&p.monthBase)
 	return p, nil, err
 }
 
@@ -266,12 +277,35 @@ func (s *Service) ask(ctx context.Context, p plan, c call, out *outcome) error {
 	if err != nil {
 		res = engines.Result{Status: engines.StatusFailed, Error: err.Error()}
 	}
-	spent, err := s.store(ctx, p, c, res, attempt)
+	answerID, spent, err := s.store(ctx, p, c, res, attempt)
 	if err != nil {
 		return err
 	}
 	out.setSpent(spent)
+	if p.find && res.Status == engines.StatusOK && !s.overBudget(p, out) {
+		s.findBrands(ctx, p, answerID, res.Text, out)
+	}
 	return nil
+}
+
+// findBrands reads a stored answer for other brands and adds what that
+// cost to the run's spend. Nothing that goes wrong here fails the check:
+// the answer is left unread for a later pass.
+func (s *Service) findBrands(ctx context.Context, p plan, answerID int64, text string, out *outcome) {
+	if err := s.finder.Find(ctx, answerID, p.runID, text); err != nil {
+		if ctx.Err() == nil {
+			s.log.Warn("read an answer for other brands", "run", p.runID, "answer", answerID, "err", err)
+		}
+		return
+	}
+	var spent float64
+	if err := s.db.QueryRow(ctx, `SELECT `+runSpent+` FROM run WHERE id = $1`, p.runID).Scan(&spent); err != nil {
+		if ctx.Err() == nil {
+			s.log.Warn("read a run's spend", "run", p.runID, "err", err)
+		}
+		return
+	}
+	out.setSpent(spent)
 }
 
 func backoffFor(r *engines.Refusal, n int) time.Duration {
@@ -282,17 +316,17 @@ func backoffFor(r *engines.Refusal, n int) time.Duration {
 	return min(d, maxBackoff)
 }
 
-// store upserts one answer with its mentions and citations and returns the
-// run's spend. The run row is locked first, so concurrent answers sum the
-// spend one after another and none is lost.
-func (s *Service) store(ctx context.Context, p plan, c call, res engines.Result, attempts int) (float64, error) {
+// store upserts one answer with its mentions and citations and returns
+// its id and the run's spend. The run row is locked first, so concurrent
+// answers sum the spend one after another and none is lost.
+func (s *Service) store(ctx context.Context, p plan, c call, res engines.Result, attempts int) (int64, float64, error) {
 	scored := panel.Score(res, p.brands, panel.Settings{MatchMode: p.settings.MatchMode})
 	var spent float64
+	var answerID int64
 	err := pgx.BeginFunc(ctx, s.db, func(tx pgx.Tx) error {
 		if _, err := tx.Exec(ctx, `SELECT 1 FROM run WHERE id = $1 FOR UPDATE`, p.runID); err != nil {
 			return err
 		}
-		var answerID int64
 		err := tx.QueryRow(ctx, `INSERT INTO answer (run_id, question_id, surface_model_id, endpoint, fidelity, reported_model,
 				status, error, attempts, mentioned, cited, position, cost_usd, text, raw, fan_out, call_id)
 			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
@@ -328,9 +362,9 @@ func (s *Service) store(ctx context.Context, p plan, c call, res engines.Result,
 		return tx.QueryRow(ctx, `UPDATE run SET
 				spend_usd = (SELECT coalesce(sum(cost_usd), 0) FROM answer WHERE run_id = $1),
 				spend_missing_calls = (SELECT count(*) FROM answer WHERE run_id = $1 AND cost_usd IS NULL AND status <> 'failed')
-			WHERE id = $1 RETURNING spend_usd::float8`, p.runID).Scan(&spent)
+			WHERE id = $1 RETURNING `+runSpent, p.runID).Scan(&spent)
 	})
-	return spent, err
+	return answerID, spent, err
 }
 
 func nullPosition(p int) *int {

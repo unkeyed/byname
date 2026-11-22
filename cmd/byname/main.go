@@ -28,10 +28,12 @@ import (
 	instconfig "github.com/unkeyed/byname/internal/config"
 	"github.com/unkeyed/byname/internal/core"
 	"github.com/unkeyed/byname/internal/db"
+	"github.com/unkeyed/byname/internal/discovery"
 	"github.com/unkeyed/byname/internal/engines"
 	"github.com/unkeyed/byname/internal/gsc"
 	"github.com/unkeyed/byname/internal/httpapi"
 	"github.com/unkeyed/byname/internal/instance"
+	"github.com/unkeyed/byname/internal/logos"
 	"github.com/unkeyed/byname/internal/mcpserver"
 	"github.com/unkeyed/byname/internal/notify"
 	"github.com/unkeyed/byname/internal/results"
@@ -392,7 +394,9 @@ func run(log *slog.Logger) error {
 		HTTPClient: &http.Client{}, Resolve: engines.HeadResolver(&http.Client{Timeout: 10 * time.Second}),
 		Alerts: alerts,
 	})
-	runs := checks.New(pool, settings, checks.Options{Log: log, Alerts: alerts})
+	brands := discovery.New(pool, settings, discovery.Options{Log: log})
+	logoLookups := logos.New(pool, settings, logos.Options{Log: log})
+	runs := checks.New(pool, settings, checks.Options{Log: log, Alerts: alerts, Finder: brands})
 	search := gsc.New(pool, gsc.Options{
 		Secrets: cfg.Secrets, Endpoints: gsc.GoogleEndpoints(cfg.GSCBaseURL), Client: cfg.GSCClient,
 		PublicURL: cfg.Auth.PublicURL, Terms: settings, Alerts: alerts,
@@ -410,7 +414,8 @@ func run(log *slog.Logger) error {
 	}
 	authn := &auth.Authenticator{Keys: auth.NewKeyStore(pool, cfg.Unkey), Users: users, OAuth: auth.NewOAuthServer(pool, cfg.Auth.PublicURL)}
 
-	services := app.Services{Instance: instance.New(version, pool, settings, mentions), Config: settings, Checks: runs, Results: res, Notify: alerts, GSC: search, Changes: site, Social: mentions}
+	services := app.Services{Instance: instance.New(version, pool, settings, mentions, brands), Config: settings, Checks: runs, Results: res, Notify: alerts,
+		GSC: search, Changes: site, Social: mentions, Discovery: brands, Logos: logoLookups}
 	mux := httpapi.NewMux(services, authn, log)
 	mux.Handle("/mcp", mcpserver.Handler(services, authn.OAuth, version))
 	mux.Handle("/", web.Handler())
@@ -444,7 +449,8 @@ func run(log *slog.Logger) error {
 	}
 	cited := sources.New(pool, settings, sources.Options{AllowPrivate: cfg.SourcesAllowPrivate, UserAgent: "Byname/" + version, Log: log})
 	jobs.Go(func() {
-		scheduler.New(runs, settings, scheduler.Options{Log: log, Sources: cited, Search: search, Changes: site, Social: mentions}).Run(ctx)
+		scheduler.New(runs, settings, scheduler.Options{Log: log, Sources: cited, Search: search, Changes: site, Social: mentions,
+			OtherBrands: []scheduler.Ticker{brands, logoLookups}}).Run(ctx)
 	})
 	jobs.Go(func() { alerts.Run(ctx) })
 	log.Info("Byname listening", "port", cfg.Port, "version", version, "keys", authn.Keys.Mode(),

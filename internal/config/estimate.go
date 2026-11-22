@@ -6,6 +6,8 @@ import (
 	"math"
 	"slices"
 
+	"github.com/jackc/pgx/v5"
+
 	"github.com/unkeyed/byname/internal/core"
 	"github.com/unkeyed/byname/internal/engines"
 )
@@ -31,9 +33,46 @@ type Estimate struct {
 	Questions    int           `json:"questions"`
 	Pairs        int           `json:"pairs"`
 	Calls        int           `json:"calls"`
-	KnownUSD     float64       `json:"known_usd" jsonschema:"the sum over pairs with a cost per call"`
+	KnownUSD     float64       `json:"known_usd" jsonschema:"the sum over pairs with a cost per call, plus reading the answers for other brands when that is on"`
 	UnknownPairs int           `json:"unknown_pairs"`
 	Rows         []EstimateRow `json:"rows"`
+	// FindBrands is reading each answer for the brands it names that you
+	// don't track, which a check does right after storing it.
+	FindBrands *FindEstimate `json:"find_brands" jsonschema:"reading each answer for other brands; null while it is off or no Treg token is stored"`
+}
+
+// FindEstimate is what reading a check's answers for other brands costs,
+// counting every call as answered.
+type FindEstimate struct {
+	Answers          int     `json:"answers"`
+	CostPerAnswerUSD float64 `json:"cost_per_answer_usd" jsonschema:"the mean of past reads, or the sampled price before any"`
+	CostUSD          float64 `json:"cost_usd"`
+}
+
+// FindCostPerAnswer is what reading one answer for other brands costs: the
+// mean of the reads that reported a cost, or the tool's sample price
+// before any did.
+func FindCostPerAnswer(ctx context.Context, q interface {
+	QueryRow(context.Context, string, ...any) pgx.Row
+}) (float64, error) {
+	var mean *float64
+	err := q.QueryRow(ctx, `SELECT avg(cost_usd)::float8 FROM brand_call WHERE purpose = 'find' AND cost_usd IS NOT NULL`).Scan(&mean)
+	if mean == nil {
+		return engines.BrandFinder.SampleCostUSD, err
+	}
+	return *mean, err
+}
+
+// findEstimate prices reading calls answers, or is nil when reading is off
+// or no Treg token is stored.
+func (s *Service) findEstimate(ctx context.Context, calls int) (*FindEstimate, error) {
+	var on bool
+	if err := s.db.QueryRow(ctx, `SELECT find_brands AND EXISTS (SELECT 1 FROM credential WHERE kind = $1) FROM instance_settings`,
+		engines.CredentialTreg).Scan(&on); err != nil || !on {
+		return nil, err
+	}
+	per, err := FindCostPerAnswer(ctx, s.db)
+	return &FindEstimate{Answers: calls, CostPerAnswerUSD: per, CostUSD: per * float64(calls)}, err
 }
 
 type EstimateRow struct {
@@ -138,6 +177,12 @@ func (s *Service) Estimate(ctx context.Context) (Estimate, error) {
 	}
 	out.Pairs = len(out.Rows)
 	out.Calls = out.Questions * out.Pairs
+	if out.FindBrands, err = s.findEstimate(ctx, out.Calls); err != nil {
+		return out, err
+	}
+	if out.FindBrands != nil {
+		out.KnownUSD += out.FindBrands.CostUSD
+	}
 	return out, nil
 }
 

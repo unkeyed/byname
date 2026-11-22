@@ -175,8 +175,7 @@ func (s *Service) monthSpend(ctx context.Context, st settings) (float64, error) 
 	local := s.now().In(st.loc)
 	start := time.Date(local.Year(), local.Month(), 1, 0, 0, 0, 0, st.loc)
 	var spent float64
-	err := s.db.QueryRow(ctx, `SELECT coalesce((SELECT sum(spend_usd) FROM run WHERE started_at >= $1), 0)::float8
-		+ coalesce((SELECT sum(cost_usd) FROM social_call WHERE called_at >= $1), 0)::float8`, start).Scan(&spent)
+	err := s.db.QueryRow(ctx, `SELECT coalesce(sum(usd), 0)::float8 FROM spend WHERE at >= $1`, start).Scan(&spent)
 	return spent, err
 }
 

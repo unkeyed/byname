@@ -315,6 +315,7 @@ func TestCostsOverHTTP(t *testing.T) {
 		DefaultMonthCapUSD float64 `json:"default_month_cap_usd"`
 		Month              struct {
 			ChecksUSD float64  `json:"checks_usd"`
+			BrandsUSD float64  `json:"brands_usd"`
 			SpentUSD  float64  `json:"spent_usd"`
 			CapUSD    *float64 `json:"cap_usd"`
 		} `json:"month"`
@@ -352,8 +353,9 @@ func TestCostsOverHTTP(t *testing.T) {
 	}
 	reader.call("GET", "/v1/runs", nil, http.StatusOK, &runs)
 	reader.call("GET", "/v1/costs", nil, http.StatusOK, &got)
-	if got.Month.ChecksUSD != runs[0].SpendUSD || got.Month.SpentUSD != runs[0].SpendUSD || got.Month.ChecksUSD == 0 {
-		t.Fatalf("month = %+v after a check that spent %v", got.Month, runs[0].SpendUSD)
+	// The check read its 4 answers for other brands, at the fake's $0.01 a call.
+	if got.Month.ChecksUSD != runs[0].SpendUSD || got.Month.BrandsUSD != 0.04 || got.Month.SpentUSD != runs[0].SpendUSD+0.04 || got.Month.ChecksUSD == 0 {
+		t.Fatalf("month = %+v after a check that spent %v on answers and read them for other brands", got.Month, runs[0].SpendUSD)
 	}
 }
 

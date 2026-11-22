@@ -1,12 +1,16 @@
 // Package tregtest is a fake Treg for tests outside internal/engines. It
 // answers /call/<tool id> with the captured or synthetic fixture for that
 // tool from internal/engines/testdata, sets X-Treg-Cost-Micro the way Treg
-// does, and replays a repeated Idempotency-Key the way Treg does.
+// does, and replays a repeated Idempotency-Key the way Treg does. A call
+// that reads an answer for other brands (engines.BrandFinder with a system
+// message) gets FindFixture's reply instead of the tool's answer.
 package tregtest
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -15,6 +19,8 @@ import (
 	"strings"
 	"sync"
 	"testing"
+
+	"github.com/unkeyed/byname/internal/engines"
 )
 
 // Fixtures is the body served per tool id, as a file under
@@ -38,6 +44,10 @@ var Fixtures = map[string]string{
 	"serpapi.x.brave-ai-mode":                                         "serpapi/serpapi.x.brave-ai-mode.json",
 }
 
+// FindFixture is the brand finder's reply: it names your brand, a
+// competitor by alias, two brands nobody tracks and a technology.
+const FindFixture = "dataforseo/dataforseo.x.ai-optimization-claude-llm-responses-live.find-brands.synthetic.json"
+
 // DefaultCostMicro is what every answer call costs unless SetCost says
 // otherwise. Model lists are free, as on Treg.
 const DefaultCostMicro = 10_000
@@ -48,6 +58,8 @@ type Call struct {
 	Token          string
 	IdempotencyKey string
 	Replay         bool
+	// Find is a call reading an answer for other brands.
+	Find bool
 }
 
 // Refusal makes the fake answer as Treg refusing on its own behalf.
@@ -64,6 +76,7 @@ type Server struct {
 	cost   map[string]*int64
 	paid   map[string]int64
 	bodies map[string][]byte
+	find   []byte
 	// Before runs for each call before it is answered. A non-nil Refusal
 	// refuses it.
 	before func(Call) *Refusal
@@ -80,6 +93,11 @@ func New(t testing.TB) *Server {
 		}
 		s.bodies[tool] = b
 	}
+	b, err := os.ReadFile(filepath.Join(testdata(), FindFixture))
+	if err != nil {
+		t.Fatalf("tregtest: %v", err)
+	}
+	s.find = b
 	s.Server = httptest.NewServer(http.HandlerFunc(s.serve))
 	t.Cleanup(s.Close)
 	return s
@@ -109,6 +127,13 @@ func (s *Server) SetBody(tool string, body []byte) {
 	s.bodies[tool] = body
 }
 
+// SetFindBody replaces the brand finder's reply.
+func (s *Server) SetFindBody(body []byte) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.find = body
+}
+
 // Before installs a hook that runs before each call is answered.
 func (s *Server) Before(f func(Call) *Refusal) {
 	s.mu.Lock()
@@ -131,11 +156,12 @@ func (s *Server) Reset() {
 	s.calls = nil
 }
 
-// Answers counts the calls that were not model lists or replays.
+// Answers counts the calls that were not model lists, replays or reads
+// for other brands.
 func (s *Server) Answers() int {
 	n := 0
 	for _, c := range s.Calls() {
-		if !strings.HasSuffix(c.Tool, "-models") && !c.Replay {
+		if !strings.HasSuffix(c.Tool, "-models") && !c.Replay && !c.Find {
 			n++
 		}
 	}
@@ -145,8 +171,13 @@ func (s *Server) Answers() int {
 func (s *Server) serve(w http.ResponseWriter, r *http.Request) {
 	tool, ok := strings.CutPrefix(r.URL.Path, "/call/")
 	c := Call{Tool: tool, Token: r.Header.Get("X-Treg-Token"), IdempotencyKey: r.Header.Get("Idempotency-Key")}
+	sent, _ := io.ReadAll(r.Body)
+	c.Find = tool == engines.BrandFinder.ID && bytes.Contains(sent, []byte(`"system_message"`))
 	s.mu.Lock()
 	body, known := s.bodies[tool]
+	if c.Find {
+		body = s.find
+	}
 	before := s.before
 	price, priced := s.cost[tool]
 	original, replay := s.paid[c.IdempotencyKey]
