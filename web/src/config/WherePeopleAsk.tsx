@@ -509,7 +509,9 @@ function PairRow({ p, result, error, testing, canEdit, onTest }: { p: Pair; resu
           )}
         </span>
       </div>
-      {result ? (
+      {error != null ? (
+        <p className="text-xs text-danger [overflow-wrap:anywhere]">{errorMessage(error)}</p>
+      ) : result ? (
         <TestDetails r={result} />
       ) : (
         tested && (
@@ -531,14 +533,13 @@ function PairRow({ p, result, error, testing, canEdit, onTest }: { p: Pair; resu
           </p>
         )
       )}
-      {!tested && !result && <p className="text-xs text-faint">The label is what this route should give. A test confirms it, or lowers it to Approximation.</p>}
+      {!tested && !result && error == null && <p className="text-xs text-faint">The label is what this route should give. A test confirms it, or lowers it to Approximation.</p>}
       {p.paused_reason && <p className="text-xs text-warn">{p.paused_reason}</p>}
       {failed && p.force_web_search && (
         <p className="text-xs text-muted">
           If the model refused forced web search, untick “Force web search” for it above, save, and test again. The pair then counts as an Approximation.
         </p>
       )}
-      <ErrorNote error={error} />
     </li>
   );
 }
