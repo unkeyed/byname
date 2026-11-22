@@ -225,6 +225,18 @@ export interface Settings {
   raw_retention_days: number | null;
 }
 
+/** A scheduled check in the instance's own time zone, so the app can say "tomorrow at 06:00, then every 3 days". */
+export interface UpcomingCheck {
+  at: Timestamp;
+  /** YYYY-MM-DD in the time zone. */
+  local_date: string;
+  /** HH:MM in the time zone. */
+  local_time: string;
+  /** Calendar days from today in the time zone: 0 is today, 1 tomorrow. */
+  days_away: number;
+  then_every_days: number;
+}
+
 export interface SettingsView extends Settings {
   checks_paused: boolean;
   next_check_at: Timestamp | null;
@@ -240,8 +252,9 @@ export interface SettingsView extends Settings {
     finished_at: Timestamp | null;
   } | null;
   /** The next scheduled check in the instance's time zone; null while paused or before onboarding is finished. */
-  next_check: { at: Timestamp; local_date: string; local_time: string; days_away: number; then_every_days: number } | null;
+  next_check: UpcomingCheck | null;
   updated_at: Timestamp;
+  onboarded_at: Timestamp | null;
   /** Lowercased; a Search Console query containing one is brand. */
   branded_terms: string[];
   /** True while the terms are the brand's name and aliases. */
@@ -270,6 +283,18 @@ export interface Question {
   id: number;
   group: string;
   text: string;
+  /** The text names your brand, by the rules answers are scored with. */
+  names_brand: boolean;
+  /** False by default when the text names your brand; set with questions.setScoring. */
+  count_in_scores: boolean;
+}
+
+/** POST /v1/naming-check: what text being typed names, before anything is saved. */
+export interface NamingCheck {
+  /** Your brand's name; empty before it is set. */
+  brand: string;
+  questions: { text: string; names_brand: boolean; brands: string[] }[];
+  aliases: { alias: string; common_word: boolean }[];
 }
 
 export interface QuestionSet {
@@ -416,6 +441,8 @@ export interface Onboarding {
   finished_at: Timestamp | null;
   /** What still blocks finishing, in plain words; empty when Finish will work. */
   missing: string[];
+  /** The scheduled check finishing now would set; null once finished. */
+  first_scheduled_check: UpcomingCheck | null;
 }
 
 export interface EstimateRow {
@@ -444,6 +471,58 @@ export interface Estimate {
   known_usd: number;
   unknown_pairs: number;
   rows: EstimateRow[];
+}
+
+/** GET /v1/costs: every cost figure, in US dollars. Expected figures are estimates. */
+export interface Costs {
+  /** One answer on each surface, on its current route, in onboarding order. */
+  per_answer: {
+    surface: SurfaceKey;
+    title: string;
+    group: SurfaceGroup;
+    route: Route;
+    endpoint: string;
+    enabled: boolean;
+    default_on: boolean;
+    models: string[];
+    cost_per_answer_usd: number | null;
+    source: "history" | "sample" | "unknown";
+    samples: number;
+  }[];
+  checks: {
+    check: Estimate;
+    check_every_days: number;
+    paused: boolean;
+    /** 0 while paused. */
+    checks_per_month: number;
+    month_usd: number;
+  };
+  social: {
+    enabled: boolean;
+    fetches_per_month: number;
+    terms: number;
+    /** 0 without a Treg token. */
+    treg_networks: number;
+    treg_per_fetch_usd: number;
+    /** What the Treg networks cost a month at these settings, on or off. */
+    treg_month_usd: number;
+    bluesky_on: boolean;
+    bluesky_month_usd: number;
+    /** 0 while social is off. */
+    month_usd: number;
+  };
+  /** checks.month_usd plus social.month_usd. */
+  month_estimate_usd: number;
+  /** The monthly cap finishing onboarding sets when none is set. */
+  default_month_cap_usd: number;
+  month: {
+    start: Timestamp;
+    checks_usd: number;
+    social_usd: number;
+    spent_usd: number;
+    missing_cost_calls: number;
+    cap_usd: number | null;
+  };
 }
 
 export type RunStatus = "queued" | "running" | "completed" | "capped" | "refused" | "failed";
@@ -1501,7 +1580,11 @@ export const api = {
     put: (body: QuestionsInput) => request<QuestionSet>("PUT", "/v1/questions", { body }),
     /** Newest first. */
     versions: () => request<QuestionSetSummary[]>("GET", "/v1/question-sets"),
+    /** true counts its answers in scores, false leaves them out, null goes back to the default. Current set only. */
+    setScoring: (id: number, count: boolean | null) => request<Question>("PUT", `/v1/questions/${id}/scoring`, { body: { count_in_scores: count } }),
   },
+  /** Which brands question texts name, and which aliases are everyday words. Stores nothing. */
+  namingCheck: (body: { questions?: string[]; aliases?: string[] }) => request<NamingCheck>("POST", "/v1/naming-check", { body }),
   surfaces: {
     list: () => request<Surface[]>("GET", "/v1/surfaces"),
     put: (key: SurfaceKey, body: SurfaceInput) => request<Surface>("PUT", `/v1/surfaces/${enc(key)}`, { body }),
@@ -1533,6 +1616,7 @@ export const api = {
     finish: () => request<Onboarding>("POST", "/v1/onboarding/finish"),
   },
   estimate: () => request<Estimate>("GET", "/v1/estimate"),
+  costs: () => request<Costs>("GET", "/v1/costs"),
 
   runs: {
     /** Newest first. */
