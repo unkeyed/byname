@@ -30,6 +30,9 @@ type Scheduler struct {
 	lastPrune time.Time
 	sources   *sources.Service
 	changes   SiteChanges
+	social    Social
+	socialing sync.WaitGroup
+	fetching  atomic.Bool
 }
 
 type Options struct {
@@ -43,6 +46,8 @@ type Options struct {
 	Search SearchSync
 	// Changes is site changes, nil when not wired.
 	Changes SiteChanges
+	// Social is social mentions, nil when not wired.
+	Social Social
 }
 
 // SearchSync is internal/gsc's daily sync: it does nothing until it is due
@@ -58,6 +63,13 @@ type SiteChanges interface {
 	Tick(ctx context.Context) error
 }
 
+// Social is internal/social: the fetch every few hours and the digest
+// when a period ends. It decides itself what is due and holds its own
+// advisory lock.
+type Social interface {
+	Tick(ctx context.Context) error
+}
+
 func New(c *checks.Service, cfg *config.Service, o Options) *Scheduler {
 	if o.Now == nil {
 		o.Now = time.Now
@@ -65,7 +77,7 @@ func New(c *checks.Service, cfg *config.Service, o Options) *Scheduler {
 	if o.Log == nil {
 		o.Log = slog.Default()
 	}
-	return &Scheduler{checks: c, config: cfg, log: o.Log, ticks: o.Ticks, now: o.Now, sources: o.Sources, search: o.Search, changes: o.Changes}
+	return &Scheduler{checks: c, config: cfg, log: o.Log, ticks: o.Ticks, now: o.Now, sources: o.Sources, search: o.Search, changes: o.Changes, social: o.Social}
 }
 
 // Run ticks once at start, which resumes a run a previous process left
@@ -75,6 +87,7 @@ func New(c *checks.Service, cfg *config.Service, o Options) *Scheduler {
 // Run returns once a Search Console sync in flight has stopped.
 func (s *Scheduler) Run(ctx context.Context) {
 	defer s.searching.Wait()
+	defer s.socialing.Wait()
 	ticks := s.ticks
 	if ticks == nil {
 		t := time.NewTicker(time.Minute)
@@ -122,6 +135,16 @@ func (s *Scheduler) Tick(ctx context.Context) {
 				if err := s.changes.Tick(ctx); err != nil && ctx.Err() == nil {
 					s.log.Warn("site changes failed", "err", err)
 				}
+			}
+		})
+	}
+	// Social mentions: a fetch calls slow search APIs, so it too runs on
+	// its own goroutine.
+	if s.social != nil && s.fetching.CompareAndSwap(false, true) {
+		s.socialing.Go(func() {
+			defer s.fetching.Store(false)
+			if err := s.social.Tick(ctx); err != nil && ctx.Err() == nil {
+				s.log.Warn("social mentions failed", "err", err)
 			}
 		})
 	}

@@ -37,6 +37,7 @@ import (
 	"github.com/unkeyed/byname/internal/results"
 	"github.com/unkeyed/byname/internal/scheduler"
 	"github.com/unkeyed/byname/internal/secretbox"
+	"github.com/unkeyed/byname/internal/social"
 	"github.com/unkeyed/byname/internal/sources"
 	"github.com/unkeyed/byname/web"
 )
@@ -80,6 +81,10 @@ type config struct {
 	// only: sends every GitHub call site changes makes to a fake GitHub at
 	// this URL. Never set it in production.
 	GitHubBaseURL string
+	// BLUESKY_BASE_URL, optional and for tests and local development
+	// only: sends social search on Bluesky to a fake at this URL. Never
+	// set it in production.
+	BlueskyBaseURL string
 }
 
 // providerURLEnv names each provider's base URL override.
@@ -187,6 +192,9 @@ func loadConfig() (config, error) {
 		return c, err
 	}
 	if c.GitHubBaseURL, err = baseURLEnv("GITHUB_API_BASE_URL"); err != nil {
+		return c, err
+	}
+	if c.BlueskyBaseURL, err = baseURLEnv("BLUESKY_BASE_URL"); err != nil {
 		return c, err
 	}
 	c.GSCClient = gsc.OAuthClient{ID: os.Getenv("GSC_GOOGLE_CLIENT_ID"), Secret: os.Getenv("GSC_GOOGLE_CLIENT_SECRET")}
@@ -390,6 +398,7 @@ func run(log *slog.Logger) error {
 		PublicURL: cfg.Auth.PublicURL, Terms: settings, Alerts: alerts,
 	})
 	site := changes.New(pool, search, changes.Options{Secrets: cfg.Secrets, Alerts: alerts, GitHubBaseURL: cfg.GitHubBaseURL})
+	mentions := social.New(pool, settings, social.Options{Alerts: alerts, BaseURLs: map[social.Network]string{social.Bluesky: cfg.BlueskyBaseURL}})
 	if err := sealSecrets(ctx, log, users, settings, alerts, search, site); err != nil {
 		return err
 	}
@@ -398,7 +407,7 @@ func run(log *slog.Logger) error {
 	}
 	authn := &auth.Authenticator{Keys: auth.NewKeyStore(pool, cfg.Unkey), Users: users, OAuth: auth.NewOAuthServer(pool, cfg.Auth.PublicURL)}
 
-	services := app.Services{Instance: instance.New(version, settings), Config: settings, Checks: runs, Results: res, Notify: alerts, GSC: search, Changes: site}
+	services := app.Services{Instance: instance.New(version, settings), Config: settings, Checks: runs, Results: res, Notify: alerts, GSC: search, Changes: site, Social: mentions}
 	mux := httpapi.NewMux(services, authn, log)
 	mux.Handle("/mcp", mcpserver.Handler(services, authn.OAuth, version))
 	mux.Handle("/", web.Handler())
@@ -420,6 +429,9 @@ func run(log *slog.Logger) error {
 	if cfg.GitHubBaseURL != "" {
 		log.Warn("GITHUB_API_BASE_URL is set: site changes call it, not GitHub. Use it only in tests and local development", "github_api_base_url", cfg.GitHubBaseURL)
 	}
+	if cfg.BlueskyBaseURL != "" {
+		log.Warn("BLUESKY_BASE_URL is set: social search on Bluesky calls it, not Bluesky. Use it only in tests and local development", "bluesky_base_url", cfg.BlueskyBaseURL)
+	}
 	if cfg.GSCBaseURL != "" {
 		log.Warn("GSC_GOOGLE_BASE_URL is set: Search Console calls go to it, not to Google. Use it only in tests and local development", "gsc_google_base_url", cfg.GSCBaseURL)
 	}
@@ -429,7 +441,7 @@ func run(log *slog.Logger) error {
 	}
 	cited := sources.New(pool, settings, sources.Options{AllowPrivate: cfg.SourcesAllowPrivate, UserAgent: "Byname/" + version, Log: log})
 	jobs.Go(func() {
-		scheduler.New(runs, settings, scheduler.Options{Log: log, Sources: cited, Search: search, Changes: site}).Run(ctx)
+		scheduler.New(runs, settings, scheduler.Options{Log: log, Sources: cited, Search: search, Changes: site, Social: mentions}).Run(ctx)
 	})
 	jobs.Go(func() { alerts.Run(ctx) })
 	log.Info("Byname listening", "port", cfg.Port, "version", version, "keys", authn.Keys.Mode(),

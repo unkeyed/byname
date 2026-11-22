@@ -10,6 +10,7 @@ import (
 	"github.com/unkeyed/byname/internal/instance"
 	"github.com/unkeyed/byname/internal/notify"
 	"github.com/unkeyed/byname/internal/results"
+	"github.com/unkeyed/byname/internal/social"
 )
 
 type Services struct {
@@ -20,4 +21,5 @@ type Services struct {
 	Notify   *notify.Service
 	GSC      *gsc.Service
 	Changes  *changes.Service
+	Social   *social.Service
 }
