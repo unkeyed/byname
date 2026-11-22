@@ -73,7 +73,7 @@ const maxDots = 30;
 function RunDots({ row, runs }: { row: PromptRow; runs: RunRef[] }) {
   const from = Math.max(0, runs.length - maxDots);
   return (
-    <span className="flex flex-wrap items-center gap-1">
+    <span className="flex flex-wrap items-center gap-1 md:justify-end">
       {runs.slice(from).map((r, i) => (
         <RunDot key={r.id} run={r} dot={row.dots[from + i]} />
       ))}
@@ -112,8 +112,6 @@ export function Instead({ names, max = 3 }: { names: string[]; max?: number }) {
 function QuestionList({ filter }: { filter: ResultsFilter }) {
   const view = useView();
   const wide = useWide();
-  const surfaces = useSurfaces();
-  const labels = useLabels(surfaces.data);
   const prompts = useQuery({ queryKey: keys.prompts(filter), queryFn: () => api.prompts(filter) });
   if (prompts.isPending) return <Pending />;
   if (prompts.isError) return <ErrorNote error={prompts.error} />;
@@ -126,7 +124,6 @@ function QuestionList({ filter }: { filter: ResultsFilter }) {
   const shown = rows.filter((r) => (!search || r.question.text.toLowerCase().includes(search)) && (!group || r.question.group === group));
   const open = (r: PromptRow) => view.set({ q: r.question.id, qa: null, qv: null }, { push: true });
   const latest = runs[runs.length - 1];
-  const namedBy = (r: PromptRow) => r.named_by.map((s) => `${labels.line(s.pair)}${s.fidelity === "approximation" ? " (stand-in)" : ""}`);
 
   return (
     <Card className={cx(prompts.isPlaceholderData && "opacity-60")}>
@@ -153,10 +150,10 @@ function QuestionList({ filter }: { filter: ResultsFilter }) {
                 <th scope="col" className="sticky left-0 z-[1] w-72 min-w-72 bg-surface px-3 py-2 text-left font-medium shadow-[inset_-1px_0_0_var(--line)]">
                   Question
                 </th>
-                <th scope="col" className="px-3 py-2 text-left font-medium">Named you in</th>
-                <th scope="col" className="px-3 py-2 text-left font-medium">Best position</th>
-                <th scope="col" className="px-3 py-2 text-left font-medium">Named instead</th>
-                <th scope="col" className="px-3 py-2 text-left font-medium">Checks</th>
+                <th scope="col" className="w-36 min-w-36 px-3 py-2 text-left font-medium">Named you in</th>
+                <th scope="col" className="w-28 min-w-28 px-3 py-2 text-left font-medium">Best position</th>
+                <th scope="col" className="w-80 min-w-80 px-3 py-2 text-left font-medium">Named instead</th>
+                <th scope="col" className="w-56 min-w-56 px-3 py-2 text-right font-medium">Checks, newest last</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-line">
@@ -169,16 +166,15 @@ function QuestionList({ filter }: { filter: ResultsFilter }) {
                       <LeftOutBadge question={r.question} />
                     </div>
                   </td>
-                  <td className="max-w-64 px-3 py-2 align-top">
+                  <td className="px-3 py-2 align-top">
                     <RowButton label={r.question.text} onClick={() => open(r)} />
                     <div className="tabular-nums">
                       {r.named_by.length} <span className="text-faint">of {r.answered} AI apps</span>
                     </div>
-                    <div className="line-clamp-2 min-h-8 text-xs text-muted">{namedBy(r).join(", ")}</div>
                     <CountAnyway question={r.question} />
                   </td>
                   <td className="px-3 py-2 align-top tabular-nums">{r.best_position ? `#${r.best_position}` : <span className="text-faint">–</span>}</td>
-                  <td className="max-w-56 px-3 py-2 align-top">
+                  <td className="px-3 py-2 align-top">
                     <Instead names={r.instead} />
                   </td>
                   <td className="px-3 py-2 align-top">

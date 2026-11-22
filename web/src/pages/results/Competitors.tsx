@@ -123,7 +123,11 @@ function Heatmap({ data }: { data: Data }) {
   const surfaces = useSurfaces();
   const labels = useLabels(surfaces.data);
   const [hover, setHover] = useState<string | null>(null);
-  const rows = data.brands.filter((b) => b.mentions > 0 || b.kind === "self").slice(0, 12);
+  // You first, then by name, so changing the date range never reorders the rows under the reader. The ranking is in Share of mentions above.
+  const rows = data.brands
+    .filter((b) => b.mentions > 0 || b.kind === "self")
+    .slice(0, 12)
+    .sort((a, b) => Number(b.kind === "self") - Number(a.kind === "self") || a.name.localeCompare(b.name));
   if (data.columns.length === 0) return null;
   return (
     <Card>
