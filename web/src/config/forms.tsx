@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, type Settings, type SettingsView } from "../api";
 import { keys } from "../queries";
-import { Button, cx, Icon, inputClass, labelClass } from "../ui";
+import { Button, cx, Icon, inputClass, labelClass, SteadyLabel } from "../ui";
 import { editable, numberFields, type NumberKey } from "./rules";
 
 /**
@@ -40,7 +40,7 @@ export function SubmitButton({ pending, saved, label = "Save", disabled }: { pen
         </span>
       )}
       <Button type="submit" variant="primary" disabled={pending || disabled}>
-        {pending ? "Saving…" : label}
+        <SteadyLabel labels={[label, "Saving…"]} current={pending ? "Saving…" : label} />
       </Button>
     </>
   );
@@ -112,7 +112,7 @@ export function FieldNote({ tone, children }: { tone: "error" | "warn" | "info";
 
 /** A field's note line, kept while empty, so a note shown on submit never pushes the form down under the pointer. */
 export function NoteSlot({ children }: { children?: ReactNode }) {
-  return <div className="min-h-5">{children}</div>;
+  return <div className="flow-root min-h-5">{children}</div>;
 }
 
 /** Shown to people who can read setup but not change it. */

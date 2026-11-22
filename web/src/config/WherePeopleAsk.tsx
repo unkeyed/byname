@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type Fidelity, type Pair, type PairTest, type Route, type RouteOption, type SearchControl, type Surface, type SurfaceGroup, type SurfaceInput, type SurfaceKey } from "../api";
 import { fidelityInfo, usd } from "../lines";
 import { keys, useCan, useIsAdmin, useSurfaces } from "../queries";
-import { Badge, Button, Card, cx, ErrorNote, errorMessage, Icon, inputClass, labelClass, Pending, RelativeTime, Spinner, type Tone } from "../ui";
+import { Badge, Button, Card, cx, ErrorNote, errorMessage, Icon, inputClass, labelClass, Pending, RelativeTime, Spinner, SteadyLabel, type Tone } from "../ui";
 import { CredentialForm, testTone, useCredentials } from "./Credentials";
 import { Disclosure, FieldNote, NoteSlot } from "./forms";
 
@@ -177,6 +177,18 @@ function Body({ surfaces, prefillDefaults, footer }: { surfaces: Surface[]; pref
     <div className="space-y-6">
       <TregToken needed={needsTreg} onNoTreg={() => setAdvanced(Object.fromEntries(surfaces.map((s) => [s.key, true])))} canEdit={canEdit} />
 
+      {canEdit && dirty.length === 0 && allPairs.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="mr-auto text-xs text-muted" aria-live="polite">
+            {allPairs.length - failing.length} of {allPairs.length} surface and model {allPairs.length === 1 ? "pair" : "pairs"} passed a test.
+          </p>
+          <Button onClick={() => void testAll()} disabled={testing.size > 0}>
+            {testing.size > 0 ? <Spinner className="size-3 border" /> : <Icon name="check" className="size-3.5" />}
+            Test all
+          </Button>
+        </div>
+      )}
+
       {groups.map(({ g, list }) => (
         <section key={g} aria-labelledby={`group-${g}`}>
           <h3 id={`group-${g}`} className="text-sm font-semibold">
@@ -208,34 +220,27 @@ function Body({ surfaces, prefillDefaults, footer }: { surfaces: Surface[]; pref
         </section>
       ))}
 
-      {canEdit && (
-        <div className="sticky bottom-0 z-10 -mx-1 bg-bg/90 px-1 py-3 backdrop-blur">
-          <div className="flex flex-wrap items-center gap-2">
-            <p className="mr-auto text-xs text-muted" aria-live="polite">
-              {dirty.length > 0
-                ? `${dirty.length} unsaved ${dirty.length === 1 ? "change" : "changes"}. ${enabledCount} ${enabledCount === 1 ? "surface" : "surfaces"} ticked.`
-                : allPairs.length > 0
-                  ? `${allPairs.length - failing.length} of ${allPairs.length} surface and model ${allPairs.length === 1 ? "pair" : "pairs"} passed a test.`
+      {canEdit && (dirty.length > 0 || allPairs.length === 0 || footer) && (
+        <div className="bottom-0 z-10 border-t border-line bg-bg py-3 md:sticky">
+          {(dirty.length > 0 || allPairs.length === 0) && (
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="mr-auto text-xs text-muted" aria-live="polite">
+                {dirty.length > 0
+                  ? `${dirty.length} unsaved ${dirty.length === 1 ? "change" : "changes"}. ${enabledCount} ${enabledCount === 1 ? "surface" : "surfaces"} ticked.`
                   : "Tick the surfaces your buyers use, then save."}
-            </p>
-            {dirty.length > 0 && (
-              <Button variant="ghost" onClick={() => setDrafts({})} disabled={saving}>
-                Discard
-              </Button>
-            )}
-            {dirty.length > 0 ? (
-              <Button variant="primary" onClick={() => void saveAll()} disabled={saving}>
-                {saving ? "Saving…" : "Save changes"}
-              </Button>
-            ) : (
-              allPairs.length > 0 && (
-                <Button onClick={() => void testAll()} disabled={testing.size > 0}>
-                  {testing.size > 0 ? <Spinner className="size-3 border" /> : <Icon name="check" className="size-3.5" />}
-                  Test all
-                </Button>
-              )
-            )}
-          </div>
+              </p>
+              {dirty.length > 0 && (
+                <>
+                  <Button variant="ghost" onClick={() => setDrafts({})} disabled={saving}>
+                    Discard
+                  </Button>
+                  <Button variant="primary" onClick={() => void saveAll()} disabled={saving}>
+                    <SteadyLabel labels={["Save changes", "Saving…"]} current={saving ? "Saving…" : "Save changes"} />
+                  </Button>
+                </>
+              )}
+            </div>
+          )}
           {footer?.(ready)}
         </div>
       )}
@@ -499,7 +504,7 @@ function PairRow({ p, result, error, testing, canEdit, onTest }: { p: Pair; resu
           {canEdit && (
             <Button size="sm" variant="ghost" onClick={onTest} disabled={testing}>
               {testing ? <Spinner className="size-3 border" /> : null}
-              {testing ? "Testing…" : tested ? "Test again" : "Test"}
+              <SteadyLabel labels={["Test", "Test again", "Testing…"]} current={testing ? "Testing…" : tested ? "Test again" : "Test"} />
             </Button>
           )}
         </span>

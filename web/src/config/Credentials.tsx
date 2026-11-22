@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type Credential, type CredentialKind } from "../api";
 import { keys, useIsAdmin, useSurfaces } from "../queries";
 import { useReauthMutation } from "../pages/settings/Reauth";
-import { Badge, Button, Card, ConfirmButton, ErrorNote, Field, Icon, inputClass, Pending, RelativeTime } from "../ui";
+import { Badge, Button, Card, ConfirmButton, ErrorNote, Field, Icon, inputClass, Pending, RelativeTime, SteadyLabel } from "../ui";
 
 /** Every credential, set or not. Admins only: the server refuses everyone else. */
 export const useCredentials = () => {
@@ -141,14 +141,12 @@ function CredentialRow({ c }: { c: Credential }) {
         <div className="ml-auto flex shrink-0 items-center gap-1">
           {c.set && (
             <Button size="sm" variant="ghost" onClick={() => test.mutate()} disabled={test.isPending}>
-              {test.isPending ? "Testing…" : "Test"}
+              <SteadyLabel labels={["Test", "Testing…"]} current={test.isPending ? "Testing…" : "Test"} />
             </Button>
           )}
-          {!editing && (
-            <Button size="sm" onClick={() => setEditing(true)}>
-              {c.set ? "Replace" : "Set"}
-            </Button>
-          )}
+          <Button size="sm" aria-expanded={editing} onClick={() => setEditing(!editing)}>
+            {c.set ? "Replace" : "Set"}
+          </Button>
           {c.set && (
             <ConfirmButton label={`Remove the ${c.title} credential`} confirmLabel="Remove?" onConfirm={() => remove.mutate()} disabled={remove.isPending}>
               Remove

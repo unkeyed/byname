@@ -48,7 +48,7 @@ export function Settings() {
   return (
     <>
       <PageHeader title="Settings" />
-      <div className="relative min-h-0 flex-1 overflow-auto">
+      <div className="relative min-h-0 flex-1 scroll-pb-36 overflow-auto">
         <div className="mx-auto max-w-3xl lg:grid lg:max-w-5xl lg:grid-cols-[11rem_minmax(0,1fr)] lg:gap-8 lg:px-8">
           <nav aria-label="Settings" className="bg-bg lg:sticky lg:top-0 lg:self-start lg:py-8">
             <div className="flex flex-wrap gap-1 px-4 pt-4 md:px-8 lg:flex-col lg:gap-0.5 lg:p-0">

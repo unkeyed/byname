@@ -40,7 +40,7 @@ export function Segmented<T extends string>({
   );
 }
 
-const filterSelect = cx(selectClass, "w-full text-xs md:w-auto");
+const filterSelect = cx(selectClass, "w-full text-xs md:w-48");
 
 /**
  * The header every results page shares: the title in the top bar with the

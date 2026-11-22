@@ -79,10 +79,17 @@ function SearchForm({ s, canEdit }: { s: Settings; canEdit: boolean }) {
           Use the distinctive form, such as your full product name or domain: a common word on its own matches posts about something else. Up to {maxTerms} terms.
         </p>
         <div className="space-y-2">
+          {canEdit && terms.length < maxTerms && (
+            <Button size="sm" onClick={() => setTerms([...terms, ""])}>
+              <Icon name="plus" className="size-3.5" />
+              Add a term
+            </Button>
+          )}
           {terms.map((t, i) => (
             <div key={i} className="flex gap-2">
               <input
                 aria-label={`Search term ${i + 1}`}
+                autoFocus={i === terms.length - 1 && t === ""}
                 className={inputClass}
                 value={t}
                 disabled={!canEdit}
@@ -100,12 +107,6 @@ function SearchForm({ s, canEdit }: { s: Settings; canEdit: boolean }) {
             <p className="rounded-control border border-dashed border-line-strong px-3 py-2 text-sm text-muted">
               Searching for {defaults || "nothing yet"}.
             </p>
-          )}
-          {canEdit && terms.length < maxTerms && (
-            <Button size="sm" onClick={() => setTerms([...terms, ""])}>
-              <Icon name="plus" className="size-3.5" />
-              Add a term
-            </Button>
           )}
         </div>
       </section>

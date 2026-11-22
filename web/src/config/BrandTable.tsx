@@ -30,7 +30,7 @@ const toDraft = (b: BrandEntry): Draft => ({ name: b.name, aliases: b.aliases.jo
 export function BrandTable() {
   const brands = useBrands();
   const canEdit = useCan("config:write");
-  const [editing, setEditing] = useState<number | null>(null);
+  const [editing, setEditing] = useState<ReadonlySet<number>>(new Set());
   if (brands.isPending) return <Pending />;
   if (brands.isError) return <ErrorNote error={brands.error} />;
   const all = brands.data;
@@ -52,12 +52,12 @@ export function BrandTable() {
         <Card>
           <ul aria-label="Competitors and technologies" className="divide-y divide-line">
             {others.map((b) =>
-              editing === b.id ? (
+              editing.has(b.id) ? (
                 <li key={b.id} className="px-4 py-3">
-                  <BrandRowForm all={all} editing={b} onDone={() => setEditing(null)} />
+                  <BrandRowForm all={all} editing={b} onDone={() => setEditing((e) => new Set([...e].filter((id) => id !== b.id)))} />
                 </li>
               ) : (
-                <BrandRow key={b.id} b={b} canEdit={canEdit} onEdit={() => setEditing(b.id)} />
+                <BrandRow key={b.id} b={b} canEdit={canEdit} onEdit={() => setEditing((e) => new Set(e).add(b.id))} />
               ),
             )}
           </ul>
@@ -149,7 +149,7 @@ function BrandRowForm({ all, editing, onDone }: { all: BrandEntry[]; editing?: B
       <div className="grid gap-3 sm:grid-cols-2">
         <div>
           <Field label="Name">
-            <input className={inputClass} value={d.name} onChange={(e) => set({ name: e.target.value })} placeholder="Kestrel" aria-invalid={tried && !!nameError} autoFocus={!!editing} />
+            <input className={inputClass} value={d.name} onChange={(e) => set({ name: e.target.value })} placeholder="Kestrel" aria-invalid={tried && !!nameError} ref={(el) => void (editing && el?.focus({ preventScroll: true }))} />
           </Field>
           <NoteSlot>{tried && nameError && <FieldNote tone="error">{nameError}</FieldNote>}</NoteSlot>
         </div>

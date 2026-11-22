@@ -184,7 +184,7 @@ function Shell({ children, aside, header }: { children: ReactNode; aside?: React
       </header>
       <div className="flex min-h-0 flex-1">
         {aside}
-        <main className="relative min-w-0 flex-1 overflow-auto">{children}</main>
+        <main className="relative min-w-0 flex-1 scroll-pb-36 overflow-auto">{children}</main>
       </div>
     </div>
   );
