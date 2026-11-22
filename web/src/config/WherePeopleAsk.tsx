@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link } from "react-router";
 import { api, type Costs, type Fidelity, type Pair, type PairTest, type Route, type RouteOption, type SearchControl, type Surface, type SurfaceGroup, type SurfaceInput, type SurfaceKey } from "../api";
 import { fidelityInfo, usd } from "../lines";
 import { keys, useCan, useCosts, useIsAdmin, useSurfaces } from "../queries";
-import { Badge, Button, Card, cx, ErrorNote, errorMessage, Icon, inputClass, labelClass, Pending, RelativeTime, Spinner, SteadyLabel, type Tone } from "../ui";
+import { Badge, Button, Card, cx, ErrorNote, errorMessage, Icon, inputClass, labelClass, Pending, RelativeTime, Spinner, SteadyLabel, useLoading, type Tone } from "../ui";
 import { about } from "./costs";
 import { CredentialForm, useCredentials } from "./Credentials";
 import { Disclosure, FieldNote, NoteSlot, type Footer } from "./forms";
@@ -138,6 +139,7 @@ function Body({
   const canEdit = useCan("config:write");
   const admin = useIsAdmin();
   const creds = useCredentials();
+  useLoading(admin && creds.isPending);
   const onboarding = !!onContinue;
   const [drafts, setDrafts] = useState<Record<SurfaceKey, Draft>>(() =>
     prefillDefaults && !surfaces.some((s) => s.enabled) ? Object.fromEntries(surfaces.filter((s) => s.default_on).map((s) => [s.key, { ...fromServer(s), enabled: true }])) : {},
@@ -266,7 +268,11 @@ function Body({
 
   return (
     <div className="space-y-6">
-      <TregToken needed={needsTreg} onNoTreg={() => setAdvanced(Object.fromEntries(surfaces.map((s) => [s.key, true])))} canEdit={canEdit} />
+      {onboarding ? (
+        <TregToken needed={needsTreg} onNoTreg={() => setAdvanced(Object.fromEntries(surfaces.map((s) => [s.key, true])))} canEdit={canEdit} />
+      ) : (
+        <TregLink missing={tregMissing} />
+      )}
 
       {!onboarding && canEdit && dirty.length === 0 && allPairs.length > 0 && (
         <div className="flex flex-wrap items-center gap-2">
@@ -352,6 +358,18 @@ function Body({
         </div>
       )}
     </div>
+  );
+}
+
+/** Settings > AI apps points at Settings > Treg, which holds the token, rather than repeating its form. */
+function TregLink({ missing }: { missing: boolean }) {
+  return (
+    <p className="text-sm text-muted">
+      {missing ? <span className="text-warn">No AI app on the Treg route can be asked until the Treg token is saved. </span> : "Treg runs each question and bills you per answer. "}
+      <Link to="/settings/treg" className="inline-flex min-h-11 items-center font-medium text-fg underline underline-offset-2 md:min-h-0">
+        {missing ? "Add the Treg token" : "Manage the Treg token"}
+      </Link>
+    </p>
   );
 }
 
