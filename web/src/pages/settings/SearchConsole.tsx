@@ -246,7 +246,7 @@ function Connected({ s }: { s: GscStatus }) {
         </p>
         <GoogleButton available={s.oauth_available} label={s.method === "oauth" ? "Sign in with Google again" : "Switch to Google sign-in"} />
         <details className="mt-4 text-sm">
-          <summary className="cursor-pointer font-medium text-muted hover:text-fg">{s.method === "service_account" ? "Replace the service account key" : "Switch to a service account"}</summary>
+          <summary className="cursor-pointer py-3.5 font-medium text-muted hover:text-fg md:py-0">{s.method === "service_account" ? "Replace the service account key" : "Switch to a service account"}</summary>
           <div className="mt-3">
             <ServiceAccountForm label={s.method === "service_account" ? "Replace key" : "Switch to this service account"} />
           </div>

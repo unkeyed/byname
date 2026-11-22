@@ -65,7 +65,7 @@ function Body({ id, listed, canEdit, onClose }: { id: number; listed: Change | u
         <div className="min-w-0 flex-1">
           <div className="text-xs text-muted">{kindInfo[c.kind]}</div>
           <h2 className="text-base font-semibold [overflow-wrap:anywhere]">
-            <a href={c.url} target="_blank" rel="noreferrer" className="group hover:underline">
+            <a href={c.url} target="_blank" rel="noreferrer" className="group py-3.5 hover:underline md:py-0">
               {c.url}
               <Icon name="external" className="ml-1 inline size-3.5 align-[-2px] text-faint group-hover:text-fg" />
             </a>
@@ -230,7 +230,7 @@ export function ReadCard({ read }: { read: ChangeRead }) {
         )}
         {controls.length > 0 && (
           <details className="text-xs">
-            <summary className="cursor-pointer text-muted hover:text-fg">
+            <summary className="cursor-pointer py-3.5 text-muted hover:text-fg md:py-0">
               Compared against {controls.length} control {controls.length === 1 ? "page" : "pages"}
             </summary>
             <ul className="mt-1.5 space-y-0.5">

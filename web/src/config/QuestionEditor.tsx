@@ -503,7 +503,7 @@ function CarryDialog({
         </ul>
         {auto.length > 0 && (
           <details className="text-xs text-muted">
-            <summary className="cursor-pointer">
+            <summary className="cursor-pointer py-3.5 md:py-0">
               {auto.length} {auto.length === 1 ? "question carries" : "questions carry"} on by themselves (same text, ignoring case and punctuation)
             </summary>
             <ul className="mt-1.5 list-disc space-y-0.5 pl-4">
