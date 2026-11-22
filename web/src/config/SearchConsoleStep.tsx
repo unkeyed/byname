@@ -42,7 +42,7 @@ function Connection({ s, onPicked }: { s: GscStatus; onPicked: () => void }) {
           <GoogleButton available={s.oauth_available} primary returnTo="onboarding" />
         </div>
         <details className="border-t border-line pt-4 text-sm">
-          <summary className="cursor-pointer font-medium text-muted hover:text-fg">Or use a service account</summary>
+          <summary className="cursor-pointer py-3.5 font-medium text-muted hover:text-fg md:py-0">Or use a service account</summary>
           <div className="mt-3">
             <ServiceAccountForm />
           </div>

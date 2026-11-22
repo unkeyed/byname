@@ -43,7 +43,7 @@ export function ControlPagesCard({ canEdit }: { canEdit: boolean }) {
         {pages.data.map((p) => (
           <li key={p.id} className="flex items-start gap-3 px-4 py-2.5">
             <div className="min-w-0 flex-1">
-              <a href={p.url} target="_blank" rel="noreferrer" className="text-sm font-medium [overflow-wrap:anywhere] hover:underline">
+              <a href={p.url} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center text-sm font-medium [overflow-wrap:anywhere] hover:underline md:min-h-0">
                 {p.url}
               </a>
               <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
