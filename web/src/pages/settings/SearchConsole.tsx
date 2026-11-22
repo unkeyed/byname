@@ -4,7 +4,7 @@ import { useSearchParams } from "react-router";
 import { api, type GscProperty, type GscStatus } from "../../api";
 import { keys, useGsc, useGscProperties } from "../../queries";
 import { Badge, Button, Card, ConfirmButton, ErrorNote, Field, Icon, Pending, RelativeTime, Spinner, cx } from "../../ui";
-import { dayList, dayRange } from "../search/model";
+import { dayList, dayRange, propertyName } from "../search/model";
 import { useReauthMutation } from "./Reauth";
 import { SettingsHeader, SettingsSubhead } from "./Settings";
 
@@ -70,7 +70,7 @@ function Connect({ s }: { s: GscStatus }) {
     <div className="space-y-10">
       {s.data_property && (
         <p className="rounded-surface border border-line bg-surface px-3 py-2 text-sm text-muted">
-          Numbers for <span className="font-medium text-fg">{s.data_property}</span> from an earlier connection are kept
+          Numbers for <span className="font-medium text-fg">{propertyName(s.data_property)}</span> from an earlier connection are kept
           {s.first_day && s.latest_final_day ? `, ${dayRange(s.first_day, s.latest_final_day)}` : ""}. Connect again to keep them current.
         </p>
       )}
@@ -211,7 +211,7 @@ function Connected({ s }: { s: GscStatus }) {
       "Property",
       s.property ? (
         <span className="flex flex-wrap items-center gap-2">
-          <span className="font-medium [overflow-wrap:anywhere]">{s.property}</span>
+          <span className="font-medium [overflow-wrap:anywhere]">{propertyName(s.property)}</span>
           {s.property_kind && <Badge>{kindInfo[s.property_kind]}</Badge>}
         </span>
       ) : (

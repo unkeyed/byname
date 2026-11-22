@@ -337,7 +337,7 @@ function MentionLine({ m, full }: { m: SocialMention; full?: boolean }) {
         <p className={cx("mt-1 text-sm whitespace-pre-line [overflow-wrap:anywhere]", full ? "line-clamp-4" : "line-clamp-2", m.hidden && "text-muted")}>{m.text || "(no text)"}</p>
         <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
           {parts.length > 0 && <span className="tabular-nums">{parts.join(" · ")}</span>}
-          <a href={link.href} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-medium text-fg hover:underline">
+          <a href={link.href} target="_blank" rel="noreferrer" className="inline-flex h-11 items-center gap-1 font-medium text-fg hover:underline md:h-auto">
             {link.label}
             <Icon name="external" className="size-3" />
           </a>

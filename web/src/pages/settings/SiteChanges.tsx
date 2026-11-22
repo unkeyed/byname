@@ -66,7 +66,7 @@ function Status({ r }: { r: RepoStatus }) {
     [
       "Repo",
       <span className="flex flex-wrap items-center gap-2">
-        <a href={`https://github.com/${r.repo}`} target="_blank" rel="noreferrer" className="font-medium [overflow-wrap:anywhere] hover:underline">
+        <a href={`https://github.com/${r.repo}`} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center font-medium [overflow-wrap:anywhere] hover:underline md:min-h-0">
           {r.repo}
         </a>
         {r.connected ? <Badge tone="success">Connected</Badge> : <Badge tone="outline">Disconnected</Badge>}
