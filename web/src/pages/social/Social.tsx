@@ -1,44 +1,47 @@
 import { useState } from "react";
 import { Link } from "react-router";
-import type { SocialDigest, SocialMention, SocialNetwork, SocialSettings } from "../../api";
-import { useCan, useIsAdmin, useSocialDigest, useSocialMentions, useSocialSettings } from "../../queries";
-import { Badge, buttonClass, Card, CardHeader, cx, EmptyState, ErrorNote, Icon, Pending, RelativeTime, selectClass, useLoading } from "../../ui";
+import type { Costs, LeftOut, SocialDigest, SocialMention, SocialNetwork, SocialSettings } from "../../api";
+import { useCan, useCosts, useIsAdmin, useLeftOut, useSocialDigest, useSocialMentions, useSocialSettings } from "../../queries";
+import { Badge, Button, buttonClass, Card, CardHeader, cx, EmptyState, ErrorNote, Icon, Pending, RelativeTime, selectClass, useLoading } from "../../ui";
 import { ViewHeader } from "../results/Header";
 import { Note } from "../search/Search";
-import { authorLabel, engagementParts, formatCount, NetworkMark, networkOrder, networks, periodLabel, postLink, settingsPath } from "./model";
+import { authorLabel, engagementParts, formatCount, leftOutPath, NetworkMark, networkOrder, networks, periodLabel, postLink, settingsPath, socialCost, tregPath, useSaveSocial } from "./model";
 
-const credentialsPath = "/settings/credentials";
 const shown = 100;
 
 export function Social() {
   const canEdit = useCan("config:write");
   const settings = useSocialSettings();
+  const costs = useCosts();
+  const leftOut = useLeftOut();
   return (
     <>
       <ViewHeader
         title="Social"
-        subtitle="Posts that mention you on X, Reddit, Hacker News, LinkedIn, YouTube, Threads and Bluesky. Posts by the people and accounts you left out are hidden, so this is what everyone else says."
+        subtitle="Mentions: posts that name you on X, Reddit, Hacker News, LinkedIn, YouTube, Threads and Bluesky. Posts by the people you left out are hidden, so this is what everyone else says."
         range={false}
         scope={false}
         action={
           <Link to={settingsPath} className={buttonClass({ size: "sm" })}>
             <Icon name="settings" className="size-3.5" />
-            {canEdit ? "Search settings" : "Settings"}
+            {canEdit ? "Social settings" : "Settings"}
           </Link>
         }
       />
       <div className="relative min-h-0 flex-1 overflow-auto px-3 py-4 md:px-5 md:py-5">
         <div className="mx-auto max-w-4xl space-y-4">
-          {settings.isPending ? (
+          {settings.isPending || costs.isPending || leftOut.isPending ? (
             <Pending />
           ) : settings.isError ? (
             <ErrorNote error={settings.error} />
-          ) : (
+          ) : settings.data.enabled ? (
             <>
-              <Notices s={settings.data} />
+              <Notices s={settings.data} leftOut={leftOut.data} />
               <DigestCard />
               <MentionsCard s={settings.data} />
             </>
+          ) : (
+            <TurnOn s={settings.data} costs={costs.data?.social} />
           )}
         </div>
       </div>
@@ -46,21 +49,74 @@ export function Social() {
   );
 }
 
-function Notices({ s }: { s: SocialSettings }) {
+/** Social is off: what it would do and cost, and the switch for those who may change settings. */
+function TurnOn({ s, costs }: { s: SocialSettings; costs: Costs["social"] | undefined }) {
+  const canEdit = useCan("config:write");
+  const save = useSaveSocial();
+  const turnOn = () =>
+    save.mutate({
+      enabled: true,
+      terms: s.custom_terms ? s.terms : [],
+      fetch_every_hours: s.fetch_every_hours,
+      digest_cadence: s.digest_cadence,
+      digest_weekday: s.digest_weekday,
+    });
+  return (
+    <EmptyState
+      icon="message"
+      title="Social mentions are off"
+      action={
+        canEdit && (
+          <div className="flex flex-col items-center gap-2">
+            <div className="flex flex-wrap justify-center gap-2">
+              <Button variant="primary" onClick={turnOn} disabled={save.isPending}>
+                Turn on social mentions
+              </Button>
+              <Link to={settingsPath} className={buttonClass()}>
+                Choose what to search first
+              </Link>
+            </div>
+            <ErrorNote error={save.error} />
+          </div>
+        )
+      }
+    >
+      Byname can watch X, Reddit, Hacker News, LinkedIn, YouTube, Threads and Bluesky for posts that name you.
+      {costs && ` ${socialCost(s, costs)}`}
+      {s.last_fetch_at && " The mentions found before it was turned off are kept and show again."}
+      {!canEdit && " An admin or editor can turn it on."}
+    </EmptyState>
+  );
+}
+
+function Notices({ s, leftOut }: { s: SocialSettings; leftOut: LeftOut[] | undefined }) {
   const admin = useIsAdmin();
+  const canEdit = useCan("config:write");
   const on = s.networks.filter((n) => n.enabled);
   const unavailable = on.filter((n) => n.unavailable);
   return (
     <>
+      {leftOut?.length === 0 && (
+        <Note tone="info" icon="note">
+          Your team&apos;s own posts are included. Leave out your team and company accounts so you see what other people say.{" "}
+          {canEdit ? (
+            <Link to={leftOutPath} className="font-medium underline">
+              Leave out accounts
+            </Link>
+          ) : (
+            "An admin or editor can leave them out in Settings, Social."
+          )}
+        </Note>
+      )}
       {!s.token_set && on.some((n) => n.route === "direct") && on.some((n) => n.route === "treg") && (
         <Note tone="info" icon="note">
-          Only Bluesky is searched until a Treg token is added, because the other networks are searched through Treg.{" "}
+          Only Bluesky is searched until a Treg token is added. The other networks are searched through Treg, the service that carries out each search and bills you for it.{" "}
           {admin ? (
-            <Link to={credentialsPath} className="font-medium underline">
+            <Link to={tregPath} className="font-medium underline">
               Add the Treg token
             </Link>
           ) : (
-            "An admin can add it under Settings > Credentials."
+            "An admin can add it in Settings, Treg."
           )}
         </Note>
       )}
@@ -93,7 +149,7 @@ function DigestCard() {
       <div className="space-y-4 border-t border-line px-4 py-3">
         <div className="flex flex-wrap items-baseline gap-x-6 gap-y-2">
           <Stat value={d.mentions} label={d.mentions === 1 ? "new mention" : "new mentions"} />
-          <Stat value={d.new_authors.length} label={d.new_authors.length === 1 ? "new voice" : "new voices"} />
+          <Stat value={d.new_authors.length} label={d.new_authors.length === 1 ? "new person" : "new people"} />
           {d.hidden > 0 && <Stat value={d.hidden} label="from people you left out" muted />}
         </div>
         {d.networks.length > 0 && (
@@ -125,7 +181,7 @@ function DigestCard() {
         )}
         {d.new_authors.length > 0 && (
           <p className="text-xs text-muted">
-            <span className="font-medium text-fg">New voices: </span>
+            <span className="font-medium text-fg">New people: </span>
             {d.new_authors
               .slice(0, 8)
               .map((a) => `${authorLabel(a.network, a.handle, a.name)} on ${networks[a.network].title}`)
@@ -233,7 +289,7 @@ function Empty({ s, filtered, runnable, on }: { s: SocialSettings; filtered: boo
           )
         }
       >
-        {canEdit ? "Turn on the networks to search in Settings > Social." : "An admin or editor can turn networks on in Settings > Social."}
+        {canEdit ? "Choose the networks to search in Settings, Social." : "An admin or editor can turn networks on in Settings, Social."}
       </EmptyState>
     );
   if (runnable === 0)
@@ -243,21 +299,21 @@ function Empty({ s, filtered, runnable, on }: { s: SocialSettings; filtered: boo
         title="Add a Treg token to search"
         action={
           admin && (
-            <Link to={credentialsPath} className={buttonClass({ variant: "primary" })}>
+            <Link to={tregPath} className={buttonClass({ variant: "primary" })}>
               Add the Treg token
             </Link>
           )
         }
       >
-        {`The networks that are on are searched through Treg, which needs a token. ${admin ? "Add it under Settings > Credentials." : "An admin can add it under Settings > Credentials."} Bluesky needs none.`}
+        {`The networks that are on are searched through Treg, which needs a token. Treg is the service that carries out each search and bills you for it. ${admin ? "Add it in Settings, Treg." : "An admin can add it in Settings, Treg."} Bluesky needs none.`}
       </EmptyState>
     );
   if (filtered) return <EmptyState icon="search" title="No mentions on this network yet" />;
   return (
     <EmptyState icon="message" title="No mentions yet">
       {s.last_fetch_at
-        ? `The searches so far found no posts with ${s.terms.map((t) => `"${t}"`).join(" or ")}. If that seems wrong, check the terms in Settings > Social.`
-        : "The first search runs within a minute, then every few hours."}
+        ? `The searches so far found no posts with ${s.terms.map((t) => `"${t}"`).join(" or ")}. If that seems wrong, check the search terms in Settings, Social.`
+        : `The first search starts within a minute, then repeats every ${s.fetch_every_hours === 1 ? "hour" : `${s.fetch_every_hours} hours`}.`}
     </EmptyState>
   );
 }

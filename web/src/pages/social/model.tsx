@@ -1,4 +1,6 @@
-import type { Engagement, SocialMention, SocialNetwork } from "../../api";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { api, type Costs, type Engagement, type SocialMention, type SocialNetwork, type SocialSettings, type SocialSettingsInput } from "../../api";
+import { keys } from "../../queries";
 import { cx, Icon, type IconName } from "../../ui";
 
 /** How the app shows each network: its name, its mark, and how its authors are written. */
@@ -15,6 +17,33 @@ export const networks: Record<SocialNetwork, { title: string; icon?: IconName; m
 export const networkOrder = Object.keys(networks) as SocialNetwork[];
 
 export const settingsPath = "/settings/social";
+export const leftOutPath = `${settingsPath}#left-out`;
+export const tregPath = "/settings/treg";
+
+/** Saves Settings > Social, and refreshes what it changes: the social reads and the cost estimate. */
+export function useSaveSocial(onSaved?: () => void) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: SocialSettingsInput) => api.social.putSettings(body),
+    onSuccess: (v) => {
+      qc.setQueryData(keys.socialSettings, v);
+      void qc.invalidateQueries({ queryKey: keys.social });
+      void qc.invalidateQueries({ queryKey: keys.costs });
+      onSaved?.();
+    },
+  });
+}
+
+const cents = new Intl.NumberFormat(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 2 });
+
+/** What social searching costs a month at the saved settings, in a sentence or two. */
+export function socialCost(s: SocialSettings, c: Costs["social"]): string {
+  const month = c.treg_month_usd < 0.01 ? "less than a cent a month" : `about ${cents.format(c.treg_month_usd)} a month`;
+  if (!s.token_set)
+    return `The paid networks need a Treg token. Treg is the service that carries out each search and bills you for it, ${month} at these settings. Bluesky is free and needs no token.`;
+  if (c.treg_networks === 0) return "The networks that are on are free.";
+  return `Searching costs ${month} at these settings, billed by Treg, the service that carries out each search. Bluesky is free.`;
+}
 
 export function NetworkMark({ network, className }: { network: SocialNetwork; className?: string }) {
   const n = networks[network];
