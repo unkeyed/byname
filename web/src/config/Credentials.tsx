@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type Credential, type CredentialKind } from "../api";
 import { keys, useIsAdmin, useSurfaces } from "../queries";
 import { useReauthMutation } from "../pages/settings/Reauth";
-import { Badge, Button, Card, ConfirmButton, ErrorNote, Field, Icon, inputClass, Pending, RelativeTime, SteadyLabel } from "../ui";
+import { Badge, Button, Card, ConfirmButton, cx, ErrorNote, Field, Icon, inputClass, Pending, RelativeTime, SteadyLabel } from "../ui";
 
 /** Every credential, set or not. Admins only: the server refuses everyone else. */
 export const useCredentials = () => {
@@ -22,14 +22,37 @@ export function testTone(status: string) {
 
 /**
  * Pastes a secret. The field is never prefilled and the secret never comes
- * back: after saving it only shows as set.
+ * back: after saving it only shows as set. Saving also makes the
+ * provider's free test call, so a mistyped key shows at once instead of on
+ * the first check.
  */
-export function CredentialForm({ kind, title, hint, set, org, onDone, compact }: { kind: CredentialKind; title: string; hint?: string; set: boolean; org?: string; onDone?: () => void; compact?: boolean }) {
+export function CredentialForm({
+  kind,
+  title,
+  hint,
+  set,
+  org,
+  onDone,
+  onCancel,
+  compact,
+}: {
+  kind: CredentialKind;
+  title: string;
+  hint?: string;
+  set: boolean;
+  org?: string;
+  onDone?: () => void;
+  onCancel?: () => void;
+  compact?: boolean;
+}) {
   const qc = useQueryClient();
   const [secret, setSecret] = useState("");
   const [orgValue, setOrgValue] = useState(org ?? "");
   const save = useReauthMutation({
-    mutationFn: () => api.credentials.set(kind, secret.trim(), treg({ kind }) ? orgValue.trim() || undefined : undefined),
+    mutationFn: async () => {
+      await api.credentials.set(kind, secret.trim(), treg({ kind }) ? orgValue.trim() || undefined : undefined);
+      return api.credentials.test(kind);
+    },
     onSuccess: async () => {
       setSecret("");
       await Promise.all([qc.invalidateQueries({ queryKey: keys.credentials }), qc.invalidateQueries({ queryKey: ["models"] })]);
@@ -58,23 +81,28 @@ export function CredentialForm({ kind, title, hint, set, org, onDone, compact }:
           </Field>
         </div>
         {treg({ kind }) && (
-          <div className={compact ? "sm:w-44" : undefined}>
-            <Field label="Org (optional)" hint={compact ? undefined : "Only for a personal token that belongs to several orgs."}>
-              <input className={inputClass} value={orgValue} onChange={(e) => setOrgValue(e.target.value)} autoCapitalize="none" spellCheck={false} placeholder="northwind" />
+          <div className={compact ? "sm:w-48" : undefined}>
+            <Field label="Treg organization">
+              <input className={inputClass} value={orgValue} onChange={(e) => setOrgValue(e.target.value)} autoCapitalize="none" spellCheck={false} placeholder="Only for a personal token" />
             </Field>
           </div>
         )}
         <div className="flex gap-2">
-          {onDone && !compact && (
-            <Button variant="ghost" onClick={onDone}>
+          {(onCancel ?? (!compact && onDone)) && (
+            <Button variant="ghost" onClick={onCancel ?? onDone}>
               Cancel
             </Button>
           )}
           <Button type="submit" variant="primary" disabled={!secret.trim() || save.isPending}>
-            {save.isPending ? "Saving…" : set ? "Replace" : "Save"}
+            <SteadyLabel labels={["Save", "Replace", "Checking…"]} current={save.isPending ? "Checking…" : set ? "Replace" : "Save"} />
           </Button>
         </div>
       </div>
+      {treg({ kind }) && (
+        <p className="text-xs text-muted">
+          A team token works on its own. A personal token belongs to you and can reach several Treg organizations, so give the organization&apos;s name too.
+        </p>
+      )}
       <ErrorNote error={save.error} />
     </form>
   );
@@ -114,7 +142,7 @@ function CredentialRow({ c }: { c: Credential }) {
             <span className="font-medium">{c.title}</span>
             {c.set ? <Badge tone="success">Set</Badge> : <Badge>Not set</Badge>}
             {c.set && c.org && <Badge tone="outline">org {c.org}</Badge>}
-            {c.last_test_status && (
+            {c.last_test_status && !c.last_test_status.startsWith("untested") && (
               <Badge tone={testTone(c.last_test_status)} title={c.last_test_status}>
                 {c.last_test_status === "ok" ? "Test passed" : "Test failed"}
               </Badge>
@@ -136,7 +164,9 @@ function CredentialRow({ c }: { c: Credential }) {
               </>
             )}
           </p>
-          {c.last_test_status && c.last_test_status !== "ok" && <p className="mt-1 text-xs text-danger [overflow-wrap:anywhere]">{c.last_test_status}</p>}
+          {c.last_test_status && c.last_test_status !== "ok" && (
+            <p className={cx("mt-1 text-xs [overflow-wrap:anywhere]", c.last_test_status.startsWith("untested") ? "text-muted" : "text-danger")}>{c.last_test_status}</p>
+          )}
         </div>
         <div className="ml-auto flex shrink-0 items-center gap-1">
           {c.set && (
