@@ -58,7 +58,7 @@ export function Settings() {
                   to={t.path}
                   className={({ isActive }) =>
                     cx(
-                      "flex h-8 items-center rounded-control px-2.5 text-sm font-medium whitespace-nowrap transition-colors",
+                      "flex h-11 items-center rounded-control px-2.5 md:h-8 text-sm font-medium whitespace-nowrap transition-colors",
                       isActive ? "bg-subtle-strong text-fg" : "text-muted hover:bg-subtle hover:text-fg",
                     )
                   }

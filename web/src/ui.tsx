@@ -72,18 +72,25 @@ const buttonStyles = {
   danger: "border-line-strong bg-surface text-danger hover:bg-danger-soft disabled:opacity-60",
 };
 
-type ButtonLook = { variant?: keyof typeof buttonStyles; size?: "sm" | "md" };
+/** Below md every control is at least 44px, the smallest target a finger hits reliably. From md up the desktop sizes apply. */
+const buttonSizes = {
+  sm: { label: "h-11 min-w-11 px-2 text-xs md:h-7 md:min-w-0", icon: "size-11 md:size-7" },
+  md: { label: "h-11 min-w-11 px-3 text-sm md:h-8 md:min-w-0", icon: "size-11 md:size-8" },
+};
 
-export function buttonClass({ variant = "secondary", size = "md" }: ButtonLook = {}) {
+/** icon makes the button square, for one that shows only an icon. */
+type ButtonLook = { variant?: keyof typeof buttonStyles; size?: keyof typeof buttonSizes; icon?: boolean };
+
+export function buttonClass({ variant = "secondary", size = "md", icon }: ButtonLook = {}) {
   return cx(
     "inline-flex shrink-0 items-center justify-center gap-1.5 rounded-control border font-medium whitespace-nowrap transition-colors active:translate-y-px disabled:pointer-events-none",
-    size === "sm" ? "h-7 px-2 text-xs" : "h-8 px-3 text-sm",
+    icon ? buttonSizes[size].icon : buttonSizes[size].label,
     buttonStyles[variant],
   );
 }
 
-export function Button({ variant, size, className, ...props }: ButtonHTMLAttributes<HTMLButtonElement> & ButtonLook) {
-  return <button type="button" {...props} className={cx(buttonClass({ variant, size }), className)} />;
+export function Button({ variant, size, icon, className, ...props }: ButtonHTMLAttributes<HTMLButtonElement> & ButtonLook) {
+  return <button type="button" {...props} className={cx(buttonClass({ variant, size, icon }), className)} />;
 }
 
 export function Logo({ className = "size-6 text-xs" }: { className?: string }) {
@@ -95,7 +102,7 @@ export function Logo({ className = "size-6 text-xs" }: { className?: string }) {
 }
 
 const fieldBase =
-  "h-8 min-w-0 rounded-control border border-line-strong bg-surface px-2.5 text-sm text-fg transition-colors placeholder:text-faint hover:border-line-hover focus:border-fg focus:ring-3 focus:ring-halo focus:outline-none focus-visible:outline-none disabled:opacity-60";
+  "h-11 md:h-8 min-w-0 rounded-control border border-line-strong bg-surface px-2.5 text-sm text-fg transition-colors placeholder:text-faint hover:border-line-hover focus:border-fg focus:ring-3 focus:ring-halo focus:outline-none focus-visible:outline-none disabled:opacity-60";
 export const inputClass = cx(fieldBase, "w-full");
 export const selectClass = cx(fieldBase, "select-chevron pr-7");
 export const labelClass = "mb-1.5 block text-xs font-medium text-muted";
@@ -278,11 +285,11 @@ export function Badge({
   return (
     <span
       title={title}
-      className={cx("inline-flex h-5 max-w-full items-center gap-1 rounded-control px-1.5 text-xs font-medium whitespace-nowrap", onRemove && "pr-0.5", tones[tone], className)}
+      className={cx("inline-flex max-w-full items-center gap-1 rounded-control px-1.5 text-xs font-medium whitespace-nowrap", onRemove ? "h-11 pr-0 md:h-5 md:pr-0.5" : "h-5", tones[tone], className)}
     >
       {children}
       {onRemove && (
-        <button type="button" aria-label={removeLabel} onClick={onRemove} className="grid size-4 shrink-0 place-items-center rounded-inner transition-colors hover:bg-subtle-strong hover:text-fg">
+        <button type="button" aria-label={removeLabel} onClick={onRemove} className="grid size-11 shrink-0 place-items-center rounded-inner transition-colors hover:bg-subtle-strong hover:text-fg md:size-4">
           <Icon name="x" className="size-3" />
         </button>
       )}
@@ -430,7 +437,7 @@ export function Dialog({ open, onClose, title, children, wide }: { open: boolean
         <div key={opening} className="flex max-h-[calc(100dvh-2rem)] flex-col">
           <div className="flex shrink-0 items-center justify-between gap-4 border-b border-line py-2.5 pr-2.5 pl-4">
             <h2 className="min-w-0 truncate text-base font-semibold">{title}</h2>
-            <Button variant="ghost" size="sm" onClick={onClose} aria-label="Close" className="w-7 px-0">
+            <Button variant="ghost" size="sm" onClick={onClose} aria-label="Close" icon>
               <Icon name="x" />
             </Button>
           </div>
@@ -491,7 +498,7 @@ export function ScrollX({ children, startAtEnd, label }: { children: ReactNode; 
     };
   }, [startAtEnd]);
   const by = (dir: 1 | -1) => ref.current?.scrollBy({ left: dir * Math.max(120, (ref.current.clientWidth - edge.sticky) * 0.8), behavior: "smooth" });
-  const nudge = "pointer-events-auto absolute top-1.5 grid size-7 place-items-center rounded-full bg-surface text-muted shadow-floating transition-colors hover:text-fg";
+  const nudge = "pointer-events-auto absolute top-1.5 hidden size-7 md:grid place-items-center rounded-full bg-surface text-muted shadow-floating transition-colors hover:text-fg";
   return (
     <div className="relative" data-scrolled={edge.left || undefined}>
       <div ref={ref} role="region" aria-label={label} tabIndex={0} className="relative overflow-x-auto overscroll-x-contain">
@@ -534,7 +541,7 @@ export function PageHeader({ title, children }: { title: ReactNode; children?: R
   return (
     <header data-load-visible className="flex h-12 shrink-0 items-center gap-3 border-b border-line px-3 md:px-5">
       {openNav && (
-        <Button variant="ghost" size="sm" onClick={openNav} aria-label="Open menu" className="-ml-1 w-8 px-0">
+        <Button variant="ghost" size="sm" onClick={openNav} aria-label="Open menu" icon className="-ml-1">
           <Icon name="menu" />
         </Button>
       )}

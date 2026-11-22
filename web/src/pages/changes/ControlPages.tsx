@@ -56,7 +56,7 @@ export function ControlPagesCard({ canEdit }: { canEdit: boolean }) {
             </div>
             {canEdit && (
               <div className="-my-0.5 flex shrink-0 items-center">
-                <Button size="sm" variant="ghost" onClick={() => setEditing(p)} aria-label={`Edit ${p.url}`} title="Edit" className="w-7 px-0">
+                <Button size="sm" variant="ghost" onClick={() => setEditing(p)} aria-label={`Edit ${p.url}`} title="Edit" icon>
                   <Icon name="pencil" className="size-3.5" />
                 </Button>
                 <ConfirmButton label={`Remove ${p.url}`} confirmLabel="Remove?" onConfirm={() => remove.mutate(p.id)} disabled={remove.isPending}>

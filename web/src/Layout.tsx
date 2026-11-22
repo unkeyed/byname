@@ -112,7 +112,7 @@ function MenuSheet({ open, onClose, label, theme }: { open: boolean; onClose: ()
       className="m-0 h-dvh max-h-none w-72 max-w-[85vw] border-0 border-r border-line bg-bg p-0 text-fg shadow-floating"
     >
       <div className="flex h-full flex-col">
-        <NavBody label={label} theme={theme} onNavigate={onClose} close={<Button variant="ghost" size="sm" onClick={onClose} aria-label="Close menu" className="ml-auto w-8 px-0"><Icon name="x" /></Button>} />
+        <NavBody label={label} theme={theme} onNavigate={onClose} close={<Button variant="ghost" size="sm" onClick={onClose} aria-label="Close menu" icon className="ml-auto"><Icon name="x" /></Button>} />
       </div>
     </dialog>
   );
@@ -164,7 +164,7 @@ function NavBody({ label, theme: [theme, setTheme], rail, onNavigate, close }: {
             onClick={onNavigate}
             className={({ isActive }) =>
               cx(
-                "flex h-8 items-center gap-2.5 rounded-surface px-2.5 text-sm font-medium transition-colors",
+                "flex h-11 items-center gap-2.5 rounded-surface px-2.5 md:h-8 text-sm font-medium transition-colors",
                 rail && "justify-center lg:justify-start",
                 isActive ? "bg-subtle text-fg" : "text-muted hover:bg-subtle hover:text-fg",
               )
@@ -189,7 +189,7 @@ function NavBody({ label, theme: [theme, setTheme], rail, onNavigate, close }: {
                 title={t.label}
                 onClick={() => setTheme(t.mode)}
                 className={cx(
-                  "flex h-6 flex-1 items-center justify-center rounded-inner transition-colors",
+                  "flex h-11 flex-1 items-center justify-center rounded-inner md:h-6 transition-colors",
                   theme === t.mode ? "bg-subtle-strong text-fg" : "text-faint hover:text-fg",
                 )}
               >
@@ -200,7 +200,7 @@ function NavBody({ label, theme: [theme, setTheme], rail, onNavigate, close }: {
           <div className={cx("flex items-center gap-2 px-1", rail && "flex-col lg:flex-row")}>
             <Avatar label={label} size={24} />
             <AccountLabel label={label} className={cx(wideOnly, "min-w-0 flex-1")} />
-            <Button variant="ghost" size="sm" onClick={() => void logout()} aria-label="Log out" title="Log out" className="w-7 px-0">
+            <Button variant="ghost" size="sm" onClick={() => void logout()} aria-label="Log out" title="Log out" icon>
               <Icon name="logout" className="size-3.5" />
             </Button>
           </div>

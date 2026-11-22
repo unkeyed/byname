@@ -10,7 +10,7 @@ export function AlertsBell({ className, onNavigate }: { className?: string; onNa
   const unread = alerts.data?.unread ?? 0;
   const label = unread ? `Alerts, ${unread} unread` : "Alerts";
   return (
-    <Link to="/alerts" onClick={onNavigate} aria-label={label} title={label} className={cx(buttonClass({ variant: "ghost", size: "sm" }), "relative w-8 px-0", className)}>
+    <Link to="/alerts" onClick={onNavigate} aria-label={label} title={label} className={cx(buttonClass({ variant: "ghost", size: "sm", icon: true }), "relative", className)}>
       <BellIcon />
       {unread > 0 && (
         <span className="absolute -top-0.5 -right-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-danger px-1 text-[0.625rem] leading-none font-semibold text-surface tabular-nums">

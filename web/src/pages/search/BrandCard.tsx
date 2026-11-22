@@ -54,7 +54,7 @@ export function BrandCard({ status, from, canEdit }: { status: GscStatus; from: 
             ))}
           </div>
           <details>
-            <summary className="cursor-pointer text-muted hover:text-fg">Show as a table</summary>
+            <summary className="cursor-pointer py-3.5 text-muted hover:text-fg md:py-0">Show as a table</summary>
             <div className="mt-2 max-h-72 overflow-y-auto">
               <ScrollX label="brand table">
                 <table className="w-full min-w-max text-left tabular-nums">

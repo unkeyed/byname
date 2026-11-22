@@ -115,31 +115,32 @@ function SearchForm({ s, canEdit }: { s: Settings; canEdit: boolean }) {
         {!s.token_set && <p className="mb-3 text-sm text-muted">No Treg token is stored, so only Bluesky is searched. An admin adds the token under Settings &gt; Credentials.</p>}
         <ul className="divide-y divide-line rounded-surface border border-line">
           {s.networks.map((n) => (
-            <li key={n.network} className="flex items-start gap-3 px-3 py-2.5">
-              <input
-                id={`network-${n.network}`}
-                type="checkbox"
-                className="mt-1.5 size-3.5 accent-[var(--fg)]"
-                checked={enabled[n.network]}
-                disabled={!canEdit}
-                onChange={(e) => setEnabled({ ...enabled, [n.network]: e.target.checked })}
-              />
-              <NetworkMark network={n.network} />
-              <label htmlFor={`network-${n.network}`} className="min-w-0 flex-1 text-sm">
-                <span className="flex flex-wrap items-center gap-2 font-medium">
-                  {n.title}
-                  {n.route === "direct" ? <Badge tone="success">Free, no token</Badge> : <Badge tone="outline">${n.cost_per_call_usd} a call through Treg</Badge>}
-                  {n.unavailable && <Badge tone="warn">Unavailable</Badge>}
-                </span>
-                <span className="mt-0.5 block text-xs text-muted [overflow-wrap:anywhere]">
-                  {n.last_call_at ? (
-                    <>
-                      Last searched <RelativeTime iso={n.last_call_at} />
-                      {n.last_error && <span className={n.unavailable ? "text-warn" : "text-danger"}>. {n.last_error}</span>}
-                    </>
-                  ) : (
-                    "Not searched yet"
-                  )}
+            <li key={n.network}>
+              <label className="flex items-start gap-3 px-3 py-2.5">
+                <input
+                  type="checkbox"
+                  className="mt-1.5 size-3.5 accent-[var(--fg)]"
+                  checked={enabled[n.network]}
+                  disabled={!canEdit}
+                  onChange={(e) => setEnabled({ ...enabled, [n.network]: e.target.checked })}
+                />
+                <NetworkMark network={n.network} />
+                <span className="min-w-0 flex-1 text-sm">
+                  <span className="flex flex-wrap items-center gap-2 font-medium">
+                    {n.title}
+                    {n.route === "direct" ? <Badge tone="success">Free, no token</Badge> : <Badge tone="outline">${n.cost_per_call_usd} a call through Treg</Badge>}
+                    {n.unavailable && <Badge tone="warn">Unavailable</Badge>}
+                  </span>
+                  <span className="mt-0.5 block text-xs text-muted [overflow-wrap:anywhere]">
+                    {n.last_call_at ? (
+                      <>
+                        Last searched <RelativeTime iso={n.last_call_at} />
+                        {n.last_error && <span className={n.unavailable ? "text-warn" : "text-danger"}>. {n.last_error}</span>}
+                      </>
+                    ) : (
+                      "Not searched yet"
+                    )}
+                  </span>
                 </span>
               </label>
             </li>
@@ -226,7 +227,7 @@ function LeftOutSection({ canEdit }: { canEdit: boolean }) {
                 {accounts.map((a) => (
                   <li key={a.id} className="flex items-center gap-1.5 rounded-control border border-line py-0.5 pr-1 pl-0.5 text-xs">
                     <NetworkMark network={a.network} className="size-5" />
-                    <a href={a.profile} target="_blank" rel="noreferrer" className="[overflow-wrap:anywhere] hover:underline">
+                    <a href={a.profile} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center [overflow-wrap:anywhere] hover:underline md:min-h-0">
                       {a.handle}
                     </a>
                     <span className="text-faint tabular-nums" title="Stored mentions it hides">

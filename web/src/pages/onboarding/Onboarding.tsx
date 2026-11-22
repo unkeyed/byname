@@ -273,7 +273,7 @@ function StepList({ steps, current, onPick }: { steps: OnboardingStep[]; current
                 to={`/onboarding/${s.key}`}
                 onClick={onPick}
                 aria-current={active ? "step" : undefined}
-                className={cx("flex items-center gap-2.5 rounded-surface px-2 py-1.5 text-sm transition-colors", active ? "bg-subtle text-fg" : "text-muted hover:bg-subtle hover:text-fg")}
+                className={cx("flex items-center gap-2.5 rounded-surface px-2 py-3 text-sm transition-colors md:py-1.5", active ? "bg-subtle text-fg" : "text-muted hover:bg-subtle hover:text-fg")}
               >
                 <span
                   className={cx(

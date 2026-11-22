@@ -75,7 +75,7 @@ function Body({ id, listed, canEdit, onClose }: { id: number; listed: Change | u
             {!c.verdict && <span>{status.detail}</span>}
           </div>
         </div>
-        <Button variant="ghost" size="sm" onClick={onClose} aria-label="Close" className="w-7 px-0">
+        <Button variant="ghost" size="sm" onClick={onClose} aria-label="Close" icon>
           <Icon name="x" />
         </Button>
       </div>
@@ -335,7 +335,7 @@ function Inspections({ rows, zone }: { rows: UrlInspection[]; zone: Zone }) {
   if (rows.length === 0) return null;
   return (
     <details className="text-sm">
-      <summary className="cursor-pointer font-medium text-muted hover:text-fg">URL Inspection results ({rows.length})</summary>
+      <summary className="cursor-pointer py-3.5 font-medium text-muted hover:text-fg md:py-0">URL Inspection results ({rows.length})</summary>
       <div className="mt-2">
         <ScrollX label="URL Inspection results">
           <table className="w-full min-w-[32rem] text-left text-xs">

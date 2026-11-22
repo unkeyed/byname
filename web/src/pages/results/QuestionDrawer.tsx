@@ -54,7 +54,7 @@ function Mark({ point, onClick, selected }: { point: HistoryPoint | undefined; o
       </span>
     );
   return (
-    <button type="button" onClick={onClick} title={`${title}. Show this answer.`} className={cx("w-full rounded-inner px-1.5 py-0.5 text-center text-xs whitespace-nowrap tabular-nums hover:bg-subtle-strong", selected && "bg-subtle-strong ring-1 ring-line-hover")}>
+    <button type="button" onClick={onClick} title={`${title}. Show this answer.`} className={cx("w-full rounded-inner px-1.5 py-3.5 text-center md:py-0.5 text-xs whitespace-nowrap tabular-nums hover:bg-subtle-strong", selected && "bg-subtle-strong ring-1 ring-line-hover")}>
       {body}
     </button>
   );
@@ -90,7 +90,7 @@ function Body({ question, onClose }: { question: number; onClose: () => void }) 
         <div className="min-w-0 flex-1">
           <QuestionTitle answer={newest?.answer_id} />
         </div>
-        <Button variant="ghost" size="sm" onClick={onClose} aria-label="Close" className="w-7 px-0">
+        <Button variant="ghost" size="sm" onClick={onClose} aria-label="Close" icon>
           <Icon name="x" />
         </Button>
       </div>
@@ -98,7 +98,7 @@ function Body({ question, onClose }: { question: number; onClose: () => void }) 
         <div className="flex shrink-0 flex-col gap-2 border-b border-line px-4 py-2.5 sm:flex-row sm:items-center">
           <select
             aria-label="Surface and model"
-            className={cx(selectClass, "h-8 w-full min-w-0 text-xs sm:w-auto sm:flex-1")}
+            className={cx(selectClass, "w-full min-w-0 text-xs sm:w-auto sm:flex-1")}
             value={lineKey(selSeries)}
             onChange={(e) => {
               const s = series.find((x) => lineKey(x) === e.target.value)!;
@@ -146,7 +146,7 @@ function Body({ question, onClose }: { question: number; onClose: () => void }) 
                       type="button"
                       onClick={() => pick(p.answer_id, { qv: "raw" })}
                       title="Read this check's full answer"
-                      className={cx("flex w-full items-start gap-3 px-3 py-2 text-left hover:bg-subtle", p.answer_id === selPoint.answer_id && "bg-subtle")}
+                      className={cx("flex w-full items-start gap-3 px-3 py-3.5 text-left hover:bg-subtle md:py-2", p.answer_id === selPoint.answer_id && "bg-subtle")}
                     >
                       <span className="w-24 shrink-0 text-xs text-muted">
                         #{p.run_id} · {shortDay(p.run_started_at)}
@@ -250,7 +250,7 @@ function Analysis({ series: s, point, label, onRaw }: { series: HistorySeries; p
           {fidelityInfo[s.fidelity].label}
         </Badge>
         {label}, check #{point.run_id}, {shortDay(point.run_started_at)}.
-        <button type="button" onClick={onRaw} className="font-medium text-fg hover:underline">
+        <button type="button" onClick={onRaw} className="inline-flex h-11 items-center font-medium text-fg hover:underline md:h-auto">
           Read the answer
         </button>
       </p>
@@ -289,7 +289,7 @@ function Analysis({ series: s, point, label, onRaw }: { series: HistorySeries; p
                   <li key={i} className="flex flex-col gap-1 px-3 py-2 sm:flex-row sm:items-center sm:gap-3">
                     <span className="flex min-w-0 flex-1 items-center gap-2">
                       <span className="text-faint tabular-nums">{i + 1}</span>
-                      <a href={c.url} target="_blank" rel="noreferrer noopener" className={cx("min-w-0 truncate hover:underline", c.is_self && "font-semibold")} title={c.url}>
+                      <a href={c.url} target="_blank" rel="noreferrer noopener" className={cx("min-w-0 truncate py-3.5 hover:underline md:py-0", c.is_self && "font-semibold")} title={c.url}>
                         {c.url.replace(/^https?:\/\/(www\.)?/, "")}
                       </a>
                       {c.is_self && <Badge tone="info">Yours</Badge>}
@@ -400,7 +400,7 @@ function AnswerView({ id }: { id: number }) {
             {a.citations.map((c, i) => (
               <li key={i} className="flex items-center gap-2">
                 <span className="text-faint tabular-nums">{i + 1}</span>
-                <a href={c.url} target="_blank" rel="noreferrer noopener" className={cx("min-w-0 truncate hover:underline", c.is_self && "font-semibold")}>
+                <a href={c.url} target="_blank" rel="noreferrer noopener" className={cx("min-w-0 truncate py-3.5 hover:underline md:py-0", c.is_self && "font-semibold")}>
                   {c.url}
                 </a>
                 {c.is_self && <Badge tone="info">Yours</Badge>}

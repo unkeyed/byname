@@ -259,7 +259,7 @@ function TregToken({ needed, onNoTreg, canEdit }: { needed: boolean; onNoTreg: (
           </Badge>
         )}
         {canEdit && (
-          <button type="button" onClick={onNoTreg} className="ml-auto text-xs text-muted underline underline-offset-2 hover:text-fg">
+          <button type="button" onClick={onNoTreg} className="ml-auto inline-flex h-11 items-center text-xs text-muted underline underline-offset-2 hover:text-fg md:h-auto">
             Don&apos;t use Treg?
           </button>
         )}
@@ -328,7 +328,9 @@ function SurfaceRow({
   return (
     <li className="px-4 py-3">
       <div className="flex items-start gap-3">
-        <input id={id} type="checkbox" className="mt-1" checked={draft.enabled} disabled={!canEdit} onChange={(e) => onChange({ enabled: e.target.checked })} />
+        <label className="-m-4 flex p-4 md:m-0 md:p-0">
+          <input id={id} type="checkbox" className="mt-1" checked={draft.enabled} disabled={!canEdit} onChange={(e) => onChange({ enabled: e.target.checked })} />
+        </label>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <label htmlFor={id} className="font-medium">
@@ -433,7 +435,7 @@ function ModelChips({ s, draft, opt, canEdit, onChange }: { s: Surface; draft: D
                 onClick={() => toggle(m.name)}
                 title={m.off ? "Not on the route's current list" : !listsSearch ? "The test call shows whether it searches" : m.web_search ? "Supports web search" : "No web search on this model"}
                 className={cx(
-                  "inline-flex h-7 items-center gap-1 rounded-full border px-2.5 font-mono text-xs transition-colors disabled:cursor-default",
+                  "inline-flex h-11 items-center gap-1 rounded-full border px-3 font-mono md:h-7 md:px-2.5 text-xs transition-colors disabled:cursor-default",
                   on ? "border-fg bg-fg text-bg" : "border-line-strong text-muted hover:border-line-hover hover:text-fg",
                   m.off && "border-dashed",
                 )}

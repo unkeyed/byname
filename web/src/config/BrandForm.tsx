@@ -234,12 +234,14 @@ function BrandFormBody({ initial, retention, footer, onSaved, submitLabel }: { i
           <fieldset>
             <legend className={labelClass}>Raw response retention</legend>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-6">
-              <label className="flex items-center gap-2 text-sm">
+              <label className="flex min-h-11 items-center gap-2 text-sm md:min-h-0">
                 <input type="radio" name="retention" checked={keepForever} onChange={() => setKeepForever(true)} />
                 Keep forever
               </label>
               <div className="flex items-start gap-2">
-                <input type="radio" name="retention" aria-label="Keep for a number of days" className="mt-2" checked={!keepForever} onChange={() => setKeepForever(false)} />
+                <label className="-m-4 flex p-4 md:m-0 md:p-0">
+                  <input type="radio" name="retention" aria-label="Keep for a number of days" className="md:mt-2" checked={!keepForever} onChange={() => setKeepForever(false)} />
+                </label>
                 <NumberField
                   name="raw_retention_days"
                   value={retentionDays}

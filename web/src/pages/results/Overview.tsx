@@ -252,7 +252,7 @@ function SearchConsoleCard() {
   return (
     <Card className="min-w-0">
       <CardHeader title="Search Console" description={s?.latest_final_day ? `Google clicks per day. Days after ${day(s.latest_final_day)} are partial and still revised.` : "Google clicks per day."}>
-        <Link to="/search" className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-muted hover:text-fg">
+        <Link to="/search" className="inline-flex h-11 shrink-0 items-center gap-1 text-xs font-medium text-muted hover:text-fg md:h-auto">
           Search <Icon name="right" className="size-3" />
         </Link>
       </CardHeader>
@@ -301,7 +301,7 @@ function RatesCard({ filter, by }: { filter: ResultsFilter; by: Grouping }) {
           <ul aria-label="Lines, with each line's latest value. Open one for its detail." className="-mx-1.5 space-y-0.5 self-start text-xs">
             {lines.map((l) => (
               <li key={l.key}>
-                <button type="button" onClick={() => openEngine(l.series)} title={`${l.models.length ? `${l.models.join(", ")}. ` : ""}Open ${l.label}`} className="flex w-full items-start gap-2 rounded-control px-1.5 py-1 text-left hover:bg-subtle">
+                <button type="button" onClick={() => openEngine(l.series)} title={`${l.models.length ? `${l.models.join(", ")}. ` : ""}Open ${l.label}`} className="flex w-full items-start gap-2 rounded-control px-1.5 py-1.5 text-left hover:bg-subtle md:py-1">
                   <LineKey color={l.color} dashed={l.approx} className="mt-1.5" />
                   <span className="min-w-0 flex-1">
                     <span className="block font-medium [overflow-wrap:anywhere]">{l.label}</span>
@@ -314,7 +314,7 @@ function RatesCard({ filter, by }: { filter: ResultsFilter; by: Grouping }) {
             ))}
           </ul>
           <details className="text-xs lg:col-span-2">
-            <summary className="cursor-pointer text-muted hover:text-fg">Show as a table</summary>
+            <summary className="cursor-pointer py-3.5 text-muted hover:text-fg md:py-0">Show as a table</summary>
             <div className="mt-2">
               <ScrollX label="rates table">
                 <table className="w-full min-w-max text-left tabular-nums">
@@ -373,7 +373,7 @@ function ShareCard({ filter }: { filter: ResultsFilter }) {
   return (
     <Card>
       <CardHeader title="Share of mentions against competitors" description={`${comp.data.mentions} mentions over ${comp.data.runs} ${comp.data.runs === 1 ? "check" : "checks"}. Technologies are left out.`}>
-        <Link to={`/competitors${view.filterSearch()}`} className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-muted hover:text-fg">
+        <Link to={`/competitors${view.filterSearch()}`} className="inline-flex h-11 shrink-0 items-center gap-1 text-xs font-medium text-muted hover:text-fg md:h-auto">
           Competitors <Icon name="right" className="size-3" />
         </Link>
       </CardHeader>

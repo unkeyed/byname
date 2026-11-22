@@ -155,7 +155,7 @@ function UrlNotice({ providers }: { providers: SignInProvider[] }) {
           </p>
         )}
       </div>
-      <Button size="sm" variant="ghost" onClick={dismiss} aria-label="Dismiss" className="w-7 px-0">
+      <Button size="sm" variant="ghost" onClick={dismiss} aria-label="Dismiss" icon>
         <Icon name="x" className="size-3.5" />
       </Button>
     </div>

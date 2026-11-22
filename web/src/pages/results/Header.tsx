@@ -29,7 +29,7 @@ export function Segmented<T extends string>({
           onClick={() => onChange(o.id)}
           className={cx(
             "rounded-inner font-medium whitespace-nowrap transition-colors",
-            size === "sm" ? "h-6 px-2 text-xs" : "h-7 px-2.5 text-xs",
+            size === "sm" ? "h-11 min-w-11 px-2 text-xs md:h-6 md:min-w-0" : "h-11 min-w-11 px-2.5 text-xs md:h-7 md:min-w-0",
             value === o.id ? "bg-subtle-strong text-fg" : "text-muted hover:text-fg",
           )}
         >
@@ -40,7 +40,7 @@ export function Segmented<T extends string>({
   );
 }
 
-const filterSelect = cx(selectClass, "h-8 w-full text-xs md:w-auto");
+const filterSelect = cx(selectClass, "w-full text-xs md:w-auto");
 
 /**
  * The header every results page shares: the title in the top bar with the

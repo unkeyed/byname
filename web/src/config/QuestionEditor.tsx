@@ -206,7 +206,7 @@ function AddQuestions({ groups, onAdd, names }: { groups: string[]; onAdd: (qs: 
                 setMode(m.id);
                 setReport(null);
               }}
-              className={cx("h-6 rounded-inner px-2 text-xs font-medium transition-colors", mode === m.id ? "bg-subtle-strong text-fg" : "text-muted hover:text-fg")}
+              className={cx("h-11 min-w-11 rounded-inner px-2 md:h-6 md:min-w-0 text-xs font-medium transition-colors", mode === m.id ? "bg-subtle-strong text-fg" : "text-muted hover:text-fg")}
             >
               {m.label}
             </button>
@@ -406,10 +406,10 @@ function QuestionRow({ row, names, canEdit, showError, onEdit, onRemove }: { row
       </div>
       {canEdit && (
         <div className="-my-0.5 flex shrink-0 items-center">
-          <Button size="sm" variant="ghost" onClick={onEdit} aria-label="Edit question" title="Edit" className="w-7 px-0">
+          <Button size="sm" variant="ghost" onClick={onEdit} aria-label="Edit question" title="Edit" icon>
             <Icon name="pencil" className="size-3.5" />
           </Button>
-          <Button size="sm" variant="ghost" onClick={onRemove} aria-label="Remove question" title="Remove" className="w-7 px-0">
+          <Button size="sm" variant="ghost" onClick={onRemove} aria-label="Remove question" title="Remove" icon>
             <Icon name="x" className="size-3.5" />
           </Button>
         </div>

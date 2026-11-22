@@ -119,7 +119,7 @@ export function ReadOnlyNote({ children = "You can see these settings. An admin 
 export function Disclosure({ summary, children, open, onToggle }: { summary: ReactNode; children: ReactNode; open?: boolean; onToggle?: (open: boolean) => void }) {
   return (
     <details open={open} onToggle={onToggle && ((e) => onToggle(e.currentTarget.open))} className="group rounded-surface border border-line">
-      <summary className="flex cursor-pointer list-none items-center gap-1.5 px-3 py-2 text-sm font-medium select-none [&::-webkit-details-marker]:hidden">
+      <summary className="flex cursor-pointer list-none items-center gap-1.5 px-3 py-3 text-sm font-medium select-none md:py-2 [&::-webkit-details-marker]:hidden">
         <Icon name="right" className="size-3.5 text-muted transition-transform group-open:rotate-90" />
         {summary}
       </summary>

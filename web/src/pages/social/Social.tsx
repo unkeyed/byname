@@ -193,7 +193,7 @@ function MentionsCard({ s }: { s: SocialSettings }) {
             : nextFetch(s)
         }
       >
-        <select aria-label="Network" className={cx(selectClass, "h-8 text-xs")} value={network} onChange={(e) => setNetwork(e.target.value as SocialNetwork | "")}>
+        <select aria-label="Network" className={cx(selectClass, "text-xs")} value={network} onChange={(e) => setNetwork(e.target.value as SocialNetwork | "")}>
           <option value="">All networks</option>
           {networkOrder.map((n) => (
             <option key={n} value={n}>
@@ -202,7 +202,7 @@ function MentionsCard({ s }: { s: SocialSettings }) {
           ))}
         </select>
         {l && (l.hidden > 0 || showHidden) && (
-          <label className="flex h-8 items-center gap-1.5 text-xs text-muted">
+          <label className="flex h-11 items-center gap-1.5 text-xs text-muted md:h-8">
             <input type="checkbox" checked={showHidden} onChange={(e) => setShowHidden(e.target.checked)} className="size-3.5 accent-[var(--fg)]" />
             {showHidden ? "Showing" : "Show"} {l.hidden} hidden from people you left out
           </label>

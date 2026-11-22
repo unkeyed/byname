@@ -40,7 +40,7 @@ export function GoalsCard({ status, canEdit }: { status: GscStatus; canEdit: boo
         {goals.data.map((g) => (
           <GoalTile key={g.id} goal={g} actions={canEdit ? (
             <>
-              <Button size="sm" variant="ghost" onClick={() => setEditing(g)} aria-label={`Edit ${goalName(g)}`} title="Edit" className="w-7 px-0">
+              <Button size="sm" variant="ghost" onClick={() => setEditing(g)} aria-label={`Edit ${goalName(g)}`} title="Edit" icon>
                 <Icon name="pencil" className="size-3.5" />
               </Button>
               <ConfirmButton label={`Delete ${goalName(g)}`} confirmLabel="Delete?" onConfirm={() => remove.mutate(g.id)} disabled={remove.isPending}>

@@ -291,13 +291,13 @@ function Rules({ r }: { r: RepoStatus }) {
                   <input aria-label={`Rule ${i + 1} URL`} className={cx(inputClass, "font-mono text-xs")} value={x.url} onChange={(e) => edit(x.key, { url: e.target.value })} placeholder={`https://${domain}/blog/{1}`} autoCapitalize="none" spellCheck={false} />
                 </div>
                 <div className="flex shrink-0 flex-col items-center sm:flex-row">
-                  <Button size="sm" variant="ghost" className="w-7 px-0" aria-label={`Move rule ${i + 1} up`} disabled={i === 0} onClick={() => move(i, -1)}>
+                  <Button size="sm" variant="ghost" icon aria-label={`Move rule ${i + 1} up`} disabled={i === 0} onClick={() => move(i, -1)}>
                     <Icon name="up" className="size-3.5" />
                   </Button>
-                  <Button size="sm" variant="ghost" className="w-7 px-0" aria-label={`Move rule ${i + 1} down`} disabled={i === rows.length - 1} onClick={() => move(i, 1)}>
+                  <Button size="sm" variant="ghost" icon aria-label={`Move rule ${i + 1} down`} disabled={i === rows.length - 1} onClick={() => move(i, 1)}>
                     <Icon name="down" className="size-3.5" />
                   </Button>
-                  <Button size="sm" variant="ghost" className="w-7 px-0" aria-label={`Remove rule ${i + 1}`} onClick={() => (save.reset(), setRows(rows.filter((y) => y.key !== x.key)))}>
+                  <Button size="sm" variant="ghost" icon aria-label={`Remove rule ${i + 1}`} onClick={() => (save.reset(), setRows(rows.filter((y) => y.key !== x.key)))}>
                     <Icon name="x" className="size-3.5" />
                   </Button>
                 </div>

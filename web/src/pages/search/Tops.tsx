@@ -30,7 +30,7 @@ export function TopPages({ status }: { status: GscStatus }) {
         key: p.page,
         totals: p,
         name: (
-          <a href={p.page} target="_blank" rel="noreferrer" className="group inline-flex max-w-full items-center gap-1 hover:underline" title={p.page}>
+          <a href={p.page} target="_blank" rel="noreferrer" className="group inline-flex h-11 max-w-full min-w-11 items-center gap-1 hover:underline md:h-auto md:min-w-0" title={p.page}>
             <span className="truncate">{pagePath(p.page)}</span>
             <Icon name="external" className="size-3 text-faint group-hover:text-fg" />
           </a>

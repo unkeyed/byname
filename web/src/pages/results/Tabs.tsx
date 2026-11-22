@@ -19,7 +19,7 @@ export function Tabs<T extends string>({ label, tabs, current }: { label: string
           aria-selected={current === t.id}
           onClick={() => view.set({ tab: i === 0 ? null : t.id })}
           className={cx(
-            "-mb-px inline-flex h-9 items-center gap-1.5 border-b-2 text-sm font-medium transition-colors",
+            "-mb-px inline-flex h-11 items-center md:h-9 gap-1.5 border-b-2 text-sm font-medium transition-colors",
             current === t.id ? "border-fg text-fg" : "border-transparent text-muted hover:text-fg",
           )}
         >

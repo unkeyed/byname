@@ -174,7 +174,7 @@ function Heatmap({ data }: { data: Data }) {
                           onPointerLeave={() => setHover(null)}
                           onFocus={() => setHover(k)}
                           onBlur={() => setHover(null)}
-                          className={cx("grid h-9 place-items-center rounded-inner font-medium tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-ring", hover === k && "ring-2 ring-fg")}
+                          className={cx("grid h-11 place-items-center rounded-inner md:h-9 font-medium tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-ring", hover === k && "ring-2 ring-fg")}
                           style={rate > 0 ? { background: `var(--heat-${step})`, color: `var(--heat-ink-${step})` } : { background: "var(--subtle)" }}
                         >
                           {rate > 0 ? pct(rate) : <span className="text-faint">0</span>}
