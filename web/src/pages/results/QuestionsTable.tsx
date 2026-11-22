@@ -100,6 +100,21 @@ const sorters: Record<string, (a: QuestionRow, b: QuestionRow) => number> = {
   change: (a, b) => a.gained - a.lost - (b.gained - b.lost) || a.moved - b.moved,
 };
 
+type Sorting = { key: string; desc: boolean; set: (k: string) => void };
+
+/** The arrow's slot is always there, so sorting by a column never widens it and moves the others. */
+function SortHead({ k, by, children, className }: { k: string; by: Sorting; children: React.ReactNode; className?: string }) {
+  const on = by.key === k;
+  return (
+    <th scope="col" aria-sort={on ? (by.desc ? "descending" : "ascending") : undefined} className={cx("px-2.5 py-2 text-left font-medium", className)}>
+      <button type="button" onClick={() => by.set(k)} className="inline-flex items-center gap-1 text-left hover:text-fg">
+        {children}
+        <Icon name={on && by.desc ? "down" : "up"} className={cx("size-3", !on && "invisible")} />
+      </button>
+    </th>
+  );
+}
+
 export function QuestionsTable({ run, filter }: { run: Run; filter: ResultsFilter }) {
   const view = useView();
   const wide = useWide();
@@ -122,15 +137,7 @@ export function QuestionsTable({ run, filter }: { run: Run; filter: ResultsFilte
     shown = [...shown].sort(sorter);
     if (desc) shown.reverse();
   }
-  const setSort = (k: string) => view.set(sort === k ? { dir: desc ? null : "desc" } : { sort: k, dir: null });
-  const SortHead = ({ k, children, className }: { k: string; children: React.ReactNode; className?: string }) => (
-    <th scope="col" aria-sort={sort === k ? (desc ? "descending" : "ascending") : undefined} className={cx("px-2.5 py-2 text-left font-medium", className)}>
-      <button type="button" onClick={() => setSort(k)} className="inline-flex items-center gap-1 text-left hover:text-fg">
-        {children}
-        {sort === k && <Icon name={desc ? "down" : "up"} className="size-3" />}
-      </button>
-    </th>
-  );
+  const by: Sorting = { key: sort, desc, set: (k) => view.set(sort === k ? { dir: desc ? null : "desc" } : { sort: k, dir: null }) };
 
   const open = (r: QuestionRow) => view.set({ q: r.question.id, qa: null }, { push: true });
   const surfaceTitle = labels.surfaceTitle;
@@ -180,17 +187,17 @@ export function QuestionsTable({ run, filter }: { run: Run; filter: ResultsFilte
           <table className="w-full min-w-max text-sm">
             <thead className="border-b border-line text-xs text-muted">
               <tr>
-                <SortHead k="question" className="sticky left-0 z-[1] w-64 align-bottom min-w-64 bg-surface shadow-[inset_-1px_0_0_var(--line)]">
+                <SortHead by={by} k="question" className="sticky left-0 z-[1] w-64 align-bottom min-w-64 bg-surface shadow-[inset_-1px_0_0_var(--line)]">
                   Question
                 </SortHead>
                 {columns.map((c, i) => (
-                  <SortHead key={i} k={`c${i}`} className="max-w-32 align-bottom">
+                  <SortHead key={i} by={by} k={`c${i}`} className="max-w-32 align-bottom">
                     <ColumnLabel column={c} surfaceTitle={surfaceTitle} />
                   </SortHead>
                 ))}
-                <SortHead k="named" className="align-bottom">Named you</SortHead>
-                <SortHead k="best" className="align-bottom">Best</SortHead>
-                <SortHead k="change" className="align-bottom">Change</SortHead>
+                <SortHead by={by} k="named" className="align-bottom">Named you</SortHead>
+                <SortHead by={by} k="best" className="align-bottom">Best</SortHead>
+                <SortHead by={by} k="change" className="align-bottom">Change</SortHead>
               </tr>
             </thead>
             <tbody className="divide-y divide-line">
