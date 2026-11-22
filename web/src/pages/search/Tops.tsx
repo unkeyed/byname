@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api, type GscStatus, type SearchTotals } from "../../api";
 import { dataVersion, keys } from "../../queries";
 import { Badge, Button, Card, CardHeader, cx, ErrorNote, Icon, Pending, ScrollX } from "../../ui";
-import { count, ctr, dayRange, position } from "./model";
+import { count, ctr, dayRange, figureInfo, position } from "./model";
 
 const shortLimit = 10;
 const longLimit = 50;
@@ -49,10 +49,10 @@ export function TopQueries({ status, nonBrand }: { status: GscStatus; nonBrand: 
   const q = useQuery({ queryKey: keys.searchQueries(limit, nonBrand, dataVersion(status)), queryFn: () => api.search.queries(limit, nonBrand) });
   return (
     <TopCard
-      title={nonBrand ? "Top non-brand queries" : "Top queries"}
-      what="query"
+      title={nonBrand ? "Top searches without your name" : "Top searches"}
+      what="search"
       range={q.data && dayRange(q.data.from, q.data.to)}
-      note={nonBrand ? "Queries without a branded term. Google hides rare queries, so these undercount." : undefined}
+      note={nonBrand ? `${figureInfo.non_brand.hint} Google hides rare searches, so these undercount.` : undefined}
       rows={q.data?.queries.map((r) => ({
         key: r.query,
         totals: r,
@@ -61,7 +61,7 @@ export function TopQueries({ status, nonBrand }: { status: GscStatus; nonBrand: 
             <span className="truncate" title={r.query}>
               {r.query}
             </span>
-            {!nonBrand && r.branded && <Badge className="shrink-0">Brand</Badge>}
+            {!nonBrand && r.branded && <Badge className="shrink-0">Your name</Badge>}
           </span>
         ),
       }))}
@@ -97,26 +97,26 @@ function TopCard({
   let body;
   if (error) body = <div className="px-4 pb-4"><ErrorNote error={error} /></div>;
   else if (!rows) body = <Pending />;
-  else if (rows.length === 0) body = <p className="px-4 pb-6 text-sm text-muted">No {what === "page" ? "pages" : "queries"} had impressions in these 28 days.</p>;
+  else if (rows.length === 0) body = <p className="px-4 pb-6 text-sm text-muted">No {what === "page" ? "pages" : "searches"} had appearances in these 28 days.</p>;
   else
     body = (
       <div className={cx("pb-2", dim && "opacity-60")}>
         <ScrollX label={title}>
-          <table className="w-full min-w-[30rem] table-fixed text-left text-sm">
+          <table className="w-full min-w-[32rem] table-fixed text-left text-sm">
             <colgroup>
               <col />
               <col className="w-18" />
-              <col className="w-24" />
-              <col className="w-16" />
-              <col className="w-18" />
+              <col className="w-26" />
+              <col className="w-22" />
+              <col className="w-22" />
             </colgroup>
             <thead className="text-xs text-muted">
               <tr className="border-y border-line">
                 <th className="py-1.5 pr-3 pl-4 font-medium capitalize">{what}</th>
                 <th className="py-1.5 pr-3 text-right font-medium">Clicks</th>
-                <th className="py-1.5 pr-3 text-right font-medium">Impressions</th>
-                <th className="py-1.5 pr-3 text-right font-medium">CTR</th>
-                <th className="py-1.5 pr-4 text-right font-medium">Position</th>
+                <th className="py-1.5 pr-3 text-right font-medium">{figureInfo.impressions.label}</th>
+                <th className="py-1.5 pr-3 text-right font-medium">{figureInfo.ctr.label}</th>
+                <th className="py-1.5 pr-4 text-right font-medium">{figureInfo.position.label}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-line tabular-nums">
