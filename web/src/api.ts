@@ -649,6 +649,8 @@ export interface HistorySeries extends Series {
 
 export interface History {
   question_id: number;
+  /** The question as it reads now. */
+  question: QuestionRef;
   series: HistorySeries[];
 }
 

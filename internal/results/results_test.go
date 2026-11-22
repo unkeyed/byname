@@ -186,6 +186,9 @@ func TestSeriesFollowQuestionVersionsAndSplitOnFidelity(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if h.Question.ID != v2.Questions[0].ID || h.Question.Text != v2.Questions[0].Text {
+		t.Errorf("history question = %+v, want the current version %+v", h.Question, v2.Questions[0])
+	}
 	var claude []results.HistorySeries
 	for _, s := range h.Series {
 		if s.Pair.ID == claudePair {

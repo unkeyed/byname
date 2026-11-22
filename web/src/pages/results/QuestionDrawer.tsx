@@ -82,13 +82,13 @@ function Body({ question, onClose }: { question: number; onClose: () => void }) 
   const selSeries = series.find((s) => s.points.some((p) => p.answer_id === qa)) ?? series[0];
   const selPoint = selSeries?.points.find((p) => p.answer_id === qa) ?? selSeries?.points[selSeries.points.length - 1];
   const pick = (answer: number, patch: { qv?: string | null } = {}) => view.set({ qa: answer, ...patch });
-  const newest = history.data.series.flatMap((s) => s.points).sort((a, b) => b.run_id - a.run_id)[0];
 
   return (
     <div className="flex h-full flex-col">
       <div className="flex shrink-0 items-start gap-3 border-b border-line px-4 py-3">
         <div className="min-w-0 flex-1">
-          <QuestionTitle answer={newest?.answer_id} />
+          <div className="text-xs text-muted">{history.data.question.group || "Question"}</div>
+          <h2 className="text-base font-semibold">{history.data.question.text}</h2>
         </div>
         <Button variant="ghost" size="sm" onClick={onClose} aria-label="Close" icon>
           <Icon name="x" />
@@ -225,7 +225,7 @@ function Body({ question, onClose }: { question: number; onClose: () => void }) 
 
 /** The selected pair's answer in one check: where you stood, who was named instead, and what it cited. */
 function Analysis({ series: s, point, label, onRaw }: { series: HistorySeries; point: HistoryPoint; label: string; onRaw: () => void }) {
-  const answer = useQuery({ queryKey: keys.answer(point.answer_id), queryFn: () => api.answer(point.answer_id) });
+  const answer = useQuery({ queryKey: keys.answer(point.answer_id), queryFn: () => api.answer(point.answer_id), placeholderData: (prev) => prev });
   const competitors = answer.data?.mentions.filter((m) => m.kind === "competitor") ?? [];
   return (
     <section className="space-y-4">
@@ -313,17 +313,6 @@ function Analysis({ series: s, point, label, onRaw }: { series: HistorySeries; p
   );
 }
 
-/** The question as the newest answer asked it, since its wording can change between versions. */
-function QuestionTitle({ answer }: { answer: number | undefined }) {
-  const a = useQuery({ queryKey: keys.answer(answer ?? 0), queryFn: () => api.answer(answer!), enabled: !!answer });
-  return (
-    <>
-      <div className="text-xs text-muted">{a.data?.question.group ?? "Question"}</div>
-      <h2 className="text-base font-semibold">{a.data?.question.text ?? (answer ? "…" : "No answers yet")}</h2>
-    </>
-  );
-}
-
 function SeriesSummary({ s, label }: { s: HistorySeries; label: string }) {
   const latest = s.points[s.points.length - 1];
   return (
@@ -346,7 +335,7 @@ function SeriesSummary({ s, label }: { s: HistorySeries; label: string }) {
 const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 function AnswerView({ id }: { id: number }) {
-  const answer = useQuery({ queryKey: keys.answer(id), queryFn: () => api.answer(id) });
+  const answer = useQuery({ queryKey: keys.answer(id), queryFn: () => api.answer(id), placeholderData: (prev) => prev });
   const brands = useBrands();
   const settings = useSettings();
   if (answer.isPending) return <Pending />;

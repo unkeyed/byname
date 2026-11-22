@@ -3,6 +3,7 @@ package results
 import (
 	"cmp"
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"time"
@@ -245,8 +246,11 @@ type HistorySeries struct {
 }
 
 type History struct {
-	QuestionID int64           `json:"question_id"`
-	Series     []HistorySeries `json:"series"`
+	QuestionID int64 `json:"question_id"`
+	// Question is the question as it reads now, so a view can title itself
+	// without fetching an answer.
+	Question QuestionRef     `json:"question"`
+	Series   []HistorySeries `json:"series"`
 }
 
 // QuestionHistory is one question's answers across runs, one series per
@@ -254,12 +258,13 @@ type History struct {
 // earlier versions it carries on. since limits it to runs started then or
 // later; nil is all time.
 func (s *Service) QuestionHistory(ctx context.Context, questionID int64, since *time.Time) (History, error) {
-	var exists bool
-	if err := s.db.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM question WHERE id = $1)`, questionID).Scan(&exists); err != nil {
-		return History{}, err
-	}
-	if !exists {
+	var q QuestionRef
+	err := s.db.QueryRow(ctx, `SELECT id, group_name, text, counts_in_scores FROM question WHERE id = $1`, questionID).Scan(&q.ID, &q.Group, &q.Text, &q.CountsInScores)
+	if errors.Is(err, pgx.ErrNoRows) {
 		return History{}, fmt.Errorf("%w: no question %d", core.ErrNotFound, questionID)
+	}
+	if err != nil {
+		return History{}, err
 	}
 	brands, err := s.brands(ctx)
 	if err != nil {
@@ -275,7 +280,7 @@ func (s *Service) QuestionHistory(ctx context.Context, questionID int64, since *
 	if err != nil {
 		return History{}, err
 	}
-	out := History{QuestionID: questionID, Series: []HistorySeries{}}
+	out := History{QuestionID: questionID, Question: q, Series: []HistorySeries{}}
 	index := map[Series]int{}
 	prev := map[Series]*panel.Scored{}
 	for _, x := range answers {
