@@ -4,18 +4,17 @@ import { keepPreviousData, MutationCache, QueryCache, QueryClient, QueryClientPr
 import { createBrowserRouter, RouterProvider } from "react-router";
 import { ApiError } from "./api";
 import { keys } from "./queries";
-import { Layout, nav, NotFound } from "./Layout";
+import { Layout, NotFound } from "./Layout";
+import { moved, Moved, section, Section } from "./nav";
 import { Login } from "./pages/Login";
 import { AcceptInvite } from "./pages/AcceptInvite";
 import { Setup } from "./pages/Setup";
 import { Consent } from "./pages/Consent";
-import { ComingSoon } from "./pages/ComingSoon";
 import { Overview } from "./pages/results/Overview";
 import { Competitors } from "./pages/results/Competitors";
 import { Prompts } from "./pages/results/Prompts";
 import { Gaps } from "./pages/results/Gaps";
 import { Compare } from "./pages/results/Compare";
-import { Runs } from "./pages/results/Runs";
 import { Alerts } from "./pages/Alerts";
 import { Search } from "./pages/search/Search";
 import { Changes } from "./pages/changes/Changes";
@@ -36,17 +35,30 @@ const router = createBrowserRouter([
     element: <Layout />,
     children: [
       { index: true, element: <Overview /> },
-      { path: "prompts", element: <Prompts /> },
-      { path: "competitors", element: <Competitors /> },
-      { path: "gaps", element: <Gaps /> },
-      { path: "compare", element: <Compare /> },
-      { path: "runs", element: <Runs /> },
-      { path: "alerts", element: <Alerts /> },
-      { path: "search", element: <Search /> },
-      { path: "changes", element: <Changes /> },
+      {
+        path: "ai",
+        element: <Section item={section("/ai")} />,
+        children: [
+          { index: true, element: <Moved to="/ai/questions" /> },
+          { path: "questions", element: <Prompts /> },
+          { path: "competitors", element: <Competitors /> },
+          { path: "missed", element: <Gaps /> },
+          { path: "what-changed", element: <Compare /> },
+        ],
+      },
+      {
+        path: "google",
+        element: <Section item={section("/google")} />,
+        children: [
+          { index: true, element: <Moved to="/google/traffic" /> },
+          { path: "traffic", element: <Search /> },
+          { path: "site-changes", element: <Changes /> },
+        ],
+      },
       { path: "social", element: <Social /> },
-      ...nav.flatMap((n) => (n.soon ? [{ path: n.to === "/" ? undefined : n.to, index: n.to === "/", element: <ComingSoon title={n.label} body={n.soon} /> }] : [])),
+      { path: "alerts", element: <Alerts /> },
       { path: "settings", element: <Settings />, children: settingsRoutes },
+      ...moved.map(([from, to]) => ({ path: from, element: <Moved to={to} /> })),
       { path: "*", element: <NotFound /> },
     ],
   },

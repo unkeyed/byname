@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { useSurfaces } from "../../queries";
 import { cx, PageHeader, selectClass, useLoading } from "../../ui";
 import { ranges, useView } from "../../view";
+import { SectionTabs, useSection } from "../../nav";
 
 export function Segmented<T extends string>({
   label,
@@ -51,6 +52,7 @@ const filterSelect = cx(selectClass, "w-full text-xs md:w-48");
  */
 export function ViewHeader({ title, subtitle, action, range = true, scope = true }: { title: string; subtitle: ReactNode; action?: ReactNode; range?: boolean; scope?: boolean }) {
   const view = useView();
+  const section = useSection();
   const surfaces = useSurfaces();
   useLoading(scope && surfaces.isPending);
   const used = surfaces.data?.filter((s) => s.pairs.length > 0) ?? [];
@@ -59,7 +61,8 @@ export function ViewHeader({ title, subtitle, action, range = true, scope = true
   const rangeOptions = ranges.map((r) => ({ id: r.id, label: r.label }));
   return (
     <>
-      <PageHeader title={title}>{action}</PageHeader>
+      <PageHeader title={section?.label ?? title}>{action}</PageHeader>
+      {section?.tabs && <SectionTabs item={section} />}
       <div className="shrink-0 space-y-3 border-b border-line bg-bg px-3 py-3 md:px-5">
         <p className="max-w-3xl text-sm text-muted">{subtitle}</p>
         {(range || scope) && (
