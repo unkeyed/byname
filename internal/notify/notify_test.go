@@ -246,7 +246,7 @@ func TestEmailChannels(t *testing.T) {
 			e.channel(t, notify.ChannelInput{Name: "Resend", Kind: notify.EmailAPI, Events: []notify.Kind{notify.SpendCapReached},
 				Settings: obj(map[string]any{"from": "alerts@northwind.example", "to": []string{"ops@northwind.example"}}),
 				Secrets:  obj(map[string]string{"api_key": "re_secret"})})
-			ev := notify.Event{Subject: "run/9", Payload: notify.SpendCapReachedPayload{RunID: 9, SpendUSD: 5.01, Message: "stopped asking questions at $5.0100; the spend cap for one check is $5.00"}}
+			ev := notify.Event{Subject: "run/9", Payload: notify.SpendCapReachedPayload{RunID: 9, SpendUSD: 5.01, Message: "stopped asking questions at $5.01; the spend cap for one check is $5.00"}}
 			if err := e.notify.Emit(ctx, ev); err != nil {
 				t.Fatal(err)
 			}

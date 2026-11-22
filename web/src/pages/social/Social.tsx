@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { Link } from "react-router";
 import type { Costs, LeftOut, SocialDigest, SocialMention, SocialNetwork, SocialSettings } from "../../api";
+import { money } from "../../money";
 import { useCan, useCosts, useIsAdmin, useLeftOut, useSocialDigest, useSocialMentions, useSocialSettings } from "../../queries";
-import { Badge, Button, buttonClass, Card, CardHeader, cx, EmptyState, ErrorNote, Icon, Pending, RelativeTime, selectClass, useLoading } from "../../ui";
+import { Badge, Button, buttonClass, Card, CardHeader, cx, EmptyState, ErrorNote, Icon, Pending, RelativeTime, scrollArea, selectClass, useLoading } from "../../ui";
 import { ViewHeader } from "../results/Header";
 import { Note } from "../search/Search";
 import { authorLabel, engagementParts, formatCount, leftOutPath, NetworkMark, networkOrder, networks, periodLabel, postLink, settingsPath, socialCost, tregPath, useSaveSocial } from "./model";
@@ -28,7 +29,7 @@ export function Social() {
           </Link>
         }
       />
-      <div className="relative min-h-0 flex-1 overflow-auto px-3 py-4 md:px-5 md:py-5">
+      <div className={cx("relative min-h-0 flex-1 px-3 py-4 md:px-5 md:py-5", scrollArea)}>
         <div className="mx-auto max-w-4xl space-y-4">
           {settings.isPending || costs.isPending || leftOut.isPending ? (
             <Pending />
@@ -195,7 +196,7 @@ function DigestCard() {
 }
 
 function searchCost(d: SocialDigest): string {
-  const cost = `Its ${d.calls} searches cost $${d.spend_usd.toFixed(4)}`;
+  const cost = `Its ${d.calls} searches cost ${money(d.spend_usd)}`;
   return d.spend_missing_calls > 0 ? `${cost}, plus ${d.spend_missing_calls} that reported no cost.` : `${cost}.`;
 }
 

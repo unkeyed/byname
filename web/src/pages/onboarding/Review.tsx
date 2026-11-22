@@ -2,11 +2,11 @@ import type { ReactNode } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router";
 import { api, type EstimateRow, type StepKey, type Surface } from "../../api";
-import { fidelityInfo, usd } from "../../lines";
+import { fidelityInfo } from "../../lines";
+import { money } from "../../money";
 import { keys, useBrands, useCosts, useGsc, useOnboarding, useQuestions, useSettings, useSocialSettings, useSurfaces } from "../../queries";
 import { Badge, Button, buttonClass, Card, CardHeader, ErrorNote, Icon, Pending, RelativeTime, ScrollX, SteadyLabel, useLoading } from "../../ui";
 import { nextCheckPhrase } from "../../checks";
-import { About, about } from "../../config/costs";
 import { Disclosure } from "../../config/forms";
 import { FidelityBadge, routeInfo } from "../../config/WherePeopleAsk";
 import type { StepNav } from "./Onboarding";
@@ -86,34 +86,34 @@ export function Review({ nav }: { nav: StepNav }) {
       <Card>
         <CardHeader title="What it costs" description="Treg bills you for each answer, not Byname. These are estimates." />
         <div className="space-y-3 border-t border-line px-4 py-3 text-sm">
-          <p className="text-base font-semibold tabular-nums">
-            {About(est.known_usd)} a check, {about(c.checks.month_usd)} a month
+          <p className="text-base font-semibold tabular-nums first-letter:uppercase">
+            {money(est.known_usd, "about")} a check, {money(c.checks.month_usd, "about")} a month
           </p>
           <p className="text-muted">
             Each check asks {plural(est.questions, "question")} in {plural(est.pairs, "AI app")}
             {est.pairs !== enabled.length && " and model"}, {plural(est.calls, "answer")} in all. At every {s.check_every_days === 1 ? "day" : `${s.check_every_days} days`} that is{" "}
-            {about(c.checks.month_usd)} a month
-            {socialMonth > 0 ? <>, plus {about(socialMonth)} a month for social mentions.</> : "."}
+            {money(c.checks.month_usd, "about")} a month
+            {socialMonth > 0 ? <>, plus {money(socialMonth, "about")} a month for social mentions.</> : "."}
             {est.unknown_pairs > 0 && ` ${plural(est.unknown_pairs, "AI app")} ${est.unknown_pairs === 1 ? "has" : "have"} no price yet, so the first check will tell.`}
           </p>
           <p className="text-muted">
             {s.spend_cap_month_usd == null ? (
               <>
-                Finishing sets a monthly spend cap of <span className="font-medium text-fg">{usd(cap)}</span>, so a mistake can&apos;t run up a bill. You can change it any time in
+                Finishing sets a monthly spend cap of <span className="font-medium text-fg">{money(cap)}</span>, so a mistake can&apos;t run up a bill. You can change it any time in
                 Settings.
               </>
             ) : (
               <>
-                Your monthly spend cap is <span className="font-medium text-fg">{usd(cap)}</span>.
+                Your monthly spend cap is <span className="font-medium text-fg">{money(cap)}</span>.
               </>
             )}{" "}
-            A single check stops at {usd(s.spend_cap_run_usd)}.
+            A single check stops at {money(s.spend_cap_run_usd)}.
           </p>
         </div>
         {est.rows.length > 0 && (
           <div className="border-t border-line p-3">
             <Disclosure summary="Cost per AI app">
-              <PairsTable rows={est.rows} pairs={pairs} surfaces={byKey} />
+              <PairsTable rows={est.rows} pairs={pairs} surfaces={byKey} checksPerMonth={c.checks.checks_per_month} />
             </Disclosure>
           </div>
         )}
@@ -143,10 +143,10 @@ export function Review({ nav }: { nav: StepNav }) {
             {gscProperty ? `Connected: ${gscProperty}` : "Not connected. You can connect it later in Settings."}
           </Section>
           <Section title="Social mentions" step="social">
-            {social.data.enabled ? `On, from when setup is finished. ${About(socialMonth)} a month.` : "Off. You can turn it on later in Settings."}
+            {social.data.enabled ? `On, from when setup is finished, for ${money(socialMonth, "about")} a month.` : "Off. You can turn it on later in Settings."}
           </Section>
           <Section title="Schedule and spend caps" step="schedule">
-            Every {plural(s.check_every_days, "day")} at {s.check_time} · {usd(s.spend_cap_run_usd)} cap per check · {usd(cap)} a month
+            Every {plural(s.check_every_days, "day")} at {s.check_time} · {money(s.spend_cap_run_usd)} cap per check · {money(cap)} a month
           </Section>
         </div>
       </Card>
@@ -190,7 +190,17 @@ export function Review({ nav }: { nav: StepNav }) {
   );
 }
 
-function PairsTable({ rows, pairs, surfaces }: { rows: EstimateRow[]; pairs: Map<number, { test_status: string; last_tested_at: string | null }>; surfaces: Map<string, Surface> }) {
+function PairsTable({
+  rows,
+  pairs,
+  surfaces,
+  checksPerMonth,
+}: {
+  rows: EstimateRow[];
+  pairs: Map<number, { test_status: string; last_tested_at: string | null }>;
+  surfaces: Map<string, Surface>;
+  checksPerMonth: number;
+}) {
   const th = "px-3 py-2 text-left text-xs font-medium whitespace-nowrap text-muted";
   const td = "px-3 py-2 align-top";
   return (
@@ -203,7 +213,7 @@ function PairsTable({ rows, pairs, surfaces }: { rows: EstimateRow[]; pairs: Map
             <th className={th}>Asked through</th>
             <th className={th}>Accuracy</th>
             <th className={th}>Test</th>
-            <th className={`${th} text-right`}>Per answer</th>
+            <th className={`${th} text-right`}>Cost</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-line">
@@ -233,7 +243,16 @@ function PairsTable({ rows, pairs, surfaces }: { rows: EstimateRow[]; pairs: Map
                     <span className="text-danger">Failed</span>
                   )}
                 </td>
-                <td className={`${td} text-right tabular-nums`}>{r.cost_per_call_usd != null ? about(r.cost_per_call_usd) : <span className="text-muted">Unknown</span>}</td>
+                <td className={`${td} text-right whitespace-nowrap tabular-nums`}>
+                  {r.cost_usd != null ? (
+                    <>
+                      {money(r.cost_usd)} a check
+                      <span className="block text-xs text-muted">{money(r.cost_usd * checksPerMonth)} a month</span>
+                    </>
+                  ) : (
+                    <span className="text-muted">No price yet</span>
+                  )}
+                </td>
               </tr>
             );
           })}

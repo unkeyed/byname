@@ -22,22 +22,22 @@ The label is decided for each AI app and model, in `PairFidelity`:
 
 ## AI apps and their pinned endpoints
 
-Each AI app calls one pinned Treg endpoint, never a routed one that picks a provider per call, so checks compare only when the same endpoint answered every time. The endpoint, the model and the label are stored on every answer, and changing any of them starts a new line on the charts. The sample cost is what one call cost in a sample on November 21, 2026, used for the estimate before your first check.
+Each AI app calls one pinned Treg endpoint, never a routed one that picks a provider per call, so checks compare only when the same endpoint answered every time. The endpoint, the model and the label are stored on every answer, and changing any of them starts a new line on the charts. The sample cost is what 1,000 calls cost at the price one call cost in a sample on November 21, 2026. Byname uses it for the estimate before your first check.
 
-| AI app | Key | Pinned Treg endpoint | Label | Sample cost |
+| AI app | Key | Pinned Treg endpoint | Label | Sample cost per 1,000 answers |
 |---|---|---|---|---|
-| ChatGPT app | `chatgpt_app` | `dataforseo.x.ai-optimization-chat-gpt-llm-scraper-live-advanced` | Real app answer | $0.004 |
-| Gemini app | `gemini_app` | `cloro.ai-search.gemini.scrape` | Real app answer | $0.0024 |
-| Google AI Mode | `google_ai_mode` | `cloro.google.serp.ai_mode` | Real app answer | $0.0024 |
-| Google AI Overview | `google_ai_overview` | `cloro.google.serp.organic` | Real app answer | $0.0028 |
-| Microsoft Copilot | `copilot` | `serpapi.x.bing-copilot` | Real app answer | $0.015 |
-| Bing AI Mode | `bing_ai_mode` | `cloro.bing.serp.ai_mode` | Real app answer | $0.0024 |
-| Brave AI answers | `brave` | `serpapi.x.brave-ai-mode` | Real app answer | $0.015 |
-| Claude Code | `claude_code` | `dataforseo.x.ai-optimization-claude-llm-responses-live` | Same model, not the full tool | $0.055 |
-| Gemini CLI | `gemini_cli` | `dataforseo.x.ai-optimization-gemini-llm-responses-live` | Same model, not the full tool | $0.060 |
-| Codex CLI | `codex_cli` | `dataforseo.x.ai-optimization-chat-gpt-llm-responses-live` | Same model, not the full tool | $0.073 |
-| Claude app | `claude_app` | `dataforseo.x.ai-optimization-claude-llm-responses-live` | Stand-in (not the real app) | $0.055 |
-| Perplexity app | `perplexity_app` | `dataforseo.x.ai-optimization-perplexity-llm-responses-live` | Stand-in (not the real app) | $0.0061 |
+| ChatGPT app | `chatgpt_app` | `dataforseo.x.ai-optimization-chat-gpt-llm-scraper-live-advanced` | Real app answer | $4.00 |
+| Gemini app | `gemini_app` | `cloro.ai-search.gemini.scrape` | Real app answer | $2.40 |
+| Google AI Mode | `google_ai_mode` | `cloro.google.serp.ai_mode` | Real app answer | $2.40 |
+| Google AI Overview | `google_ai_overview` | `cloro.google.serp.organic` | Real app answer | $2.80 |
+| Microsoft Copilot | `copilot` | `serpapi.x.bing-copilot` | Real app answer | $15.00 |
+| Bing AI Mode | `bing_ai_mode` | `cloro.bing.serp.ai_mode` | Real app answer | $2.40 |
+| Brave AI answers | `brave` | `serpapi.x.brave-ai-mode` | Real app answer | $15.00 |
+| Claude Code | `claude_code` | `dataforseo.x.ai-optimization-claude-llm-responses-live` | Same model, not the full tool | $55.00 |
+| Gemini CLI | `gemini_cli` | `dataforseo.x.ai-optimization-gemini-llm-responses-live` | Same model, not the full tool | $60.00 |
+| Codex CLI | `codex_cli` | `dataforseo.x.ai-optimization-chat-gpt-llm-responses-live` | Same model, not the full tool | $73.00 |
+| Claude app | `claude_app` | `dataforseo.x.ai-optimization-claude-llm-responses-live` | Stand-in (not the real app) | $55.00 |
+| Perplexity app | `perplexity_app` | `dataforseo.x.ai-optimization-perplexity-llm-responses-live` | Stand-in (not the real app) | $6.10 |
 
 The ChatGPT app, the Gemini app and Google AI Mode are ticked by default in onboarding. They are what most buyers use, and each answer costs well under a cent. No developer tool is ticked: they cost about ten times more an answer and matter only when developers are your buyers. Token-billed endpoints, the developer tools and stand-ins, cost a different amount on every answer, so the review step labels the cost per check as an estimate. `GET /v1/costs` gives the cost of one answer in every AI app. See [Treg](treg.md#cost).
 

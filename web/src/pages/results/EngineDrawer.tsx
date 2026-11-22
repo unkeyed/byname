@@ -4,7 +4,7 @@ import { api, type EnginePrompt, type Fidelity, type Line, type Series } from ".
 import { LineChart } from "../../charts";
 import { fidelityInfo, palette, pct, shortDay, useLabels } from "../../lines";
 import { keys, useSurfaces } from "../../queries";
-import { Badge, Button, Card, cx, ErrorNote, Icon, LoadBoundary, Pending, useModal } from "../../ui";
+import { Badge, Button, Card, cx, ErrorNote, Icon, LoadBoundary, Pending, scrollArea, useModal } from "../../ui";
 import { useFilter, useView } from "../../view";
 import { Instead } from "./Questions";
 
@@ -166,7 +166,7 @@ function Body({ line, onClose }: { line: Line; onClose: () => void }) {
           <Icon name="x" />
         </Button>
       </div>
-      <div className="min-h-0 flex-1 overflow-auto px-4 py-4">{body}</div>
+      <div className={cx("min-h-0 flex-1 px-4 py-4", scrollArea)}>{body}</div>
     </div>
   );
 }

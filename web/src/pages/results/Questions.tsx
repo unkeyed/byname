@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api, type AnswerSummary, type Dot, type DotState, type PromptRow, type ResultsFilter, type Run, type RunRef } from "../../api";
 import { shortDay, useLabels } from "../../lines";
 import { keys, useAnsweredRuns, useSettings, useSurfaces } from "../../queries";
-import { Badge, Card, cx, EmptyState, ErrorNote, inputClass, Pending, RowButton, ScrollX, selectClass, useLoading, useWide } from "../../ui";
+import { Badge, Card, cx, EmptyState, ErrorNote, inputClass, Pending, RowButton, scrollArea, ScrollX, selectClass, useLoading, useWide } from "../../ui";
 import { runTime, useFilter, useView } from "../../view";
 import { ViewHeader } from "./Header";
 import { CellMark } from "./QuestionsTable";
@@ -42,7 +42,7 @@ export function Questions() {
         subtitle={`Every question you track, which AI apps name ${brand}, and who they name instead. Open a question to read its answers, or list every answer from the latest check.`}
         range={tab === "questions"}
       />
-      <div className="relative min-h-0 flex-1 overflow-auto px-3 py-4 md:px-5 md:py-5">
+      <div className={cx("relative min-h-0 flex-1 px-3 py-4 md:px-5 md:py-5", scrollArea)}>
         <div className="mx-auto max-w-6xl space-y-4">
           <Tabs label="Question views" tabs={tabs} current={tab} />
           {body}

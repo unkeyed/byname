@@ -218,7 +218,7 @@ type Digest struct {
 	NewAuthors        []Author        `json:"new_authors" jsonschema:"accounts whose first shown mention fell in the period, most mentions first"`
 	Calls             int             `json:"calls" jsonschema:"Treg search calls made in the period"`
 	SpendUSD          float64         `json:"spend_usd"`
-	SpendMissingCalls int             `json:"spend_missing_calls" jsonschema:"Treg calls in the period that reported no cost, left out of spend_usd rather than counted as $0; direct calls are a known 0 and never counted here"`
+	SpendMissingCalls int             `json:"spend_missing_calls" jsonschema:"Treg calls in the period that reported no cost, left out of spend_usd rather than counted as $0.00; direct calls are a known 0 and never counted here"`
 }
 
 const topPerNetwork = 5

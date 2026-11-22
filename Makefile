@@ -19,6 +19,8 @@ lint:
 	@test -z "$$(gofmt -l .)" || { gofmt -l .; echo "run: gofmt -w ."; exit 1; }
 	go vet ./...
 	go vet -tags e2e ./e2e/
+	cd web && npm test
+	@! grep -rnE '(^|[ "])([a-z]+:)?overflow-(y-)?(auto|scroll)([ "]|$$)' web/src --include='*.tsx' | grep -v '^web/src/ui.tsx:' || { echo "scroll containers take scrollArea from web/src/ui.tsx"; exit 1; }
 
 web:
 	cd web && npm ci && npm run build

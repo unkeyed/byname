@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type Change, type ChangeOutcome, type ChangeRead, type ChangeStep, type ChangeWindow, type UrlInspection } from "../../api";
 import { keys } from "../../queries";
-import { Badge, Button, Card, ConfirmButton, cx, ErrorNote, Icon, LoadBoundary, Pending, ScrollX, useModal } from "../../ui";
+import { Badge, Button, Card, ConfirmButton, cx, ErrorNote, Icon, LoadBoundary, Pending, scrollArea, ScrollX, useModal } from "../../ui";
 import { useView } from "../../view";
 import { count, ctr, dayRange, figureInfo, fullDay, position } from "../search/model";
 import { FigureLegend } from "../search/Search";
@@ -80,7 +80,7 @@ function Body({ id, listed, canEdit, onClose }: { id: number; listed: Change | u
           <Icon name="x" />
         </Button>
       </div>
-      <div className="min-h-0 flex-1 space-y-6 overflow-auto px-4 py-4">
+      <div className={cx("min-h-0 flex-1 space-y-6 px-4 py-4", scrollArea)}>
         <Facts c={c} zone={zone} />
         <Before c={c} />
         <section className="space-y-3">

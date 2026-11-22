@@ -105,7 +105,7 @@ func TestRunCheckStoresEveryAnswer(t *testing.T) {
 		t.Fatalf("run = %+v, want completed with 2 questions x 6 pairs and its job_run completed", r)
 	}
 	if !near(r.Spend, 0.10) || r.Missing != 2 {
-		t.Fatalf("spend $%v with %d missing, want $0.10 from 10 priced calls and Perplexity's 2 calls counted missing, not $0", r.Spend, r.Missing)
+		t.Fatalf("spend %v with %d missing, want $0.10 from 10 priced calls and Perplexity's 2 calls counted missing, not $0", r.Spend, r.Missing)
 	}
 	if n := e.treg.Answers(); n != 12 {
 		t.Fatalf("Treg got %d answer calls, want 12", n)
@@ -182,7 +182,7 @@ func TestSpendCapStopsQueueing(t *testing.T) {
 	if n := e.treg.Answers(); n != 3 || r.Answers != 3 {
 		t.Fatalf("%d calls and %d answers, want 3: $0.01 each stops queueing once $0.03 passes the $0.025 cap", n, r.Answers)
 	}
-	if r.Status != checks.Capped || r.JobStatus != "capped" || !strings.Contains(r.Error, "the spend cap for one check is") {
+	if r.Status != checks.Capped || r.JobStatus != "capped" || r.Error != "stopped asking questions at $0.03; the spend cap for one check is $0.03" {
 		t.Fatalf("run = %+v, want capped with the cap named", r)
 	}
 }
@@ -194,7 +194,7 @@ func TestMonthlyCapStopsARunBeforeItStarts(t *testing.T) {
 	if err := e.checks.Work(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if r := e.run(t, first); r.Status != checks.Capped || r.Answers != 5 || !strings.Contains(r.Error, "the monthly spend cap is") {
+	if r := e.run(t, first); r.Status != checks.Capped || r.Answers != 5 || r.Error != "stopped asking questions: checks and social searches have spent $0.05 this month; the monthly spend cap is $0.05" {
 		t.Fatalf("first run = %+v, want capped by the month after 5 calls", r)
 	}
 	second := e.runNow(t)

@@ -579,7 +579,7 @@ paths:
         Until it succeeds nothing runs on schedule and Run now refuses.
         With no monthly spend cap set, it sets one of three times the
         monthly estimate of checks and social searches (GET /v1/costs),
-        rounded up to a whole dollar and at least $5. Finishing again
+        rounded up to a whole dollar and at least $5.00. Finishing again
         changes nothing. Queue the first check with POST /v1/runs.
       security:
         - apiKey: [config:write]
@@ -7063,7 +7063,7 @@ components:
           type: number
         spend_missing_calls:
           type: integer
-          description: Treg calls that reported no cost, left out of spend_usd rather than counted as $0.
+          description: Treg calls that reported no cost, left out of spend_usd rather than counted as $0.00.
     SocialSettings:
       type: object
       required: [enabled, terms, default_terms, custom_terms, fetch_every_hours, digest_cadence, digest_weekday, time_zone, token_set, networks, last_fetch_at, next_fetch_at]

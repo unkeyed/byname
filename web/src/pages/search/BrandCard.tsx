@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, type BrandPoint, type Day, type GscStatus } from "../../api";
 import { LineChart, LineKey, niceTicks, type ChartLine } from "../../charts";
 import { keys, useSettings } from "../../queries";
-import { Badge, Button, Card, CardHeader, cx, Dialog, DialogBody, ErrorNote, Icon, inputClass, Pending, ScrollX } from "../../ui";
+import { Badge, Button, Card, CardHeader, cx, Dialog, DialogBody, ErrorNote, Icon, inputClass, Pending, scrollArea, ScrollX } from "../../ui";
 import { compact, count, day, figureInfo, longDay, useSearchBrand } from "./model";
 
 /** The three kinds of click a window splits into, in legend order. Your brand is drawn in ink, as everywhere. */
@@ -55,7 +55,7 @@ export function BrandCard({ status, from, canEdit }: { status: GscStatus; from: 
           </div>
           <details>
             <summary className="cursor-pointer py-3.5 text-muted hover:text-fg md:py-0">Show as a table</summary>
-            <div className="mt-2 max-h-72 overflow-y-auto">
+            <div className={cx("mt-2 max-h-72", scrollArea)}>
               <ScrollX label="brand table">
                 <table className="w-full min-w-max text-left tabular-nums">
                   <thead className="sticky top-0 bg-surface text-muted">

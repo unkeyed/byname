@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build && touch dist/.gitkeep",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "node --test src/*.test.ts"
   },
   "dependencies": {
     "@fontsource-variable/geist": "5.3.0",

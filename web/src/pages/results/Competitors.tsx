@@ -4,7 +4,7 @@ import { api, type BrandStanding, type Competitors as Data } from "../../api";
 import { Donut, type Segment } from "../../charts";
 import { lineKey, pct, useLabels } from "../../lines";
 import { keys, useAnsweredRuns, useBrands, useSettings, useSurfaces } from "../../queries";
-import { Badge, Card, CardHeader, cx, EmptyState, ErrorNote, Pending, ScrollX, useLoading } from "../../ui";
+import { Badge, Card, CardHeader, cx, EmptyState, ErrorNote, Pending, scrollArea, ScrollX, useLoading } from "../../ui";
 import { useFilter, useView } from "../../view";
 import { useOpenEngine } from "./EngineDrawer";
 import { ViewHeader } from "./Header";
@@ -37,7 +37,7 @@ export function Competitors() {
   return (
     <>
       <ViewHeader title="Competitors" subtitle={`Which brands AI answers name, how ${brand} compares, and the questions where a competitor was named and ${brand} was not.`} />
-      <div className="relative min-h-0 flex-1 overflow-auto px-3 py-4 md:px-5 md:py-5">
+      <div className={cx("relative min-h-0 flex-1 px-3 py-4 md:px-5 md:py-5", scrollArea)}>
         <div className="mx-auto max-w-6xl">{body}</div>
       </div>
     </>

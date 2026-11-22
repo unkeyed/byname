@@ -4,7 +4,7 @@ import { LeftOutEditor } from "../pages/social/LeftOut";
 import { useSaveSocial } from "../pages/social/model";
 import { useCosts, useSettings, useSocialSettings } from "../queries";
 import { Button, Card, ErrorNote, Pending, SteadyLabel } from "../ui";
-import { about } from "./costs";
+import { money } from "../money";
 import type { Footer } from "./forms";
 
 /**
@@ -50,7 +50,7 @@ function Body({
             <>Without a Treg token it searches Bluesky only, which is free.</>
           ) : (
             <>
-              At the default settings it costs <span className="font-medium text-fg">{tregMonth != null ? about(tregMonth) : "a little"} a month</span>, billed by Treg. Bluesky
+              At the default settings it costs <span className="font-medium text-fg">{tregMonth != null ? money(tregMonth, "about") : "a little"} a month</span>, billed by Treg. Bluesky
               is free.
             </>
           )}{" "}

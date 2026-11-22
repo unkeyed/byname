@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api, type Gap, type GapPair, type PageCheck, type ResultsFilter, type SourcePage } from "../../api";
 import { useLabels } from "../../lines";
 import { keys, useAnsweredRuns, useSettings, useSurfaces } from "../../queries";
-import { Badge, Button, Card, CardHeader, cx, EmptyState, ErrorNote, Icon, Pending, ScrollX, useLoading } from "../../ui";
+import { Badge, Button, Card, CardHeader, cx, EmptyState, ErrorNote, Icon, Pending, scrollArea, ScrollX, useLoading } from "../../ui";
 import { useFilter, useView } from "../../view";
 import { ViewHeader } from "./Header";
 import { Instead } from "./Questions";
@@ -43,7 +43,7 @@ export function Missed() {
         subtitle={`Questions where an AI app did not name ${brand} in the latest check, what to do about each, and the pages AI links to that name a competitor and never you.`}
         range={tab === "sources"}
       />
-      <div className="relative min-h-0 flex-1 overflow-auto px-3 py-4 md:px-5 md:py-5">
+      <div className={cx("relative min-h-0 flex-1 px-3 py-4 md:px-5 md:py-5", scrollArea)}>
         <div className="mx-auto max-w-6xl space-y-4">
           <Tabs label="Missed questions views" tabs={tabs} current={tab} />
           {body}

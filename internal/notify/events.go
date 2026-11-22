@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/unkeyed/byname/internal/engines"
+	"github.com/unkeyed/byname/internal/money"
 )
 
 // Kind is one kind of event. The registry below is the only list of them.
@@ -439,9 +440,9 @@ func (p SocialDigestPayload) message() Message {
 		m.Lines = append(m.Lines, "The posts people engaged with most:")
 		m.Lines = append(m.Lines, top...)
 	}
-	spend := fmt.Sprintf("Searching for posts cost $%.4f.", p.SpendUSD)
+	spend := "Searching for posts cost " + money.Format(p.SpendUSD) + "."
 	if p.SpendMissingCalls > 0 {
-		spend = fmt.Sprintf("Searching for posts cost $%.4f, plus %s that did not report a cost.", p.SpendUSD, count(p.SpendMissingCalls, "search", "searches"))
+		spend = fmt.Sprintf("Searching for posts cost %s, plus %s that did not report a cost.", money.Format(p.SpendUSD), count(p.SpendMissingCalls, "search", "searches"))
 	}
 	m.Lines = append(m.Lines, spend)
 	return m

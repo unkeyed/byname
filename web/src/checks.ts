@@ -1,4 +1,5 @@
 import type { Costs, SettingsView, UpcomingCheck as NextCheck } from "./api";
+import { money } from "./money";
 
 const weekday = new Intl.DateTimeFormat(undefined, { weekday: "long" });
 const monthDay = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" });
@@ -23,16 +24,11 @@ export function scheduleLine(s: SettingsView | undefined): string {
   return `Next check ${nextCheckPhrase(s.next_check)}.`;
 }
 
-const cents = new Intl.NumberFormat(undefined, { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
-/** A sum of money a person reads at a glance: whole cents, and "under $0.01" for less. Per-answer prices keep usd's precision. */
-export const money = (v: number) => (v > 0 && v < 0.005 ? `under ${cents.format(0.01)}` : cents.format(v));
-
 /** One check's price in words: "about $0.38", with what it leaves out when some AI apps have no price yet. */
 export function checkPrice(c: Costs): { amount: string; unknown: string | null } {
   const e = c.checks.check;
   return {
-    amount: `about ${money(e.known_usd)}`,
+    amount: money(e.known_usd, "about"),
     unknown: e.unknown_pairs > 0 ? `${e.unknown_pairs === 1 ? "One AI app has" : `${e.unknown_pairs} AI apps have`} no price yet, so it may cost more.` : null,
   };
 }

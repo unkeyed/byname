@@ -38,4 +38,4 @@ Treg bills you, not Byname. `GET /v1/costs`, or the `get_costs` tool, gathers ev
 
 ### The default monthly cap
 
-When onboarding finishes and no monthly cap is set, Byname sets one: three times the monthly estimate of checks and social searches, rounded up to a whole dollar, and at least $5. A normal month stays well under it, and a mistake, such as a question list ten times longer than meant, stops at it. Onboarding's **Schedule and spend caps** step and its review show the cap finishing will set, and the estimate beside each cap. Change it or remove it under **Settings > Schedule and limits**, or with `PUT /v1/settings`.
+When onboarding finishes and no monthly cap is set, Byname sets one: three times the monthly estimate of checks and social searches, rounded up to a whole dollar, and at least $5.00. A normal month stays well under it, and a mistake, such as a question list ten times longer than meant, stops at it. Onboarding's **Schedule and spend caps** step and its review show the cap finishing will set, and the estimate beside each cap. Change it or remove it under **Settings > Schedule and limits**, or with `PUT /v1/settings`.

@@ -3,10 +3,11 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router";
 import { api, type Change, type Competitors, type Costs, type Gap, type Grouping, type LeftOut, type QuestionSet, type ResultsFilter, type RunSummary, type Series, type SettingsView, type SocialSettings, type Sources } from "../../api";
 import { LineChart, LineKey, Sparkline, type ChartLine } from "../../charts";
-import { money, nextCheckDay, nextCheckPhrase } from "../../checks";
+import { nextCheckDay, nextCheckPhrase } from "../../checks";
+import { money } from "../../money";
 import { fidelityInfo, lineKey, palette, pct, shortDay, useLabels } from "../../lines";
 import { keys, useAnsweredRuns, useChanges, useCosts, useGsc, useLeftOut, useMe, useQuestions, useRuns, useSettings, useSocialSettings, useSurfaces } from "../../queries";
-import { Card, CardHeader, cx, EmptyState, ErrorNote, Icon, Pending, ScrollX, useLoading, type IconName } from "../../ui";
+import { Card, CardHeader, cx, EmptyState, ErrorNote, Icon, Pending, scrollArea, ScrollX, useLoading, type IconName } from "../../ui";
 import { runTime, useFilter, useView, type RangeID } from "../../view";
 import { DailyChart } from "../search/DailyChart";
 import { day, figureInfo, searchState, spanFrom, useSearchDaily, type SearchState } from "../search/model";
@@ -53,7 +54,7 @@ export function ThisWeek() {
         scope={false}
         action={canRun && answered.data?.length ? <RunNowButton variant="secondary" /> : undefined}
       />
-      <div className="relative min-h-0 flex-1 overflow-auto px-3 py-4 md:px-5 md:py-5">
+      <div className={cx("relative min-h-0 flex-1 px-3 py-4 md:px-5 md:py-5", scrollArea)}>
         <div className="mx-auto max-w-6xl">{body}</div>
       </div>
     </>
@@ -340,7 +341,7 @@ const setupRules: ((d: WeekData) => Item[])[] = [
           {
             key: "cap",
             icon: "key",
-            text: `Add a monthly spend cap, so checks and social searches stop when they reach it.${d.costs ? ` You can expect about ${money(d.costs.month_estimate_usd)} a month.` : ""}`,
+            text: `Add a monthly spend cap, so checks and social searches stop when they reach it.${d.costs ? ` You can expect ${money(d.costs.month_estimate_usd, "about")} a month.` : ""}`,
             to: "/settings/schedule",
             action: "Add a cap",
           },
@@ -403,7 +404,7 @@ function Footer({ d }: { d: WeekData }) {
         <span>
           Spent <span className="font-medium text-fg tabular-nums">{money(m.spent_usd)}</span>
           {m.cap_usd != null ? ` of your ${money(m.cap_usd)} cap` : ""} this month
-          {d.costs && `, about ${money(d.costs.month_estimate_usd)} expected`}
+          {d.costs && `, ${money(d.costs.month_estimate_usd, "about")} expected`}
         </span>
       )}
       <Link to="/settings/schedule" className="inline-flex h-11 items-center gap-1 font-medium text-fg hover:underline sm:ml-auto md:h-auto">
@@ -496,7 +497,7 @@ function RatesCard({ filter, by }: { filter: ResultsFilter; by: Grouping }) {
             </p>
           )}
           <LineChart xs={xs} lines={lines} format={(v) => pct(v)} label={`${metric === "mention" ? "Named you" : "Linked to your site"} per check, one line per ${by === "surface" ? "AI app" : "AI app and model"}`} />
-          <ul aria-label="AI apps, with each one's latest value. Open one for its detail." className="-mx-1.5 space-y-0.5 self-start text-xs lg:max-h-60 lg:overflow-y-auto">
+          <ul aria-label="AI apps, with each one's latest value. Open one for its detail." className={cx("-mx-1.5 space-y-0.5 self-start text-xs lg:max-h-60", scrollArea)}>
             {lines.map((l) => (
               <li key={l.key}>
                 <button type="button" onClick={() => openEngine(l.series)} title={`${l.models.length ? `${l.models.join(", ")}. ` : ""}Open ${l.label}`} className="flex w-full items-start gap-2 rounded-control px-1.5 py-1.5 text-left hover:bg-subtle md:py-1">

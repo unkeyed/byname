@@ -3,7 +3,7 @@ import { Link } from "react-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, type Change, type ChangeKind, type GscStatus, type RepoStatus } from "../../api";
 import { keys, useChanges, useChangeSettings, useGsc, useMe, useRepo } from "../../queries";
-import { Badge, Button, buttonClass, Card, CardHeader, cx, Dialog, DialogBody, EmptyState, ErrorNote, Field, Icon, inputClass, Pending, RelativeTime, RowButton, ScrollX, selectClass, useLoading, useWide, type Tone } from "../../ui";
+import { Badge, Button, buttonClass, Card, CardHeader, cx, Dialog, DialogBody, EmptyState, ErrorNote, Field, Icon, inputClass, Pending, RelativeTime, RowButton, scrollArea, ScrollX, selectClass, useLoading, useWide, type Tone } from "../../ui";
 import { ViewHeader } from "../results/Header";
 import { fullDay } from "../search/model";
 import { Note, settingsPath as searchConsolePath } from "../search/Search";
@@ -37,7 +37,7 @@ export function Changes() {
           )
         }
       />
-      <div className="relative min-h-0 flex-1 overflow-auto px-3 py-4 md:px-5 md:py-5">
+      <div className={cx("relative min-h-0 flex-1 px-3 py-4 md:px-5 md:py-5", scrollArea)}>
         <div className="mx-auto max-w-6xl space-y-4">
           <Notices gsc={gsc.data} repo={repo.data} admin={admin} zone={zone} />
           <ChangesCard changes={changes.data} error={changes.error ?? repo.error} repo={repo.data} admin={admin} canEdit={canEdit} zone={zone} onLog={() => setLogging(true)} />

@@ -14,6 +14,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/unkeyed/byname/internal/engines"
+	"github.com/unkeyed/byname/internal/money"
 	"github.com/unkeyed/byname/internal/notify"
 )
 
@@ -118,7 +119,7 @@ func (s *Service) fetch(ctx context.Context, st settings, nets []spec, treg engi
 			q := search{Term: term, Newest: newest}
 			for range n.Pages {
 				if n.Route == ViaTreg && st.monthCap != nil && spent >= *st.monthCap {
-					tregStop = &stop{"capped", fmt.Sprintf("stopped searching: checks and social searches have spent $%.4f this month; the monthly spend cap is $%.2f", spent, *st.monthCap)}
+					tregStop = &stop{"capped", fmt.Sprintf("stopped searching: checks and social searches have spent %s this month; the monthly spend cap is %s", money.Format(spent), money.Format(*st.monthCap))}
 					break terms
 				}
 				q.At = s.now()

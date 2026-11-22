@@ -533,7 +533,7 @@ export interface EndpointStats {
   succeeded: number;
   success_rate: number;
   cost_usd: number;
-  /** Answered calls that reported no cost: unknown, not $0. */
+  /** Answered calls that reported no cost: unknown, not $0.00. */
   missing_cost: number;
   cost_per_call: number | null;
 }

@@ -199,7 +199,9 @@ export function CopyButton({ text, label = "Copy", className }: { text: string; 
   return (
     <Button size="sm" variant="ghost" onClick={() => copy(text)} className={className} aria-label={copied ? "Copied" : label}>
       <Icon name={copied ? "check" : "copy"} className={cx("size-3.5", copied && "text-success")} />
-      <span aria-live="polite">{copied ? "Copied" : label}</span>
+      <span aria-live="polite">
+        <SteadyLabel labels={[label, "Copied"]} current={copied ? "Copied" : label} />
+      </span>
     </Button>
   );
 }
@@ -463,8 +465,17 @@ export function Dialog({ open, onClose, title, children, wide }: { open: boolean
   );
 }
 
+/**
+ * Every element that scrolls up and down takes these classes. The stable
+ * gutter keeps the scrollbar's room while nothing overflows, so where
+ * scrollbars take space (Windows, Linux, macOS set to always show them) a
+ * page that grows past the window, or a switch to a longer one, does not
+ * move the content sideways. make lint refuses overflow-auto anywhere else.
+ */
+export const scrollArea = "overflow-auto [scrollbar-gutter:stable]";
+
 export function DialogBody({ children }: { children: ReactNode }) {
-  return <div className="relative min-h-0 overflow-auto p-4">{children}</div>;
+  return <div className={cx("relative min-h-0 p-4", scrollArea)}>{children}</div>;
 }
 
 export function Card({ children, className }: { children: ReactNode; className?: string }) {

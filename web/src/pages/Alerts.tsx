@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router";
 import { api, type Alert } from "../api";
 import { keys, useAlerts, useMe } from "../queries";
-import { Button, Card, cx, EmptyState, ErrorNote, Icon, PageHeader, Pending, RelativeTime } from "../ui";
+import { Button, Card, cx, EmptyState, ErrorNote, Icon, PageHeader, Pending, RelativeTime, scrollArea } from "../ui";
 
 /** Every alert this person may see, newest first. Opening one marks it read. */
 export function Alerts() {
@@ -24,7 +24,7 @@ export function Alerts() {
           </Button>
         )}
       </PageHeader>
-      <div className="relative min-h-0 flex-1 overflow-auto">
+      <div className={cx("relative min-h-0 flex-1", scrollArea)}>
         <div className="mx-auto max-w-3xl space-y-3 px-4 py-6 pb-16 md:px-8">
           <p className="text-sm text-muted">
             Alerts tell you what changed. One arrives when a check finishes, stops or reaches its spend cap, when an AI app stops offering a model, when your Google

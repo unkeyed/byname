@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { api, type Run, type RunStatus } from "../../api";
-import { pct, usd } from "../../lines";
+import { pct } from "../../lines";
+import { money } from "../../money";
 import { keys, useRuns, useSurfaces } from "../../queries";
 import { Badge, Card, cx, EmptyState, ErrorNote, Icon, Pending, RelativeTime, type Tone } from "../../ui";
 import { runTime } from "../../view";
@@ -83,7 +84,7 @@ function CheckRow({ run: r, title }: { run: Run; title: (endpoint: string) => st
             <span className="text-xs text-muted xl:hidden"> answered</span>
           </span>
           <span className="flex flex-wrap items-center gap-1.5 tabular-nums xl:justify-end">
-            {usd(r.spend_usd)}
+            {money(r.spend_usd)}
             <MissingCost run={r} />
           </span>
         </div>
@@ -91,14 +92,14 @@ function CheckRow({ run: r, title }: { run: Run; title: (endpoint: string) => st
       </summary>
       <div className="px-4 pb-3">
         {r.error && <p className="mb-2 text-xs text-danger [overflow-wrap:anywhere]">{r.error}</p>}
-        {r.spend_missing_calls > 0 && <p className="mb-2 text-xs text-warn">{r.spend_missing_calls} answers reported no price. Their cost is unknown, not $0, so the real spend is higher.</p>}
+        {r.spend_missing_calls > 0 && <p className="mb-2 text-xs text-warn">{r.spend_missing_calls} answers reported no price. Their cost is unknown, not $0.00, so the real spend is higher.</p>}
         <table className="w-full max-w-xl text-xs">
           <caption className="sr-only">Check #{r.id} by AI app</caption>
           <thead className="text-muted">
             <tr>
               <th className="py-1 pr-3 text-left font-medium">AI app</th>
               <th className="py-1 pr-3 text-right font-medium">Answered</th>
-              <th className="py-1 text-right font-medium">Cost per answer</th>
+              <th className="py-1 text-right font-medium">Cost</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-line">
@@ -111,7 +112,7 @@ function CheckRow({ run: r, title }: { run: Run; title: (endpoint: string) => st
                 <td className={cx("py-1 pr-3 text-right align-top tabular-nums", e.success_rate < 0.9 ? "font-semibold text-danger" : "text-muted")}>
                   {e.succeeded} of {e.calls}
                 </td>
-                <td className="py-1 text-right align-top text-muted tabular-nums">{e.cost_per_call == null ? "–" : usd(e.cost_per_call)}</td>
+                <td className="py-1 text-right align-top text-muted tabular-nums">{e.cost_per_call == null && e.missing_cost > 0 ? "Unknown" : money(e.cost_usd)}</td>
               </tr>
             ))}
           </tbody>
@@ -194,7 +195,7 @@ function Jobs() {
                 <span className="col-span-2 flex flex-wrap gap-x-2 text-xs text-muted md:col-span-1">
                   <span>{triggerLabel(j.trigger)}</span>
                   {j.run_id && <span className="tabular-nums">Check #{j.run_id}</span>}
-                  {j.spend_usd != null && <span className="tabular-nums">{usd(j.spend_usd)}</span>}
+                  {j.spend_usd != null && <span className="tabular-nums">{money(j.spend_usd)}</span>}
                 </span>
                 <span className="col-span-2 text-xs text-muted md:col-span-1 md:text-right">
                   <RelativeTime iso={j.started_at} />

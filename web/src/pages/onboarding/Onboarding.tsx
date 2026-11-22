@@ -4,7 +4,7 @@ import { Link, Navigate, useLocation, useNavigate, useParams } from "react-route
 import { api, ApiError, type OnboardingStep, type StepKey } from "../../api";
 import { keys, useCan, useMe, useOnboarding } from "../../queries";
 import { useTheme } from "../../theme";
-import { Button, buttonClass, cx, Dialog, EmptyState, ErrorNote, Icon, LoadBoundary, Logo, Spinner, useWide } from "../../ui";
+import { Button, buttonClass, cx, Dialog, EmptyState, ErrorNote, Icon, LoadBoundary, Logo, scrollArea, Spinner, useWide } from "../../ui";
 import { AlertsSlot } from "../../config/AlertsSlot";
 import { BrandForm } from "../../config/BrandForm";
 import { BrandTable } from "../../config/BrandTable";
@@ -178,7 +178,7 @@ function Shell({ children, aside, header }: { children: ReactNode; aside?: React
       </header>
       <div className="flex min-h-0 flex-1">
         {aside}
-        <main className="relative min-w-0 flex-1 scroll-pb-36 overflow-auto">{children}</main>
+        <main className={cx("relative min-w-0 flex-1 scroll-pb-36", scrollArea)}>{children}</main>
       </div>
     </div>
   );
@@ -235,7 +235,7 @@ function Wizard({ steps, finished }: { steps: OnboardingStep[]; finished: boolea
           )}
         </>
       }
-      aside={wide && <aside className="w-60 shrink-0 overflow-auto border-r border-line px-3 py-6 lg:w-64">{list}</aside>}
+      aside={wide && <aside className={cx("w-60 shrink-0 border-r border-line px-3 py-6 lg:w-64", scrollArea)}>{list}</aside>}
     >
       <div className="mx-auto max-w-3xl px-4 py-6 pb-16 md:px-8 md:py-8">
         <p className="text-xs font-medium text-muted">

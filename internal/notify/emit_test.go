@@ -101,7 +101,7 @@ func TestAlertsReadAsSentences(t *testing.T) {
 			{Network: "hackernews", Title: "Hacker News", Mentions: 3},
 			{Network: "linkedin", Title: "LinkedIn"},
 		},
-		NewAuthors: []string{"@dana", "u/ledgerfan"}, NewAuthorsCount: 3, SpendUSD: 0.0138}
+		NewAuthors: []string{"@dana", "u/ledgerfan"}, NewAuthorsCount: 3, SpendUSD: 0.0406}
 	for _, e := range []notify.Event{
 		{Subject: "week/2026-11-16", Payload: digest},
 		{Subject: "change/7/final", Payload: notify.ChangeVerdictPayload{ChangeID: 7, URL: "https://northwind.example/pricing", Verdict: "improved"}},
@@ -126,7 +126,7 @@ func TestAlertsReadAsSentences(t *testing.T) {
 		"2 more posts came from accounts you left out, so they are not counted.",
 		"The posts people engaged with most:",
 		"@dana on X, with 40 likes, replies and reposts: “Northwind sorted our invoices” https://x.example/1",
-		"Searching for posts cost $0.0138.",
+		"Searching for posts cost $0.04.",
 	}
 	if strings.Join(social.Lines, "\n") != strings.Join(want, "\n") {
 		t.Errorf("digest lines:\n%s\nwant:\n%s", strings.Join(social.Lines, "\n"), strings.Join(want, "\n"))
