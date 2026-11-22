@@ -22,6 +22,7 @@ const (
 	SearchMoved     Kind = "search_moved"
 	ChangeVerdict   Kind = "change_verdict"
 	TokenExpiring   Kind = "token_expiring"
+	SocialDigest    Kind = "social_digest"
 )
 
 // Audience is who may read an event's alerts in the app.
@@ -88,6 +89,7 @@ var registry = []KindInfo{
 	kind[SearchMovedPayload](SearchMoved, "Search moved", "28-day clicks or non-brand clicks moved by at least a quarter and at least 20 clicks against the 28 days before.", Readers),
 	kind[ChangeVerdictPayload](ChangeVerdict, "Change verdict", "A site change got its final verdict against the control pages.", Readers),
 	kind[TokenExpiringPayload](TokenExpiring, "Token expiring", "The GitHub token for site changes expires soon.", Admins),
+	kind[SocialDigestPayload](SocialDigest, "Social digest", "The day's or week's posts that mention you on X, Reddit, Hacker News and LinkedIn, without the accounts you left out.", Readers),
 }
 
 // Kinds is every event kind Byname can raise, in display order.
@@ -303,6 +305,94 @@ func (p TokenExpiringPayload) message() Message {
 		Lines: []string{"Paste a new token under Settings > Site changes before it expires, or site changes stop updating."},
 		Path:  "/settings/site-changes",
 	}
+}
+
+// SocialPost is one post in a social digest.
+type SocialPost struct {
+	Author     string `json:"author" jsonschema:"the author's handle"`
+	Text       string `json:"text" jsonschema:"the start of the post"`
+	URL        string `json:"url"`
+	Engagement int    `json:"engagement"`
+}
+
+// SocialNetworkDigest is one network's share of a social digest.
+type SocialNetworkDigest struct {
+	Network  string       `json:"network"`
+	Title    string       `json:"title"`
+	Mentions int          `json:"mentions"`
+	Top      []SocialPost `json:"top" jsonschema:"the most engaged posts, at most three"`
+}
+
+// SocialDigestPayload is one finished period's social mentions
+// (internal/social), without the accounts left out when it was sent.
+type SocialDigestPayload struct {
+	Cadence  string                `json:"cadence" jsonschema:"daily or weekly"`
+	From     string                `json:"from" jsonschema:"the period's first day"`
+	To       string                `json:"to" jsonschema:"the period's last day"`
+	Mentions int                   `json:"mentions"`
+	Hidden   int                   `json:"hidden" jsonschema:"mentions by left-out accounts, not counted in mentions"`
+	Networks []SocialNetworkDigest `json:"networks"`
+	// NewAuthors names, at most ten, the accounts whose first mention fell in the period.
+	NewAuthors      []string `json:"new_authors"`
+	NewAuthorsCount int      `json:"new_authors_count"`
+	SpendUSD        float64  `json:"spend_usd"`
+	// SpendMissingCalls is calls that reported no cost, which SpendUSD
+	// leaves out rather than counting as $0.
+	SpendMissingCalls int `json:"spend_missing_calls"`
+}
+
+func (SocialDigestPayload) Kind() Kind { return SocialDigest }
+
+func (p SocialDigestPayload) message() Message {
+	when := "week of " + shortDay(p.From)
+	if p.Cadence == "daily" {
+		when = shortDay(p.From)
+	}
+	m := Message{Path: "/social"}
+	switch p.Mentions {
+	case 0:
+		m.Title = "Social digest, " + when + ": no new mentions"
+	case 1:
+		m.Title = "Social digest, " + when + ": 1 new mention"
+	default:
+		m.Title = fmt.Sprintf("Social digest, %s: %d new mentions", when, p.Mentions)
+	}
+	var counts []string
+	for _, n := range p.Networks {
+		counts = append(counts, fmt.Sprintf("%s %d", n.Title, n.Mentions))
+	}
+	if len(counts) > 0 {
+		m.Lines = append(m.Lines, strings.Join(counts, ", ")+".")
+	}
+	if p.Hidden > 0 {
+		m.Lines = append(m.Lines, fmt.Sprintf("%d more from accounts you left out.", p.Hidden))
+	}
+	for _, n := range p.Networks {
+		for _, post := range n.Top {
+			m.Lines = append(m.Lines, fmt.Sprintf("%s, %s (%d): %s %s", n.Title, post.Author, post.Engagement, post.Text, post.URL))
+		}
+	}
+	if p.NewAuthorsCount > 0 {
+		line := "New voices: " + strings.Join(p.NewAuthors, ", ")
+		if more := p.NewAuthorsCount - len(p.NewAuthors); more > 0 {
+			line += fmt.Sprintf(" and %d more", more)
+		}
+		m.Lines = append(m.Lines, line+".")
+	}
+	spend := fmt.Sprintf("Searches cost $%.4f.", p.SpendUSD)
+	if p.SpendMissingCalls > 0 {
+		spend = fmt.Sprintf("Searches cost $%.4f, plus %d calls that reported no cost.", p.SpendUSD, p.SpendMissingCalls)
+	}
+	m.Lines = append(m.Lines, spend)
+	return m
+}
+
+func shortDay(day string) string {
+	t, err := time.Parse(time.DateOnly, day)
+	if err != nil {
+		return day
+	}
+	return t.Format("Jan 2")
 }
 
 // testPayload is what Send test delivers. It is never stored as an alert.

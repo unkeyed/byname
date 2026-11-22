@@ -225,6 +225,20 @@ func (s *Service) conn(ctx context.Context, kind engines.CredentialKind) (engine
 	return engines.Conn{Secret: secret, Org: org, BaseURL: s.baseURLs[kind], Client: s.client, Resolve: s.resolve}, nil
 }
 
+// Treg opens the stored Treg token as a client for Treg tools outside the
+// surface registry, such as social search. ok is false when none is set.
+func (s *Service) Treg(ctx context.Context) (engines.Treg, bool, error) {
+	var set bool
+	if err := s.db.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM credential WHERE kind = $1)`, engines.CredentialTreg).Scan(&set); err != nil || !set {
+		return engines.Treg{}, false, err
+	}
+	c, err := s.conn(ctx, engines.CredentialTreg)
+	if err != nil {
+		return engines.Treg{}, false, err
+	}
+	return engines.Treg{Client: c.Client, BaseURL: c.BaseURL, Token: c.Secret, Org: c.Org}, true, nil
+}
+
 // SealCredentials reseals keys sealed under ENCRYPTION_KEY_PREVIOUS with
 // ENCRYPTION_KEY, so a key rotation finishes with one restart.
 func (s *Service) SealCredentials(ctx context.Context) (int, error) {
