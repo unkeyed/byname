@@ -1,9 +1,9 @@
 import { useState, type FormEvent, type ReactNode } from "react";
 import type { Costs, Settings, SettingsView } from "../api";
-import { useCan, useSettings } from "../queries";
+import { useCan, useCosts, useSettings } from "../queries";
 import { cx, ErrorNote, inputClass, labelClass, Pending } from "../ui";
 import { usd } from "../lines";
-import { about, monthOfChecks, useCosts } from "./costs";
+import { about, monthOfChecks } from "./costs";
 import { defaultFooter, Disclosure, NumberField, ReadOnlyNote, SubmitButton, useSaveSettings, type Footer } from "./forms";
 import { formatNumber, parseNumber, type NumberKey } from "./rules";
 

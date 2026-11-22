@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useLoading } from "./ui";
 import { api, type Grouping, type GscStatus, type Line, type ResultsFilter, type Run, type Scope, type SocialMentionQuery } from "./api";
 
 /** Query keys in one place, so a mutation can invalidate exactly what it touched. */
@@ -111,7 +112,16 @@ export const useStatus = () => useQuery({ queryKey: keys.status, queryFn: api.st
 export const useSettings = () => useQuery({ queryKey: keys.settings, queryFn: api.settings.get });
 export const useBrands = () => useQuery({ queryKey: keys.brands, queryFn: api.brands.list, staleTime: 60_000 });
 export const useSurfaces = () => useQuery({ queryKey: keys.surfaces, queryFn: api.surfaces.list, staleTime: 60_000 });
-export const useCosts = () => useQuery({ queryKey: keys.costs, queryFn: api.costs });
+/**
+ * GET /v1/costs. It holds the nearest LoadBoundary on its first load. Its key
+ * sits under results, so a finished check refreshes it; a setup change that
+ * moves a cost invalidates keys.costs.
+ */
+export function useCosts() {
+  const costs = useQuery({ queryKey: keys.costs, queryFn: api.costs });
+  useLoading(costs.isPending);
+  return costs;
+}
 export const useOnboarding = () => useQuery({ queryKey: keys.onboarding, queryFn: api.onboarding.get });
 
 /**

@@ -2,9 +2,9 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type Costs, type Fidelity, type Pair, type PairTest, type Route, type RouteOption, type SearchControl, type Surface, type SurfaceGroup, type SurfaceInput, type SurfaceKey } from "../api";
 import { fidelityInfo, usd } from "../lines";
-import { keys, useCan, useIsAdmin, useSurfaces } from "../queries";
+import { keys, useCan, useCosts, useIsAdmin, useSurfaces } from "../queries";
 import { Badge, Button, Card, cx, ErrorNote, errorMessage, Icon, inputClass, labelClass, Pending, RelativeTime, Spinner, SteadyLabel, type Tone } from "../ui";
-import { about, refreshCosts, useCosts } from "./costs";
+import { about } from "./costs";
 import { CredentialForm, useCredentials } from "./Credentials";
 import { Disclosure, FieldNote, NoteSlot, type Footer } from "./forms";
 
@@ -179,7 +179,7 @@ function Body({
     setTried(false);
     void qc.invalidateQueries({ queryKey: keys.estimate });
     void qc.invalidateQueries({ queryKey: keys.credentials });
-    void refreshCosts(qc);
+    void qc.invalidateQueries({ queryKey: keys.costs });
     return errors;
   };
   const save = async () => {
@@ -240,7 +240,7 @@ function Body({
       }),
     );
     void qc.invalidateQueries({ queryKey: keys.estimate });
-    void refreshCosts(qc);
+    void qc.invalidateQueries({ queryKey: keys.costs });
     const bad = results.filter((ok) => !ok).length;
     if (bad) return setRun({ phase: "blocked", message: `${bad} of ${pending.length} ${pending.length === 1 ? "test" : "tests"} didn't pass. The reason is under each AI app. Fix it, or untick that app, and press Test and continue again.` });
     setRun({ phase: "idle" });

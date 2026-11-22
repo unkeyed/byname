@@ -4,7 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../api";
 import { BrandForm } from "../../config/BrandForm";
 import { BrandTable } from "../../config/BrandTable";
-import { CredentialForm, Credentials as CredentialList, testTone, useCredentials } from "../../config/Credentials";
+import { CredentialForm, ProviderKeyList, testTone, useCredentials } from "../../config/Credentials";
 import { QuestionEditor } from "../../config/QuestionEditor";
 import { RunSettingsForm } from "../../config/RunSettings";
 import { WherePeopleAsk as Surfaces } from "../../config/WherePeopleAsk";
@@ -149,7 +149,7 @@ export function ProviderKeys() {
         Your own keys for a scraping or model provider, for an AI app you set to use one instead of Treg. Most teams need none. Keys are stored encrypted, sent only to their provider, and never
         shown again after you save them.
       </SettingsHeader>
-      <CredentialList />
+      <ProviderKeyList />
     </>
   );
 }

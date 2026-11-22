@@ -4,7 +4,6 @@ import { api, type Question, type QuestionSet, type QuestionsInput } from "../ap
 import { absoluteTime } from "../format";
 import { keys, useBrands, useCan, useQuestions, useSettings } from "../queries";
 import { Badge, Button, Card, CardHeader, cx, Dialog, DialogBody, EmptyState, ErrorNote, Field, Icon, inputClass, labelClass, Pending, RelativeTime, selectClass, SteadyLabel } from "../ui";
-import { refreshCosts } from "./costs";
 import { defaultFooter, FieldNote, NoteSlot, ReadOnlyNote, SubmitButton, type Footer } from "./forms";
 import { useQuestionNaming, useSteady, type QuestionNaming } from "./naming";
 import { dedupe, normalizeQuestion, questionError, questionLength, questionsFromCSV, questionsFromLines, suggestQuestions, type DraftQuestion } from "./rules";
@@ -114,7 +113,7 @@ function EditorBody({
       qc.setQueryData(keys.questionSet, set);
       void qc.invalidateQueries({ queryKey: keys.questionSets });
       void qc.invalidateQueries({ queryKey: keys.estimate });
-      void refreshCosts(qc);
+      void qc.invalidateQueries({ queryKey: keys.costs });
       await onSaved?.();
     },
   });

@@ -1,18 +1,4 @@
-import { useQuery, type QueryClient } from "@tanstack/react-query";
-import { api } from "../api";
 import { usd } from "../lines";
-import { useLoading } from "../ui";
-
-const costsKey = ["costs"] as const;
-
-/** GET /v1/costs. Every setup change that moves a cost refreshes it with refreshCosts. It holds the nearest LoadBoundary on its first load. */
-export function useCosts() {
-  const costs = useQuery({ queryKey: costsKey, queryFn: api.costs });
-  useLoading(costs.isPending);
-  return costs;
-}
-
-export const refreshCosts = (qc: QueryClient) => qc.invalidateQueries({ queryKey: costsKey });
 
 /** The average calendar month, as internal/config counts it. */
 const daysPerMonth = 365.25 / 12;

@@ -1,6 +1,4 @@
-import type { Costs, SettingsView } from "./api";
-
-type NextCheck = NonNullable<SettingsView["next_check"]>;
+import type { Costs, SettingsView, UpcomingCheck as NextCheck } from "./api";
 
 const weekday = new Intl.DateTimeFormat(undefined, { weekday: "long" });
 const monthDay = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" });

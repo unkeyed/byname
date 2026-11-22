@@ -1,11 +1,12 @@
 import type { ReactNode } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router";
-import { api, type EstimateRow, type StepKey, type Surface, type UpcomingCheck } from "../../api";
+import { api, type EstimateRow, type StepKey, type Surface } from "../../api";
 import { fidelityInfo, usd } from "../../lines";
-import { keys, useBrands, useGsc, useOnboarding, useQuestions, useSettings, useSocialSettings, useSurfaces } from "../../queries";
+import { keys, useBrands, useCosts, useGsc, useOnboarding, useQuestions, useSettings, useSocialSettings, useSurfaces } from "../../queries";
 import { Badge, Button, buttonClass, Card, CardHeader, ErrorNote, Icon, Pending, RelativeTime, ScrollX, SteadyLabel, useLoading } from "../../ui";
-import { About, about, refreshCosts, useCosts } from "../../config/costs";
+import { nextCheckPhrase } from "../../checks";
+import { About, about } from "../../config/costs";
 import { Disclosure } from "../../config/forms";
 import { FidelityBadge, routeInfo } from "../../config/WherePeopleAsk";
 import type { StepNav } from "./Onboarding";
@@ -26,17 +27,6 @@ function Section({ title, step, children }: { title: string; step: StepKey; chil
 }
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
-
-/** "tomorrow at 06:00", "today at 18:00" or "on Tuesday, Nov 24 at 06:00", in the instance's time zone. */
-export function whenLocal(c: UpcomingCheck): string {
-  const day =
-    c.days_away === 0
-      ? "today"
-      : c.days_away === 1
-        ? "tomorrow"
-        : `on ${new Date(`${c.local_date}T12:00:00Z`).toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric", timeZone: "UTC" })}`;
-  return `${day} at ${c.local_time}`;
-}
 
 /** Onboarding's last step: everything set, what it costs a check and a month, when results come, and Start first check. */
 export function Review({ nav }: { nav: StepNav }) {
@@ -62,7 +52,7 @@ export function Review({ nav }: { nav: StepNav }) {
         qc.invalidateQueries({ queryKey: keys.onboarding }),
         qc.invalidateQueries({ queryKey: keys.settings }),
         qc.invalidateQueries({ queryKey: keys.runs }),
-        refreshCosts(qc),
+        qc.invalidateQueries({ queryKey: keys.costs }),
       ]);
       void navigate("/");
     },
@@ -178,7 +168,7 @@ export function Review({ nav }: { nav: StepNav }) {
           {next && (
             <>
               {" "}
-              The second check runs {whenLocal(next)}, so you can see what moves, then every {next.then_every_days === 1 ? "day" : `${next.then_every_days} days`}.
+              The second check runs {nextCheckPhrase(next)}, so you can see what moves.
             </>
           )}
         </p>

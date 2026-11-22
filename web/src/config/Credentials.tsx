@@ -13,9 +13,6 @@ export const useCredentials = () => {
 
 const treg = (c: { kind: CredentialKind }) => c.kind === "treg";
 
-/** Treg first, then the rest in the server's order. */
-const ordered = (list: Credential[]) => [...list.filter(treg), ...list.filter((c) => !treg(c))];
-
 export function testTone(status: string) {
   return status === "ok" ? "success" : status ? "danger" : "neutral";
 }
@@ -108,15 +105,15 @@ export function CredentialForm({
   );
 }
 
-/** Settings > Credentials: the Treg token and every provider key, as rows. */
-export function Credentials() {
+/** Settings > Provider keys: every key but Treg's, which has its own page, as rows. */
+export function ProviderKeyList() {
   const list = useCredentials();
   if (list.isPending) return <Pending />;
   if (list.isError) return <ErrorNote error={list.error} />;
   return (
     <Card>
-      <ul aria-label="Credentials" className="divide-y divide-line">
-        {ordered(list.data).map((c) => (
+      <ul aria-label="Provider keys" className="divide-y divide-line">
+        {list.data.filter((c) => !treg(c)).map((c) => (
           <CredentialRow key={c.kind} c={c} />
         ))}
       </ul>
@@ -150,7 +147,7 @@ function CredentialRow({ c }: { c: Credential }) {
           </div>
           <p className="mt-0.5 text-xs text-muted [overflow-wrap:anywhere]">{c.hint}</p>
           <p className="mt-0.5 text-xs text-muted">
-            {c.used_by.length ? <>Used by {c.used_by.map((k) => titles.get(k) ?? k).join(", ")}</> : "No surface uses it"}
+            {c.used_by.length ? <>Used by {c.used_by.map((k) => titles.get(k) ?? k).join(", ")}</> : "No AI app uses it"}
             {c.updated_at && (
               <>
                 {" "}
