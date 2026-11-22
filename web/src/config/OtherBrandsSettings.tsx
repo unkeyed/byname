@@ -62,7 +62,7 @@ function Form({ s }: { s: Settings }) {
           <span>
             <span className="font-medium">Find other brands in answers</span>
             <span className="mt-0.5 block text-muted">
-              A small model reads each new answer and lists the brands it names{calls > 0 && `, about ${money(s.find.cost_per_answer_usd * calls)} for a check of ${calls} answers`}. If a read fails, the check still finishes and the answer is read again later.
+              A small model reads each new answer and lists the brands it names{calls > 0 && `, ${money(s.find.cost_per_answer_usd * calls, "about")} for a check of ${calls} answers`}. If a read fails, the check still finishes and the answer is read again later.
             </span>
           </span>
         </label>
@@ -71,7 +71,7 @@ function Form({ s }: { s: Settings }) {
           <span>
             <span className="font-medium">Show logos</span>
             <span className="mt-0.5 block text-muted">
-              Looks up each brand once on Context.dev: about {money(s.logos.cost_per_brand_usd)} for each new brand, nothing for one it doesn't know. Logos are kept in Byname, so your browser never
+              Looks up each brand once on Context.dev: {money(s.logos.cost_per_brand_usd, "about")} for each new brand, nothing for one it doesn't know. Logos are kept in Byname, so your browser never
               loads them from anyone else. {s.logos.logos > 0 && `${s.logos.logos} ${s.logos.logos === 1 ? "brand has" : "brands have"} a logo.`}
             </span>
           </span>
