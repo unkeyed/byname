@@ -134,50 +134,51 @@ function sidebar(active) {
     .join("");
 }
 
-const github = `<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.65.5.5 5.65.5 12a11.5 11.5 0 0 0 7.86 10.92c.58.1.79-.25.79-.56v-2c-3.2.7-3.87-1.37-3.87-1.37-.52-1.33-1.28-1.68-1.28-1.68-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.19 1.76 1.19 1.03 1.76 2.69 1.25 3.35.96.1-.75.4-1.25.73-1.54-2.55-.29-5.24-1.28-5.24-5.68 0-1.26.45-2.28 1.19-3.09-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.83 1.19 3.09 0 4.41-2.69 5.39-5.25 5.67.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5Z"/></svg>`;
 
-const header = `<header class="nav">
-  <div class="wrap nav-in">
-    <div class="nav-bar">
-      <a class="brand" href="/" aria-label="Byname home"><span class="brand-mark" aria-hidden="true">B</span>byname</a>
-      <nav class="nav-links" aria-label="Site">
-        <a href="/#panel">Panel</a>
-        <a href="/#surfaces">Surfaces</a>
-        <a href="/#product">Product</a>
+const logo = `<a class="logo" href="/" aria-label="Byname home">by<span class="mk" data-mark="circle" data-pad="6 5">name</span></a>`;
+
+const header = `<a class="skip" href="#main">Skip to content</a>
+<header class="mast">
+  <div class="wrap mast-in">
+    ${logo}
+    <nav class="mast-links" aria-label="Site">
+      <a href="/#questions">Questions</a>
+      <a href="/#record">The record</a>
+      <a href="/#evidence">Surfaces</a>
+      <a href="/#agents">Agents</a>
+      <a href="/docs/" aria-current="page">Docs</a>
+      <a href="${repo}">GitHub</a>
+    </nav>
+    <a class="btn btn-sm" href="/#run">Deploy on Unkey</a>
+    <details class="mast-menu">
+      <summary aria-label="Menu"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 6.5h14M3 13.5h14" /></svg></summary>
+      <nav class="mast-sheet sheet" aria-label="Menu">
+        <a href="/#questions">Questions</a>
+        <a href="/#record">The record</a>
+        <a href="/#evidence">Surfaces</a>
         <a href="/#agents">Agents</a>
-        <a href="/docs/" aria-current="page">Docs</a>
+        <a href="/docs/">Docs</a>
+        <a href="${repo}">GitHub</a>
+        <a class="btn" href="/#run">Deploy on Unkey</a>
       </nav>
-      <details class="nav-menu">
-        <summary aria-label="Menu"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M2 4.5h12M2 8h12M2 11.5h12" /></svg></summary>
-        <nav class="nav-sheet" aria-label="Menu">
-          <a href="/#panel">Panel</a>
-          <a href="/#surfaces">Surfaces</a>
-          <a href="/#product">Product</a>
-          <a href="/#agents">Agents</a>
-          <a href="/docs/">Docs</a>
-          <a href="${repo}">GitHub</a>
-          <a href="/#deploy">Deploy on Unkey</a>
-        </nav>
-      </details>
-    </div>
-    <a class="nav-box nav-gh" href="${repo}">${github}GitHub</a>
-    <a class="nav-box nav-cta" href="/#deploy">Deploy on Unkey</a>
+    </details>
   </div>
 </header>`;
 
-const footer = `<footer class="footer">
-  <div class="wrap footer-grid">
+const footer = `<footer class="foot">
+  <div class="wrap foot-grid">
     <div>
-      <a class="brand" href="/" aria-label="Byname home"><span class="brand-mark" aria-hidden="true">B</span>byname</a>
-      <p class="footer-tag">Find out when AI assistants name you.</p>
-      <p class="footer-meta">MIT licensed. Provided by <a href="https://www.unkey.com">Unkey</a>.</p>
+      ${logo}
+      <p class="foot-tag">Find out when AI answers name you, and who they name instead.</p>
+      <p class="foot-meta">MIT licensed. Provided by <a href="https://www.unkey.com">Unkey</a>.</p>
     </div>
     <nav aria-labelledby="f-product"><h2 id="f-product">Product</h2><ul>
-      <li><a href="/#panel">The panel</a></li>
-      <li><a href="/#surfaces">Where people ask</a></li>
-      <li><a href="/#product">After every check</a></li>
+      <li><a href="/#questions">The questions</a></li>
+      <li><a href="/#record">The record</a></li>
+      <li><a href="/#evidence">Surfaces</a></li>
+      <li><a href="/#search">Search and changes</a></li>
       <li><a href="/#agents">Agents</a></li>
-      <li><a href="/#deploy">Deploy on Unkey</a></li>
+      <li><a href="/#run">Deploy on Unkey</a></li>
     </ul></nav>
     <nav aria-labelledby="f-docs"><h2 id="f-docs">Docs</h2><ul>
       <li><a href="/docs/self-hosting">Self-host</a></li>
@@ -198,13 +199,14 @@ const footer = `<footer class="footer">
 
 function layout({ title, description, url, eyebrow, body, side, toc = "" }) {
   return `<!doctype html>
-<html lang="en">
+<html lang="en" class="no-js">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>${escape(title)} · Byname docs</title>
 <meta name="description" content="${escape(description)}" />
-<meta name="theme-color" content="#040406" />
+<meta name="theme-color" content="#f4f1ea" media="(prefers-color-scheme: light)" />
+<meta name="theme-color" content="#1a1814" media="(prefers-color-scheme: dark)" />
 <link rel="canonical" href="${origin}${url}" />
 <meta property="og:type" content="article" />
 <meta property="og:site_name" content="Byname" />
@@ -219,22 +221,23 @@ function layout({ title, description, url, eyebrow, body, side, toc = "" }) {
 <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@300..500&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400..600;1,6..72,400..500&family=Instrument+Sans:wght@400..600&family=IBM+Plex+Mono:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="/base.css" />
 <link rel="stylesheet" href="/docs/docs.css" />
 </head>
 <body class="docs">
 ${header}
-<main class="wrap docs-layout">
+<main class="wrap docs-layout" id="main">
   <aside class="docs-side" aria-label="Documentation">${side}</aside>
   <article class="docs-main">
-    ${url === "/docs/" ? "" : '<a class="docs-back" href="/docs/">&larr; All docs</a><br />'}
-    <span class="chip">${escape(eyebrow)}</span>
+    ${url === "/docs/" ? "" : '<a class="docs-back" href="/docs/">&larr; All docs</a>'}
+    <p class="docs-kicker">${escape(eyebrow)}</p>
     ${body}
   </article>
   <aside class="docs-toc" aria-label="On this page">${toc}</aside>
 </main>
 ${footer}
+<script src="/app.js" defer></script>
 </body>
 </html>
 `;

@@ -1,534 +1,447 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="no-js">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Byname: find out when AI assistants name you</title>
-<meta name="description" content="Byname is an open source app you run yourself. It asks your questions where your buyers ask them, keeps every answer, and shows who AI assistants name instead of you, next to your Search Console numbers." />
-<meta name="theme-color" content="#040406" />
+<title>Byname: find out when AI answers name you</title>
+<meta name="description" content="Byname is an open source app you run yourself. It asks your buyers' questions in the ChatGPT app, Google AI Mode, Claude Code and nine other places, keeps every answer, and marks who was named instead of you." />
+<meta name="theme-color" content="#f4f1ea" media="(prefers-color-scheme: light)" />
+<meta name="theme-color" content="#1a1814" media="(prefers-color-scheme: dark)" />
 <link rel="canonical" href="https://byname.dev/" />
 <meta property="og:type" content="website" />
 <meta property="og:site_name" content="Byname" />
-<meta property="og:title" content="Byname: find out when AI assistants name you" />
-<meta property="og:description" content="Open source and self-hosted. Ask your questions in the ChatGPT app, Google AI Mode, Claude Code and more, keep every answer, and see who gets named instead of you. Deploy it on Unkey in one prompt." />
+<meta property="og:title" content="Byname: find out when AI answers name you" />
+<meta property="og:description" content="Open source and self-hosted. Ask your buyers' questions in the ChatGPT app, Google AI Mode, Claude Code and more, keep every answer, and see who gets named instead of you. Deploy it on Unkey in one prompt." />
 <meta property="og:url" content="https://byname.dev/" />
 <meta property="og:image" content="https://byname.dev/og.png" />
 <meta property="og:image:width" content="1200" />
 <meta property="og:image:height" content="630" />
-<meta property="og:image:alt" content="Byname: find out when AI assistants name you, and who they name instead. A grid of six questions on six surfaces for an example brand, 29 of 36 answers named." />
+<meta property="og:image:alt" content="Byname: when buyers ask AI, does it say your name? An AI answer marked up by Byname: the example brand circled at position 2 and cited, the brands named instead underlined." />
 <meta name="twitter:card" content="summary_large_image" />
-<meta name="twitter:title" content="Byname: find out when AI assistants name you" />
+<meta name="twitter:title" content="Byname: find out when AI answers name you" />
 <meta name="twitter:description" content="Open source and self-hosted. MIT licensed. Deploy it on Unkey in one prompt." />
 <meta name="twitter:image" content="https://byname.dev/og.png" />
 <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@300..500&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400..600;1,6..72,400..500&family=Instrument+Sans:wght@400..600&family=IBM+Plex+Mono:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="/base.css" />
 <link rel="stylesheet" href="/home.css" />
 </head>
 <body>
+<a class="skip" href="#main">Skip to content</a>
 
-<header class="nav">
-  <div class="wrap nav-in">
-    <div class="nav-bar">
-      <a class="brand" href="#top" aria-label="Byname home"><span class="brand-mark" aria-hidden="true">B</span>byname</a>
-      <nav class="nav-links" aria-label="Sections">
-        <a href="#panel">Panel</a>
-        <a href="#surfaces">Surfaces</a>
-        <a href="#product">Product</a>
+<header class="mast">
+  <div class="wrap mast-in">
+    <a class="logo" href="#top" aria-label="Byname home">by<span class="mk" data-mark="circle" data-pad="6 5">name</span></a>
+    <nav class="mast-links" aria-label="Sections">
+      <a href="#questions">Questions</a>
+      <a href="#record">The record</a>
+      <a href="#evidence">Surfaces</a>
+      <a href="#agents">Agents</a>
+      <a href="/docs/">Docs</a>
+      <a href="https://github.com/unkeyed/byname">GitHub</a>
+    </nav>
+    <a class="btn btn-sm" href="#run">Deploy on Unkey</a>
+    <details class="mast-menu">
+      <summary aria-label="Menu"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 6.5h14M3 13.5h14" /></svg></summary>
+      <nav class="mast-sheet sheet" aria-label="Menu">
+        <a href="#questions">Questions</a>
+        <a href="#record">The record</a>
+        <a href="#evidence">Surfaces</a>
+        <a href="#search">Search</a>
         <a href="#agents">Agents</a>
         <a href="/docs/">Docs</a>
+        <a href="https://github.com/unkeyed/byname">GitHub</a>
+        <a class="btn" href="#run">Deploy on Unkey</a>
       </nav>
-      <details class="nav-menu">
-        <summary aria-label="Menu"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M2 4.5h12M2 8h12M2 11.5h12" /></svg></summary>
-        <nav class="nav-sheet" aria-label="Menu">
-          <a href="#panel">Panel</a>
-          <a href="#surfaces">Surfaces</a>
-          <a href="#product">Product</a>
-          <a href="#agents">Agents</a>
-          <a href="/docs/">Docs</a>
-          <a href="https://github.com/unkeyed/byname">GitHub</a>
-          <a href="#deploy">Deploy on Unkey</a>
-        </nav>
-      </details>
-    </div>
-    <a class="nav-box nav-gh" href="https://github.com/unkeyed/byname">
-      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.65.5.5 5.65.5 12a11.5 11.5 0 0 0 7.86 10.92c.58.1.79-.25.79-.56v-2c-3.2.7-3.87-1.37-3.87-1.37-.52-1.33-1.28-1.68-1.28-1.68-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.19 1.76 1.19 1.03 1.76 2.69 1.25 3.35.96.1-.75.4-1.25.73-1.54-2.55-.29-5.24-1.28-5.24-5.68 0-1.26.45-2.28 1.19-3.09-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.83 1.19 3.09 0 4.41-2.69 5.39-5.25 5.67.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5Z"/></svg>
-      GitHub
-    </a>
-    <a class="nav-box nav-cta" href="#deploy">Deploy on Unkey</a>
+    </details>
   </div>
 </header>
 
-<main id="top">
-  <section class="hero" aria-labelledby="hero-title">
-    <canvas class="hero-grid" aria-hidden="true"></canvas>
-    <div class="wrap hero-in">
-      <div class="hero-copy">
-        <span class="chip">Open source · self-hosted</span>
-        <h1 id="hero-title">Find out when AI assistants name you. And <mark class="hl">who they name instead.</mark></h1>
-        <p class="hero-lede">Byname asks your buyers' questions in the ChatGPT app, Google AI Mode, Claude Code and nine other places. It keeps every answer with its cost and counts who got named and cited.</p>
-        <p class="hero-sub">MIT licensed. One container and your Postgres.</p>
-        <div class="hero-actions">
-          <a class="btn btn-primary" href="#deploy">Deploy on Unkey</a>
-          <a class="btn btn-outline" href="https://github.com/unkeyed/byname">View on GitHub</a>
-        </div>
+<main id="main">
+  <section class="hero wrap" id="top" aria-labelledby="hero-title">
+    <div class="hero-copy">
+      <h1 id="hero-title">When buyers ask AI, does it say <span class="mk" data-mark="circle" data-pad="0.16em 0.05em" data-sw="3">your name</span>?</h1>
+      <p class="hero-lede">Byname asks your buyers' questions in the ChatGPT app, Google AI Mode, Claude Code and nine other places, on a schedule. It keeps every answer, marks who was named and cited, and tells you when that changes.</p>
+      <div class="hero-acts">
+        <a class="btn" href="#run">Deploy on Unkey</a>
+        <a class="go" href="https://github.com/unkeyed/byname">View on GitHub</a>
       </div>
+      <p class="hero-meta">Open source, MIT licensed. One container and your Postgres.</p>
+    </div>
 
-      <div class="ac" data-answers>
-        <div class="ac-top">
-          <div class="ac-tabs" role="tablist" aria-label="Surface">
-            <button type="button" role="tab" id="ac-t1" aria-controls="ac-p1" aria-selected="true">ChatGPT app</button>
-            <button type="button" role="tab" id="ac-t2" aria-controls="ac-p2" aria-selected="false" tabindex="-1">Google AI Mode</button>
-            <button type="button" role="tab" id="ac-t3" aria-controls="ac-p3" aria-selected="false" tabindex="-1">Claude Code</button>
+    <div class="desk">
+      <div class="ghost" aria-hidden="true"></div>
+      <div class="ghost" aria-hidden="true"></div>
+      <div class="sheet answer" data-hero>
+        <article class="pane" id="pane-0" role="tabpanel" aria-labelledby="tab-0" data-stamp="Named #2" data-stamp-tone="you">
+          <header class="sheet-head"><span>Asked in <b>ChatGPT app</b></span><span>App answer</span></header>
+          <p class="q">Which hosting platform should a small SaaS team use in 2026?</p>
+          <div class="ans">
+            <p>It depends on your stack, but three providers come up again and again.</p>
+            <ol>
+              <li><span class="li-t"><b class="mk" data-mark="underline" data-tone="instead">Litware Cloud</b> for enterprise contracts and region pinning.</span><span class="note instead">#1, named instead</span></li>
+              <li><span class="li-t"><b class="mk" data-mark="circle">Northwind</b> for a managed platform with preview environments and per-team budgets.</span><span class="note you">you, #2 · cited</span></li>
+              <li><span class="li-t"><b class="mk" data-mark="underline" data-tone="instead">Tailspin Hosting</b> for long-running containers at a flat monthly price.</span><span class="note instead">#3</span></li>
+            </ol>
           </div>
-          <span class="ac-ex">Example data</span>
+          <footer class="sheet-foot"><span>Cited: northwind.example, litware.example, docs.example.org</span><span class="cost">$0.0040</span></footer>
+        </article>
+        <article class="pane" id="pane-1" role="tabpanel" aria-labelledby="tab-1" data-stamp="Named #1" data-stamp-tone="you" hidden>
+          <header class="sheet-head"><span>Asked in <b>Google AI Mode</b></span><span>App answer</span></header>
+          <p class="q">What is the easiest way to get preview environments for every pull request?</p>
+          <div class="ans">
+            <p>Pick a platform that builds a preview for each pull request and removes it when the branch merges.</p>
+            <ol>
+              <li><span class="li-t"><b class="mk" data-mark="circle">Northwind</b> gives every pull request a preview URL and its own seeded database.</span><span class="note you">you, #1 · cited</span></li>
+              <li><span class="li-t"><b class="mk" data-mark="underline" data-tone="instead">Fabrikam Deploy</b> builds previews through a GitHub Action you maintain.</span><span class="note instead">#2</span></li>
+              <li><span class="li-t"><b class="mk" data-mark="underline" data-tone="instead">Contoso Edge</b> routes previews at the edge, with one shared database.</span><span class="note instead">#3</span></li>
+            </ol>
+          </div>
+          <footer class="sheet-foot"><span>Cited: northwind.example, fabrikam.example</span><span class="cost">$0.0024</span></footer>
+        </article>
+        <article class="pane" id="pane-2" role="tabpanel" aria-labelledby="tab-2" data-stamp="Not named" data-stamp-tone="instead" hidden>
+          <header class="sheet-head"><span>Asked in <b>Claude Code</b> · claude-sonnet-5-5</span><span>Same model and search</span></header>
+          <p class="q">Which platform is best for hosting a Postgres-backed API close to European users?</p>
+          <div class="ans">
+            <p>Choose a provider with a Frankfurt or Amsterdam region and managed Postgres in the same place.</p>
+            <ol>
+              <li><span class="li-t"><b class="mk" data-mark="underline" data-tone="instead">Tailspin Hosting</b> runs managed Postgres in Frankfurt with read replicas.</span><span class="note instead">named instead</span></li>
+              <li><span class="li-t"><b class="mk" data-mark="underline" data-tone="instead">Contoso Edge</b> puts edge routing in front of a regional database.</span><span class="note instead">named instead</span></li>
+              <li><span class="li-t"><b class="mk" data-mark="underline" data-tone="instead">Fabrikam Deploy</b> keeps container deploys and data inside the EU.</span><span class="note instead">named instead</span></li>
+            </ol>
+          </div>
+          <footer class="sheet-foot"><span>Searched: managed postgres frankfurt, eu api hosting</span><span class="cost">$0.0545</span></footer>
+        </article>
+        <span class="stamp" aria-hidden="true"></span>
+      </div>
+      <div class="asked">
+        <div class="asked-tabs" role="tablist" aria-label="Where the question was asked">
+          <button type="button" role="tab" id="tab-0" aria-controls="pane-0" aria-selected="true">ChatGPT app</button>
+          <button type="button" role="tab" id="tab-1" aria-controls="pane-1" aria-selected="false" tabindex="-1">Google AI Mode</button>
+          <button type="button" role="tab" id="tab-2" aria-controls="pane-2" aria-selected="false" tabindex="-1">Claude Code</button>
         </div>
-        <div class="ac-panes">
-          <article class="ac-pane" id="ac-p1" role="tabpanel" aria-labelledby="ac-t1" data-fidelity="App answer" data-endpoint="dataforseo.x.ai-optimization-chat-gpt-llm-scraper-live-advanced">
-            <p class="ac-label">Question<span>Choosing a platform</span></p>
-            <p class="ac-q">Which hosting platform should a small SaaS team use in 2026?</p>
-            <div class="ac-a">
-              <p>It depends on your stack, but three providers come up again and again.</p>
-              <ol>
-                <li><b class="bn" data-pos="1">Litware Cloud</b> for enterprise contracts and region pinning.</li>
-                <li><b class="bn you" data-pos="2">Northwind</b> for a managed platform with preview environments and per-team budgets.</li>
-                <li><b class="bn" data-pos="3">Tailspin Hosting</b> for long-running containers at a flat monthly price.</li>
-              </ol>
-            </div>
-            <p class="ac-cites"><span class="ac-k">Cited</span><span class="cite you">northwind.example</span><span class="cite">litware.example</span><span class="cite">docs.example.org</span></p>
-            <dl class="ac-rec">
-              <div><dt>Named you</dt><dd class="good">#2 of 3</dd></div>
-              <div><dt>Cited you</dt><dd class="good">Yes</dd></div>
-              <div><dt>Fidelity</dt><dd>App answer</dd></div>
-              <div><dt>Cost</dt><dd>$0.0040</dd></div>
-            </dl>
-          </article>
-          <article class="ac-pane" id="ac-p2" role="tabpanel" aria-labelledby="ac-t2" data-fidelity="App answer" data-endpoint="cloro.google.serp.ai_mode" hidden>
-            <p class="ac-label">Question<span>Choosing a platform</span></p>
-            <p class="ac-q">What is the easiest way to get preview environments for every pull request?</p>
-            <div class="ac-a">
-              <p>Pick a platform that builds a preview for each pull request and removes it when the branch merges.</p>
-              <ol>
-                <li><b class="bn you" data-pos="1">Northwind</b> gives every pull request a preview URL and its own seeded database.</li>
-                <li><b class="bn" data-pos="2">Fabrikam Deploy</b> builds previews through a GitHub Action you maintain.</li>
-                <li><b class="bn" data-pos="3">Contoso Edge</b> routes previews at the edge, with one shared database.</li>
-              </ol>
-            </div>
-            <p class="ac-cites"><span class="ac-k">Cited</span><span class="cite you">northwind.example</span><span class="cite">fabrikam.example</span></p>
-            <dl class="ac-rec">
-              <div><dt>Named you</dt><dd class="good">#1 of 3</dd></div>
-              <div><dt>Cited you</dt><dd class="good">Yes</dd></div>
-              <div><dt>Fidelity</dt><dd>App answer</dd></div>
-              <div><dt>Cost</dt><dd>$0.0024</dd></div>
-            </dl>
-          </article>
-          <article class="ac-pane" id="ac-p3" role="tabpanel" aria-labelledby="ac-t3" data-fidelity="Same model and search" data-endpoint="dataforseo.x.ai-optimization-claude-llm-responses-live" hidden>
-            <p class="ac-label">Question<span>Migrating · claude-sonnet-5-5</span></p>
-            <p class="ac-q">Which platform is best for hosting a Postgres-backed API close to European users?</p>
-            <div class="ac-a">
-              <p>Choose a provider with a Frankfurt or Amsterdam region and managed Postgres in the same place.</p>
-              <ol>
-                <li><b class="bn" data-pos="1">Tailspin Hosting</b> runs managed Postgres in Frankfurt with read replicas.</li>
-                <li><b class="bn" data-pos="2">Contoso Edge</b> puts edge routing in front of a regional database.</li>
-                <li><b class="bn" data-pos="3">Fabrikam Deploy</b> keeps container deploys and data inside the EU.</li>
-              </ol>
-            </div>
-            <p class="ac-cites"><span class="ac-k">Searched</span><span class="cite">managed postgres frankfurt</span><span class="cite">eu api hosting</span></p>
-            <dl class="ac-rec">
-              <div><dt>Named you</dt><dd class="bad">Not named</dd></div>
-              <div class="wide"><dt>Named instead</dt><dd>Tailspin Hosting, Contoso Edge, Fabrikam Deploy</dd></div>
-              <div><dt>Cost</dt><dd>$0.0545</dd></div>
-            </dl>
-          </article>
-        </div>
-        <div class="ac-foot">
-          <button type="button" class="ac-play" aria-label="Pause" data-play hidden><svg viewBox="0 0 12 12" aria-hidden="true"><path class="i-pause" d="M3 2h2v8H3zM7 2h2v8H7z" /><path class="i-play" d="M3 1.5l7 4.5-7 4.5z" /></svg></button>
-          <span class="ac-ep"><span class="ac-k">Endpoint</span><span data-endpoint-out>dataforseo.x.ai-optimization-chat-gpt-llm-scraper-live-advanced</span></span>
-          <span class="ac-bar" aria-hidden="true"><i></i></span>
-        </div>
+        <button type="button" class="play" data-play hidden><span class="play-l">Pause</span></button>
+        <span class="asked-ex">Example data</span>
       </div>
     </div>
   </section>
-  <section class="sec" id="panel" aria-labelledby="panel-title">
-    <div class="wrap">
-      <div class="frame">
-        <div class="sec-head">
-          <div>
-            <span class="chip">The panel</span>
-            <h2 id="panel-title">Same questions, same places, <mark class="hl keep">every check.</mark></h2>
-          </div>
-          <p class="lead">You write the questions your buyers ask. Byname sends each one word for word, never with your brand name, to every surface and model you pick, on a schedule. So two checks compare answer by answer.</p>
-        </div>
 
-        <figure class="mx" data-matrix>
-          <div class="mx-bar">
-            <span class="mx-title"><b data-mx-check>Check #8</b> · Northwind Cloud · example data</span>
-            <p class="mx-legend" id="mx-legend"><span><i class="k-named"></i>Named, with position</span><span><i class="k-cited"></i>Cited, not named</span><span><i class="k-miss"></i>Not named</span></p>
-          </div>
-          <div class="mx-body">
-            <div class="mx-grid" role="table" aria-label="Check #8: each question on each surface and model pair" aria-describedby="mx-legend">
-              <div class="mx-row mx-head" role="row">
-                <span class="mx-q" role="columnheader">Question</span>
-                <span class="mx-col fid-model_match" role="columnheader" data-name="Claude Code · claude-sonnet-5-5" title="Claude Code · claude-sonnet-5-5 · Same model and search"><b class="full">Claude Code</b><b class="short" aria-hidden="true">Sonnet</b><small>sonnet-5-5</small></span>
-                <span class="mx-col fid-model_match" role="columnheader" data-name="Claude Code · claude-opus-5-5" title="Claude Code · claude-opus-5-5 · Same model and search"><b class="full">Claude Code</b><b class="short" aria-hidden="true">Opus</b><small>opus-5-5</small></span>
-                <span class="mx-col fid-model_match" role="columnheader" data-name="Codex CLI · gpt-6.1-sol" title="Codex CLI · gpt-6.1-sol · Same model and search"><b class="full">Codex CLI</b><b class="short" aria-hidden="true">Codex</b></span>
-                <span class="mx-col fid-approximation" role="columnheader" data-name="Perplexity app · sonar-reasoning-pro" title="Perplexity app · sonar-reasoning-pro · Approximation"><b class="full">Perplexity app</b><b class="short" aria-hidden="true">Perplexity</b></span>
-                <span class="mx-col fid-app" role="columnheader" data-name="Google AI Overview" title="Google AI Overview · App answer"><b class="full">Google AI Overview</b><b class="short" aria-hidden="true">AI Overview</b></span>
-                <span class="mx-col fid-app" role="columnheader" data-name="ChatGPT app" title="ChatGPT app · App answer"><b class="full">ChatGPT app</b><b class="short" aria-hidden="true">ChatGPT</b></span>
-                <span class="mx-n" role="columnheader">Named</span>
-              </div>
-              <div class="mx-row" role="row">
-                <span class="mx-q" role="rowheader"><b>Q1</b><span>Which hosting platform should a small SaaS team use in 2026?</span></span>
-                <span class="mx-c is-named" role="cell"><i>#2</i><span class="sr-only"> named</span></span>
-                <span class="mx-c is-named" role="cell"><i>#2</i><span class="sr-only"> named</span></span>
-                <span class="mx-c is-named" role="cell"><i>#2</i><span class="sr-only"> named</span></span>
-                <span class="mx-c is-named" role="cell"><i>#2</i><span class="sr-only"> named</span></span>
-                <span class="mx-c is-named" role="cell"><i>#1</i><span class="sr-only"> named</span></span>
-                <span class="mx-c is-named" role="cell"><i>#1</i><span class="sr-only"> named</span></span>
-                <span class="mx-n" role="cell">6<small>/6</small></span>
-              </div>
-              <div class="mx-row" role="row">
-                <span class="mx-q" role="rowheader"><b>Q2</b><span>What is the easiest way to get preview environments for every pull request?</span></span>
-                <span class="mx-c is-named" role="cell"><i>#4</i><span class="sr-only"> named</span></span>
-                <span class="mx-c is-named" role="cell"><i>#1</i><span class="sr-only"> named</span></span>
-                <span class="mx-c is-named" role="cell"><i>#2</i><span class="sr-only"> named</span></span>
-                <span class="mx-c is-named" role="cell"><i>#1</i><span class="sr-only"> named</span></span>
-                <span class="mx-c is-named" role="cell"><i>#1</i><span class="sr-only"> named</span></span>
-                <span class="mx-c is-named" role="cell"><i>#2</i><span class="sr-only"> named</span></span>
-                <span class="mx-n" role="cell">6<small>/6</small></span>
-              </div>
-              <div class="mx-row" role="row">
-                <span class="mx-q" role="rowheader"><b>Q3</b><span>Which cloud platform has the most predictable pricing for a startup?</span></span>
-                <span class="mx-c is-named" role="cell"><i>#4</i><span class="sr-only"> named</span></span>
-                <span class="mx-c is-named" role="cell"><i>#3</i><span class="sr-only"> named</span></span>
-                <span class="mx-c is-named" role="cell"><i>#1</i><span class="sr-only"> named</span></span>
-                <span class="mx-c is-named" role="cell"><i>#3</i><span class="sr-only"> named</span></span>
-                <span class="mx-c is-named" role="cell"><i>#2</i><span class="sr-only"> named</span></span>
-                <span class="mx-c is-miss" role="cell"><span class="sr-only">Not named</span></span>
-                <span class="mx-n" role="cell">5<small>/6</small></span>
-              </div>
-              <div class="mx-row" role="row">
-                <span class="mx-q" role="rowheader"><b>Q4</b><span>How do I move a Node.js app off a single VPS without downtime?</span></span>
-                <span class="mx-c is-named" role="cell"><i>#1</i><span class="sr-only"> named</span></span>
-                <span class="mx-c is-named" role="cell"><i>#1</i><span class="sr-only"> named</span></span>
-                <span class="mx-c is-named" role="cell"><i>#1</i><span class="sr-only"> named</span></span>
-                <span class="mx-c is-named" role="cell"><i>#2</i><span class="sr-only"> named</span></span>
-                <span class="mx-c is-named" role="cell"><i>#3</i><span class="sr-only"> named</span></span>
-                <span class="mx-c is-named" role="cell"><i>#2</i><span class="sr-only"> named</span></span>
-                <span class="mx-n" role="cell">6<small>/6</small></span>
-              </div>
-              <div class="mx-row" role="row">
-                <span class="mx-q" role="rowheader"><b>Q5</b><span>What are good alternatives to managing my own container cluster?</span></span>
-                <span class="mx-c is-named" role="cell"><i>#1</i><span class="sr-only"> named</span></span>
-                <span class="mx-c is-named" role="cell"><i>#1</i><span class="sr-only"> named</span></span>
-                <span class="mx-c is-named" role="cell"><i>#3</i><span class="sr-only"> named</span></span>
-                <span class="mx-c is-named" role="cell"><i>#5</i><span class="sr-only"> named</span></span>
-                <span class="mx-c is-named" role="cell"><i>#2</i><span class="sr-only"> named</span></span>
-                <span class="mx-c is-named" role="cell"><i>#3</i><span class="sr-only"> named</span></span>
-                <span class="mx-n" role="cell">6<small>/6</small></span>
-              </div>
-              <div class="mx-row" role="row">
-                <span class="mx-q" role="rowheader"><b>Q6</b><span>Which platform is best for hosting a Postgres-backed API close to European users?</span></span>
-                <span class="mx-c is-miss" role="cell"><span class="sr-only">Not named</span></span>
-                <span class="mx-c is-cited" role="cell"><span class="sr-only">Cited, not named</span></span>
-                <span class="mx-c is-miss" role="cell"><span class="sr-only">Not named</span></span>
-                <span class="mx-c is-cited" role="cell"><span class="sr-only">Cited, not named</span></span>
-                <span class="mx-c is-miss" role="cell"><span class="sr-only">Not named</span></span>
-                <span class="mx-c is-miss" role="cell"><span class="sr-only">Not named</span></span>
-                <span class="mx-n" role="cell">0<small>/6</small></span>
-              </div>
-            </div>
-            <div class="mx-out" aria-live="polite">
-              <p class="mx-k" data-mx-status>Check #8 · 36 of 36 answered</p>
-              <p class="mx-big"><span data-mx-named>29</span><small> of <span data-mx-answered>36</span></small></p>
-              <p class="mx-cap">answers named Northwind Cloud</p>
-              <p class="mx-delta" data-mx-delta>+14 pts since check #7</p>
-              <p class="mx-k mx-hist-k">Eight checks</p>
-              <div class="mx-hist" role="group" aria-label="Show another check">
-                <button type="button" class="mx-h" data-run="0" aria-pressed="false"><span class="mx-mini" aria-hidden="true"><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i></i><i></i><i></i><i class="c"></i><i></i><i class="n"></i><i></i><i class="n"></i><i class="n"></i><i></i><i class="n"></i><i class="n"></i><i class="c"></i><i></i><i class="c"></i><i></i><i class="n"></i><i class="n"></i><i></i><i></i><i></i><i></i><i></i><i class="n"></i><i class="c"></i><i class="c"></i><i></i><i></i><i></i><i></i></span><span class="mx-h-l">#1</span><span class="mx-h-n">14<span class="sr-only"> of 36 named</span></span></button>
-                <button type="button" class="mx-h" data-run="1" aria-pressed="false"><span class="mx-mini" aria-hidden="true"><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i></i><i class="n"></i><i class="n"></i><i></i><i></i><i class="c"></i><i class="n"></i><i></i><i class="n"></i><i class="n"></i><i class="c"></i><i class="n"></i><i></i><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i></i><i></i><i class="n"></i><i class="c"></i><i class="n"></i><i></i><i></i><i></i><i></i><i></i><i></i><i class="c"></i></span><span class="mx-h-l">#2</span><span class="mx-h-n">19<span class="sr-only"> of 36 named</span></span></button>
-                <button type="button" class="mx-h" data-run="2" aria-pressed="false"><span class="mx-mini" aria-hidden="true"><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i class="x"></i><i class="x"></i><i class="n"></i><i class="n"></i><i class="c"></i><i></i><i class="n"></i><i class="n"></i><i></i><i class="n"></i><i class="n"></i><i class="c"></i><i></i><i></i><i class="n"></i><i class="n"></i><i class="n"></i><i></i><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i></i><i></i><i></i><i class="c"></i><i class="c"></i><i></i><i></i><i></i></span><span class="mx-h-l">#3</span><span class="mx-h-n">19<span class="sr-only"> of 36 named</span></span></button>
-                <button type="button" class="mx-h" data-run="3" aria-pressed="false"><span class="mx-mini" aria-hidden="true"><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i></i><i class="n"></i><i class="n"></i><i class="n"></i><i></i><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i></i><i class="n"></i><i class="n"></i><i class="c"></i><i></i><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i></i><i class="n"></i><i></i><i></i><i class="c"></i><i></i><i></i><i class="c"></i></span><span class="mx-h-l">#4</span><span class="mx-h-n">24<span class="sr-only"> of 36 named</span></span></button>
-                <button type="button" class="mx-h" data-run="4" aria-pressed="false"><span class="mx-mini" aria-hidden="true"><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i></i><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i class="c"></i><i class="n"></i><i></i><i class="n"></i><i></i><i class="n"></i><i class="n"></i><i class="n"></i><i></i><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i></i><i></i><i class="c"></i><i></i><i class="c"></i><i></i></span><span class="mx-h-l">#5</span><span class="mx-h-n">25<span class="sr-only"> of 36 named</span></span></button>
-                <button type="button" class="mx-h" data-run="5" aria-pressed="false"><span class="mx-mini" aria-hidden="true"><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i></i><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i class="c"></i><i></i><i></i><i></i><i></i><i></i></span><span class="mx-h-l">#6</span><span class="mx-h-n">29<span class="sr-only"> of 36 named</span></span></button>
-                <button type="button" class="mx-h" data-run="6" aria-pressed="false"><span class="mx-mini" aria-hidden="true"><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i></i><i class="c"></i><i class="n"></i><i></i><i class="n"></i><i class="n"></i><i></i><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i></i><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i></i><i class="n"></i><i class="n"></i><i></i><i></i><i></i><i></i><i></i><i></i></span><span class="mx-h-l">#7</span><span class="mx-h-n">24<span class="sr-only"> of 36 named</span></span></button>
-                <button type="button" class="mx-h" data-run="7" aria-pressed="true"><span class="mx-mini" aria-hidden="true"><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i></i><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i class="n"></i><i></i><i class="c"></i><i></i><i class="c"></i><i></i><i></i></span><span class="mx-h-l">#8</span><span class="mx-h-n">29<span class="sr-only"> of 36 named</span></span></button>
-              </div>
-              <dl class="mx-stats">
-                <div><dt>Mention rate</dt><dd data-mx-rate>81%</dd></div>
-                <div><dt>Citation rate</dt><dd data-mx-cite>53%</dd></div>
-              </dl>
-              <button type="button" class="mx-replay" data-mx-replay>Run check #8 again</button>
-            </div>
-          </div>
-          <p class="mx-gap" data-mx-gap><b>Q6</b> named you on 0 of 6. Named instead: Tailspin Hosting, Contoso Edge, Fabrikam Deploy, Litware Cloud.</p>
+  <section class="sec wrap" id="questions" aria-labelledby="questions-title">
+    <div class="sec-head">
+      <p class="kicker"><span>1</span>The questions</p>
+      <h2 id="questions-title">The questions your buyers ask. <em>Asked the same way, every check.</em></h2>
+      <p class="sec-lede">You write them once. Byname sends each one word for word to every surface and model you pick, on a schedule, and never puts your brand name in the prompt. So any two checks compare answer by answer.</p>
+    </div>
+    <figure class="contents sheet" data-reveal>
+      <div class="contents-scroll">
+        <table class="qtable">
+          <caption class="sr-only">Check #8 for Northwind Cloud, an example brand: each question on each surface and model.</caption>
+<!-- contents -->
+<thead><tr><th scope="col" class="q-h">Question</th><th scope="col"><span>ChatGPT app</span></th><th scope="col"><span>Google AI Overview</span></th><th scope="col"><span>Perplexity app</span></th><th scope="col"><span>Codex CLI</span></th><th scope="col"><span>Claude Code<small>Opus 5.5</small></span></th><th scope="col"><span>Claude Code<small>Sonnet 5.5</small></span></th><th scope="col" class="q-s">Named</th></tr></thead>
+<tbody>
+<tr><th scope="row"><div class="q-cell"><span class="q-n">1</span><span class="q-t">Which hosting platform should a small SaaS team use in 2026?</span></div></th><td data-s="ChatGPT"><span class="tm mk" data-mark="circle" aria-hidden="true">1</span><span class="sr-only">ChatGPT app: named #1</span></td><td data-s="AI Overview"><span class="tm mk" data-mark="circle" aria-hidden="true">1</span><span class="sr-only">Google AI Overview: named #1</span></td><td data-s="Perplexity"><span class="tm mk" data-mark="circle" aria-hidden="true">2</span><span class="sr-only">Perplexity app: named #2</span></td><td data-s="Codex"><span class="tm mk" data-mark="circle" aria-hidden="true">2</span><span class="sr-only">Codex CLI: named #2</span></td><td data-s="Opus"><span class="tm mk" data-mark="circle" aria-hidden="true">2</span><span class="sr-only">Claude Code Opus 5.5: named #2</span></td><td data-s="Sonnet"><span class="tm mk" data-mark="circle" aria-hidden="true">2</span><span class="sr-only">Claude Code Sonnet 5.5: named #2</span></td><td class="q-s">6<small> of 6</small></td></tr>
+<tr><th scope="row"><div class="q-cell"><span class="q-n">2</span><span class="q-t">What is the easiest way to get preview environments for every pull request?</span></div></th><td data-s="ChatGPT"><span class="tm mk" data-mark="circle" aria-hidden="true">2</span><span class="sr-only">ChatGPT app: named #2</span></td><td data-s="AI Overview"><span class="tm mk" data-mark="circle" aria-hidden="true">1</span><span class="sr-only">Google AI Overview: named #1</span></td><td data-s="Perplexity"><span class="tm mk" data-mark="circle" aria-hidden="true">1</span><span class="sr-only">Perplexity app: named #1</span></td><td data-s="Codex"><span class="tm mk" data-mark="circle" aria-hidden="true">2</span><span class="sr-only">Codex CLI: named #2</span></td><td data-s="Opus"><span class="tm mk" data-mark="circle" aria-hidden="true">1</span><span class="sr-only">Claude Code Opus 5.5: named #1</span></td><td data-s="Sonnet"><span class="tm mk" data-mark="circle" aria-hidden="true">4</span><span class="sr-only">Claude Code Sonnet 5.5: named #4</span></td><td class="q-s">6<small> of 6</small></td></tr>
+<tr><th scope="row"><div class="q-cell"><span class="q-n">3</span><span class="q-t">Which cloud platform has the most predictable pricing for a startup?</span></div></th><td data-s="ChatGPT"><span class="tm miss mk" data-mark="dash" data-tone="instead" aria-hidden="true"></span><span class="sr-only">ChatGPT app: not named</span></td><td data-s="AI Overview"><span class="tm mk" data-mark="circle" aria-hidden="true">2</span><span class="sr-only">Google AI Overview: named #2</span></td><td data-s="Perplexity"><span class="tm mk" data-mark="circle" aria-hidden="true">3</span><span class="sr-only">Perplexity app: named #3</span></td><td data-s="Codex"><span class="tm mk" data-mark="circle" aria-hidden="true">1</span><span class="sr-only">Codex CLI: named #1</span></td><td data-s="Opus"><span class="tm mk" data-mark="circle" aria-hidden="true">3</span><span class="sr-only">Claude Code Opus 5.5: named #3</span></td><td data-s="Sonnet"><span class="tm mk" data-mark="circle" aria-hidden="true">4</span><span class="sr-only">Claude Code Sonnet 5.5: named #4</span></td><td class="q-s">5<small> of 6</small></td></tr>
+<tr><th scope="row"><div class="q-cell"><span class="q-n">4</span><span class="q-t">How do I move a Node.js app off a single VPS without downtime?</span></div></th><td data-s="ChatGPT"><span class="tm mk" data-mark="circle" aria-hidden="true">2</span><span class="sr-only">ChatGPT app: named #2</span></td><td data-s="AI Overview"><span class="tm mk" data-mark="circle" aria-hidden="true">3</span><span class="sr-only">Google AI Overview: named #3</span></td><td data-s="Perplexity"><span class="tm mk" data-mark="circle" aria-hidden="true">2</span><span class="sr-only">Perplexity app: named #2</span></td><td data-s="Codex"><span class="tm mk" data-mark="circle" aria-hidden="true">1</span><span class="sr-only">Codex CLI: named #1</span></td><td data-s="Opus"><span class="tm mk" data-mark="circle" aria-hidden="true">1</span><span class="sr-only">Claude Code Opus 5.5: named #1</span></td><td data-s="Sonnet"><span class="tm mk" data-mark="circle" aria-hidden="true">1</span><span class="sr-only">Claude Code Sonnet 5.5: named #1</span></td><td class="q-s">6<small> of 6</small></td></tr>
+<tr><th scope="row"><div class="q-cell"><span class="q-n">5</span><span class="q-t">What are good alternatives to managing my own container cluster?</span></div></th><td data-s="ChatGPT"><span class="tm mk" data-mark="circle" aria-hidden="true">3</span><span class="sr-only">ChatGPT app: named #3</span></td><td data-s="AI Overview"><span class="tm mk" data-mark="circle" aria-hidden="true">2</span><span class="sr-only">Google AI Overview: named #2</span></td><td data-s="Perplexity"><span class="tm mk" data-mark="circle" aria-hidden="true">5</span><span class="sr-only">Perplexity app: named #5</span></td><td data-s="Codex"><span class="tm mk" data-mark="circle" aria-hidden="true">3</span><span class="sr-only">Codex CLI: named #3</span></td><td data-s="Opus"><span class="tm mk" data-mark="circle" aria-hidden="true">1</span><span class="sr-only">Claude Code Opus 5.5: named #1</span></td><td data-s="Sonnet"><span class="tm mk" data-mark="circle" aria-hidden="true">1</span><span class="sr-only">Claude Code Sonnet 5.5: named #1</span></td><td class="q-s">6<small> of 6</small></td></tr>
+<tr><th scope="row"><div class="q-cell"><span class="q-n">6</span><span class="q-t">Which platform is best for hosting a Postgres-backed API close to European users?</span></div></th><td data-s="ChatGPT"><span class="tm miss mk" data-mark="dash" data-tone="instead" aria-hidden="true"></span><span class="sr-only">ChatGPT app: not named</span></td><td data-s="AI Overview"><span class="tm miss mk" data-mark="dash" data-tone="instead" aria-hidden="true"></span><span class="sr-only">Google AI Overview: not named</span></td><td data-s="Perplexity"><span class="tm cite mk" data-mark="tick" aria-hidden="true">c</span><span class="sr-only">Perplexity app: cited, not named</span></td><td data-s="Codex"><span class="tm miss mk" data-mark="dash" data-tone="instead" aria-hidden="true"></span><span class="sr-only">Codex CLI: not named</span></td><td data-s="Opus"><span class="tm cite mk" data-mark="tick" aria-hidden="true">c</span><span class="sr-only">Claude Code Opus 5.5: cited, not named</span></td><td data-s="Sonnet"><span class="tm miss mk" data-mark="dash" data-tone="instead" aria-hidden="true"></span><span class="sr-only">Claude Code Sonnet 5.5: not named</span></td><td class="q-s">0<small> of 6</small></td></tr>
+</tbody>
+<!-- /contents -->
+        </table>
+      </div>
+      <figcaption class="legend">
+        <span><span class="tm mk" data-mark="circle" aria-hidden="true">2</span> named, at position 2</span>
+        <span><span class="tm cite mk" data-mark="tick" aria-hidden="true">c</span> cited, not named</span>
+        <span><span class="tm miss mk" data-mark="dash" data-tone="instead" aria-hidden="true"></span> named someone else</span>
+        <span class="legend-src">Check #8 · Northwind Cloud, an example brand · 29 of 36 named</span>
+      </figcaption>
+    </figure>
+  </section>
+
+  <section class="sec wrap" id="record" aria-labelledby="record-title">
+    <div class="sec-head sec-head-split">
+      <div>
+        <p class="kicker"><span>2</span>The record</p>
+        <h2 id="record-title">Every answer, kept. <em>With what it cost.</em></h2>
+      </div>
+      <p class="sec-lede">Each check stores the raw answer, who it named and cited, and what the call cost. A call that reports no cost is flagged, never counted as $0. Pick any two checks to see what you gained, lost and moved.</p>
+    </div>
+    <figure class="ledger sheet" data-reveal>
+      <table class="ltable">
+        <caption class="sr-only">Eight checks for the example brand Northwind Cloud, each with 36 answers: how many named it, what changed since the check before, and the spend.</caption>
+        <thead><tr><th scope="col">Check</th><th scope="col">Named</th><th scope="col" class="l-strip-h">Its 36 answers</th><th scope="col">Gained</th><th scope="col">Lost</th><th scope="col">Moved</th><th scope="col">Spend</th></tr></thead>
+        <tbody>
+<!-- ledger -->
+<tr data-check="1"><th scope="row">#1</th><td class="l-named"><span class="l-n">14</span><small> of 36</small></td><td class="l-strip"><svg class="strip" viewBox="0 0 202 22" aria-hidden="true"><path class="t-n" d="M2 4v14"/><path class="t-n" d="M7 4v14"/><path class="t-n" d="M12 4v14"/><path class="t-n" d="M17 4v14"/><path class="t-n" d="M22 4v14"/><path class="t-n" d="M27 4v14"/><path class="t-m" d="M36 15v3"/><path class="t-m" d="M41 15v3"/><path class="t-m" d="M46 15v3"/><path class="t-c" d="M51 11v7"/><path class="t-m" d="M56 15v3"/><path class="t-n" d="M61 4v14"/><path class="t-m" d="M70 15v3"/><path class="t-n" d="M75 4v14"/><path class="t-n" d="M80 4v14"/><path class="t-m" d="M85 15v3"/><path class="t-n" d="M90 4v14"/><path class="t-n" d="M95 4v14"/><path class="t-c" d="M104 11v7"/><path class="t-m" d="M109 15v3"/><path class="t-c" d="M114 11v7"/><path class="t-m" d="M119 15v3"/><path class="t-n" d="M124 4v14"/><path class="t-n" d="M129 4v14"/><path class="t-m" d="M138 15v3"/><path class="t-m" d="M143 15v3"/><path class="t-m" d="M148 15v3"/><path class="t-m" d="M153 15v3"/><path class="t-m" d="M158 15v3"/><path class="t-n" d="M163 4v14"/><path class="t-c" d="M172 11v7"/><path class="t-c" d="M177 11v7"/><path class="t-m" d="M182 15v3"/><path class="t-m" d="M187 15v3"/><path class="t-m" d="M192 15v3"/><path class="t-m" d="M197 15v3"/></svg></td><td colspan="3" class="first">First check</td><td class="l-spend">$0.882<small>6 without a cost</small></td></tr>
+<tr data-check="2"><th scope="row">#2</th><td class="l-named"><span class="l-n">19</span><small> of 36</small></td><td class="l-strip"><svg class="strip" viewBox="0 0 202 22" aria-hidden="true"><path class="t-n" d="M2 4v14"/><path class="t-n" d="M7 4v14"/><path class="t-n" d="M12 4v14"/><path class="t-n" d="M17 4v14"/><path class="t-n" d="M22 4v14"/><path class="t-n" d="M27 4v14"/><path class="t-m" d="M36 15v3"/><path class="t-n" d="M41 4v14"/><path class="t-n" d="M46 4v14"/><path class="t-m" d="M51 15v3"/><path class="t-x" d="M54.5 13.5l3 3m0-3l-3 3"/><path class="t-c" d="M61 11v7"/><path class="t-n" d="M70 4v14"/><path class="t-m" d="M75 15v3"/><path class="t-n" d="M80 4v14"/><path class="t-n" d="M85 4v14"/><path class="t-c" d="M90 11v7"/><path class="t-n" d="M95 4v14"/><path class="t-m" d="M104 15v3"/><path class="t-n" d="M109 4v14"/><path class="t-n" d="M114 4v14"/><path class="t-n" d="M119 4v14"/><path class="t-n" d="M124 4v14"/><path class="t-n" d="M129 4v14"/><path class="t-m" d="M138 15v3"/><path class="t-m" d="M143 15v3"/><path class="t-n" d="M148 4v14"/><path class="t-c" d="M153 11v7"/><path class="t-n" d="M158 4v14"/><path class="t-m" d="M163 15v3"/><path class="t-m" d="M172 15v3"/><path class="t-m" d="M177 15v3"/><path class="t-m" d="M182 15v3"/><path class="t-m" d="M187 15v3"/><path class="t-m" d="M192 15v3"/><path class="t-c" d="M197 11v7"/></svg></td><td class="l-g">9</td><td class="l-l lost">4</td><td class="l-m">5</td><td class="l-spend">$0.882<small>6 without a cost</small></td></tr>
+<tr data-check="3"><th scope="row">#3</th><td class="l-named"><span class="l-n">19</span><small class="mk" data-mark="underline" data-tone="ink"> of 34</small></td><td class="l-strip"><svg class="strip" viewBox="0 0 202 22" aria-hidden="true"><path class="t-n" d="M2 4v14"/><path class="t-n" d="M7 4v14"/><path class="t-n" d="M12 4v14"/><path class="t-n" d="M17 4v14"/><path class="t-n" d="M22 4v14"/><path class="t-n" d="M27 4v14"/><path class="t-x" d="M34.5 13.5l3 3m0-3l-3 3"/><path class="t-x" d="M39.5 13.5l3 3m0-3l-3 3"/><path class="t-n" d="M46 4v14"/><path class="t-n" d="M51 4v14"/><path class="t-c" d="M56 11v7"/><path class="t-m" d="M61 15v3"/><path class="t-n" d="M70 4v14"/><path class="t-n" d="M75 4v14"/><path class="t-m" d="M80 15v3"/><path class="t-n" d="M85 4v14"/><path class="t-n" d="M90 4v14"/><path class="t-c" d="M95 11v7"/><path class="t-m" d="M104 15v3"/><path class="t-m" d="M109 15v3"/><path class="t-n" d="M114 4v14"/><path class="t-n" d="M119 4v14"/><path class="t-n" d="M124 4v14"/><path class="t-m" d="M129 15v3"/><path class="t-n" d="M138 4v14"/><path class="t-n" d="M143 4v14"/><path class="t-n" d="M148 4v14"/><path class="t-n" d="M153 4v14"/><path class="t-m" d="M158 15v3"/><path class="t-m" d="M163 15v3"/><path class="t-m" d="M172 15v3"/><path class="t-c" d="M177 11v7"/><path class="t-c" d="M182 11v7"/><path class="t-m" d="M187 15v3"/><path class="t-m" d="M192 15v3"/><path class="t-m" d="M197 15v3"/></svg></td><td class="l-g">6</td><td class="l-l lost">5</td><td class="l-m">7</td><td class="l-spend">$0.773<small>6 without a cost</small></td></tr>
+<tr data-check="4"><th scope="row">#4</th><td class="l-named"><span class="l-n">24</span><small> of 36</small></td><td class="l-strip"><svg class="strip" viewBox="0 0 202 22" aria-hidden="true"><path class="t-n" d="M2 4v14"/><path class="t-n" d="M7 4v14"/><path class="t-n" d="M12 4v14"/><path class="t-n" d="M17 4v14"/><path class="t-n" d="M22 4v14"/><path class="t-n" d="M27 4v14"/><path class="t-m" d="M36 15v3"/><path class="t-n" d="M41 4v14"/><path class="t-n" d="M46 4v14"/><path class="t-n" d="M51 4v14"/><path class="t-m" d="M56 15v3"/><path class="t-n" d="M61 4v14"/><path class="t-n" d="M70 4v14"/><path class="t-n" d="M75 4v14"/><path class="t-n" d="M80 4v14"/><path class="t-n" d="M85 4v14"/><path class="t-n" d="M90 4v14"/><path class="t-n" d="M95 4v14"/><path class="t-n" d="M104 4v14"/><path class="t-m" d="M109 15v3"/><path class="t-n" d="M114 4v14"/><path class="t-n" d="M119 4v14"/><path class="t-c" d="M124 11v7"/><path class="t-m" d="M129 15v3"/><path class="t-n" d="M138 4v14"/><path class="t-n" d="M143 4v14"/><path class="t-n" d="M148 4v14"/><path class="t-n" d="M153 4v14"/><path class="t-x" d="M156.5 13.5l3 3m0-3l-3 3"/><path class="t-n" d="M163 4v14"/><path class="t-m" d="M172 15v3"/><path class="t-m" d="M177 15v3"/><path class="t-c" d="M182 11v7"/><path class="t-m" d="M187 15v3"/><path class="t-m" d="M192 15v3"/><path class="t-c" d="M197 11v7"/></svg></td><td class="l-g">5</td><td class="l-l lost">1</td><td class="l-m">12</td><td class="l-spend">$0.882<small>6 without a cost</small></td></tr>
+<tr data-check="5"><th scope="row">#5</th><td class="l-named"><span class="l-n">25</span><small> of 36</small></td><td class="l-strip"><svg class="strip" viewBox="0 0 202 22" aria-hidden="true"><path class="t-n" d="M2 4v14"/><path class="t-n" d="M7 4v14"/><path class="t-n" d="M12 4v14"/><path class="t-n" d="M17 4v14"/><path class="t-n" d="M22 4v14"/><path class="t-n" d="M27 4v14"/><path class="t-m" d="M36 15v3"/><path class="t-n" d="M41 4v14"/><path class="t-n" d="M46 4v14"/><path class="t-n" d="M51 4v14"/><path class="t-n" d="M56 4v14"/><path class="t-n" d="M61 4v14"/><path class="t-n" d="M70 4v14"/><path class="t-n" d="M75 4v14"/><path class="t-c" d="M80 11v7"/><path class="t-n" d="M85 4v14"/><path class="t-m" d="M90 15v3"/><path class="t-n" d="M95 4v14"/><path class="t-m" d="M104 15v3"/><path class="t-n" d="M109 4v14"/><path class="t-n" d="M114 4v14"/><path class="t-n" d="M119 4v14"/><path class="t-x" d="M122.5 13.5l3 3m0-3l-3 3"/><path class="t-n" d="M129 4v14"/><path class="t-n" d="M138 4v14"/><path class="t-n" d="M143 4v14"/><path class="t-n" d="M148 4v14"/><path class="t-n" d="M153 4v14"/><path class="t-n" d="M158 4v14"/><path class="t-n" d="M163 4v14"/><path class="t-m" d="M172 15v3"/><path class="t-m" d="M177 15v3"/><path class="t-c" d="M182 11v7"/><path class="t-m" d="M187 15v3"/><path class="t-c" d="M192 11v7"/><path class="t-m" d="M197 15v3"/></svg></td><td class="l-g">4</td><td class="l-l lost">3</td><td class="l-m">13</td><td class="l-spend">$0.882<small>6 without a cost</small></td></tr>
+<tr data-check="6"><th scope="row">#6</th><td class="l-named"><span class="l-n">29</span><small> of 36</small></td><td class="l-strip"><svg class="strip" viewBox="0 0 202 22" aria-hidden="true"><path class="t-n" d="M2 4v14"/><path class="t-n" d="M7 4v14"/><path class="t-n" d="M12 4v14"/><path class="t-n" d="M17 4v14"/><path class="t-n" d="M22 4v14"/><path class="t-n" d="M27 4v14"/><path class="t-m" d="M36 15v3"/><path class="t-n" d="M41 4v14"/><path class="t-n" d="M46 4v14"/><path class="t-n" d="M51 4v14"/><path class="t-n" d="M56 4v14"/><path class="t-n" d="M61 4v14"/><path class="t-n" d="M70 4v14"/><path class="t-n" d="M75 4v14"/><path class="t-n" d="M80 4v14"/><path class="t-n" d="M85 4v14"/><path class="t-n" d="M90 4v14"/><path class="t-n" d="M95 4v14"/><path class="t-n" d="M104 4v14"/><path class="t-n" d="M109 4v14"/><path class="t-n" d="M114 4v14"/><path class="t-n" d="M119 4v14"/><path class="t-n" d="M124 4v14"/><path class="t-n" d="M129 4v14"/><path class="t-n" d="M138 4v14"/><path class="t-n" d="M143 4v14"/><path class="t-n" d="M148 4v14"/><path class="t-n" d="M153 4v14"/><path class="t-n" d="M158 4v14"/><path class="t-n" d="M163 4v14"/><path class="t-c" d="M172 11v7"/><path class="t-m" d="M177 15v3"/><path class="t-m" d="M182 15v3"/><path class="t-m" d="M187 15v3"/><path class="t-m" d="M192 15v3"/><path class="t-m" d="M197 15v3"/></svg></td><td class="l-g">4</td><td class="l-l">0</td><td class="l-m">17</td><td class="l-spend">$0.882<small>6 without a cost</small></td></tr>
+<tr data-check="7"><th scope="row">#7</th><td class="l-named"><span class="l-n">24</span><small> of 36</small></td><td class="l-strip"><svg class="strip" viewBox="0 0 202 22" aria-hidden="true"><path class="t-n" d="M2 4v14"/><path class="t-n" d="M7 4v14"/><path class="t-n" d="M12 4v14"/><path class="t-n" d="M17 4v14"/><path class="t-n" d="M22 4v14"/><path class="t-n" d="M27 4v14"/><path class="t-n" d="M36 4v14"/><path class="t-n" d="M41 4v14"/><path class="t-n" d="M46 4v14"/><path class="t-n" d="M51 4v14"/><path class="t-n" d="M56 4v14"/><path class="t-m" d="M61 15v3"/><path class="t-c" d="M70 11v7"/><path class="t-n" d="M75 4v14"/><path class="t-m" d="M80 15v3"/><path class="t-n" d="M85 4v14"/><path class="t-n" d="M90 4v14"/><path class="t-m" d="M95 15v3"/><path class="t-n" d="M104 4v14"/><path class="t-n" d="M109 4v14"/><path class="t-n" d="M114 4v14"/><path class="t-n" d="M119 4v14"/><path class="t-m" d="M124 15v3"/><path class="t-n" d="M129 4v14"/><path class="t-n" d="M138 4v14"/><path class="t-n" d="M143 4v14"/><path class="t-n" d="M148 4v14"/><path class="t-m" d="M153 15v3"/><path class="t-n" d="M158 4v14"/><path class="t-n" d="M163 4v14"/><path class="t-m" d="M172 15v3"/><path class="t-m" d="M177 15v3"/><path class="t-m" d="M182 15v3"/><path class="t-m" d="M187 15v3"/><path class="t-m" d="M192 15v3"/><path class="t-m" d="M197 15v3"/></svg></td><td class="l-g">1</td><td class="l-l lost"><span class="mk" data-mark="circle" data-tone="instead" data-pad="9 5">6</span></td><td class="l-m">17</td><td class="l-spend">$0.882<small>6 without a cost</small></td></tr>
+<tr data-check="8"><th scope="row">#8</th><td class="l-named"><span class="l-n mk" data-mark="circle" data-pad="10 6">29</span><small> of 36</small></td><td class="l-strip"><svg class="strip" viewBox="0 0 202 22" aria-hidden="true"><path class="t-n" d="M2 4v14"/><path class="t-n" d="M7 4v14"/><path class="t-n" d="M12 4v14"/><path class="t-n" d="M17 4v14"/><path class="t-n" d="M22 4v14"/><path class="t-n" d="M27 4v14"/><path class="t-n" d="M36 4v14"/><path class="t-n" d="M41 4v14"/><path class="t-n" d="M46 4v14"/><path class="t-n" d="M51 4v14"/><path class="t-n" d="M56 4v14"/><path class="t-n" d="M61 4v14"/><path class="t-n" d="M70 4v14"/><path class="t-n" d="M75 4v14"/><path class="t-n" d="M80 4v14"/><path class="t-n" d="M85 4v14"/><path class="t-n" d="M90 4v14"/><path class="t-m" d="M95 15v3"/><path class="t-n" d="M104 4v14"/><path class="t-n" d="M109 4v14"/><path class="t-n" d="M114 4v14"/><path class="t-n" d="M119 4v14"/><path class="t-n" d="M124 4v14"/><path class="t-n" d="M129 4v14"/><path class="t-n" d="M138 4v14"/><path class="t-n" d="M143 4v14"/><path class="t-n" d="M148 4v14"/><path class="t-n" d="M153 4v14"/><path class="t-n" d="M158 4v14"/><path class="t-n" d="M163 4v14"/><path class="t-m" d="M172 15v3"/><path class="t-c" d="M177 11v7"/><path class="t-m" d="M182 15v3"/><path class="t-c" d="M187 11v7"/><path class="t-m" d="M192 15v3"/><path class="t-m" d="M197 15v3"/></svg></td><td class="l-g">5</td><td class="l-l">0</td><td class="l-m">16</td><td class="l-spend">$0.882<small>6 without a cost</small></td></tr>
+<!-- /ledger -->
+        </tbody>
+      </table>
+      <figcaption class="ledger-notes">
+        <p class="lnote" data-for="3"><span class="mk" data-mark="underline" data-tone="ink">Check #3</span>: 2 calls failed. They are kept and marked, not counted as misses.</p>
+        <p class="lnote instead" data-for="7"><span class="mk" data-mark="underline" data-tone="instead">Check #7</span>: 6 answers lost. One of them is below.</p>
+        <p class="lnote you" data-for="8"><span class="mk" data-mark="underline">Check #8</span>: back to 29 of 36, the best yet.</p>
+      </figcaption>
+    </figure>
+    <p class="strip-key" aria-hidden="true"><svg viewBox="0 0 12 22"><path class="t-n" d="M6 4v14" /></svg>named <svg viewBox="0 0 12 22"><path class="t-c" d="M6 11v7" /></svg>cited only <svg viewBox="0 0 12 22"><path class="t-m" d="M6 15v3" /></svg>not named <svg viewBox="0 0 12 22"><path class="t-x" d="M4.5 13.5l3 3m0-3l-3 3" /></svg>failed</p>
+  </section>
+
+  <section class="sec wrap" id="lost" aria-labelledby="lost-title">
+    <div class="sec-head">
+      <p class="kicker"><span>3</span>When you lose one</p>
+      <h2 id="lost-title">Second in check #6. <em>Gone in check #7.</em></h2>
+      <p class="sec-lede">The same question, on the same surface, a check apart. Byname compares every answer with the one before it and tells you when the check finishes.</p>
+    </div>
+    <div class="story" data-reveal>
+      <figure class="sheet clip" aria-labelledby="c6-cap">
+        <header class="sheet-head"><span id="c6-cap"><b>Check #6</b> · ChatGPT app</span><span>App answer</span></header>
+        <p class="q">Which cloud platform has the most predictable pricing for a startup?</p>
+        <ol class="mini">
+          <li><b>Litware Cloud</b></li>
+          <li><b class="mk" data-mark="circle">Northwind</b><span class="note you">you, #2 · cited</span></li>
+          <li><b>Contoso Edge</b></li>
+          <li><b>Tailspin Hosting</b></li>
+          <li><b>Fabrikam Deploy</b></li>
+        </ol>
+        <footer class="sheet-foot"><span>Cited: northwind.example and 3 more</span><span class="cost">$0.004</span></footer>
+      </figure>
+      <svg class="story-arrow" viewBox="0 0 80 40" aria-hidden="true"><path class="draw" pathLength="1" d="M4 24 C 22 10, 46 10, 70 20 M61 13 L71 20 L60 25" /></svg>
+      <figure class="sheet clip" aria-labelledby="c7-cap">
+        <header class="sheet-head"><span id="c7-cap"><b>Check #7</b> · ChatGPT app</span><span>App answer</span></header>
+        <p class="q">Which cloud platform has the most predictable pricing for a startup?</p>
+        <ol class="mini">
+          <li><b class="mk" data-mark="underline" data-tone="instead">Tailspin Hosting</b><span class="note instead">named first</span></li>
+          <li><b>Contoso Edge</b></li>
+          <li><b>Fabrikam Deploy</b></li>
+          <li><b>Litware Cloud</b></li>
+        </ol>
+        <p class="gone"><span class="mk caret" data-mark="caret" data-tone="instead" aria-hidden="true"></span><span class="note instead">Northwind: not named, and northwind.example no longer cited</span></p>
+        <footer class="sheet-foot"><span>Cited: tailspin.example and 3 more</span><span class="cost">$0.004</span></footer>
+      </figure>
+      <svg class="story-arrow" viewBox="0 0 80 40" aria-hidden="true"><path class="draw" pathLength="1" d="M4 22 C 24 30, 48 28, 70 18 M60 15 L71 18 L64 27" style="--d:.5s" /></svg>
+      <figure class="sheet alert" aria-labelledby="alert-cap">
+        <header class="alert-head"><span class="alert-av" aria-hidden="true">b</span><span><b id="alert-cap">Byname</b><small>#visibility in Slack</small></span></header>
+        <p class="alert-title">Check #7: 1 gained, 6 lost</p>
+        <p>Named in 24 of 36 answers.</p>
+        <p>Since check #6: 1 gained, 6 lost, 17 moved, net -5.</p>
+        <ul>
+          <li>1 gained, 1 lost, 4 moved: What is the easiest way to get preview environments for every pull request?</li>
+          <li><span class="mk" data-mark="underline" data-tone="instead">3 lost</span>, 3 moved: Which cloud platform has the most predictable pricing for a startup?</li>
+          <li>1 lost, 5 moved: How do I move a Node.js app off a single VPS without downtime?</li>
+        </ul>
+        <p class="alert-link">Open in Byname</p>
+      </figure>
+    </div>
+    <div class="proof">
+      <p class="proof-note">The same two checks in Byname's Compare view, filtered to what was lost. <span>A real screenshot of the app, with example data.</span></p>
+      <figure class="sheet shot">
+        <picture>
+          <source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="/screens/compare-lost-sm-dark.webp" width="788" height="490" />
+          <source media="(max-width: 600px)" srcset="/screens/compare-lost-sm.webp" width="788" height="490" />
+          <source media="(prefers-color-scheme: dark)" srcset="/screens/compare-lost-dark.webp" width="1848" height="1066" />
+          <img src="/screens/compare-lost.webp" width="1848" height="1066" loading="lazy" decoding="async" alt="Byname's Compare view for check #6 against check #7, showing the 6 lost pairs. The pricing question lost Claude Code with claude-sonnet-5-5 (#2, then cited but not named), Codex CLI (#3, then not named) and the ChatGPT app (#2, then not named)." />
+        </picture>
+      </figure>
+    </div>
+  </section>
+
+  <section class="sec wrap" id="evidence" aria-labelledby="evidence-title">
+    <div class="sec-head sec-head-split">
+      <div>
+        <p class="kicker"><span>4</span>Graded evidence</p>
+        <h2 id="evidence-title">Three grades of evidence. <em>Never averaged together.</em></h2>
+      </div>
+      <p class="sec-lede">You pick surfaces, not engines. Byname pins each surface to the endpoint closest to what a person sees there, and labels every answer with one of three grades. Charts keep the grades apart, so a stand-in never <span class="mk" data-mark="double">passes for the app</span>.</p>
+    </div>
+    <div class="register sheet" data-reveal>
+      <article class="grade">
+        <div class="grade-h">
+          <p class="grade-n"><span class="mk" data-mark="circle" data-pad="9 6">7</span> surfaces</p>
+          <h3>App answer</h3>
+          <p>Read from the real app or results page by a scraping provider.</p>
+        </div>
+        <ul class="filed">
+          <li>ChatGPT app<span>DataForSEO</span></li><li>Gemini app<span>cloro</span></li><li>Google AI Mode<span>cloro</span></li><li>Google AI Overview<span>cloro</span></li><li>Microsoft Copilot<span>SerpApi</span></li><li>Bing AI Mode<span>cloro</span></li><li>Brave AI answers<span>SerpApi</span></li>
+        </ul>
+      </article>
+      <article class="grade">
+        <div class="grade-h">
+          <p class="grade-n"><span class="mk" data-mark="circle" data-pad="9 6">3</span> surfaces</p>
+          <h3>Same model and search</h3>
+          <p>Your team's model through its API, with web search on. The tool's own system prompt is not included.</p>
+        </div>
+        <ul class="filed">
+          <li>Claude Code<span>DataForSEO</span></li><li>Gemini CLI<span>DataForSEO</span></li><li>Codex CLI<span>DataForSEO</span></li>
+        </ul>
+      </article>
+      <article class="grade">
+        <div class="grade-h">
+          <p class="grade-n"><span class="mk" data-mark="circle" data-pad="9 6">2</span> surfaces</p>
+          <h3>Approximation</h3>
+          <p>The closest stand-in where no app answer exists. Never called the app.</p>
+        </div>
+        <ul class="filed">
+          <li>Claude app<span>DataForSEO</span></li><li>Perplexity app<span>DataForSEO</span></li>
+        </ul>
+      </article>
+    </div>
+    <p class="grades-foot">One Treg token runs every surface. Or bring your own DataForSEO, cloro or SerpApi key and keep the App answer grade, or call OpenAI, Anthropic, Gemini, Perplexity or a gateway directly, which makes an app surface an Approximation. <a class="link" href="/docs/engines/surfaces">Every surface and its pinned endpoint</a></p>
+  </section>
+
+  <section class="sec wrap" id="search" aria-labelledby="search-title">
+    <div class="sec-head sec-head-split">
+      <div>
+        <p class="kicker"><span>5</span>Search and site changes</p>
+        <h2 id="search-title">Search Console, <em>on the same timeline.</em></h2>
+      </div>
+      <p class="sec-lede">Byname reads Search Console every day with read-only access: clicks, impressions, CTR and position, and brand against non-brand. Merged pull requests and changes you log by hand mark the chart. After Google recrawls a changed page, Byname compares it with control pages you left alone.</p>
+    </div>
+    <div class="chart-block" data-reveal>
+      <figure class="chart sheet">
+        <figcaption class="chart-cap"><span>Clicks per day · northwind.example</span><span>Aug 23 to Nov 20, 2026</span></figcaption>
+        <div class="chart-wide">
+<!-- chart-wide -->
+<svg class="chart-svg" viewBox="0 0 1000 360" role="img" aria-labelledby="chart-t-1000" style="--fs:12px">
+<title id="chart-t-1000">Search Console clicks per day for the example site, August 23 to November 20, 2026, between about 50 and 120 a day. Five site changes are marked. The change logged on October 7 to /docs/preview-environments is circled, with brackets over the 31 days before it and the 31 days after Google's first crawl, October 10 to November 9.</title>
+<path class="c-grid" d="M40 216.15384615384616H988"/><text class="c-y" x="32" y="220.35384615384615" text-anchor="end">50</text><path class="c-grid" d="M40 102.30769230769229H988"/><text class="c-y" x="32" y="106.5076923076923" text-anchor="end">100</text><text class="c-x" x="135.86516853932585" y="351.6" text-anchor="middle">Sep</text><path class="c-tick" d="M135.86516853932585 330v5"/><text class="c-x" x="455.4157303370787" y="351.6" text-anchor="middle">Oct</text><path class="c-tick" d="M455.4157303370787 330v5"/><text class="c-x" x="785.6179775280899" y="351.6" text-anchor="middle">Nov</text><path class="c-tick" d="M785.6179775280899 330v5"/>
+<path class="c-area" d="M40.0 218.4L50.7 152.4L61.3 154.7L72.0 161.5L82.6 157.0L93.3 166.1L103.9 213.9L114.6 211.6L125.2 154.7L135.9 168.3L146.5 157.0L157.2 152.4L167.8 154.7L178.5 202.5L189.1 204.8L199.8 157.0L210.4 152.4L221.1 141.0L231.7 161.5L242.4 154.7L253.0 202.5L263.7 209.3L274.3 145.6L285.0 150.1L295.6 154.7L306.3 138.7L316.9 154.7L327.6 218.4L338.2 213.9L348.9 150.1L359.6 129.6L370.2 152.4L380.9 154.7L391.5 141.0L402.2 211.6L412.8 197.9L423.5 145.6L434.1 159.2L444.8 163.8L455.4 166.1L466.1 172.9L476.7 223.0L487.4 211.6L498.0 150.1L508.7 129.6L519.3 145.6L530.0 131.9L540.6 159.2L551.3 168.3L561.9 188.8L572.6 118.2L583.2 93.2L593.9 129.6L604.5 100.0L615.2 111.4L625.8 166.1L636.5 182.0L647.1 127.4L657.8 106.9L668.4 111.4L679.1 93.2L689.8 116.0L700.4 172.9L711.1 163.8L721.7 88.6L732.4 134.2L743.0 109.1L753.7 93.2L764.3 97.8L775.0 161.5L785.6 184.3L796.3 122.8L806.9 72.7L817.6 113.7L828.2 61.3L838.9 97.8L849.5 172.9L860.2 188.8L870.8 104.6L881.5 90.9L892.1 97.8L902.8 97.8L913.4 90.9L924.1 161.5L934.7 154.7L945.4 104.6L956.0 77.3L966.7 68.2L977.3 72.7L988.0 79.5L988.0 330L40.0 330Z"/><path class="c-line" d="M40.0 218.4L50.7 152.4L61.3 154.7L72.0 161.5L82.6 157.0L93.3 166.1L103.9 213.9L114.6 211.6L125.2 154.7L135.9 168.3L146.5 157.0L157.2 152.4L167.8 154.7L178.5 202.5L189.1 204.8L199.8 157.0L210.4 152.4L221.1 141.0L231.7 161.5L242.4 154.7L253.0 202.5L263.7 209.3L274.3 145.6L285.0 150.1L295.6 154.7L306.3 138.7L316.9 154.7L327.6 218.4L338.2 213.9L348.9 150.1L359.6 129.6L370.2 152.4L380.9 154.7L391.5 141.0L402.2 211.6L412.8 197.9L423.5 145.6L434.1 159.2L444.8 163.8L455.4 166.1L466.1 172.9L476.7 223.0L487.4 211.6L498.0 150.1L508.7 129.6L519.3 145.6L530.0 131.9L540.6 159.2L551.3 168.3L561.9 188.8L572.6 118.2L583.2 93.2L593.9 129.6L604.5 100.0L615.2 111.4L625.8 166.1L636.5 182.0L647.1 127.4L657.8 106.9L668.4 111.4L679.1 93.2L689.8 116.0L700.4 172.9L711.1 163.8L721.7 88.6L732.4 134.2L743.0 109.1L753.7 93.2L764.3 97.8L775.0 161.5L785.6 184.3L796.3 122.8L806.9 72.7L817.6 113.7L828.2 61.3L838.9 97.8L849.5 172.9L860.2 188.8L870.8 104.6L881.5 90.9L892.1 97.8L902.8 97.8L913.4 90.9L924.1 161.5L934.7 154.7L945.4 104.6L956.0 77.3L966.7 68.2L977.3 72.7L988.0 79.5"/>
+<path class="c-pr" d="M732.3595505617977 38V330"/><text class="c-prl" x="732.3595505617977" y="30" text-anchor="middle">#21</text><path class="c-pr" d="M902.7865168539325 38V330"/><text class="c-prl" x="902.7865168539325" y="30" text-anchor="middle">#27</text><path class="c-pr" d="M945.3932584269663 38V330"/><text class="c-prl" x="945.3932584269663" y="30" text-anchor="middle">#24</text><path class="c-pr" d="M988 38V330"/><text class="c-prl" x="988" y="30" text-anchor="middle">#26</text>
+<path class="c-log" d="M519.3258426966293 38V330"/>
+<text class="c-logl" x="519.3258426966293" y="30" text-anchor="middle">logged</text>
+<path class="draw you" pathLength="1" d="M514.4 20.3C514.8 20.2 516.2 19.7 517.1 19.5C518.1 19.2 519.0 19.1 520.0 19.1C521.0 19.0 522.0 19.1 523.0 19.3C523.9 19.4 524.9 19.7 525.8 20.1C526.7 20.5 527.6 21.0 528.4 21.6C529.2 22.1 530.0 22.8 530.7 23.6C531.3 24.3 531.9 25.1 532.4 26.0C532.9 26.8 533.3 27.7 533.6 28.6C534.0 29.6 534.2 30.5 534.3 31.5C534.5 32.4 534.6 33.4 534.5 34.3C534.5 35.3 534.4 36.3 534.3 37.2C534.1 38.1 533.8 39.1 533.5 39.9C533.1 40.8 532.7 41.7 532.2 42.5C531.7 43.3 531.1 44.1 530.5 44.8C529.8 45.5 529.1 46.1 528.3 46.6C527.6 47.2 526.7 47.7 525.9 48.0C525.0 48.4 524.1 48.7 523.2 48.9C522.3 49.1 521.4 49.3 520.5 49.3C519.5 49.4 518.6 49.3 517.7 49.2C516.8 49.1 515.8 49.0 514.9 48.7C514.1 48.5 513.2 48.2 512.3 47.8C511.5 47.4 510.6 46.9 509.9 46.4C509.1 45.8 508.3 45.2 507.7 44.5C507.0 43.8 506.4 43.0 505.9 42.2C505.4 41.4 505.0 40.5 504.7 39.6C504.4 38.7 504.1 37.7 504.1 36.8C504.0 35.8 504.0 34.8 504.1 33.9C504.3 32.9 504.5 32.0 504.8 31.1C505.1 30.2 505.6 29.4 506.0 28.6C506.5 27.8 507.1 27.1 507.6 26.4C508.2 25.7 508.9 25.1 509.5 24.5C510.2 23.9 510.9 23.4 511.6 22.9C512.4 22.4 513.1 22.0 513.9 21.6C514.7 21.2 515.6 20.9 516.4 20.6C517.3 20.4 518.2 20.2 519.1 20.1C520.0 20.0 521.4 20.1 521.9 20.1" style="--d:.2s"/>
+<path class="draw ink" pathLength="1" d="M191.1 250.5Q191.1 259.4 200.1 259.8L339.9 259.2Q348.9 259.4 348.9 265.7Q348.9 259.4 357.9 259.3L497.7 259.3Q506.7 259.4 506.7 250.3" style="--d:.9s"/>
+<text class="c-note ink" x="348.89887640449433" y="282.2153846153846" text-anchor="middle">31 days before</text>
+<path class="draw you" pathLength="1" d="M553.3 250.3Q553.3 259.4 562.3 259.5L702.1 259.0Q711.1 259.4 711.1 265.7Q711.1 259.4 720.1 259.5L859.8 259.4Q868.8 259.4 868.8 250.7" style="--d:1.4s"/>
+<text class="c-note you" x="711.056179775281" y="282.2153846153846" text-anchor="middle">31 days after Google recrawled it</text>
+</svg>
+<!-- /chart-wide -->
+        </div>
+        <div class="chart-narrow">
+<!-- chart-narrow -->
+<svg class="chart-svg" viewBox="0 0 360 300" role="img" aria-labelledby="chart-t-360" style="--fs:10px">
+<title id="chart-t-360">Search Console clicks per day for the example site, August 23 to November 20, 2026, between about 50 and 120 a day. Five site changes are marked. The change logged on October 7 to /docs/preview-environments is circled, with brackets over the 31 days before it and the 31 days after Google's first crawl, October 10 to November 9.</title>
+<path class="c-grid" d="M26 180.15384615384616H354"/><text class="c-y" x="18" y="183.65384615384616" text-anchor="end">50</text><path class="c-grid" d="M26 86.30769230769229H354"/><text class="c-y" x="18" y="89.80769230769229" text-anchor="end">100</text><text class="c-x" x="59.168539325842694" y="292" text-anchor="middle">Sep</text><path class="c-tick" d="M59.168539325842694 274v5"/><text class="c-x" x="169.7303370786517" y="292" text-anchor="middle">Oct</text><path class="c-tick" d="M169.7303370786517 274v5"/><text class="c-x" x="283.97752808988764" y="292" text-anchor="middle">Nov</text><path class="c-tick" d="M283.97752808988764 274v5"/>
+<path class="c-area" d="M26.0 182.0L29.7 127.6L33.4 129.5L37.1 135.1L40.7 131.4L44.4 138.9L48.1 178.3L51.8 176.4L55.5 129.5L59.2 140.7L62.9 131.4L66.5 127.6L70.2 129.5L73.9 168.9L77.6 170.8L81.3 131.4L85.0 127.6L88.7 118.2L92.3 135.1L96.0 129.5L99.7 168.9L103.4 174.5L107.1 122.0L110.8 125.7L114.4 129.5L118.1 116.3L121.8 129.5L125.5 182.0L129.2 178.3L132.9 125.7L136.6 108.8L140.2 127.6L143.9 129.5L147.6 118.2L151.3 176.4L155.0 165.1L158.7 122.0L162.4 133.2L166.0 137.0L169.7 138.9L173.4 144.5L177.1 185.8L180.8 176.4L184.5 125.7L188.2 108.8L191.8 122.0L195.5 110.7L199.2 133.2L202.9 140.7L206.6 157.6L210.3 99.4L214.0 78.8L217.6 108.8L221.3 84.4L225.0 93.8L228.7 138.9L232.4 152.0L236.1 107.0L239.8 90.1L243.4 93.8L247.1 78.8L250.8 97.6L254.5 144.5L258.2 137.0L261.9 75.0L265.6 112.6L269.2 91.9L272.9 78.8L276.6 82.6L280.3 135.1L284.0 153.9L287.7 103.2L291.3 61.9L295.0 95.7L298.7 52.5L302.4 82.6L306.1 144.5L309.8 157.6L313.5 88.2L317.1 76.9L320.8 82.6L324.5 82.6L328.2 76.9L331.9 135.1L335.6 129.5L339.3 88.2L342.9 65.7L346.6 58.2L350.3 61.9L354.0 67.5L354.0 274L26.0 274Z"/><path class="c-line" d="M26.0 182.0L29.7 127.6L33.4 129.5L37.1 135.1L40.7 131.4L44.4 138.9L48.1 178.3L51.8 176.4L55.5 129.5L59.2 140.7L62.9 131.4L66.5 127.6L70.2 129.5L73.9 168.9L77.6 170.8L81.3 131.4L85.0 127.6L88.7 118.2L92.3 135.1L96.0 129.5L99.7 168.9L103.4 174.5L107.1 122.0L110.8 125.7L114.4 129.5L118.1 116.3L121.8 129.5L125.5 182.0L129.2 178.3L132.9 125.7L136.6 108.8L140.2 127.6L143.9 129.5L147.6 118.2L151.3 176.4L155.0 165.1L158.7 122.0L162.4 133.2L166.0 137.0L169.7 138.9L173.4 144.5L177.1 185.8L180.8 176.4L184.5 125.7L188.2 108.8L191.8 122.0L195.5 110.7L199.2 133.2L202.9 140.7L206.6 157.6L210.3 99.4L214.0 78.8L217.6 108.8L221.3 84.4L225.0 93.8L228.7 138.9L232.4 152.0L236.1 107.0L239.8 90.1L243.4 93.8L247.1 78.8L250.8 97.6L254.5 144.5L258.2 137.0L261.9 75.0L265.6 112.6L269.2 91.9L272.9 78.8L276.6 82.6L280.3 135.1L284.0 153.9L287.7 103.2L291.3 61.9L295.0 95.7L298.7 52.5L302.4 82.6L306.1 144.5L309.8 157.6L313.5 88.2L317.1 76.9L320.8 82.6L324.5 82.6L328.2 76.9L331.9 135.1L335.6 129.5L339.3 88.2L342.9 65.7L346.6 58.2L350.3 61.9L354.0 67.5"/>
+<path class="c-pr" d="M265.55056179775283 34V274"/><path class="c-pr" d="M324.5168539325843 34V274"/><path class="c-pr" d="M339.2584269662921 34V274"/><path class="c-pr" d="M354 34V274"/>
+<path class="c-log" d="M191.8426966292135 34V274"/>
+<text class="c-logl" x="191.8426966292135" y="26" text-anchor="middle">logged</text>
+<path class="draw you" pathLength="1" d="M183.4 20.5C183.7 20.2 184.7 19.3 185.4 18.9C186.1 18.4 186.9 18.1 187.8 17.8C188.6 17.5 189.5 17.3 190.3 17.2C191.2 17.1 192.1 17.1 192.9 17.3C193.8 17.4 194.6 17.6 195.4 17.9C196.2 18.2 197.0 18.6 197.7 19.1C198.4 19.5 199.1 20.1 199.7 20.7C200.2 21.2 200.8 21.9 201.2 22.5C201.7 23.2 202.1 23.9 202.5 24.6C202.9 25.3 203.2 26.0 203.5 26.8C203.7 27.5 203.9 28.3 204.1 29.1C204.2 29.9 204.3 30.7 204.3 31.5C204.3 32.4 204.2 33.2 204.1 34.0C203.9 34.8 203.7 35.7 203.3 36.4C203.0 37.2 202.5 38.0 202.0 38.6C201.5 39.3 200.9 39.9 200.2 40.5C199.6 41.0 198.8 41.5 198.1 41.8C197.3 42.2 196.5 42.5 195.7 42.7C194.9 42.9 194.1 43.0 193.2 43.0C192.4 43.1 191.6 43.0 190.8 42.9C190.0 42.8 189.2 42.6 188.4 42.3C187.7 42.1 186.9 41.8 186.2 41.4C185.5 41.0 184.8 40.6 184.2 40.1C183.6 39.6 183.0 39.1 182.4 38.5C181.9 37.9 181.4 37.2 181.1 36.5C180.7 35.8 180.3 35.0 180.1 34.3C179.9 33.5 179.7 32.7 179.7 31.9C179.6 31.1 179.6 30.3 179.7 29.5C179.7 28.7 179.9 27.9 180.1 27.2C180.3 26.4 180.6 25.7 181.0 25.0C181.3 24.3 181.7 23.6 182.2 22.9C182.7 22.3 183.2 21.7 183.8 21.1C184.4 20.6 185.0 20.0 185.7 19.6C186.4 19.2 187.2 18.8 187.9 18.6C188.7 18.3 189.5 18.1 190.3 18.0C191.1 17.9 192.4 18.0 192.8 18.0" style="--d:.2s"/>
+<path class="draw ink" pathLength="1" d="M79.6 208.4Q79.6 215.8 87.1 216.2L125.4 215.6Q132.9 215.8 132.9 221.1Q132.9 215.8 140.4 215.7L178.7 215.7Q186.2 215.8 186.2 208.2" style="--d:.9s"/>
+<text class="c-note ink" x="132.87640449438203" y="234.8153846153846" text-anchor="middle">31 days before</text>
+<path class="draw you" pathLength="1" d="M204.9 208.2Q204.9 215.8 212.4 215.9L250.7 215.4Q258.2 215.8 258.2 221.1Q258.2 215.8 265.7 215.9L304.0 215.8Q311.5 215.8 311.5 208.6" style="--d:1.4s"/>
+<text class="c-note you" x="258.17977528089887" y="234.8153846153846" text-anchor="middle">31 days after recrawl</text>
+</svg>
+<!-- /chart-narrow -->
+        </div>
+      </figure>
+      <div class="verdict">
+        <div class="verdict-text">
+          <p class="verdict-k">/docs/preview-environments</p>
+          <p class="verdict-v"><span class="mk" data-mark="circle" data-pad="12 6">Improved</span> <span class="exp">experimental</span></p>
+          <p>Logged by hand on Oct 7. Over the 31 days after Google recrawled it, against 2 control pages: position up 4.07 places and CTR up 0.97 points.</p>
+          <p class="verdict-how">Each read subtracts what the control pages did over the same days, so a swing in demand that moved every page cancels out.</p>
+        </div>
+        <figure class="sheet shot">
+          <picture>
+            <source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="/screens/verdict-sm-dark.webp" width="706" height="578" />
+            <source media="(max-width: 600px)" srcset="/screens/verdict-sm.webp" width="706" height="578" />
+            <source media="(prefers-color-scheme: dark)" srcset="/screens/verdict-dark.webp" width="1510" height="1052" />
+            <img src="/screens/verdict.webp" width="1510" height="1052" loading="lazy" decoding="async" alt="The final read for the change to /docs/preview-environments in Byname, marked Improved and Experimental. Against the control pages, position moved -4.07 places and CTR rose 0.97 points, both past their thresholds. Impressions rose by a factor of 1.43, under the threshold." />
+          </picture>
         </figure>
       </div>
     </div>
   </section>
-  <section class="sec" id="surfaces" aria-labelledby="surfaces-title">
-    <div class="wrap">
-      <div class="frame">
-        <div class="sec-head">
-          <div>
-            <span class="chip">Where people ask</span>
-            <h2 id="surfaces-title">What a person sees there. <span class="second">Or labeled as not.</span></h2>
-          </div>
-          <p class="lead">You pick surfaces, not engines. Each one is pinned to the endpoint closest to what a person sees, and every answer carries one of three labels. Labels are charted apart and never averaged together.</p>
-        </div>
-        <div class="fid">
-          <canvas class="fid-field" aria-hidden="true"></canvas>
-          <p class="fid-axis" aria-hidden="true"><span>Closest to what a person sees</span><span>Stand-in</span></p>
-          <div class="fid-zones">
-            <div class="fid-zone">
-              <h3><i class="fk fk-app"></i>App answer <span>7</span></h3>
-              <p>Read from the real app or results page by a scraping provider.</p>
-              <ul class="tiles app">
-                <li>ChatGPT app<small>DataForSEO</small></li><li>Gemini app<small>cloro</small></li><li>Google AI Mode<small>cloro</small></li><li>Google AI Overview<small>cloro</small></li><li>Microsoft Copilot<small>SerpApi</small></li><li>Bing AI Mode<small>cloro</small></li><li>Brave AI answers<small>SerpApi</small></li>
-              </ul>
-            </div>
-            <div class="fid-zone">
-              <h3><i class="fk fk-model"></i>Same model and search <span>3</span></h3>
-              <p>Your team's model through its API, with web search on. The tool's own system prompt is not included.</p>
-              <ul class="tiles model">
-                <li>Claude Code<small>DataForSEO</small></li><li>Gemini CLI<small>DataForSEO</small></li><li>Codex CLI<small>DataForSEO</small></li>
-              </ul>
-            </div>
-            <div class="fid-zone">
-              <h3><i class="fk fk-approx"></i>Approximation <span>2</span></h3>
-              <p>The closest stand-in where no app answer exists. Never called the app.</p>
-              <ul class="tiles approx">
-                <li>Claude app<small>DataForSEO</small></li><li>Perplexity app<small>DataForSEO</small></li>
-              </ul>
-            </div>
-          </div>
-        </div>
-        <div class="fid-routes">
-          <p>Under each surface is the provider its endpoint is pinned at. One Treg token runs every surface. Or bring your own DataForSEO, cloro or SerpApi key and keep the App answer, or call OpenAI, Anthropic, Gemini, Perplexity or a gateway directly, which makes an app surface an Approximation.</p>
-          <a class="link" href="/docs/engines/surfaces">Every surface and its pinned endpoint</a>
-        </div>
+
+  <section class="sec wrap" id="agents" aria-labelledby="agents-title">
+    <div class="sec-head sec-head-split">
+      <div>
+        <p class="kicker"><span>6</span>Agents</p>
+        <h2 id="agents-title">Ask your agent <em>what you lost.</em></h2>
       </div>
+      <p class="sec-lede">Agents read Byname over MCP, signed in as you with OAuth and the scopes you tick. REST and MCP call the same code as the web UI, so an agent sees exactly what your team sees.</p>
     </div>
-  </section>
-  <section class="sec sec-tabs" id="product" aria-labelledby="product-title">
-    <div class="wrap">
-      <div class="sec-head sec-head-open">
-        <div>
-          <span class="chip">After every check</span>
-          <h2 id="product-title">See what moved since the last check. <span class="second">Down to the raw answer.</span></h2>
-        </div>
-        <p class="lead">Each check fills the same five views. Your team reads them in the app, and your agents read the same numbers over MCP.</p>
-      </div>
-      <div class="tabs" data-tabs>
-        <div class="tab-list" role="tablist" aria-label="Views">
-          <button type="button" role="tab" id="tab-score" aria-controls="panel-score" aria-selected="true">Score</button>
-          <button type="button" role="tab" id="tab-compare" aria-controls="panel-compare" aria-selected="false" tabindex="-1">Compare</button>
-          <button type="button" role="tab" id="tab-gaps" aria-controls="panel-gaps" aria-selected="false" tabindex="-1">Gaps</button>
-          <button type="button" role="tab" id="tab-search" aria-controls="panel-search" aria-selected="false" tabindex="-1">Search</button>
-          <button type="button" role="tab" id="tab-alerts" aria-controls="panel-alerts" aria-selected="false" tabindex="-1">Alerts</button>
-        </div>
-
-        <div class="tab-panel" role="tabpanel" id="panel-score" aria-labelledby="tab-score" tabindex="0">
-          <div class="tp-copy">
-            <h3>Named and cited, counted apart <span>With your position in every answer</span></h3>
-            <p>A link to your domain without your name is a citation, not a mention. Each gets its own rate and its own chart, with a line per surface that never mixes fidelity labels.</p>
-          </div>
-          <div class="tp-art" data-tone="lime">
-            <canvas class="halftone" aria-hidden="true"></canvas>
-            <i class="sq" style="--x:78%;--y:6%;--w:15%;--h:18%;--c:var(--lime)"></i>
-            <i class="sq" style="--x:0%;--y:72%;--w:6%;--h:9%;--c:var(--lime)"></i>
-            <figure class="shot" style="--sx:9%;--sy:11%;--sw:86%">
-              <img src="/screens/score.webp" width="1496" height="1720" loading="lazy" decoding="async" alt="Byname's overview for the example brand Northwind Cloud: mention rate 81%, 29 of 36 answers named, up 14 points since the previous check, and citation rate 53%, above a chart of mention rate per surface over eight checks." />
-            </figure>
+    <div class="agents">
+      <figure class="sheet transcript" data-reveal aria-label="A coding agent asks Byname which questions were lost in check #7 and answers from compare_runs.">
+        <p class="t-head"><span>~/northwind-site</span><span>claude</span></p>
+        <div class="t-body">
+          <p class="t-user"><span aria-hidden="true">&gt;</span> Which questions did we lose in check #7?</p>
+          <p class="t-call"><b>byname</b> compare_runs <span>before=6 after=7</span></p>
+          <p class="t-res">1 gained · <span class="mk" data-mark="circle" data-tone="instead" data-pad="8 4">6 lost</span> · 17 moved · net -5</p>
+          <div class="t-say">
+            <p>Check #7 lost 6 answers that check #6 had:</p>
+            <ul>
+              <li><q>Which cloud platform has the most predictable pricing for a startup?</q> on Claude Code with Sonnet, Codex CLI and the ChatGPT app.</li>
+              <li><q>What is the easiest way to get preview environments for every pull request?</q> on the ChatGPT app.</li>
+              <li><q>How do I move a Node.js app off a single VPS without downtime?</q> on Google AI Overview.</li>
+              <li><q>What are good alternatives to managing my own container cluster?</q> on the Perplexity app.</li>
+            </ul>
+            <p>On the ChatGPT app, the pricing question now names Tailspin Hosting first.</p>
           </div>
         </div>
-
-        <div class="tab-panel" role="tabpanel" id="panel-compare" aria-labelledby="tab-compare" tabindex="0" hidden>
-          <div class="tp-copy">
-            <h3>Gained, lost and moved <span>Between any two checks</span></h3>
-            <p>Pick two checks to see every question and pair you gained, lost or moved on, with the net change. Check #8 against #7: 5 gained, none lost, net +5.</p>
-          </div>
-          <div class="tp-art" data-tone="blue">
-            <canvas class="halftone" aria-hidden="true"></canvas>
-            <i class="sq" style="--x:84%;--y:0%;--w:12%;--h:22%;--c:#3d6bff"></i>
-            <i class="sq" style="--x:4%;--y:82%;--w:9%;--h:18%;--c:#3d6bff"></i>
-            <figure class="shot" style="--sx:9%;--sy:11%;--sw:86%">
-              <img src="/screens/compare.webp" width="1496" height="1800" loading="lazy" decoding="async" alt="Byname's Compare view, check #7 against check #8: 5 gained, 0 lost, 16 moved, net change +5, with each question's surfaces and their positions in both checks." />
-            </figure>
-          </div>
-        </div>
-
-        <div class="tab-panel" role="tabpanel" id="panel-gaps" aria-labelledby="tab-gaps" tabindex="0" hidden>
-          <div class="tp-copy">
-            <h3>Who they name instead <span>Ranked by opportunity</span></h3>
-            <p>Questions where a surface named a competitor and not you, with the brands it named and the web searches the engine ran, where the endpoint exposes them.</p>
-          </div>
-          <div class="tp-art" data-tone="orange">
-            <canvas class="halftone" aria-hidden="true"></canvas>
-            <i class="sq" style="--x:80%;--y:4%;--w:14%;--h:14%;--c:#ff8a2a"></i>
-            <i class="sq" style="--x:0%;--y:60%;--w:8%;--h:24%;--c:#ff8a2a"></i>
-            <figure class="shot" style="--sx:9%;--sy:11%;--sw:86%">
-              <img src="/screens/gaps.webp" width="1496" height="880" loading="lazy" decoding="async" alt="Byname's Gaps view: a question visible on 0 of 6 surfaces, with Tailspin Hosting, Contoso Edge, Fabrikam Deploy and Litware Cloud named instead, and the web searches each engine ran." />
-            </figure>
-          </div>
-        </div>
-
-        <div class="tab-panel" role="tabpanel" id="panel-search" aria-labelledby="tab-search" tabindex="0" hidden>
-          <div class="tp-copy">
-            <h3>Search Console on the same timeline <span>With every site change marked</span></h3>
-            <p>Clicks, impressions and position straight from Google, read-only, with brand against non-brand and goals. Merged pull requests mark the chart, and each changed page gets a read against control pages 31 days after Google recrawls it. Verdicts are experimental.</p>
-          </div>
-          <div class="tp-art" data-tone="violet">
-            <canvas class="halftone" aria-hidden="true"></canvas>
-            <i class="sq" style="--x:86%;--y:58%;--w:12%;--h:26%;--c:#9d7bff"></i>
-            <i class="sq" style="--x:3%;--y:0%;--w:10%;--h:10%;--c:#9d7bff"></i>
-            <figure class="shot" style="--sx:7%;--sy:9%;--sw:88%">
-              <img src="/screens/search.webp" width="1496" height="534" loading="lazy" decoding="async" alt="Byname's Search view: Search Console clicks per day for the example site, with a vertical line and dot for each site change." />
-            </figure>
-            <figure class="shot" style="--sx:16%;--sy:50%;--sw:88%">
-              <img src="/screens/verdict.webp" width="1518" height="946" loading="lazy" decoding="async" alt="The final read for a change to /docs/preview-environments, marked Improved and Experimental: against the control pages, position moved -4.07 places and CTR rose 0.97 points." />
-            </figure>
-          </div>
-        </div>
-
-        <div class="tab-panel" role="tabpanel" id="panel-alerts" aria-labelledby="tab-alerts" tabindex="0" hidden>
-          <div class="tp-copy">
-            <h3>Told when something moves <span>By email, in Slack or at your webhook</span></h3>
-            <p>A finished check with what it gained and lost, a spend cap, a paused model, a goal reached, search moving, a change verdict. Every alert shows in the app, and each channel sends the events it subscribes to.</p>
-          </div>
-          <div class="tp-art" data-tone="white">
-            <canvas class="halftone" aria-hidden="true"></canvas>
-            <i class="sq" style="--x:82%;--y:2%;--w:14%;--h:16%;--c:var(--lime)"></i>
-            <i class="sq" style="--x:2%;--y:78%;--w:8%;--h:12%;--c:#3d6bff"></i>
-            <div class="msg" role="img" aria-label="A chat message from Byname in an alerts channel: Check #8, 5 gained, 0 lost. Named in 29 of 36 answers. Since check #7, 5 gained, 0 lost, 16 moved, net +5. Then the questions that changed most, and a link to open the comparison in Byname.">
-              <div class="msg-head"><span class="msg-ch"># visibility-alerts</span><span class="msg-n">3 new</span></div>
-              <div class="msg-row">
-                <span class="msg-av" aria-hidden="true">B</span>
-                <div class="msg-body">
-                  <p class="msg-who">Byname <span>APP</span><time>9:14 AM</time></p>
-                  <p class="msg-title">Check #8: 5 gained, 0 lost</p>
-                  <p>Named in 29 of 36 answers.</p>
-                  <p>Since check #7: 5 gained, 0 lost, 16 moved, net +5.</p>
-                  <p>1 gained, 5 moved: How do I move a Node.js app off a single VPS without downtime?</p>
-                  <p>2 gained, 3 moved: Which cloud platform has the most predictable pricing for a startup?</p>
-                  <p>1 gained, 3 moved: What is the easiest way to get preview environments for every pull request?</p>
-                  <p class="msg-link">Open in Byname</p>
-                </div>
-              </div>
-              <div class="msg-row msg-dim">
-                <span class="msg-av" aria-hidden="true">B</span>
-                <div class="msg-body">
-                  <p class="msg-title">Change verdict: improved</p>
-                  <p>https://www.northwind.example/docs/preview-environments</p>
-                  <p>Against 2 control pages over 31 days: position -4.1, CTR +0.97 points, impressions ×1.43.</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div class="hatch" aria-hidden="true"></div>
-    </div>
-  </section>
-  <section class="sec" id="agents" aria-labelledby="agents-title">
-    <div class="wrap">
-      <div class="frame">
-        <div class="sec-head">
-          <div>
-            <span class="chip">Agents</span>
-            <h2 id="agents-title">Ask your agent what you lost. <span class="second">It reads Byname over MCP.</span></h2>
-          </div>
-          <p class="lead">The agent signs in as you, with the scopes you tick. REST and MCP call the same code as the web UI, so an agent sees what your team sees.</p>
-        </div>
-        <div class="ag">
-          <div class="term" data-term>
-            <div class="term-bar"><span>~/northwind-site</span><span>claude</span></div>
-            <div class="term-body" role="img" aria-label="A coding agent asks Byname what was lost since the last check. It calls compare_runs, which returns 5 gained, 0 lost, 16 moved and net +5, then gaps, which returns two questions. It answers that nothing was lost, and that one question names Northwind Cloud on 0 of 6 surfaces, with Tailspin Hosting, Contoso Edge, Fabrikam Deploy and Litware Cloud named instead.">
-              <p class="t-user"><span class="t-p">&gt;</span> what did we lose since the last check, and who got named instead?</p>
-              <p class="t-call"><span class="t-dot"></span><b>byname</b> compare_runs <span class="t-arg">before=7 after=8</span></p>
-              <p class="t-res">5 gained · 0 lost · 16 moved · net +5</p>
-              <p class="t-call"><span class="t-dot"></span><b>byname</b> gaps</p>
-              <p class="t-res">2 questions, biggest opportunity first</p>
-              <p class="t-say">Nothing was lost. Check #8 gained 5 answers on check #7 and lost none.</p>
-              <p class="t-say">One question still misses you everywhere:</p>
-              <p class="t-say t-q">"Which platform is best for hosting a Postgres-backed API close to European users?"</p>
-              <p class="t-say">Named on 0 of 6. Named instead: <span class="t-hl">Tailspin Hosting</span>, <span class="t-hl">Contoso Edge</span>, <span class="t-hl">Fabrikam Deploy</span>, <span class="t-hl">Litware Cloud</span>.</p>
-              <p class="t-user t-next"><span class="t-p">&gt;</span> <span class="t-caret"></span></p>
-            </div>
-          </div>
-          <div class="ag-side">
-            <div class="ag-cell">
-              <h3>MCP, signed in with OAuth.</h3>
-              <p>Add the URL to Claude Code, Cursor or Claude Desktop. Your browser opens, you tick the scopes, and the agent reads results as you. No key to copy.</p>
+      </figure>
+      <div class="agents-side">
+        <div class="snip">
+          <h3>MCP, signed in with OAuth</h3>
+          <p>Add the URL to Claude Code, Cursor or Claude Desktop. Your browser opens, you tick the scopes, and the agent reads results as you. No key to copy.</p>
 <pre class="code"><span class="c"># Claude Code</span>
 claude mcp add --transport http byname \
-  <span class="s">https://byname.example.com/mcp</span></pre>
-            </div>
-            <div class="ag-cell">
-              <h3>REST, with scoped keys.</h3>
-              <p>Give each script its own key with only the scopes it needs and an expiry. A key that leaks can revoke itself.</p>
-<pre class="code"><span class="c"># Questions where a surface named someone else</span>
-curl <span class="s">https://byname.example.com/v1/gaps</span> \
-  -H "Authorization: Bearer $BYNAME_API_KEY"</pre>
-            </div>
-            <dl class="scopes">
-              <div><dt>results:read</dt><dd>Read checks, answers and search data</dd></div>
-              <div><dt>runs:write</dt><dd>Queue, pause and resume checks</dd></div>
-              <div><dt>config:write</dt><dd>Change questions, surfaces and settings</dd></div>
-            </dl>
-          </div>
+  https://byname.example.com/mcp</pre>
         </div>
+        <div class="snip">
+          <h3>REST, with scoped keys</h3>
+          <p>Give each script its own key with only the scopes it needs, and an expiry.</p>
+<pre class="code"><span class="c"># Questions where a surface named someone else</span>
+curl https://byname.example.com/v1/gaps \
+  -H "Authorization: Bearer $BYNAME_API_KEY"</pre>
+        </div>
+        <dl class="scopes">
+          <div><dt>results:read</dt><dd>Read checks, answers and search data</dd></div>
+          <div><dt>runs:write</dt><dd>Queue, pause and resume checks</dd></div>
+          <div><dt>config:write</dt><dd>Change questions, surfaces and settings</dd></div>
+        </dl>
       </div>
     </div>
   </section>
-  <section class="own" aria-labelledby="own-title">
-    <div class="wrap own-in">
-      <h2 id="own-title" class="chip">Yours to run</h2>
-      <div class="own-cell"><h3>Your keys</h3><p>The Treg token and provider keys are encrypted at rest and never returned by any API. Only an Admin can set them.</p></div>
-      <div class="own-cell"><h3>Your data</h3><p>Every answer, its raw response and its cost live in your Postgres. Nothing leaves except the calls you turn on.</p></div>
-      <div class="own-cell"><h3>Spend caps</h3><p>A cap per check stops queueing calls once it is spent. An optional monthly cap stops the next check from starting.</p></div>
-      <div class="own-cell"><h3>MIT licensed</h3><p>One Go binary with the web UI, REST API, MCP server and scheduler. Fork it, change it, keep it.</p></div>
+
+  <section class="sec wrap" id="run" aria-labelledby="run-title">
+    <div class="sec-head sec-head-split">
+      <div>
+        <p class="kicker"><span>7</span>Run it yourself</p>
+        <h2 id="run-title">One container and your Postgres. <em>Your agent can deploy it.</em></h2>
+      </div>
+      <p class="sec-lede">Paste one prompt into your coding agent. It asks for your Postgres URL, creates the project, sets the secrets, then deploys and protects Byname on Unkey. You watch and approve. Provider keys never pass through the agent. You enter them in onboarding.</p>
     </div>
-  </section>
-  <section class="sec" id="deploy" aria-labelledby="deploy-title">
-    <div class="wrap">
-      <div class="frame">
-        <div class="sec-head">
-          <div>
-            <span class="chip">Deploy on Unkey</span>
-            <h2 id="deploy-title">Your agent deploys it. <mark class="hl keep">Unkey runs it.</mark></h2>
-          </div>
-          <p class="lead">Paste one prompt into your coding agent. It asks for your Postgres URL, creates the project, sets the secrets, then deploys and protects Byname on Unkey. You watch and approve. Provider keys never pass through the agent. You enter them in onboarding.</p>
-        </div>
-        <div class="dp">
-          <div class="dp-steps">
-            <ol class="steps">
-              <li>
-                <b>Add Unkey's MCP server to your agent</b>
+    <div class="run">
+      <div class="run-steps">
+        <ol class="steps">
+          <li>
+            <h3>Add Unkey's MCP server to your agent</h3>
 <pre class="code"><span class="c"># Claude Code. Other agents: mcp.unkey.com/install</span>
 claude mcp add --transport http unkey \
-  <span class="s">https://mcp.unkey.com</span></pre>
-              </li>
-              <li><b>Copy the prompt and paste it into your agent</b><span>It signs you in to Unkey, asks for your Postgres URL, and does the rest.</span></li>
-              <li><b>Open the link it gives you</b><span>Register a passkey, then onboarding asks for your brand, your questions and where people ask.</span></li>
-            </ol>
-            <div class="dp-actions">
-              <button class="btn btn-primary" type="button" data-copy-prompt data-label="Copy agent prompt">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="9" y="9" width="12" height="12" /><path d="M5 15H3V3h12v2" /></svg>
-                <span class="copy-state">Copy agent prompt</span>
-              </button>
-              <a class="btn btn-outline" href="https://app.unkey.com">Create an Unkey account</a>
-            </div>
-          </div>
-          <div class="dp-art">
-            <canvas class="halftone" aria-hidden="true" data-tone="lime"></canvas>
-            <i class="sq" style="--x:88%;--y:0%;--w:12%;--h:12%;--c:var(--lime)"></i>
-            <div class="prompt">
-              <div class="prompt-bar"><span>deploy-byname-on-unkey.md</span>
-                <button class="btn btn-outline btn-sm" type="button" data-copy-prompt data-label="Copy"><span class="copy-state">Copy</span></button>
-              </div>
+  https://mcp.unkey.com</pre>
+          </li>
+          <li><h3>Copy the prompt and paste it into your agent</h3><p>It signs you in to Unkey, asks for your Postgres URL, and does the rest.</p></li>
+          <li><h3>Open the link it gives you</h3><p>Register a passkey. Onboarding then asks for your brand, your questions and where people ask.</p></li>
+        </ol>
+        <div class="run-acts">
+          <button class="btn" type="button" data-copy-prompt data-label="Copy the prompt">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2.5" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>
+            <span class="copy-state">Copy the prompt</span>
+          </button>
+          <a class="go" href="https://app.unkey.com">Create an Unkey account</a>
+        </div>
+      </div>
+      <figure class="sheet prompt">
+        <figcaption class="prompt-head"><span>deploy-byname-on-unkey.md</span><button class="copy-sm" type="button" data-copy-prompt data-label="Copy"><span class="copy-state">Copy</span></button></figcaption>
 <pre id="agent-prompt" tabindex="0" aria-label="Agent prompt">Deploy Byname (https://github.com/unkeyed/byname) to Unkey for me, using Unkey's MCP server. Byname tracks how a brand shows up in AI answers and in Google search. The repository's docs/deploy-unkey.md is the reference for Byname's settings.
 
 1. Connect to Unkey
@@ -575,48 +488,42 @@ claude mcp add --transport http unkey \
    - Give me PUBLIC_URL/setup/SETUP_TOKEN to create the first account with a passkey. Tell me to add a second passkey under Settings &gt; Account.
    - Tell me the next stop is onboarding: my brand and domain, competitors, questions, where people ask with a Treg token or my own keys, Search Console, and the schedule with spend caps. Nothing runs until I finish it.
    - Finish with a short summary: the URL, the Unkey project, the variables you set, where the encryption key is saved, and anything you could not do.</pre>
-            </div>
-          </div>
-        </div>
-        <div class="docker">
-          <div>
-            <h3>Or run it anywhere with Docker</h3>
-            <p>Docker with Compose v2 starts Byname and Postgres 17 on your machine. Open the link it prints and register a passkey. <a class="link" href="/docs/self-hosting">Self-host Byname</a> covers any other container host, and <a class="link" href="/docs/deploy-unkey">Deploy on Unkey</a> covers every step by hand.</p>
-          </div>
+      </figure>
+    </div>
+    <div class="anywhere">
+      <div>
+        <h3>Or run it anywhere with Docker</h3>
+        <p>Docker with Compose v2 starts Byname and Postgres 17 on your machine. Open the link it prints and register a passkey. <a class="link" href="/docs/self-hosting">Self-host Byname</a> covers any other container host, and <a class="link" href="/docs/deploy-unkey">Deploy on Unkey</a> covers every step by hand.</p>
+      </div>
 <pre class="code">git clone https://github.com/unkeyed/byname.git
 cd byname
 echo "ENCRYPTION_KEY=$(openssl rand -base64 32)" &gt;&gt; .env
 docker compose up -d --build --wait
 docker compose logs app | grep -A2 'Open this link'</pre>
-        </div>
-      </div>
     </div>
-  </section>
-  <section class="cta" aria-labelledby="cta-title">
-    <div class="cta-glow" aria-hidden="true"></div>
-    <div class="wrap cta-in">
-      <h2 id="cta-title">Find out who the answers name. <span class="second">Then watch it change, check by check.</span></h2>
-      <div class="hero-actions">
-        <a class="btn btn-primary" href="#deploy">Deploy on Unkey</a>
-        <a class="btn btn-outline" href="/docs/">Read the docs</a>
-      </div>
-    </div>
+    <ul class="yours">
+      <li><h3>Your keys</h3><p>The Treg token and provider keys are encrypted at rest and never returned by any API. Only an Admin can set them.</p></li>
+      <li><h3>Your data</h3><p>Every answer, its raw response and its cost live in your Postgres. Nothing leaves except the calls you turn on.</p></li>
+      <li><h3>Spend caps</h3><p>A cap per check stops queueing calls once it is spent. An optional monthly cap stops the next check from starting.</p></li>
+      <li><h3>MIT licensed</h3><p>One Go binary with the web UI, REST API, MCP server and scheduler. Fork it, change it, keep it.</p></li>
+    </ul>
   </section>
 </main>
 
-<footer class="footer">
-  <div class="wrap footer-grid">
+<footer class="foot">
+  <div class="wrap foot-grid">
     <div>
-      <a class="brand" href="#top" aria-label="Byname home"><span class="brand-mark" aria-hidden="true">B</span>byname</a>
-      <p class="footer-tag">Find out when AI assistants name you.</p>
-      <p class="footer-meta">MIT licensed. Provided by <a href="https://www.unkey.com">Unkey</a>.</p>
+      <a class="logo" href="#top" aria-label="Byname home">by<span class="mk" data-mark="circle" data-pad="6 5">name</span></a>
+      <p class="foot-tag">Find out when AI answers name you, and who they name instead.</p>
+      <p class="foot-meta">MIT licensed. Provided by <a href="https://www.unkey.com">Unkey</a>.</p>
     </div>
     <nav aria-labelledby="f-product"><h2 id="f-product">Product</h2><ul>
-      <li><a href="#panel">The panel</a></li>
-      <li><a href="#surfaces">Where people ask</a></li>
-      <li><a href="#product">After every check</a></li>
+      <li><a href="#questions">The questions</a></li>
+      <li><a href="#record">The record</a></li>
+      <li><a href="#evidence">Surfaces</a></li>
+      <li><a href="#search">Search and changes</a></li>
       <li><a href="#agents">Agents</a></li>
-      <li><a href="#deploy">Deploy on Unkey</a></li>
+      <li><a href="#run">Deploy on Unkey</a></li>
     </ul></nav>
     <nav aria-labelledby="f-docs"><h2 id="f-docs">Docs</h2><ul>
       <li><a href="/docs/self-hosting">Self-host</a></li>
@@ -636,7 +543,6 @@ docker compose logs app | grep -A2 'Open this link'</pre>
 </footer>
 
 <div class="toast" role="status" aria-live="polite"></div>
-
 <script src="/app.js" defer></script>
 </body>
 </html>
