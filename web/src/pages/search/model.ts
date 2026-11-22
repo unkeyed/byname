@@ -67,24 +67,39 @@ export const compact = (v: number) => compactFmt.format(v);
 export const ctr = (v: number) => ctrFmt.format(v);
 export const position = (v: number) => (v > 0 ? positionFmt.format(v) : "–");
 
-export const metricInfo: Record<GoalMetric, string> = {
-  clicks: "Clicks",
-  impressions: "Impressions",
-  non_brand_clicks: "Non-brand clicks",
+/** The Search Console figures, in the words and hints a first-timer reads wherever one shows. */
+export type Figure = "clicks" | "impressions" | "ctr" | "position" | "non_brand";
+export const figureInfo: Record<Figure, { label: string; hint: string }> = {
+  clicks: { label: "Clicks", hint: "Times someone clicked through to your site from Google." },
+  impressions: { label: "Appearances", hint: "Times your site appeared in Google results." },
+  ctr: { label: "Click rate", hint: "Clicks divided by appearances." },
+  position: { label: "Average position", hint: "Your average spot in Google results. 1 is the top." },
+  non_brand: { label: "Searches without your name", hint: "Clicks from searches that don't include your name." },
 };
+
+const goalFigure: Record<GoalMetric, Figure> = { clicks: "clicks", impressions: "impressions", non_brand_clicks: "non_brand" };
+export const metricInfo: Record<GoalMetric, string> = {
+  clicks: figureInfo.clicks.label,
+  impressions: figureInfo.impressions.label,
+  non_brand_clicks: figureInfo.non_brand.label,
+};
+export const metricHint = (m: GoalMetric) => figureInfo[goalFigure[m]].hint;
 export const windowInfo: Record<GoalWindow, string> = { 28: "28 days", 90: "3 months" };
+
+/** A property as a person reads it: a domain property covers every address on the domain. */
+export const propertyName = (p: string) => (p.startsWith("sc-domain:") ? `${p.slice("sc-domain:".length)} (every address on the domain)` : p);
 
 /**
  * The latest-28-day headline. change says how a move against the previous
- * 28 days reads: relative for counts, in points for CTR, and as a plain
- * difference for position, where lower is better.
+ * 28 days reads: relative for counts, in points for click rate, and as a
+ * plain difference for position, where lower is better.
  */
-export const headline: { key: string; label: string; value: (p: SearchPeriod) => number; format: (v: number) => string; change: "relative" | "points" | "difference"; lowerIsBetter?: boolean }[] = [
-  { key: "clicks", label: "Clicks", value: (p) => p.clicks, format: count, change: "relative" },
-  { key: "impressions", label: "Impressions", value: (p) => p.impressions, format: count, change: "relative" },
-  { key: "ctr", label: "CTR", value: (p) => p.ctr, format: ctr, change: "points" },
-  { key: "position", label: "Average position", value: (p) => p.position, format: position, change: "difference", lowerIsBetter: true },
-  { key: "non_brand", label: "Non-brand clicks", value: (p) => p.non_brand_clicks, format: count, change: "relative" },
+export const headline: { key: Figure; label: string; hint: string; value: (p: SearchPeriod) => number; format: (v: number) => string; change: "relative" | "points" | "difference"; lowerIsBetter?: boolean }[] = [
+  { key: "clicks", ...figureInfo.clicks, value: (p) => p.clicks, format: count, change: "relative" },
+  { key: "impressions", ...figureInfo.impressions, value: (p) => p.impressions, format: count, change: "relative" },
+  { key: "ctr", ...figureInfo.ctr, value: (p) => p.ctr, format: ctr, change: "points" },
+  { key: "position", ...figureInfo.position, value: (p) => p.position, format: position, change: "difference", lowerIsBetter: true },
+  { key: "non_brand", ...figureInfo.non_brand, value: (p) => p.non_brand_clicks, format: count, change: "relative" },
 ];
 
 /** A move against the previous window, or null when there is nothing to compare. */
@@ -98,7 +113,7 @@ export function change(now: number, before: number | undefined, kind: "relative"
     text = `${Math.abs(d * 100) < 10 ? Math.abs(d * 100).toFixed(1) : Math.round(Math.abs(d * 100))}%`;
   } else if (kind === "points") {
     d = (now - before) * 100;
-    text = `${Math.abs(d).toFixed(2)} pts`;
+    text = `${Math.abs(d).toFixed(2)} points`;
   } else {
     if (now === 0 || before === 0) return null;
     d = now - before;

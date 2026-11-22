@@ -1,19 +1,21 @@
 import { useQuery } from "@tanstack/react-query";
 import { api, type AnswerSummary, type Dot, type DotState, type PromptRow, type ResultsFilter, type Run, type RunRef } from "../../api";
-import { fidelityInfo, shortDay, useLabels } from "../../lines";
+import { shortDay, useLabels } from "../../lines";
 import { keys, useAnsweredRuns, useSettings, useSurfaces } from "../../queries";
 import { Badge, Card, cx, EmptyState, ErrorNote, inputClass, Pending, RowButton, ScrollX, selectClass, useLoading, useWide } from "../../ui";
 import { runTime, useFilter, useView } from "../../view";
 import { ViewHeader } from "./Header";
 import { CellMark } from "./QuestionsTable";
 import { Tabs, useTab } from "./Tabs";
+import { CountAnyway, LeftOutBadge } from "./Scoring";
 
 const tabs = [
-  { id: "prompts", label: "Prompts" },
-  { id: "answers", label: "Answers" },
+  { id: "questions", label: "By question" },
+  { id: "answers", label: "Every answer" },
 ] as const;
 
-export function Prompts() {
+/** AI answers > Questions: every question, which AI apps name you, and every answer of the latest check. */
+export function Questions() {
   const settings = useSettings();
   const runs = useAnsweredRuns();
   const { filter, ready } = useFilter();
@@ -27,22 +29,22 @@ export function Prompts() {
   else if (!runs.data?.length)
     body = (
       <EmptyState icon="message" title="No checks yet">
-        Once a check has run, every question shows here with the surfaces and models that named {brand}.
+        Once a check has run, every question shows here with the AI apps that named {brand}.
       </EmptyState>
     );
-  else if (tab === "prompts") body = <PromptList filter={filter} />;
+  else if (tab === "questions") body = <QuestionList filter={filter} />;
   else body = <AnswerList run={runs.data[0]} filter={filter} />;
 
   return (
     <>
       <ViewHeader
-        title="Prompts"
-        subtitle={tab === "prompts" ? `Every question, which surfaces and models name ${brand}, and who they name instead.` : `Every answer from the latest check, with ${brand}'s position and how many sources it cited.`}
-        range={tab === "prompts"}
+        title="Questions"
+        subtitle={`Every question you track, which AI apps name ${brand}, and who they name instead. Open a question to read its answers, or list every answer from the latest check.`}
+        range={tab === "questions"}
       />
       <div className="relative min-h-0 flex-1 overflow-auto px-3 py-4 md:px-5 md:py-5">
         <div className="mx-auto max-w-6xl space-y-4">
-          <Tabs label="Prompts views" tabs={tabs} current={tab} />
+          <Tabs label="Question views" tabs={tabs} current={tab} />
           {body}
         </div>
       </div>
@@ -52,16 +54,16 @@ export function Prompts() {
 
 const dotLook: Record<DotState, { label: string; className: string }> = {
   named: { label: "Named you", className: "bg-success" },
-  cited: { label: "Cited you, not named", className: "bg-info" },
+  cited: { label: "Linked to your site, not named", className: "bg-info" },
   not_named: { label: "Not named", className: "border border-line-hover bg-transparent" },
-  failed: { label: "Every call failed", className: "bg-subtle-strong" },
+  failed: { label: "No AI app answered", className: "bg-subtle-strong" },
 };
 
 function RunDot({ dot, run }: { dot: Dot | null; run: RunRef }) {
   const when = `Check #${run.id}, ${shortDay(run.started_at)}`;
   if (!dot) return <span className="size-2.5 shrink-0" title={`${when}: not asked`} />;
   const look = dotLook[dot.state];
-  const detail = dot.state === "failed" ? look.label : `${look.label}: named on ${dot.named} of ${dot.answered}`;
+  const detail = dot.state === "failed" ? look.label : `${look.label}: named you in ${dot.named} of ${dot.answered}`;
   return <span role="img" aria-label={`${when}: ${detail}`} title={`${when}: ${detail}`} className={cx("size-2.5 shrink-0 rounded-full", look.className)} />;
 }
 
@@ -71,7 +73,7 @@ const maxDots = 30;
 function RunDots({ row, runs }: { row: PromptRow; runs: RunRef[] }) {
   const from = Math.max(0, runs.length - maxDots);
   return (
-    <span className="flex flex-wrap items-center gap-1">
+    <span className="flex flex-wrap items-center gap-1 md:justify-end">
       {runs.slice(from).map((r, i) => (
         <RunDot key={r.id} run={r} dot={row.dots[from + i]} />
       ))}
@@ -88,7 +90,7 @@ function DotKey() {
           {dotLook[k].label}
         </span>
       ))}
-      <span>One dot per check, oldest first, counting the surfaces and models in view.</span>
+      <span>One dot per check, oldest first, counting the AI apps in view.</span>
     </p>
   );
 }
@@ -107,11 +109,9 @@ export function Instead({ names, max = 3 }: { names: string[]; max?: number }) {
   );
 }
 
-function PromptList({ filter }: { filter: ResultsFilter }) {
+function QuestionList({ filter }: { filter: ResultsFilter }) {
   const view = useView();
   const wide = useWide();
-  const surfaces = useSurfaces();
-  const labels = useLabels(surfaces.data);
   const prompts = useQuery({ queryKey: keys.prompts(filter), queryFn: () => api.prompts(filter) });
   if (prompts.isPending) return <Pending />;
   if (prompts.isError) return <ErrorNote error={prompts.error} />;
@@ -124,7 +124,6 @@ function PromptList({ filter }: { filter: ResultsFilter }) {
   const shown = rows.filter((r) => (!search || r.question.text.toLowerCase().includes(search)) && (!group || r.question.group === group));
   const open = (r: PromptRow) => view.set({ q: r.question.id, qa: null, qv: null }, { push: true });
   const latest = runs[runs.length - 1];
-  const namedBy = (r: PromptRow) => r.named_by.map((s) => `${labels.line(s.pair)}${s.fidelity === "approximation" ? " (approx.)" : ""}`);
 
   return (
     <Card className={cx(prompts.isPlaceholderData && "opacity-60")}>
@@ -144,17 +143,17 @@ function PromptList({ filter }: { filter: ResultsFilter }) {
         </p>
       </div>
       {wide ? (
-        <ScrollX label="prompts table">
+        <ScrollX label="questions table">
           <table className="w-full min-w-max text-sm">
             <thead className="border-b border-line text-xs text-muted">
               <tr>
                 <th scope="col" className="sticky left-0 z-[1] w-72 min-w-72 bg-surface px-3 py-2 text-left font-medium shadow-[inset_-1px_0_0_var(--line)]">
                   Question
                 </th>
-                <th scope="col" className="px-3 py-2 text-left font-medium">Named by</th>
-                <th scope="col" className="px-3 py-2 text-left font-medium">Best</th>
-                <th scope="col" className="px-3 py-2 text-left font-medium">Named instead</th>
-                <th scope="col" className="px-3 py-2 text-left font-medium">Checks</th>
+                <th scope="col" className="w-36 min-w-36 px-3 py-2 text-left font-medium">Named you in</th>
+                <th scope="col" className="w-28 min-w-28 px-3 py-2 text-left font-medium">Best position</th>
+                <th scope="col" className="w-80 min-w-80 px-3 py-2 text-left font-medium">Named instead</th>
+                <th scope="col" className="w-56 min-w-56 px-3 py-2 text-right font-medium">Checks, newest last</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-line">
@@ -162,17 +161,20 @@ function PromptList({ filter }: { filter: ResultsFilter }) {
                 <tr key={r.question.id} className="group relative hover:bg-subtle">
                   <td data-sticky className="sticky left-0 z-[1] w-72 min-w-72 max-w-72 bg-surface px-3 py-2 shadow-[inset_-1px_0_0_var(--line)] group-hover:bg-[color-mix(in_oklab,var(--surface),var(--fg)_5%)]">
                     <div className="font-medium group-hover:underline">{r.question.text}</div>
-                    <div className="text-xs text-faint">{r.question.group}</div>
+                    <div className="flex flex-wrap items-center gap-x-2 text-xs text-faint">
+                      {r.question.group}
+                      <LeftOutBadge question={r.question} />
+                    </div>
                   </td>
-                  <td className="max-w-64 px-3 py-2 align-top">
+                  <td className="px-3 py-2 align-top">
                     <RowButton label={r.question.text} onClick={() => open(r)} />
                     <div className="tabular-nums">
-                      {r.named_by.length} <span className="text-faint">of {r.answered}</span>
+                      {r.named_by.length} <span className="text-faint">of {r.answered} AI apps</span>
                     </div>
-                    {r.named_by.length > 0 && <div className="truncate text-xs text-muted" title={namedBy(r).join(", ")}>{namedBy(r).join(", ")}</div>}
+                    <CountAnyway question={r.question} />
                   </td>
                   <td className="px-3 py-2 align-top tabular-nums">{r.best_position ? `#${r.best_position}` : <span className="text-faint">–</span>}</td>
-                  <td className="max-w-56 px-3 py-2 align-top">
+                  <td className="px-3 py-2 align-top">
                     <Instead names={r.instead} />
                   </td>
                   <td className="px-3 py-2 align-top">
@@ -190,15 +192,18 @@ function PromptList({ filter }: { filter: ResultsFilter }) {
               <button type="button" onClick={() => open(r)} className="block w-full space-y-2 px-4 py-3 text-left hover:bg-subtle">
                 <span className="block">
                   <span className="block font-medium">{r.question.text}</span>
-                  <span className="block text-xs text-faint">{r.question.group}</span>
+                  <span className="flex flex-wrap items-center gap-x-2 text-xs text-faint">
+                    {r.question.group}
+                    <LeftOutBadge question={r.question} />
+                  </span>
                 </span>
                 <span className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted tabular-nums">
                   <span>
-                    Named by <span className="font-medium text-fg">{r.named_by.length}</span> of {r.answered}
+                    Named you in <span className="font-medium text-fg">{r.named_by.length}</span> of {r.answered} AI apps
                   </span>
                   {r.best_position && (
                     <span>
-                      Best <span className="font-medium text-fg">#{r.best_position}</span>
+                      Best position <span className="font-medium text-fg">#{r.best_position}</span>
                     </span>
                   )}
                 </span>
@@ -240,7 +245,7 @@ function AnswerList({ run, filter }: { run: Run; filter: ResultsFilter }) {
   const pairLabel = (a: AnswerSummary) => (
     <>
       {labels.line(a.pair)}
-      {a.fidelity === "approximation" && <span className="text-warn"> · approx.</span>}
+      {a.fidelity === "approximation" && <span className="text-warn"> · stand-in</span>}
     </>
   );
 
@@ -258,10 +263,10 @@ function AnswerList({ run, filter }: { run: Run; filter: ResultsFilter }) {
             <thead className="border-b border-line text-xs text-muted">
               <tr>
                 <th scope="col" className="w-80 px-3 py-2 text-left font-medium">Question</th>
-                <th scope="col" className="px-3 py-2 text-left font-medium">Surface and model</th>
+                <th scope="col" className="px-3 py-2 text-left font-medium">AI app and model</th>
                 <th scope="col" className="px-3 py-2 text-left font-medium">You</th>
-                <th scope="col" className="px-3 py-2 text-right font-medium" title="Competitors the answer named">Competitors</th>
-                <th scope="col" className="px-3 py-2 text-right font-medium" title="Pages the answer cited">Sources</th>
+                <th scope="col" className="px-3 py-2 text-right font-medium">Competitors named</th>
+                <th scope="col" className="px-3 py-2 text-right font-medium">Links</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-line">
@@ -271,7 +276,7 @@ function AnswerList({ run, filter }: { run: Run; filter: ResultsFilter }) {
                     <RowButton label={a.question.text} onClick={() => open(a)} />
                     <span className="font-medium group-hover:underline">{a.question.text}</span>
                   </td>
-                  <td className="px-3 py-2 text-xs" title={fidelityInfo[a.fidelity].detail}>
+                  <td className="px-3 py-2 text-xs">
                     {pairLabel(a)}
                   </td>
                   <td className="px-3 py-2 whitespace-nowrap">{mark(a)}</td>
@@ -295,7 +300,7 @@ function AnswerList({ run, filter }: { run: Run; filter: ResultsFilter }) {
                     <span className="font-medium text-fg">{competitors(a)}</span> competitors
                   </span>
                   <span>
-                    <span className="font-medium text-fg">{a.citation_count}</span> sources
+                    <span className="font-medium text-fg">{a.citation_count}</span> links
                   </span>
                 </span>
               </button>

@@ -1,35 +1,49 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, type LeftOut, type SocialNetwork, type SocialSettings as Settings, type SocialSettingsInput } from "../../api";
+import { Link, useLocation } from "react-router";
+import { api, type Costs, type LeftOut, type SocialNetwork, type SocialSettings as Settings } from "../../api";
 import { ReadOnlyNote, SubmitButton } from "../../config/forms";
-import { keys, useCan, useLeftOut, useSocialSettings } from "../../queries";
+import { keys, useCan, useCosts, useIsAdmin, useLeftOut, useSocialSettings } from "../../queries";
 import { Badge, Button, ConfirmButton, cx, EmptyState, ErrorNote, Field, Icon, inputClass, labelClass, Pending, RelativeTime, selectClass } from "../../ui";
 import { SettingsHeader, SettingsSubhead } from "../settings/Settings";
-import { NetworkMark, networkOrder, networks, weekdays } from "./model";
+import { NetworkMark, networkOrder, networks, socialCost, tregPath, useSaveSocial, weekdays } from "./model";
 
 const maxTerms = 5;
 const fetchEvery = [1, 3, 6, 12, 24];
 
 export function SocialSettings() {
   const settings = useSocialSettings();
+  const costs = useCosts();
+  const leftOut = useLeftOut();
   const canEdit = useCan("config:write");
+  const { hash } = useLocation();
+  const linked = hash === "#left-out" && !settings.isPending && !costs.isPending && !leftOut.isPending;
+  useEffect(() => {
+    if (linked) document.getElementById("left-out")?.scrollIntoView({ block: "start" });
+  }, [linked]);
   return (
     <>
       <SettingsHeader title="Social">
-        Byname searches social networks for posts that name you and sends a digest of them. Leave out your team and your own accounts, and the Social page and the digest
-        show what everyone else says.
+        Byname can watch social networks for mentions, posts that name you, and send you a digest of the new ones. Leave out your team and your company&apos;s own accounts
+        so the Social page and the digest show what other people say.
       </SettingsHeader>
       {!canEdit && <ReadOnlyNote />}
       <div className="space-y-10">
-        {settings.isPending ? <Pending /> : settings.isError ? <ErrorNote error={settings.error} /> : <SearchForm key={JSON.stringify(settings.data)} s={settings.data} canEdit={canEdit} />}
+        {settings.isPending || costs.isPending ? (
+          <Pending />
+        ) : settings.isError ? (
+          <ErrorNote error={settings.error} />
+        ) : (
+          <SearchForm key={JSON.stringify(settings.data)} s={settings.data} costs={costs.data?.social} canEdit={canEdit} />
+        )}
         <LeftOutSection canEdit={canEdit} />
       </div>
     </>
   );
 }
 
-function SearchForm({ s, canEdit }: { s: Settings; canEdit: boolean }) {
-  const qc = useQueryClient();
+function SearchForm({ s, costs, canEdit }: { s: Settings; costs: Costs["social"] | undefined; canEdit: boolean }) {
+  const admin = useIsAdmin();
   const [on, setOn] = useState(s.enabled);
   const [terms, setTerms] = useState<string[]>(s.custom_terms ? s.terms : []);
   const [enabled, setEnabled] = useState<Record<string, boolean>>(Object.fromEntries(s.networks.map((n) => [n.network, n.enabled])));
@@ -37,14 +51,7 @@ function SearchForm({ s, canEdit }: { s: Settings; canEdit: boolean }) {
   const [cadence, setCadence] = useState(s.digest_cadence);
   const [weekday, setWeekday] = useState(s.digest_weekday);
   const [saved, setSaved] = useState(false);
-  const save = useMutation({
-    mutationFn: (body: SocialSettingsInput) => api.social.putSettings(body),
-    onSuccess: (v) => {
-      qc.setQueryData(keys.socialSettings, v);
-      void qc.invalidateQueries({ queryKey: keys.social });
-      setSaved(true);
-    },
-  });
+  const save = useSaveSocial(() => setSaved(true));
   const cleaned = terms.map((t) => t.trim()).filter(Boolean);
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -66,8 +73,10 @@ function SearchForm({ s, canEdit }: { s: Settings; canEdit: boolean }) {
         <label className="flex items-start gap-3 text-sm">
           <input type="checkbox" className="mt-1 size-3.5 accent-[var(--fg)]" checked={on} disabled={!canEdit} onChange={(e) => setOn(e.target.checked)} />
           <span>
-            <span className="font-medium">Search social networks for posts that name you</span>
-            <span className="mt-0.5 block text-muted">Off until you turn it on. Searches through Treg cost money; Bluesky is free. Nothing runs before onboarding is finished.</span>
+            <span className="font-medium">Watch X, Reddit, Hacker News, LinkedIn, YouTube, Threads and Bluesky for mentions</span>
+            <span className="mt-0.5 block text-muted">
+              Off until you turn it on.{costs && ` ${socialCost(s, costs)}`}
+            </span>
           </span>
         </label>
       </section>
@@ -113,7 +122,18 @@ function SearchForm({ s, canEdit }: { s: Settings; canEdit: boolean }) {
 
       <section>
         <SettingsSubhead>Networks</SettingsSubhead>
-        {!s.token_set && <p className="mb-3 text-sm text-muted">No Treg token is stored, so only Bluesky is searched. An admin adds the token under Settings &gt; Credentials.</p>}
+        {!s.token_set && (
+          <p className="mb-3 text-sm text-muted">
+            No Treg token is stored, so only Bluesky is searched.{" "}
+            {admin ? (
+              <Link to={tregPath} className="text-fg underline underline-offset-2">
+                Add the Treg token
+              </Link>
+            ) : (
+              "An admin can add the token in Settings, Treg."
+            )}
+          </p>
+        )}
         <ul className="divide-y divide-line rounded-surface border border-line">
           {s.networks.map((n) => (
             <li key={n.network}>
@@ -180,8 +200,12 @@ function SearchForm({ s, canEdit }: { s: Settings; canEdit: boolean }) {
           )}
         </div>
         <p className="mt-2 text-xs text-muted">
-          The digest goes out when each {cadence === "weekly" ? "week" : "day"} ends in {s.time_zone}, to the notification channels subscribed to Social digest, and shows in the
-          app.
+          The digest lists the new mentions. It shows in Alerts when each {cadence === "weekly" ? "week" : "day"} ends in {s.time_zone}, and goes wherever alerts go that get
+          the Social digest, chosen in{" "}
+          <Link to="/settings/alerts" className="text-fg underline underline-offset-2">
+            Settings, Alerts
+          </Link>
+          .
         </p>
       </section>
 
@@ -208,8 +232,8 @@ function LeftOutSection({ canEdit }: { canEdit: boolean }) {
   for (const l of list.data ?? []) groups.set(l.label, [...(groups.get(l.label) ?? []), l]);
 
   return (
-    <section>
-      <SettingsSubhead>People to leave out</SettingsSubhead>
+    <section id="left-out" className="scroll-mt-4">
+      <SettingsSubhead>People left out</SettingsSubhead>
       <p className="mb-3 text-sm text-muted">
         Posts by these accounts are hidden from the Social page and the digest, past posts included. Byname keeps them, so taking an account off the list brings its posts back.
       </p>
@@ -219,10 +243,10 @@ function LeftOutSection({ canEdit }: { canEdit: boolean }) {
         <ErrorNote error={list.error} />
       ) : groups.size === 0 ? (
         <EmptyState icon="users" title="Nobody is left out">
-          {canEdit ? "Add your teammates' handles and your company's own accounts, so the digest shows what everyone else says." : "An admin or editor can add accounts here."}
+          {canEdit ? "Your team's own posts are included. Add your teammates' handles and your company's own accounts so you see what other people say." : "An admin or editor can add accounts here."}
         </EmptyState>
       ) : (
-        <ul aria-label="People to leave out" className="divide-y divide-line rounded-surface border border-line">
+        <ul aria-label="People left out" className="divide-y divide-line rounded-surface border border-line">
           {[...groups].map(([label, accounts]) => (
             <li key={label} className="px-3 py-2.5">
               <div className="text-sm font-medium [overflow-wrap:anywhere]">{label}</div>

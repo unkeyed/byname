@@ -23,6 +23,8 @@ export const keys = {
   credentials: ["credentials"] as const,
   onboarding: ["onboarding"] as const,
   estimate: ["estimate"] as const,
+  /** Under results, so a finished check refreshes the month's spend. */
+  costs: ["results", "costs"] as const,
   /** Everything a check changes sits under this prefix, so a finished run refreshes it in one call. */
   results: ["results"] as const,
   runs: ["results", "runs"] as const,
@@ -109,6 +111,7 @@ export const useStatus = () => useQuery({ queryKey: keys.status, queryFn: api.st
 export const useSettings = () => useQuery({ queryKey: keys.settings, queryFn: api.settings.get });
 export const useBrands = () => useQuery({ queryKey: keys.brands, queryFn: api.brands.list, staleTime: 60_000 });
 export const useSurfaces = () => useQuery({ queryKey: keys.surfaces, queryFn: api.surfaces.list, staleTime: 60_000 });
+export const useCosts = () => useQuery({ queryKey: keys.costs, queryFn: api.costs });
 export const useOnboarding = () => useQuery({ queryKey: keys.onboarding, queryFn: api.onboarding.get });
 
 /**

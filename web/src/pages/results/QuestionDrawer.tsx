@@ -6,8 +6,9 @@ import { keys, useBrands, useSettings, useSurfaces } from "../../queries";
 import { Markdown } from "../../markdown";
 import { Badge, Button, cx, ErrorNote, Icon, LoadBoundary, Pending, ScrollX, selectClass, useModal } from "../../ui";
 import { useFilter, useView } from "../../view";
-import { PageMark } from "./Gaps";
+import { PageMark } from "./Missed";
 import { Segmented } from "./Header";
+import { CountAnyway, LeftOutBadge, leftOutWhy } from "./Scoring";
 
 /** The question view: open wherever ?q= names a question, with ?qa= naming the answer shown. */
 export function QuestionDrawer() {
@@ -43,9 +44,9 @@ function Mark({ point, onClick, selected }: { point: HistoryPoint | undefined; o
       </span>
     );
   if (point.status === "failed") [body, title] = [<span className="text-faint">Failed</span>, "The call failed"];
-  else if (point.status === "no_answer") [body, title] = [<span className="text-faint">No answer</span>, "The surface showed no AI answer"];
+  else if (point.status === "no_answer") [body, title] = [<span className="text-faint">No answer</span>, "This AI app showed no AI answer"];
   else if (point.mentioned) [body, title] = [<span className="font-semibold text-success">#{point.position ?? "?"}</span>, `Named you at #${point.position}`];
-  else if (point.cited) [body, title] = [<span className="text-info">Cited</span>, "Cited you without naming you"];
+  else if (point.cited) [body, title] = [<span className="text-info">Linked</span>, "Linked to your site without naming you"];
   else [body, title] = [<span className="text-faint">—</span>, "Did not name you"];
   if (!onClick)
     return (
@@ -89,6 +90,15 @@ function Body({ question, onClose }: { question: number; onClose: () => void }) 
         <div className="min-w-0 flex-1">
           <div className="text-xs text-muted">{history.data.question.group || "Question"}</div>
           <h2 className="text-base font-semibold">{history.data.question.text}</h2>
+          {!history.data.question.counts_in_scores && (
+            <div className="mt-2 space-y-1 text-xs text-muted">
+              <p className="flex flex-wrap items-center gap-2">
+                <LeftOutBadge question={history.data.question} />
+                {leftOutWhy}
+              </p>
+              <CountAnyway question={history.data.question} />
+            </div>
+          )}
         </div>
         <Button variant="ghost" size="sm" onClick={onClose} aria-label="Close" icon>
           <Icon name="x" />
@@ -97,7 +107,7 @@ function Body({ question, onClose }: { question: number; onClose: () => void }) 
       {selSeries && selPoint && (
         <div className="flex shrink-0 flex-col gap-2 border-b border-line px-4 py-2.5 sm:flex-row sm:items-center">
           <select
-            aria-label="Surface and model"
+            aria-label="AI app and model"
             className={cx(selectClass, "w-full min-w-0 text-xs sm:w-auto sm:flex-1")}
             value={lineKey(selSeries)}
             onChange={(e) => {
@@ -111,7 +121,7 @@ function Body({ question, onClose }: { question: number; onClose: () => void }) 
               </option>
             ))}
           </select>
-          <Segmented className="self-start sm:self-auto" label="View" value={raw ? "raw" : "analysis"} options={[{ id: "analysis", label: "Analysis" }, { id: "raw", label: "Raw answer" }]} onChange={(v) => view.set({ qv: v === "raw" ? "raw" : null })} />
+          <Segmented className="self-start sm:self-auto" label="View" value={raw ? "raw" : "analysis"} options={[{ id: "analysis", label: "Summary" }, { id: "raw", label: "Full answer" }]} onChange={(v) => view.set({ qv: v === "raw" ? "raw" : null })} />
         </div>
       )}
       <div className="min-h-0 flex-1 space-y-6 overflow-auto px-4 py-4">
@@ -138,7 +148,7 @@ function Body({ question, onClose }: { question: number; onClose: () => void }) 
             <Analysis series={selSeries} point={selPoint} label={labels.line(selSeries.pair)} onRaw={() => view.set({ qv: "raw" })} />
 
             <section>
-              <h3 className="mb-2 text-sm font-semibold">Run history · {labels.line(selSeries.pair)}</h3>
+              <h3 className="mb-2 text-sm font-semibold">Check history · {labels.line(selSeries.pair)}</h3>
               <ol className="divide-y divide-line rounded-surface border border-line bg-surface">
                 {[...selSeries.points].reverse().map((p) => (
                   <li key={p.answer_id}>
@@ -167,7 +177,7 @@ function Body({ question, onClose }: { question: number; onClose: () => void }) 
                     <thead className="border-b border-line text-xs text-muted">
                       <tr>
                         <th scope="col" className="sticky left-0 z-[1] bg-surface px-3 py-2 text-left font-medium shadow-[inset_-1px_0_0_var(--line)]">
-                          Surface and model
+                          AI app and model
                         </th>
                         {runs.map(([id, at]) => (
                           <th key={id} scope="col" className="w-12 min-w-12 px-1 py-2 text-center font-medium" title={`Check #${id}, ${shortDay(at)}`}>
@@ -184,7 +194,7 @@ function Body({ question, onClose }: { question: number; onClose: () => void }) 
                             {(s.pair.model || s.fidelity === "approximation") && (
                               <span className="block font-normal text-muted [overflow-wrap:anywhere]">
                                 {s.pair.model}
-                                {s.fidelity === "approximation" && <span className="text-warn">{s.pair.model && " · "}approx.</span>}
+                                {s.fidelity === "approximation" && <span className="text-warn">{s.pair.model && " · "}stand-in</span>}
                               </span>
                             )}
                           </th>
@@ -203,13 +213,13 @@ function Body({ question, onClose }: { question: number; onClose: () => void }) 
                 </ScrollX>
               </div>
               <p className="mt-1.5 text-xs text-faint">
-                <span className="font-semibold text-success">#2</span> named you at that position. <span className="text-info">Cited</span> cited you without naming you. — did not name you. · not asked. Pick a mark to analyse
-                that answer.
+                <span className="font-semibold text-success">#2</span> named you, as the 2nd brand. <span className="text-info">Linked</span> linked to your site without naming you. — did not name you. · not asked. Pick a mark to
+                see that answer.
               </p>
             </section>
 
             <section>
-              <h3 className="mb-2 text-sm font-semibold">Per model</h3>
+              <h3 className="mb-2 text-sm font-semibold">Each AI app</h3>
               <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 {series.map((s) => (
                   <SeriesSummary key={lineKey(s)} s={s} label={labels.line(s.pair)} />
@@ -223,7 +233,7 @@ function Body({ question, onClose }: { question: number; onClose: () => void }) 
   );
 }
 
-/** The selected pair's answer in one check: where you stood, who was named instead, and what it cited. */
+/** The selected AI app's answer in one check: where you stood, who was named instead, and what it linked to. */
 function Analysis({ series: s, point, label, onRaw }: { series: HistorySeries; point: HistoryPoint; label: string; onRaw: () => void }) {
   const answer = useQuery({ queryKey: keys.answer(point.answer_id), queryFn: () => api.answer(point.answer_id), placeholderData: (prev) => prev });
   const competitors = answer.data?.mentions.filter((m) => m.kind === "competitor") ?? [];
@@ -231,14 +241,14 @@ function Analysis({ series: s, point, label, onRaw }: { series: HistorySeries; p
     <section className="space-y-4">
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
         <div className="rounded-surface border border-line bg-surface px-3 py-2">
-          <div className="text-xs text-muted">Visibility</div>
+          <div className="text-xs text-muted">Named you</div>
           <div className="text-lg font-semibold tabular-nums">
             {s.named} <span className="text-sm font-normal text-muted">of {s.answered} checks</span>
           </div>
         </div>
         <div className="rounded-surface border border-line bg-surface px-3 py-2">
           <div className="text-xs text-muted">Position in check #{point.run_id}</div>
-          <div className="text-lg font-semibold tabular-nums">{point.position ? `#${point.position}` : point.status === "ok" && point.cited ? "Cited" : "–"}</div>
+          <div className="text-lg font-semibold tabular-nums">{point.position ? `#${point.position}` : point.status === "ok" && point.cited ? "Linked" : "–"}</div>
         </div>
         <div className="col-span-2 rounded-surface border border-line bg-surface px-3 py-2 sm:col-span-1">
           <div className="text-xs text-muted">Best position</div>
@@ -246,9 +256,7 @@ function Analysis({ series: s, point, label, onRaw }: { series: HistorySeries; p
         </div>
       </div>
       <p className="flex flex-wrap items-center gap-2 text-xs text-muted">
-        <Badge tone={s.fidelity === "approximation" ? "warn" : "outline"} title={fidelityInfo[s.fidelity].detail}>
-          {fidelityInfo[s.fidelity].label}
-        </Badge>
+        <Badge tone={s.fidelity === "approximation" ? "warn" : "outline"}>{fidelityInfo[s.fidelity].label}</Badge>
         {label}, check #{point.run_id}, {shortDay(point.run_started_at)}.
         <button type="button" onClick={onRaw} className="inline-flex h-11 items-center font-medium text-fg hover:underline md:h-auto">
           Read the answer
@@ -259,7 +267,7 @@ function Analysis({ series: s, point, label, onRaw }: { series: HistorySeries; p
       ) : answer.isError ? (
         <ErrorNote error={answer.error} />
       ) : answer.data.status !== "ok" ? (
-        <p className="text-sm text-muted">{answer.data.status === "failed" ? `The call failed: ${answer.data.error || "no reason given"}.` : "The surface showed no AI answer for this question."}</p>
+        <p className="text-sm text-muted">{answer.data.status === "failed" ? `The call failed: ${answer.data.error || "no reason given"}.` : "This AI app showed no AI answer for this question."}</p>
       ) : (
         <>
           <div>
@@ -280,9 +288,9 @@ function Analysis({ series: s, point, label, onRaw }: { series: HistorySeries; p
             )}
           </div>
           <div>
-            <h3 className="mb-2 text-sm font-semibold">Sources cited</h3>
+            <h3 className="mb-2 text-sm font-semibold">Pages it linked to</h3>
             {answer.data.citations.length === 0 ? (
-              <p className="text-sm text-muted">This answer cited no pages.</p>
+              <p className="text-sm text-muted">This answer linked to no pages.</p>
             ) : (
               <ol className="divide-y divide-line rounded-surface border border-line bg-surface text-xs">
                 {answer.data.citations.map((c, i) => (
@@ -319,13 +327,11 @@ function SeriesSummary({ s, label }: { s: HistorySeries; label: string }) {
     <li className="min-w-0 rounded-surface border border-line bg-surface px-3 py-2">
       <div className="flex flex-wrap items-start justify-between gap-x-2 gap-y-1">
         <span className="min-w-0 text-sm font-medium [overflow-wrap:anywhere]">{label}</span>
-        <Badge tone={s.fidelity === "approximation" ? "warn" : "outline"} title={fidelityInfo[s.fidelity].detail}>
-          {fidelityInfo[s.fidelity].label}
-        </Badge>
+        <Badge tone={s.fidelity === "approximation" ? "warn" : "outline"}>{fidelityInfo[s.fidelity].label}</Badge>
       </div>
       <p className="mt-1 text-xs text-muted">
         Named you in {s.named} of {s.answered} {s.answered === 1 ? "check" : "checks"}
-        {s.best_position ? `, best #${s.best_position}` : ""}. Cited you in {s.cited}.
+        {s.best_position ? `, best position #${s.best_position}` : ""}. Linked to your site in {s.cited}.
       </p>
       <p className="text-xs text-faint">Latest: {latest.summary || (latest.mentioned ? `named at #${latest.position}` : "not named")}</p>
     </li>
@@ -365,9 +371,9 @@ function AnswerView({ id }: { id: number }) {
     <div className="rounded-surface border border-line bg-surface">
       <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2 text-xs text-muted">
         {a.mentioned ? <Badge tone="success">Named you at #{a.position}</Badge> : <Badge>Not named</Badge>}
-        {a.cited && <Badge tone="info">Cited you</Badge>}
+        {a.cited && <Badge tone="info">Linked to your site</Badge>}
         {a.reported_model && <span>Model {a.reported_model}</span>}
-        <span>{a.cost_usd == null ? <span className="text-warn">No cost reported</span> : usd(a.cost_usd)}</span>
+        <span>{a.cost_usd == null ? <span className="text-warn">No price reported</span> : usd(a.cost_usd)}</span>
         <span className="ml-auto flex items-center gap-2">
           <mark className="rounded-inner bg-you px-1 font-semibold text-you-fg">You</mark>
           <mark className="rounded-inner bg-subtle-strong px-1 text-fg">Competitor</mark>
@@ -376,7 +382,7 @@ function AnswerView({ id }: { id: number }) {
       {a.status === "failed" ? (
         <p className="px-3 py-3 text-sm text-danger">The call failed: {a.error || "no reason given"}.</p>
       ) : a.status === "no_answer" ? (
-        <p className="px-3 py-3 text-sm text-muted">The surface showed no AI answer for this question.</p>
+        <p className="px-3 py-3 text-sm text-muted">This AI app showed no AI answer for this question.</p>
       ) : (
         <div className="max-h-[28rem] overflow-auto px-3 py-3 text-sm leading-relaxed [overflow-wrap:anywhere]">
           <Markdown text={a.text} mark={mark} />
@@ -384,7 +390,7 @@ function AnswerView({ id }: { id: number }) {
       )}
       {a.citations.length > 0 && (
         <div className="border-t border-line px-3 py-2">
-          <h4 className="mb-1 text-xs font-medium text-muted">Cited</h4>
+          <h4 className="mb-1 text-xs font-medium text-muted">Links</h4>
           <ol className="space-y-0.5 text-xs">
             {a.citations.map((c, i) => (
               <li key={i} className="flex items-center gap-2">
@@ -400,7 +406,7 @@ function AnswerView({ id }: { id: number }) {
       )}
       {a.fan_out && a.fan_out.length > 0 && (
         <div className="border-t border-line px-3 py-2 text-xs">
-          <span className="text-muted">The engine searched for </span>
+          <span className="text-muted">The AI searched Google for </span>
           {a.fan_out.map((f, i) => (
             <span key={i}>
               {i > 0 && ", "}“{f}”

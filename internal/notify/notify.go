@@ -265,7 +265,7 @@ func (s *Service) deliver(ctx context.Context, id, alertID, channelID int64) err
 		return err
 	}
 	if !ch.Enabled {
-		return errors.New("the channel was turned off before this was sent")
+		return errors.New("alerts here were turned off before this was sent")
 	}
 	info, ok := lookup(k)
 	if !ok {
@@ -301,7 +301,7 @@ func (s *Service) envelope(id string, p Payload, channel string, created time.Ti
 	if m.Lines == nil {
 		m.Lines = []string{}
 	}
-	return envelope{ID: id, Kind: p.Kind(), Message: m, URL: s.link(m.Path), Settings: s.link("/settings/notifications"), Channel: channel, CreatedAt: created}
+	return envelope{ID: id, Kind: p.Kind(), Message: m, URL: s.link(m.Path), Settings: s.link("/settings/alerts"), Channel: channel, CreatedAt: created}
 }
 
 func (s *Service) link(path string) string {

@@ -2,9 +2,9 @@ import { useSearchParams } from "react-router";
 import type { Grouping, ResultsFilter, Run } from "./api";
 import { useAnsweredRuns } from "./queries";
 
-/** Date range presets. days counts back from today; latest is the newest run alone. */
+/** Date range presets. days counts back from today; latest is the newest check alone. */
 export const ranges = [
-  { id: "latest", label: "Latest run" },
+  { id: "latest", label: "Latest check" },
   { id: "7d", label: "7 days", days: 7 },
   { id: "14d", label: "14 days", days: 14 },
   { id: "30d", label: "30 days", days: 30 },

@@ -2,33 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router";
 import { api, type Alert } from "../api";
 import { keys, useAlerts, useMe } from "../queries";
-import { Button, buttonClass, Card, cx, EmptyState, ErrorNote, Icon, PageHeader, Pending, RelativeTime } from "../ui";
-
-/** The alerts indicator: a bell with the unread count, linking to the alerts list. */
-export function AlertsBell({ className, onNavigate }: { className?: string; onNavigate?: () => void }) {
-  const alerts = useAlerts();
-  const unread = alerts.data?.unread ?? 0;
-  const label = unread ? `Alerts, ${unread} unread` : "Alerts";
-  return (
-    <Link to="/alerts" onClick={onNavigate} aria-label={label} title={label} className={cx(buttonClass({ variant: "ghost", size: "sm", icon: true }), "relative", className)}>
-      <BellIcon />
-      {unread > 0 && (
-        <span className="absolute -top-0.5 -right-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-danger px-1 text-[0.625rem] leading-none font-semibold text-surface tabular-nums">
-          {unread > 99 ? "99+" : unread}
-        </span>
-      )}
-    </Link>
-  );
-}
-
-function BellIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" className="size-4 shrink-0" aria-hidden="true">
-      <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
-      <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
-    </svg>
-  );
-}
+import { Button, Card, cx, EmptyState, ErrorNote, Icon, PageHeader, Pending, RelativeTime } from "../ui";
 
 /** Every alert this person may see, newest first. Opening one marks it read. */
 export function Alerts() {
@@ -53,13 +27,14 @@ export function Alerts() {
       <div className="relative min-h-0 flex-1 overflow-auto">
         <div className="mx-auto max-w-3xl space-y-3 px-4 py-6 pb-16 md:px-8">
           <p className="text-sm text-muted">
-            Byname raises an alert when a check finishes, stops or reaches its spend cap, and when a model leaves its list.
+            Alerts tell you what changed. One arrives when a check finishes, stops or reaches its spend cap, when an AI app stops offering a model, when your Google
+            clicks move or reach a goal, when a site change gets its final result, and with the social digest of new mentions.
             {me.data?.role === "admin" ? (
               <>
                 {" "}
-                Send them by email, to Slack or to a webhook under{" "}
-                <Link to="/settings/notifications" className="text-fg underline underline-offset-2">
-                  Settings, Notifications
+                To also get them by email, in Slack or at a webhook, choose where alerts go in{" "}
+                <Link to="/settings/alerts" className="text-fg underline underline-offset-2">
+                  Settings, Alerts
                 </Link>
                 .
               </>

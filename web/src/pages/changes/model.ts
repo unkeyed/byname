@@ -2,28 +2,28 @@ import { useMemo } from "react";
 import type { Change, ChangeDeltas, ChangeKind, ChangeMetric, ChangeOutcome, ChangeStage, ChangeStepKind, ChangeThresholds, RepoStatus } from "../../api";
 import type { IconName, Tone } from "../../ui";
 import { useSettings } from "../../queries";
-import { fullDay } from "../search/model";
+import { figureInfo, fullDay } from "../search/model";
 
 export const kindInfo: Record<ChangeKind, string> = { new_page: "New page", edit: "Edit", removed: "Removed" };
 export const changeKinds = Object.keys(kindInfo) as ChangeKind[];
 
 export const outcomeInfo: Record<ChangeOutcome, { label: string; tone: Tone; detail: string }> = {
-  improved: { label: "Improved", tone: "success", detail: "At least one metric passed its threshold for the better against the control pages, and none for the worse." },
-  worsened: { label: "Worsened", tone: "danger", detail: "At least one metric passed its threshold for the worse against the control pages, and none for the better." },
-  no_change: { label: "No change", tone: "neutral", detail: "No metric passed its threshold against the control pages, or they pointed different ways." },
-  insufficient_data: { label: "Not enough data", tone: "warn", detail: "Byname could not compare the page with the control pages." },
+  improved: { label: "Helped", tone: "success", detail: "Appearances, click rate or position moved for the better by more than its margin, compared with the comparison pages, and none moved for the worse." },
+  worsened: { label: "Hurt", tone: "danger", detail: "Appearances, click rate or position moved for the worse by more than its margin, compared with the comparison pages, and none moved for the better." },
+  no_change: { label: "No clear change", tone: "neutral", detail: "Nothing moved by more than its margin compared with the comparison pages, or the numbers pointed different ways." },
+  insufficient_data: { label: "Not enough data", tone: "warn", detail: "Byname couldn't compare the page with the comparison pages." },
 };
 
-/** Before the final read, the stage is what a change shows; after it, the verdict. */
+/** Before the final result, the stage is what a change shows; after it, the result. */
 export const stageInfo: Record<ChangeStage, { label: string; tone: Tone; detail: (c: Change) => string }> = {
   awaiting_crawl: {
     label: "Waiting for Google",
     tone: "outline",
-    detail: () => "Google has not crawled the page since the change. Byname asks Search Console's URL Inspection every day.",
+    detail: () => "Google hasn't looked at the page since the change. Byname asks Google about it every day.",
   },
-  awaiting_interim: { label: "Interim read due", tone: "info", detail: (c) => `Google has crawled the page. The interim read is due ${c.interim_on ? fullDay(c.interim_on) : "soon"}.` },
-  awaiting_verdict: { label: "Verdict due", tone: "info", detail: (c) => `The interim read is in. The final read is due ${c.verdict_on ? fullDay(c.verdict_on) : "soon"}.` },
-  decided: { label: "Decided", tone: "neutral", detail: () => "The final read is in." },
+  awaiting_interim: { label: "First result due", tone: "info", detail: (c) => `Google saw the change. The first result is due ${c.interim_on ? fullDay(c.interim_on) : "soon"}.` },
+  awaiting_verdict: { label: "Final result due", tone: "info", detail: (c) => `The first result is in. The final result is due ${c.verdict_on ? fullDay(c.verdict_on) : "soon"}.` },
+  decided: { label: "Done", tone: "neutral", detail: () => "The final result is in." },
 };
 
 export const changeStatus = (c: Change) => {
@@ -35,7 +35,7 @@ export const changeStatus = (c: Change) => {
 const signedFmt = new Intl.NumberFormat(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2, signDisplay: "exceptZero" });
 const ratioFmt = new Intl.NumberFormat(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-/** The three differences in differences, each read against its threshold. */
+/** The three differences in differences, each read against its margin. */
 export const deltaMetrics: {
   metric: ChangeMetric;
   label: string;
@@ -46,36 +46,36 @@ export const deltaMetrics: {
 }[] = [
   {
     metric: "position",
-    label: "Position",
+    label: figureInfo.position.label,
     value: (d) => d.position,
     format: (v) => `${signedFmt.format(v)} places`,
     threshold: (t) => `${t.position} places either way`,
-    reading: "Negative is better: the page moved up against the controls.",
+    reading: "Negative is better: the page moved up compared with the comparison pages.",
   },
   {
     metric: "ctr",
-    label: "CTR",
+    label: figureInfo.ctr.label,
     value: (d) => d.ctr_points,
-    format: (v) => `${signedFmt.format(v)} pts`,
-    threshold: (t) => `${t.ctr_points} pts either way`,
-    reading: "Percentage points, against the controls.",
+    format: (v) => `${signedFmt.format(v)} points`,
+    threshold: (t) => `${t.ctr_points} points either way`,
+    reading: "Percentage points, compared with the comparison pages.",
   },
   {
     metric: "impressions",
-    label: "Impressions",
+    label: figureInfo.impressions.label,
     value: (d) => d.impressions_ratio,
     format: (v) => `×${ratioFmt.format(v)}`,
     threshold: (t) => `×${ratioFmt.format(t.impressions_ratio)} or ×${ratioFmt.format(1 / t.impressions_ratio)}`,
-    reading: "The page's after over before, divided by the controls'. Above 1 means it gained on them.",
+    reading: "The page's appearances after over before, divided by the comparison pages'. Above 1 means it gained on them.",
   },
 ];
 
 export const stepInfo: Record<ChangeStepKind, { label: (c: Change) => string; icon: IconName }> = {
   merged: { label: (c) => (c.source === "manual" ? "Logged" : "Merged"), icon: "merge" },
-  inspected: { label: () => "URL Inspection", icon: "search" },
-  crawled: { label: () => "Google crawled it", icon: "globe" },
-  interim: { label: () => "Interim read", icon: "chart" },
-  verdict: { label: () => "Final read", icon: "check" },
+  inspected: { label: () => "Asked Google about the page", icon: "search" },
+  crawled: { label: () => "Google saw it", icon: "globe" },
+  interim: { label: () => "First result", icon: "chart" },
+  verdict: { label: () => "Final result", icon: "check" },
 };
 
 /** Where changes come from, which decides what an empty list asks for. */
@@ -109,7 +109,7 @@ function validZone(tz: string): string {
   }
 }
 
-/** Times in the instance's time zone, which places interim and verdict days too. */
+/** Times in the instance's time zone, which places first and final result days too. */
 export function useZone() {
   const settings = useSettings();
   const zone = validZone(settings.data?.time_zone || "UTC");

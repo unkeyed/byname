@@ -16,9 +16,9 @@ export const scopes = ["results:read", "runs:write", "config:write"] as const;
 export type Scope = (typeof scopes)[number];
 
 export const scopeInfo: Record<Scope, { title: string; detail: string }> = {
-  "results:read": { title: "Read results", detail: "Runs, answers, questions, brands, Search Console data and settings. Never secrets." },
-  "runs:write": { title: "Run checks", detail: "Queue a check, and pause or resume the schedule." },
-  "config:write": { title: "Change setup", detail: "Edit the brand, competitors, questions, surfaces and schedule." },
+  "results:read": { title: "Read results", detail: "Checks, answers, questions, brands, Search Console data and settings. Never secrets." },
+  "runs:write": { title: "Start checks", detail: "Start a check, and pause or resume the schedule." },
+  "config:write": { title: "Change setup", detail: "Edit the brand, competitors, questions, AI apps and schedule." },
 };
 
 /** core.Roles. Admin and editor have every scope, viewer reads; only admins manage keys, apps and the team. */
@@ -27,7 +27,7 @@ export type Role = (typeof roles)[number];
 
 export const roleInfo: Record<Role, string> = {
   admin: "Everything, including API keys, connected apps and the team",
-  editor: "Reads results, runs checks and changes setup",
+  editor: "Reads results, starts checks and changes setup",
   viewer: "Reads results",
 };
 
@@ -551,6 +551,8 @@ export interface Run {
   spend_missing_calls: number;
   calls: number;
   succeeded: number;
+  /** Answers that did not fail and count in scores; mentioned and cited are out of these. */
+  scored: number;
   mentioned: number;
   cited: number;
   error: string;
@@ -581,6 +583,8 @@ export interface QuestionRef {
   id: number;
   group: string;
   text: string;
+  /** False when its answers are left out of scores, as for a question that names your brand. Its answers are still shown. */
+  counts_in_scores: boolean;
 }
 
 /** One line: a pair (or a surface) on one endpoint at one fidelity. */

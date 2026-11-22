@@ -4,13 +4,13 @@ import { api, type BrandPoint, type Day, type GscStatus } from "../../api";
 import { LineChart, LineKey, niceTicks, type ChartLine } from "../../charts";
 import { keys, useSettings } from "../../queries";
 import { Badge, Button, Card, CardHeader, cx, Dialog, DialogBody, ErrorNote, Icon, inputClass, Pending, ScrollX } from "../../ui";
-import { compact, count, day, longDay, useSearchBrand } from "./model";
+import { compact, count, day, figureInfo, longDay, useSearchBrand } from "./model";
 
 /** The three kinds of click a window splits into, in legend order. Your brand is drawn in ink, as everywhere. */
 const kinds: { key: keyof Omit<BrandPoint, "date" | "clicks">; label: string; color: string; detail: string }[] = [
-  { key: "brand_clicks", label: "Brand", color: "var(--you)", detail: "Queries containing a branded term" },
-  { key: "non_brand_clicks", label: "Non-brand", color: "var(--series-1)", detail: "Named queries without a branded term" },
-  { key: "anonymized_clicks", label: "Anonymized", color: "var(--faint)", detail: "Queries Google hides for privacy; never counted as non-brand" },
+  { key: "brand_clicks", label: "With your name", color: "var(--you)", detail: "Clicks from searches that include your name or another branded term." },
+  { key: "non_brand_clicks", label: figureInfo.non_brand.label, color: "var(--series-1)", detail: figureInfo.non_brand.hint },
+  { key: "anonymized_clicks", label: "Hidden by Google", color: "var(--faint)", detail: "Clicks from searches Google keeps private. Never counted as searches without your name." },
 ];
 
 export function BrandCard({ status, from, canEdit }: { status: GscStatus; from: Day; canEdit: boolean }) {
@@ -20,7 +20,7 @@ export function BrandCard({ status, from, canEdit }: { status: GscStatus; from: 
   let body;
   if (brand.isPending) body = <Pending />;
   else if (brand.isError) body = <div className="px-4 pb-4"><ErrorNote error={brand.error} /></div>;
-  else if (brand.data.points.length === 0) body = <p className="px-4 pb-6 text-sm text-muted">A window needs 28 days of data. This shows once 28 days are stored.</p>;
+  else if (brand.data.points.length === 0) body = <p className="px-4 pb-6 text-sm text-muted">Each point adds up 28 days, so this shows once Byname has 28 days from Google.</p>;
   else {
     const pts = brand.data.points;
     const xs = pts.map((p) => ({ key: p.date, label: day(p.date), title: `28 days to ${longDay(p.date)}` }));
@@ -28,7 +28,7 @@ export function BrandCard({ status, from, canEdit }: { status: GscStatus; from: 
     const latest = pts[pts.length - 1];
     body = (
       <div className={cx("grid grid-cols-[minmax(0,1fr)] gap-4 px-4 pb-4 lg:grid-cols-[minmax(0,1fr)_14rem]", brand.isPlaceholderData && "opacity-60")}>
-        <LineChart xs={xs} lines={lines} ticks={niceTicks(Math.max(...pts.flatMap((p) => kinds.map((k) => p[k.key]))))} format={compact} height={220} label="Brand, non-brand and anonymized clicks over trailing 28-day windows" />
+        <LineChart xs={xs} lines={lines} ticks={niceTicks(Math.max(...pts.flatMap((p) => kinds.map((k) => p[k.key]))))} format={compact} height={220} label="Clicks from searches with your name, without it and hidden by Google, over each 28 days" />
         <div className="space-y-3 self-start">
           <ul aria-label={`The 28 days to ${day(latest.date)}`} className="space-y-2 text-xs">
             {kinds.map((k) => (
@@ -42,11 +42,11 @@ export function BrandCard({ status, from, canEdit }: { status: GscStatus; from: 
               </li>
             ))}
           </ul>
-          <p className="text-xs text-faint">Latest window: the 28 days to {day(latest.date)}.</p>
+          <p className="text-xs text-faint">Numbers for the 28 days to {day(latest.date)}.</p>
         </div>
         <div className="space-y-1.5 text-xs lg:col-span-2">
           <div className="flex flex-wrap items-center gap-1.5">
-            <span className="text-muted">Brand means the query contains</span>
+            <span className="text-muted">A search includes your name when it contains</span>
             {brand.data.terms.map((t) => (
               <Badge key={t} tone="outline">
                 {t}
@@ -93,7 +93,7 @@ export function BrandCard({ status, from, canEdit }: { status: GscStatus; from: 
 
   return (
     <Card>
-      <CardHeader title="Brand against non-brand clicks" description="Clicks in the 28 days up to each day, by whether the query named your brand. Windows end on final days only.">
+      <CardHeader title="Searches with and without your name" description="Clicks in the 28 days up to each day, split by whether the search included your name. Searches without your name come from people who didn't know you yet. Only days Google has finished counting.">
         {canEdit && (
           <Button size="sm" onClick={() => setEditing(true)}>
             <Icon name="tag" className="size-3.5" />
@@ -135,7 +135,7 @@ function TermsForm({ onDone }: { onDone: () => void }) {
     <DialogBody>
       <div className="space-y-4">
         <p className="text-sm text-muted">
-          A Search Console query that contains any of these is brand. Matching ignores case. {settings.data.branded_terms_default && terms === null ? "These are the default: your brand's name and aliases." : "The default is your brand's name and aliases."}
+          A Google search that contains any of these counts as including your name. Capitals don&apos;t matter. {settings.data.branded_terms_default && terms === null ? "These are the default: your brand's name and aliases." : "The default is your brand's name and aliases."}
         </p>
         <div className="flex min-h-8 flex-wrap gap-1.5" aria-label="Terms">
           {list.length === 0 ? (

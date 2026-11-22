@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, goalMetrics, goalWindows, type Goal, type GoalInput, type GoalMetric, type GoalWindow, type GscStatus } from "../../api";
 import { dataVersion, keys } from "../../queries";
 import { Badge, Button, Card, CardHeader, ConfirmButton, Dialog, DialogBody, EmptyState, ErrorNote, Field, Icon, inputClass, Pending, selectClass } from "../../ui";
-import { count, dayRange, fullDay, metricInfo, windowInfo } from "./model";
+import { count, dayRange, fullDay, metricHint, metricInfo, windowInfo } from "./model";
 
 /** Goal KPIs: each goal's metric over its trailing window against the target, with add, edit and delete for editors. */
 export function GoalsCard({ status, canEdit }: { status: GscStatus; canEdit: boolean }) {
@@ -30,7 +30,7 @@ export function GoalsCard({ status, canEdit }: { status: GscStatus; canEdit: boo
             ) : undefined
           }
         >
-          {canEdit ? "Set a target for clicks, impressions or non-brand clicks over 28 days or 3 months, and the date to reach it by." : "Nobody has set a goal. Someone with the Editor or Admin role can add one."}
+          {canEdit ? "Set a target for clicks, appearances or searches without your name over 28 days or 3 months, and the date to reach it by." : "Nobody has set a goal. Someone with the Editor or Admin role can add one."}
         </EmptyState>
       </div>
     );
@@ -54,7 +54,7 @@ export function GoalsCard({ status, canEdit }: { status: GscStatus; canEdit: boo
 
   return (
     <Card>
-      <CardHeader title="Goals" description="Each goal counts its metric over the trailing window that ends on the latest final day.">
+      <CardHeader title="Goals" description="Targets you set. Each goal adds up the last 28 days or 3 months, up to the latest day Google has finished counting.">
         {canEdit && goals.data && goals.data.length > 0 && (
           <Button size="sm" onClick={() => setEditing("new")}>
             <Icon name="plus" className="size-3.5" />
@@ -79,7 +79,10 @@ function GoalTile({ goal: g, actions }: { goal: Goal; actions?: React.ReactNode 
   return (
     <li className="flex flex-col gap-1.5 rounded-surface border border-line px-3 py-3">
       <div className="flex items-start justify-between gap-2">
-        <h3 className="text-xs font-medium text-muted">{goalName(g)}</h3>
+        <div className="min-w-0">
+          <h3 className="text-xs font-medium text-muted">{goalName(g)}</h3>
+          <p className="text-xs text-faint">{metricHint(g.metric)}</p>
+        </div>
         {actions && <div className="-my-1 -mr-1 flex shrink-0 items-center">{actions}</div>}
       </div>
       <div className="flex flex-wrap items-baseline gap-x-1.5">
@@ -109,7 +112,7 @@ function GoalTile({ goal: g, actions }: { goal: Goal; actions?: React.ReactNode 
       {p && (
         <div className="text-xs text-faint">
           {dayRange(p.from, p.to)}
-          {p.days_with_data < g.window_days && `, only ${p.days_with_data} of ${g.window_days} days stored`}
+          {p.days_with_data < g.window_days && `, only ${p.days_with_data} of ${g.window_days} days in so far`}
         </div>
       )}
     </li>
@@ -139,7 +142,7 @@ function GoalForm({ goal, onDone }: { goal: Goal | null; onDone: () => void }) {
     <DialogBody>
       <form onSubmit={submit} className="space-y-4">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <Field label="Metric">
+          <Field label="What to count" hint={metricHint(metric)}>
             <select className={selectClass + " w-full"} value={metric} onChange={(e) => setMetric(e.target.value as GoalMetric)} disabled={!!goal}>
               {goalMetrics.map((m) => (
                 <option key={m} value={m}>
@@ -148,16 +151,16 @@ function GoalForm({ goal, onDone }: { goal: Goal | null; onDone: () => void }) {
               ))}
             </select>
           </Field>
-          <Field label="Window">
+          <Field label="Over">
             <select className={selectClass + " w-full"} value={windowDays} onChange={(e) => setWindowDays(Number(e.target.value) as GoalWindow)} disabled={!!goal}>
               {goalWindows.map((w) => (
                 <option key={w} value={w}>
-                  Trailing {windowInfo[w]}
+                  The last {windowInfo[w]}
                 </option>
               ))}
             </select>
           </Field>
-          <Field label="Target" hint={`${metricInfo[metric]} over the trailing ${windowInfo[windowDays]}.`}>
+          <Field label="Target" hint={`${metricInfo[metric]} over the last ${windowInfo[windowDays]}.`}>
             <input className={inputClass} inputMode="numeric" required value={target} onChange={(e) => setTarget(e.target.value)} placeholder="2400" data-autofocus />
           </Field>
           <Field label="Due">
@@ -165,9 +168,9 @@ function GoalForm({ goal, onDone }: { goal: Goal | null; onDone: () => void }) {
           </Field>
         </div>
         {goal ? (
-          <p className="text-xs text-muted">To track another metric or window, add a new goal.</p>
+          <p className="text-xs text-muted">To count something else or over another span, add a new goal.</p>
         ) : (
-          <p className="text-xs text-muted">A goal with the same metric, window and due date is replaced.</p>
+          <p className="text-xs text-muted">A goal that counts the same thing over the same span with the same due date is replaced.</p>
         )}
         <div className="flex justify-end gap-2">
           <Button onClick={onDone}>Cancel</Button>

@@ -2,29 +2,15 @@ import { useState, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, Navigate, NavLink, Outlet, useLocation, useNavigate } from "react-router";
 import { api, ApiError } from "./api";
-import { useCan, useMe, useStatus } from "./queries";
+import { useAlerts, useCan, useMe, useStatus } from "./queries";
 import { NotSetUp } from "./pages/onboarding/Onboarding";
 import { Toaster } from "./components/Toaster";
 import { QuestionDrawer } from "./pages/results/QuestionDrawer";
 import { EngineDrawer } from "./pages/results/EngineDrawer";
-import { AlertsBell } from "./pages/Alerts";
 import { useView } from "./view";
+import { nav } from "./nav";
 import { useTheme, type ThemeMode } from "./theme";
 import { Avatar, Button, buttonClass, Crumbs, cx, EmptyState, ErrorNote, Icon, LoadBoundary, Logo, NavMenu, PageHeader, Spinner, useModal, useWide, type IconName } from "./ui";
-
-/** The app's pages. soon is what a page will show, for those not built yet. */
-export const nav: { to: string; label: string; icon: IconName; soon?: string }[] = [
-  { to: "/", label: "Overview", icon: "chart" },
-  { to: "/prompts", label: "Prompts", icon: "message" },
-  { to: "/competitors", label: "Competitors", icon: "users" },
-  { to: "/gaps", label: "Gaps", icon: "alert" },
-  { to: "/compare", label: "Compare", icon: "layers" },
-  { to: "/search", label: "Search", icon: "globe" },
-  { to: "/changes", label: "Changes", icon: "pencil" },
-  { to: "/social", label: "Social", icon: "message" },
-  { to: "/runs", label: "Runs", icon: "refresh" },
-  { to: "/settings", label: "Settings", icon: "settings" },
-];
 
 const themes: { mode: ThemeMode; icon: IconName; label: string }[] = [
   { mode: "system", icon: "monitor", label: "System theme" },
@@ -128,6 +114,7 @@ function NavBody({ label, theme: [theme, setTheme], rail, onNavigate, close }: {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const filters = useView().filterSearch();
+  const unread = useAlerts().data?.unread ?? 0;
   const wideOnly = rail ? "hidden lg:block" : "block";
 
   const logout = async () => {
@@ -144,23 +131,16 @@ function NavBody({ label, theme: [theme, setTheme], rail, onNavigate, close }: {
       <div className={cx("flex h-12 shrink-0 items-center gap-2", rail ? "justify-center lg:justify-start lg:px-4" : "pr-2 pl-4")}>
         <Logo />
         <span className={cx(wideOnly, "text-sm font-semibold")}>Byname</span>
-        <span className={cx("ml-auto flex items-center gap-1", rail && "hidden lg:flex")}>
-          <AlertsBell onNavigate={onNavigate} />
-          {close}
-        </span>
+        {close && <span className="ml-auto flex items-center gap-1">{close}</span>}
       </div>
-      {rail && (
-        <div className="flex justify-center lg:hidden">
-          <AlertsBell />
-        </div>
-      )}
       <nav aria-label="Main" className="flex flex-col gap-0.5 px-2 py-2">
         {nav.map((n) => (
           <NavLink
             key={n.to}
-            to={n.to === "/settings" ? n.to : n.to + filters}
+            to={n.filters ? n.to + filters : n.to}
             end={n.to === "/"}
             title={rail ? n.label : undefined}
+            aria-label={n.to === "/alerts" && unread ? `${n.label}, ${unread} unread` : undefined}
             onClick={onNavigate}
             className={({ isActive }) =>
               cx(
@@ -170,8 +150,20 @@ function NavBody({ label, theme: [theme, setTheme], rail, onNavigate, close }: {
               )
             }
           >
-            <Icon name={n.icon} />
-            <span className={wideOnly}>{n.label}</span>
+            <span className="relative">
+              <Icon name={n.icon} />
+              {n.to === "/alerts" && unread > 0 && (
+                <span className={cx(rail ? "lg:hidden" : "hidden", "absolute -top-1.5 -right-2 grid h-3.5 min-w-3.5 place-items-center rounded-full bg-danger px-0.5 text-[0.625rem] leading-none font-semibold text-surface tabular-nums")}>
+                  {unread > 99 ? "99+" : unread}
+                </span>
+              )}
+            </span>
+            <span className={cx(wideOnly, "flex-1")}>{n.label}</span>
+            {n.to === "/alerts" && unread > 0 && (
+              <span className={cx(rail ? "hidden lg:grid" : "grid", "h-4 min-w-4 place-items-center rounded-full bg-danger px-1 text-[0.625rem] leading-none font-semibold text-surface tabular-nums")}>
+                {unread > 99 ? "99+" : unread}
+              </span>
+            )}
           </NavLink>
         ))}
       </nav>
@@ -234,10 +226,10 @@ export function NotFound({
 }: {
   title?: string;
   body?: string;
-  /** The page to go back to, as in "Overview". */
+  /** The page to go back to, as in "This week". */
   parent?: { label: string; to: string };
 }) {
-  const back = parent ?? { label: "Overview", to: "/" };
+  const back = parent ?? { label: "This week", to: "/" };
   return (
     <>
       <PageHeader title={parent ? <Crumbs parent={parent.label} to={parent.to} current="Not found" /> : "Not found"} />

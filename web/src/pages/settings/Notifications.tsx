@@ -35,7 +35,7 @@ const kinds: Record<ChannelKind, { label: string; icon: IconName; blurb: string 
 };
 const kindOrder: ChannelKind[] = ["smtp", "email_api", "slack_webhook", "webhook"];
 
-/** What a new channel subscribes to: everything about checks and models. */
+/** What a new place gets: every alert about checks and models. */
 const defaultEvents: EventKindName[] = ["check_completed", "check_refused", "check_failed", "spend_cap_reached", "pair_paused"];
 
 const tlsModes: { value: SMTPTLS; label: string }[] = [
@@ -49,9 +49,9 @@ const useChannels = () => useQuery({ queryKey: keys.channels, queryFn: api.chann
 export function Notifications() {
   return (
     <>
-      <SettingsHeader title="Notifications">
-        Alerts always show in the app, under the bell. Add a channel to also send them by email, to Slack or to a webhook. Each channel gets only the
-        events you tick.
+      <SettingsHeader title="Alerts">
+        Alerts tell you what changed, and every one shows in the app under the bell. Choose where else they go: an email address, a Slack channel or a webhook. Each place
+        gets only the alerts you tick.
       </SettingsHeader>
       <Channels />
       <DeliveryLog />
@@ -68,26 +68,26 @@ function Channels() {
   return (
     <>
       <div className="mb-3 flex items-center justify-between gap-3">
-        <h3 className="text-sm font-semibold">Channels</h3>
+        <h3 className="text-sm font-semibold">Where alerts go</h3>
         <Button variant="primary" onClick={() => setEditing("new")}>
           <Icon name="plus" className="size-3.5" />
-          Add channel
+          Add a place
         </Button>
       </div>
       {channels.length === 0 ? (
-        <EmptyState icon="mail" title="No channels yet">
-          Alerts show in the app only. Add email, Slack or a webhook to send them where your team already looks.
+        <EmptyState icon="mail" title="Alerts show in the app only">
+          Add an email address, Slack or a webhook to send them where your team already looks.
         </EmptyState>
       ) : (
         <Card>
-          <ul aria-label="Notification channels" className="divide-y divide-line">
+          <ul aria-label="Where alerts go" className="divide-y divide-line">
             {channels.map((c) => (
               <ChannelRow key={c.id} channel={c} events={events} onEdit={() => setEditing(c)} />
             ))}
           </ul>
         </Card>
       )}
-      <Dialog open={editing !== null} onClose={() => setEditing(null)} title={editing === "new" ? "Add a channel" : "Edit channel"} wide>
+      <Dialog open={editing !== null} onClose={() => setEditing(null)} title={editing === "new" ? "Add a place to send alerts" : `Edit ${editing?.name ?? ""}`} wide>
         {editing !== null && <ChannelForm channel={editing === "new" ? undefined : editing} events={events} onDone={() => setEditing(null)} />}
       </Dialog>
     </>
@@ -141,7 +141,7 @@ function ChannelRow({ channel: c, events, onEdit }: { channel: NotificationChann
         <div className="text-xs text-muted [overflow-wrap:anywhere]">{channelTarget(c)}</div>
         <div className="flex flex-wrap gap-1">
           {c.events.length === 0 ? (
-            <Badge tone="warn">No events</Badge>
+            <Badge tone="warn">No alerts ticked</Badge>
           ) : (
             c.events.map((k) => (
               <Badge key={k} tone="info">
@@ -268,7 +268,7 @@ function ChannelForm({ channel, events, onDone }: { channel?: NotificationChanne
             <Field label="Name">
               <input data-autofocus className={inputClass} placeholder="Marketing email" value={name} onChange={(e) => setName(e.target.value)} />
             </Field>
-            <Field label="Kind" hint={editing ? "A channel's kind cannot change." : undefined}>
+            <Field label="Kind" hint={editing ? "The kind cannot change." : undefined}>
               <select className={cx(selectClass, "w-full")} value={kind} disabled={editing} onChange={(e) => setKind(e.target.value as ChannelKind)}>
                 {kindOrder.map((k) => (
                   <option key={k} value={k}>
@@ -319,13 +319,13 @@ function ChannelForm({ channel, events, onDone }: { channel?: NotificationChanne
           {kind === "slack_webhook" &&
             secretField("webhook_url", "Webhook URL", "https://hooks.slack.com/services/…", editing ? secretHint : "In Slack, add the Incoming Webhooks app and copy the URL it gives.")}
           {kind === "webhook" && (
-            <Field label="URL" hint={editing ? undefined : "Byname makes a signing secret when you add the channel and shows it once."}>
+            <Field label="URL" hint={editing ? undefined : "Byname makes a signing secret when you add it and shows it once."}>
               <input className={inputClass} placeholder="https://example.com/hooks/byname" value={url} onChange={(e) => setURL(e.target.value)} />
             </Field>
           )}
 
           <fieldset>
-            <legend className="mb-1.5 text-xs font-medium text-muted">Events it gets</legend>
+            <legend className="mb-1.5 text-xs font-medium text-muted">Alerts it gets</legend>
             <div className="space-y-1.5">
               {events.map((e) => (
                 <label key={e.kind} className="flex items-start gap-2 text-sm">
@@ -341,7 +341,7 @@ function ChannelForm({ channel, events, onDone }: { channel?: NotificationChanne
           {editing && (
             <label className="flex items-center gap-2 text-sm">
               <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
-              On. Turned off, the channel keeps its settings and gets nothing.
+              On. Turned off, it keeps its settings and gets no alerts.
             </label>
           )}
           <div className="flex justify-end gap-2">
@@ -349,7 +349,7 @@ function ChannelForm({ channel, events, onDone }: { channel?: NotificationChanne
               Cancel
             </Button>
             <Button type="submit" variant="primary" disabled={!name.trim() || save.isPending}>
-              {editing ? "Save" : "Add channel"}
+              {editing ? "Save" : "Add"}
             </Button>
           </div>
           <ErrorNote error={save.error} />
@@ -365,7 +365,7 @@ function DeliveryLog() {
   const log = useQuery({ queryKey: keys.deliveries, queryFn: () => api.channels.deliveries(), refetchInterval: (q) => (q.state.data?.some((d) => d.status === "pending") ? 5000 : false) });
   return (
     <Card className="mt-10">
-      <CardHeader title="Delivery log" description="Each alert sent to each channel, newest first. A failed send is retried with backoff, up to 5 attempts. Tests show on their channel." />
+      <CardHeader title="Sent alerts" description="Each alert sent to each place, newest first. A failed send is tried again, up to 5 times. Tests show on their place above." />
       {log.isPending ? (
         <Pending />
       ) : log.isError ? (
@@ -375,7 +375,7 @@ function DeliveryLog() {
       ) : log.data.length === 0 ? (
         <p className="border-t border-line px-4 py-6 text-center text-sm text-muted">Nothing sent yet.</p>
       ) : (
-        <ul aria-label="Delivery log" className="divide-y divide-line border-t border-line">
+        <ul aria-label="Sent alerts" className="divide-y divide-line border-t border-line">
           {log.data.map((d) => (
             <li key={d.id} className="flex flex-col gap-1 px-4 py-2.5 text-sm sm:flex-row sm:items-start sm:gap-4">
               <div className="min-w-0 flex-1">
@@ -407,7 +407,7 @@ function DeliveryLog() {
 /**
  * Picks which channels get alerts, for onboarding step 6: each channel with
  * an on switch, and Add channel. With none, alerts are in the app only.
- * Admin only, like Settings > Notifications, which manages them later.
+ * Admin only, like Settings > Alerts, which manages them later.
  */
 export function ChannelPicker() {
   return (

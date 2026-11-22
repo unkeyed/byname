@@ -3,13 +3,13 @@ import { Link } from "react-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, type Change, type ChangeKind, type GscStatus, type RepoStatus } from "../../api";
 import { keys, useChanges, useChangeSettings, useGsc, useMe, useRepo } from "../../queries";
-import { Badge, Button, buttonClass, Card, CardHeader, cx, Dialog, DialogBody, EmptyState, ErrorNote, Field, Icon, inputClass, Pending, RelativeTime, RowButton, ScrollX, selectClass, useLoading, useWide } from "../../ui";
+import { Badge, Button, buttonClass, Card, CardHeader, cx, Dialog, DialogBody, EmptyState, ErrorNote, Field, Icon, inputClass, Pending, RelativeTime, RowButton, ScrollX, selectClass, useLoading, useWide, type Tone } from "../../ui";
 import { ViewHeader } from "../results/Header";
 import { fullDay } from "../search/model";
 import { Note, settingsPath as searchConsolePath } from "../search/Search";
 import { ChangeDrawer, ChangeSource, useOpenChange } from "./ChangeDrawer";
 import { ControlPagesCard } from "./ControlPages";
-import { changeKinds, changeStatus, feed, kindInfo, outcomeInfo, pagePath, siteChangesPath, todayIn, useZone, type Feed, type Zone } from "./model";
+import { changeKinds, changeStatus, feed, kindInfo, outcomeInfo, pagePath, siteChangesPath, stageInfo, todayIn, useZone, type Feed, type Zone } from "./model";
 
 export function Changes() {
   const me = useMe();
@@ -24,8 +24,8 @@ export function Changes() {
   return (
     <>
       <ViewHeader
-        title="Changes"
-        subtitle="Changes to your site's pages, when Google first crawled each one afterwards, and whether the page moved against your control pages."
+        title="Site changes"
+        subtitle="Did a change to your site help it in Google? Byname waits for Google to see the change, then compares the page's appearances, click rate and position before and after with pages you left alone."
         range={false}
         scope={false}
         action={
@@ -66,25 +66,25 @@ function Notices({ gsc, repo, admin, zone }: { gsc: GscStatus | undefined; repo:
     <>
       {gsc && !gsc.connected && (
         <Note tone="warn" icon="alert">
-          Search Console is not connected, so Byname cannot see Google crawl a changed page or take its reads. Changes are still recorded.
+          Search Console is not connected, so Byname can&apos;t see when Google saw a changed page or measure its results. Changes are still recorded.
           {fix(searchConsolePath, "Connect Search Console")}
         </Note>
       )}
       {repo?.connected && repo.expiring_soon && repo.token_expires_at && (
         <Note tone="warn" icon="alert">
-          The GitHub token expires {zone.date(repo.token_expires_at)}. After that no new merges are picked up.
+          The GitHub token expires {zone.date(repo.token_expires_at)}. After that Byname stops finding new changes.
           {admin ? fix(siteChangesPath, "Replace the token") : " Ask an admin to replace it."}
         </Note>
       )}
       {repo?.connected && repo.last_poll_error && (
         <Note tone="danger" icon="alert">
-          The last GitHub check failed: {repo.last_poll_error}
+          Byname couldn&apos;t read GitHub last time: {repo.last_poll_error}
           {fix(siteChangesPath, "Check the connection")}
         </Note>
       )}
       {repo && feed(repo) === "disconnected" && (
         <Note tone="info" icon="note">
-          GitHub is disconnected from {repo.repo}, so no new merges are picked up. The changes found so far stay.
+          GitHub is disconnected from {repo.repo}, so Byname stops finding new changes. The changes found so far stay.
           {fix(siteChangesPath, "Reconnect")}
         </Note>
       )}
@@ -96,11 +96,11 @@ function Notices({ gsc, repo, admin, zone }: { gsc: GscStatus | undefined; repo:
 const emptyBody: Record<Feed, (r: RepoStatus, admin: boolean) => string> = {
   none: (_, admin) =>
     admin
-      ? "Connect your site's GitHub repo in Settings > Site changes, and Byname picks up merged pull requests every hour. Or log a change by hand."
+      ? "Connect your site's GitHub repo in Settings > Site changes, and Byname finds merged pull requests every hour. Or log a change by hand."
       : "An admin can connect your site's GitHub repo in Settings > Site changes. Changes can also be logged by hand.",
   disconnected: (r) => `GitHub is disconnected from ${r.repo}. Reconnect it in Settings > Site changes, or log a change by hand.`,
-  no_rules: (r) => `${r.repo} is connected, but no path rule maps its files to pages yet. Add rules in Settings > Site changes, and the next hourly check finds merges from the last 30 days.`,
-  watching: (r) => `No pull request merged into ${r.repo} since it was connected has touched a page the path rules map. Byname checks every hour.`,
+  no_rules: (r) => `${r.repo} is connected, but no path rule says which files are which pages yet. Add rules in Settings > Site changes, and within the hour Byname finds merges from the last 30 days.`,
+  watching: (r) => `No pull request merged into ${r.repo} since it was connected has touched a page the path rules cover. Byname looks every hour.`,
 };
 
 function ChangesCard({
@@ -157,18 +157,24 @@ function ChangesCard({
         </EmptyState>
       </div>
     );
-  } else body = wide ? <ChangeTable changes={changes} zone={zone} /> : <ChangeList changes={changes} zone={zone} />;
+  } else
+    body = (
+      <>
+        {wide ? <ChangeTable changes={changes} zone={zone} interimDays={s?.interim_days} verdictDays={s?.verdict_days} /> : <ChangeList changes={changes} zone={zone} />}
+        <ResultKey />
+      </>
+    );
 
   return (
     <Card>
       <CardHeader
-        title="Site changes"
+        title="Your changes"
         description={
           <>
             {source === "watching" && repo ? (
               <>
                 Merges into {repo.repo}
-                {repo.default_branch && <> ({repo.default_branch})</>}, checked every hour
+                {repo.default_branch && <> ({repo.default_branch})</>}, looked at every hour
                 {repo.last_poll_at && (
                   <>
                     , last <RelativeTime iso={repo.last_poll_at} />
@@ -177,8 +183,8 @@ function ChangesCard({
                 .{" "}
               </>
             ) : null}
-            {s && `Reads come ${s.interim_days} days (interim) and ${s.verdict_days} days (final) after Google's first crawl. `}
-            Verdicts are experimental: check a surprising one against Search before acting on it.{" "}
+            {s && `The first result comes ${s.interim_days} days after Google saw the change, the final result ${s.verdict_days} days after. `}
+            Results are experimental: check a surprising one against Traffic before acting on it.{" "}
             Times are in {zone.zone}.
           </>
         }
@@ -191,20 +197,18 @@ function ChangesCard({
 function StatusBadge({ c }: { c: Change }) {
   const s = changeStatus(c);
   return (
-    <Badge tone={s.tone} title={s.detail}>
-      {s.label}
-    </Badge>
+    <Badge tone={s.tone}>{s.label}</Badge>
   );
 }
 
-/** The interim day, with the provisional outcome once it is in. */
+/** The first result's day, with its early outcome once it is in. */
 function InterimCell({ c }: { c: Change }) {
   if (!c.interim_on) return <span className="text-faint">–</span>;
   return (
     <span className="inline-flex flex-wrap items-center gap-1.5">
       {fullDay(c.interim_on)}
       {c.interim && !c.final && (
-        <Badge tone={outcomeInfo[c.interim.outcome].tone} title="Provisional: the final read can differ" className="opacity-80">
+        <Badge tone={outcomeInfo[c.interim.outcome].tone} className="opacity-80">
           {outcomeInfo[c.interim.outcome].label}
         </Badge>
       )}
@@ -212,7 +216,9 @@ function InterimCell({ c }: { c: Change }) {
   );
 }
 
-function ChangeTable({ changes, zone }: { changes: Change[]; zone: Zone }) {
+const after = (days: number | undefined) => (days ? ` (${days} days)` : "");
+
+function ChangeTable({ changes, zone, interimDays, verdictDays }: { changes: Change[]; zone: Zone; interimDays?: number; verdictDays?: number }) {
   const open = useOpenChange();
   const th = "py-1.5 pr-3 font-medium";
   const td = "py-2 pr-3 align-top whitespace-nowrap";
@@ -223,11 +229,11 @@ function ChangeTable({ changes, zone }: { changes: Change[]; zone: Zone }) {
           <tr className="border-y border-line">
             <th className={cx(th, "pl-4")}>Page</th>
             <th className={th}>Change</th>
-            <th className={th}>Merged</th>
-            <th className={th}>Google&apos;s first crawl after</th>
-            <th className={th}>Interim read</th>
-            <th className={th}>Final read</th>
-            <th className={cx(th, "pr-4")}>Status</th>
+            <th className={th}>Went live</th>
+            <th className={th}>Google saw it</th>
+            <th className={th}>First result{after(interimDays)}</th>
+            <th className={th}>Final result{after(verdictDays)}</th>
+            <th className={cx(th, "pr-4")}>Result</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-line">
@@ -281,15 +287,37 @@ function ChangeList({ changes, zone }: { changes: Change[]; zone: Zone }) {
               <StatusBadge c={c} />
             </span>
             <span className="mt-2 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 text-xs">
-              {fact(c.source === "manual" ? "Went live" : "Merged", zone.date(c.merged_at))}
-              {fact("First crawl after", c.first_crawl_at ? zone.at(c.first_crawl_at) : "Not yet")}
-              {c.interim_on && fact("Interim read", <InterimCell c={c} />)}
-              {c.verdict_on && fact("Final read", fullDay(c.verdict_on))}
+              {fact("Went live", zone.date(c.merged_at))}
+              {fact("Google saw it", c.first_crawl_at ? zone.at(c.first_crawl_at) : "Not yet")}
+              {c.interim_on && fact("First result", <InterimCell c={c} />)}
+              {c.verdict_on && fact("Final result", fullDay(c.verdict_on))}
             </span>
           </button>
         </li>
       ))}
     </ul>
+  );
+}
+
+/** What each result word means, since a badge in a table can't carry its own explanation. */
+function ResultKey() {
+  const rows: { label: string; tone: Tone; detail: string }[] = [
+    ...(["improved", "worsened", "no_change", "insufficient_data"] as const).map((o) => outcomeInfo[o]),
+    { ...stageInfo.awaiting_crawl, detail: "Google hasn't looked at the page since the change." },
+    { ...stageInfo.awaiting_interim, detail: "Google saw the change. A faded word next to the first result's date is early: the final result can differ." },
+    { ...stageInfo.awaiting_verdict, detail: "The first result is in. The final result is still to come." },
+  ];
+  return (
+    <dl aria-label="What the results mean" className="grid grid-cols-1 gap-x-4 gap-y-1.5 border-t border-line px-4 py-3 text-xs lg:grid-cols-2">
+      {rows.map((r) => (
+        <div key={r.label} className="flex items-start gap-2">
+          <dt className="shrink-0">
+            <Badge tone={r.tone}>{r.label}</Badge>
+          </dt>
+          <dd className="pt-0.5 text-muted">{r.detail}</dd>
+        </div>
+      ))}
+    </dl>
   );
 }
 
@@ -317,7 +345,7 @@ function LogForm({ zone, onDone }: { zone: Zone; onDone: () => void }) {
   return (
     <DialogBody>
       <form onSubmit={submit} className="space-y-4">
-        <p className="text-sm text-muted">For a site without GitHub, or a change made outside it. Byname then watches for Google&apos;s next crawl and takes the reads the same way.</p>
+        <p className="text-sm text-muted">For a site without GitHub, or a change made outside it. Byname then waits for Google to see the page and measures the results the same way.</p>
         <Field label="Page URL" hint="The full URL, as Search Console reports it.">
           <input
             className={inputClass}

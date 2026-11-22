@@ -1,38 +1,38 @@
-# Notifications
+# Alerts
 
-Byname tells people when something moves: a check finished with gains and losses, a check stopped, a spend cap was reached, a model was paused, a search goal was reached, search clicks moved, a site change got its verdict, or the GitHub token for site changes is about to expire. Every event shows in the app under **Alerts**. To also get it by email, in Slack or at your own endpoint, an Admin adds notification channels under **Settings > Notifications**, or in onboarding's **Schedule and spend caps** step. With no channel, alerts stay in the app.
+Byname tells people when something moves: a check finished and some answers started or stopped naming you, a check stopped, a spend cap was reached, a model was paused, a Google search goal was reached, Google clicks moved, a site change got its final result, a day or week of social posts ended, or the GitHub token for site changes is about to expire. Every alert shows in the app under **Alerts**. To also get alerts by email, in Slack or at your own endpoint, an Admin adds where alerts go under **Settings > Alerts**, or in onboarding's **Schedule and spend caps** step. With nowhere added, alerts stay in the app.
 
-## Channels
+## Where alerts go
 
-| Kind | Stored as | Settings | Secret |
+| Where | Stored as | Settings | Secret |
 |---|---|---|---|
 | Email (SMTP) | `smtp` | Host, port, encryption (`starttls` on 587, `tls` on 465, or `none` for a local relay), username, from, and 1 to 20 recipients | The SMTP password |
 | Email (Resend) | `email_api` | From, and 1 to 20 recipients | A Resend API key (`re_...`) |
 | Slack | `slack_webhook` | None | The Slack incoming webhook URL |
 | Webhook | `webhook` | The URL to post to | A signing secret that Byname makes |
 
-Each channel subscribes to the events it should get. Byname encrypts each channel's secret with `ENCRYPTION_KEY` and never returns it, except the webhook signing secret, which it shows once when you add the channel. Adding or editing a channel needs a sign-in within the last 15 minutes. **Send test** sends a test message through the channel at once.
+For each place, you pick which alerts go there. Byname encrypts each place's secret with `ENCRYPTION_KEY` and never returns it, except the webhook signing secret, which it shows once when you add the webhook. Adding or editing a place needs a sign-in within the last 15 minutes. **Send test** sends a test alert there at once. The API calls each place a notification channel, as in `GET /v1/notification-channels`.
 
-Webhook and Slack URLs must use `https`, or `http` to `localhost` for a receiver on the same machine. Email uses plain text, with the event's title as the subject and a link to the page in Byname, built from `PUBLIC_URL`.
+Webhook and Slack URLs must use `https`, or `http` to `localhost` for a receiver on the same machine. Email uses plain text, with the alert's title as the subject and a link to the page in Byname, built from `PUBLIC_URL`. Email, Slack and the webhook carry the same title and lines.
 
 ## Events
 
-`internal/notify/events.go` is the one list of events. Settings lists them in this order.
+`internal/notify/events.go` is the one list of events. **Settings > Alerts** lists them in this order.
 
 | Event | Kind | Raised when | Seen in the app by |
 |---|---|---|---|
-| Check completed | `check_completed` | A check finished. It carries gains, losses and moves since the previous check, the net change, how many answers named you, the spend, and the questions that changed most. | Anyone with `results:read` |
-| Check refused | `check_refused` | Treg refused a call, for example for an empty balance, and the check stopped. | Anyone with `results:read` |
-| Check failed | `check_failed` | A check could not run or could not store its answers. | Anyone with `results:read` |
-| Spend cap reached | `spend_cap_reached` | A check stopped queueing calls at the per-check or monthly spend cap. | Anyone with `results:read` |
-| Model paused | `pair_paused` | A model left its surface's live model list, so Byname stopped asking it. | Anyone with `results:read` |
-| Goal reached | `goal_reached` | After a Search Console sync, a search goal's progress over its window first meets its target. | Anyone with `results:read` |
-| Search moved | `search_moved` | After a Search Console sync, 28-day clicks or 28-day non-brand clicks differ from the 28 days before by at least 25% of the earlier number and by at least 20 clicks. Both 28-day windows must have data for every day. | Anyone with `results:read` |
-| Change verdict | `change_verdict` | A site change got its final read against the control pages, 31 days after Google's first crawl by default. The interim read raises nothing. See [Changes](changes.md). | Anyone with `results:read` |
+| Check completed | `check_completed` | A check finished. It says how many answers started naming you, stopped naming you or moved your position since the previous check, how many answers named you, the spend, and the questions that changed most. Its link opens **AI answers > What changed** for the two checks. | Anyone with `results:read` |
+| Check refused | `check_refused` | Treg, the service that runs each question and bills you per answer, refused a request, for example for an empty balance, and the check stopped. | Anyone with `results:read` |
+| Check failed | `check_failed` | A check could not start, or could not save its answers. | Anyone with `results:read` |
+| Spend cap reached | `spend_cap_reached` | A check stopped asking questions when it reached the spend cap for one check or for the month. | Anyone with `results:read` |
+| Model paused | `pair_paused` | An AI app stopped offering a model you picked, so Byname stopped asking it. | Anyone with `results:read` |
+| Goal reached | `goal_reached` | After a Search Console sync, a Google search goal's progress over its window first meets its target. | Anyone with `results:read` |
+| Google clicks moved | `search_moved` | After a Search Console sync, clicks over the last 28 days, or clicks from searches without your name, differ from the 28 days before by at least 25% of the earlier number and by at least 20 clicks. Both 28-day windows must have data for every day. | Anyone with `results:read` |
+| Change result | `change_verdict` | A site change got its final result against your comparison pages, 31 days after Google first saw the change by default. The first result raises nothing. Its link opens the change on **Google search > Site changes**. See [Site changes](changes.md). | Anyone with `results:read` |
 | Token expiring | `token_expiring` | The hourly GitHub poll, or **Test** under **Settings > Site changes**, finds that the token expires within 14 days. | Admins only |
-| Social digest | `social_digest` | A day or week of social searches ended. It carries the new mentions per network with the most engaged posts, the new voices and what the searches cost, without the accounts left out. See [Social](social.md). | Anyone with `results:read` |
+| Social digest | `social_digest` | A day or week of social searches ended. It says in sentences how many new posts named you and on which networks, who mentioned you for the first time, and what the searches cost, then lists the posts people engaged with most, without the accounts left out. See [Social](social.md). | Anyone with `results:read` |
 
-Each event has a natural key, its kind and what it happened to, such as one run. Raising the same event twice stores and sends it once. For the five events that do not come from a check, the key decides how often each one fires:
+Each event has a natural key, its kind and what it happened to, such as one check. Raising the same event twice stores and sends it once. For the five events that do not come from a check, the key decides how often each one fires:
 
 | Event | Fires once per |
 |---|---|
@@ -44,25 +44,25 @@ Each event has a natural key, its kind and what it happened to, such as one run.
 
 ## Delivery and retries
 
-Byname sends from a background job, never inside a request. A delivery that fails is tried again after 30 seconds, 2 minutes, 8 minutes and 32 minutes, five attempts in all. Any `2xx` answer counts as delivered. Each attempt is logged with its status and error, and **Settings > Notifications** shows the log. The log never records a channel's URL, because a Slack webhook URL is a secret.
+Byname sends from a background job, never inside a request. A delivery that fails is tried again after 30 seconds, 2 minutes, 8 minutes and 32 minutes, five attempts in all. Any `2xx` answer counts as delivered. Each attempt is logged with its status and error, and **Settings > Alerts** shows the log. The log never records a place's URL, because a Slack webhook URL is a secret.
 
 ## Receive a webhook
 
-A webhook channel sends `POST` to its URL with a JSON body:
+A webhook gets a `POST` to its URL with a JSON body:
 
 ```json
 {
 	"id": "alert-12/channel-3",
 	"kind": "check_completed",
-	"title": "Check #42: 3 gained, 1 lost",
-	"lines": ["Named in 31 of 96 answers.", "Since check #41: 3 gained, 1 lost, 2 moved, net +2."],
-	"url": "https://byname.example.com/compare?before=41&after=42",
+	"title": "Check #42: 3 answers started naming you, 1 answer stopped naming you",
+	"lines": ["AI apps named you in 31 of 96 answers.", "Since check #41, 3 answers started naming you, 1 answer stopped naming you and 2 answers moved your position."],
+	"url": "https://byname.example.com/ai/what-changed?before=41&after=42",
 	"payload": {"run_id": 42, "previous_run_id": 41, "gained": 3, "lost": 1, "moved": 2, "net": 2, "named": 31, "answered": 96},
 	"created_at": "2026-11-21T06:14:09Z"
 }
 ```
 
-`payload` is the event's own data, and its fields depend on `kind`. `id` is the same on every retry of one delivery, so use it to ignore a repeat. Each request carries these headers:
+`payload` is the event's own data, and its fields depend on `kind`. Its field names keep the API's words, such as `run_id` for the check and `gained` and `lost` for answers that started and stopped naming you. Its field names keep the API's words, such as `run_id` for the check and `gained` and `lost` for answers that started and stopped naming you. `id` is the same on every retry of one delivery, so use it to ignore a repeat. Each request carries these headers:
 
 | Header | Value |
 |---|---|
@@ -73,7 +73,7 @@ A webhook channel sends `POST` to its URL with a JSON body:
 
 ### Verify the signature
 
-The signature is the hex HMAC-SHA256 of `<t>.<raw body>`, keyed with the channel's signing secret, which starts with `whsec_`. The timestamp is signed too, so refuse a request whose `t` is more than a few minutes away from now, and a captured request cannot be replayed later. Check the raw body before you parse it.
+The signature is the hex HMAC-SHA256 of `<t>.<raw body>`, keyed with the webhook's signing secret, which starts with `whsec_`. The timestamp is signed too, so refuse a request whose `t` is more than a few minutes away from now, and a captured request cannot be replayed later. Check the raw body before you parse it.
 
 In Node.js:
 

@@ -5,7 +5,7 @@ import { keys, useControlPages } from "../../queries";
 import { Badge, Button, Card, CardHeader, ConfirmButton, Dialog, DialogBody, EmptyState, ErrorNote, Field, Icon, inputClass, Pending } from "../../ui";
 import { fullDay } from "../search/model";
 
-/** The pages verdicts compare against, with add, edit and delete for editors. */
+/** The comparison pages results are measured against, with add, edit and delete for editors. */
 export function ControlPagesCard({ canEdit }: { canEdit: boolean }) {
   const qc = useQueryClient();
   const pages = useControlPages();
@@ -21,25 +21,25 @@ export function ControlPagesCard({ canEdit }: { canEdit: boolean }) {
       <div className="px-4 pb-4">
         <EmptyState
           icon="pin"
-          title="No control pages"
+          title="No comparison pages yet"
           action={
             canEdit ? (
               <Button variant="primary" onClick={() => setEditing("new")}>
                 <Icon name="plus" className="size-3.5" />
-                Add a control page
+                Add a comparison page
               </Button>
             ) : undefined
           }
         >
           {canEdit
-            ? "Without them every read says there is not enough data. Add a few pages with steady traffic that nobody will edit before the hold date."
-            : "Without them every read says there is not enough data. Someone with the Editor or Admin role can add them."}
+            ? "Without them every result says there is not enough data. Add a few steady pages you promise not to edit for a while."
+            : "Without them every result says there is not enough data. Someone with the Editor or Admin role can add them."}
         </EmptyState>
       </div>
     );
   else
     body = (
-      <ul aria-label="Control pages" className="divide-y divide-line border-t border-line">
+      <ul aria-label="Comparison pages" className="divide-y divide-line border-t border-line">
         {pages.data.map((p) => (
           <li key={p.id} className="flex items-start gap-3 px-4 py-2.5">
             <div className="min-w-0 flex-1">
@@ -47,9 +47,9 @@ export function ControlPagesCard({ canEdit }: { canEdit: boolean }) {
                 {p.url}
               </a>
               <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
-                {p.active ? <Badge tone="success">Active</Badge> : <Badge tone="outline">Ended</Badge>}
+                {p.active ? <Badge tone="success">In use</Badge> : <Badge tone="outline">Ended</Badge>}
                 <span>
-                  {p.active ? "Held until" : "Held through"} {fullDay(p.hold_until)}
+                  {p.active ? "Not edited until" : "Counted through"} {fullDay(p.hold_until)}
                 </span>
                 {p.note && <span className="[overflow-wrap:anywhere] text-faint">{p.note}</span>}
               </div>
@@ -72,17 +72,15 @@ export function ControlPagesCard({ canEdit }: { canEdit: boolean }) {
   return (
     <Card>
       <CardHeader
-        title="Control pages"
-        description={
-          pages.data && pages.data.length > 0
-            ? `${active} of ${pages.data.length} active. Each read compares a changed page with the active ones over the same days; a page drops out after its hold date.`
-            : "Pages you leave unchanged, so a read can tell a page's own move from a sitewide one."
-        }
+        title="Comparison pages"
+        description={`A few steady pages you promise not to edit. Each result compares a changed page with these over the same days, so a rise or fall across your whole site isn't credited to the change.${
+          pages.data && pages.data.length > 0 ? ` ${active} of ${pages.data.length} in use. A page stops counting after its date.` : ""
+        }`}
       >
         {canEdit && pages.data && pages.data.length > 0 && (
           <Button size="sm" onClick={() => setEditing("new")}>
             <Icon name="plus" className="size-3.5" />
-            Add control page
+            Add comparison page
           </Button>
         )}
       </CardHeader>
@@ -92,7 +90,7 @@ export function ControlPagesCard({ canEdit }: { canEdit: boolean }) {
           <ErrorNote error={remove.error} />
         </div>
       )}
-      <Dialog open={editing !== null} onClose={() => setEditing(null)} title={editing === "new" ? "Add a control page" : "Edit control page"}>
+      <Dialog open={editing !== null} onClose={() => setEditing(null)} title={editing === "new" ? "Add a comparison page" : "Edit comparison page"}>
         {editing !== null && <ControlForm page={editing === "new" ? null : editing} onDone={() => setEditing(null)} />}
       </Dialog>
     </Card>
@@ -119,7 +117,7 @@ function ControlForm({ page, onDone }: { page: ControlPage | null; onDone: () =>
   return (
     <DialogBody>
       <form onSubmit={submit} className="space-y-4">
-        <Field label="Page URL" hint={page ? "To hold another page, add it as a new control page." : "The full URL, as Search Console reports it. Adding a URL that is already a control page updates it."}>
+        <Field label="Page URL" hint={page ? "To use another page, add it as a new comparison page." : "The full URL, as Search Console reports it. Adding a URL that is already a comparison page updates it."}>
           <input
             className={inputClass}
             type="url"
@@ -134,7 +132,7 @@ function ControlForm({ page, onDone }: { page: ControlPage | null; onDone: () =>
             data-autofocus
           />
         </Field>
-        <Field label="Hold until" hint="The last day it counts. Leave the page unchanged until then.">
+        <Field label="Don't edit until" hint="The last day it counts. Leave the page unchanged until then.">
           <input className={inputClass} type="date" required value={hold} onChange={(e) => setHold(e.target.value)} />
         </Field>
         <Field label="Note" hint="Optional, such as why this page.">
@@ -143,7 +141,7 @@ function ControlForm({ page, onDone }: { page: ControlPage | null; onDone: () =>
         <div className="flex justify-end gap-2">
           <Button onClick={onDone}>Cancel</Button>
           <Button type="submit" variant="primary" disabled={!valid || save.isPending}>
-            {page ? "Save" : "Add control page"}
+            {page ? "Save" : "Add comparison page"}
           </Button>
         </div>
         <ErrorNote error={save.error} />
