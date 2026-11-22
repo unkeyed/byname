@@ -205,7 +205,7 @@ func (s *Service) UpdateChannel(ctx context.Context, id int64, in ChannelInput) 
 func nameTaken(err error, name string) error {
 	var pg *pgconn.PgError
 	if err != nil && errors.As(err, &pg) && pg.Code == "23505" && pg.ConstraintName == "notification_channel_name" {
-		return fmt.Errorf("%w: a channel named %q already exists", core.ErrConflict, name)
+		return fmt.Errorf("%w: the name %q is already used for alerts going somewhere else", core.ErrConflict, name)
 	}
 	return err
 }

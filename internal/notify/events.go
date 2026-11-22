@@ -3,6 +3,7 @@ package notify
 import (
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -59,8 +60,8 @@ type Event struct {
 	Payload Payload
 }
 
-// KindInfo describes one kind of event, as Settings > Notifications lists
-// them for a channel to subscribe to.
+// KindInfo describes one kind of event, as Settings > Alerts lists them to
+// choose which alerts go where.
 type KindInfo struct {
 	Kind        Kind     `json:"kind"`
 	Title       string   `json:"title"`
@@ -80,16 +81,16 @@ func kind[P Payload](k Kind, title, description string, audience Audience) KindI
 // registry is every event kind, in the order Settings lists them. A kind
 // another package emits later is declared here with its payload type first.
 var registry = []KindInfo{
-	kind[CheckCompletedPayload](CheckCompleted, "Check completed", "Gains, losses and moves since the previous check, with the questions that changed most.", Readers),
-	kind[CheckRefusedPayload](CheckRefused, "Check refused", "Treg refused a call, for example for an empty balance, and the check stopped.", Readers),
-	kind[CheckFailedPayload](CheckFailed, "Check failed", "A check could not run or could not store its answers.", Readers),
-	kind[SpendCapReachedPayload](SpendCapReached, "Spend cap reached", "A check stopped queueing calls at the per-check or monthly spend cap.", Readers),
-	kind[PairPausedPayload](PairPaused, "Model paused", "A model left its surface's live model list, so Byname stopped asking it.", Readers),
-	kind[GoalReachedPayload](GoalReached, "Goal reached", "A search goal reached its target.", Readers),
-	kind[SearchMovedPayload](SearchMoved, "Search moved", "28-day clicks or non-brand clicks moved by at least a quarter and at least 20 clicks against the 28 days before.", Readers),
-	kind[ChangeVerdictPayload](ChangeVerdict, "Change verdict", "A site change got its final verdict against the control pages.", Readers),
+	kind[CheckCompletedPayload](CheckCompleted, "Check completed", "Which answers started or stopped naming you since the previous check, and the questions that changed most.", Readers),
+	kind[CheckRefusedPayload](CheckRefused, "Check refused", "Treg, the service that runs each question and bills you per answer, refused a request, for example for an empty balance, and the check stopped.", Readers),
+	kind[CheckFailedPayload](CheckFailed, "Check failed", "A check could not start, or could not save its answers.", Readers),
+	kind[SpendCapReachedPayload](SpendCapReached, "Spend cap reached", "A check stopped asking questions when it reached the spend cap for one check or for the month.", Readers),
+	kind[PairPausedPayload](PairPaused, "Model paused", "An AI app stopped offering a model you picked, so Byname stopped asking it.", Readers),
+	kind[GoalReachedPayload](GoalReached, "Goal reached", "A Google search goal reached its target.", Readers),
+	kind[SearchMovedPayload](SearchMoved, "Google clicks moved", "Google clicks, or clicks from searches without your name, over the last 28 days moved by at least a quarter and by at least 20 clicks against the 28 days before.", Readers),
+	kind[ChangeVerdictPayload](ChangeVerdict, "Change result", "A site change got its final result, compared with your comparison pages.", Readers),
 	kind[TokenExpiringPayload](TokenExpiring, "Token expiring", "The GitHub token for site changes expires soon.", Admins),
-	kind[SocialDigestPayload](SocialDigest, "Social digest", "The day's or week's posts that mention you on X, Reddit, Hacker News and LinkedIn, without the accounts you left out.", Readers),
+	kind[SocialDigestPayload](SocialDigest, "Social digest", "The day's or week's posts that name you on social networks, without the accounts you left out.", Readers),
 }
 
 // Kinds is every event kind Byname can raise, in display order.
@@ -137,31 +138,54 @@ type CheckCompletedPayload struct {
 func (CheckCompletedPayload) Kind() Kind { return CheckCompleted }
 
 func (p CheckCompletedPayload) message() Message {
-	m := Message{Path: "/runs", Lines: []string{fmt.Sprintf("Named in %d of %d answers.", p.Named, p.Answered)}}
+	m := Message{Path: "/settings/checks", Lines: []string{fmt.Sprintf("AI apps named you in %d of %d answers.", p.Named, p.Answered)}}
 	if p.PreviousRunID == 0 {
 		m.Title = fmt.Sprintf("Check #%d finished, the first to compare against", p.RunID)
 		return m
 	}
-	m.Path = fmt.Sprintf("/compare?before=%d&after=%d", p.PreviousRunID, p.RunID)
-	if p.Gained+p.Lost+p.Moved == 0 {
+	m.Path = fmt.Sprintf("/ai/what-changed?before=%d&after=%d", p.PreviousRunID, p.RunID)
+	changes := changeParts(p.Gained, p.Lost, p.Moved, "answer", "answers")
+	if len(changes) == 0 {
 		m.Title = fmt.Sprintf("Check #%d: no change", p.RunID)
-	} else {
-		m.Title = fmt.Sprintf("Check #%d: %d gained, %d lost", p.RunID, p.Gained, p.Lost)
+		m.Lines = append(m.Lines, fmt.Sprintf("No answer started or stopped naming you since check #%d.", p.PreviousRunID))
+		return m
 	}
-	m.Lines = append(m.Lines, fmt.Sprintf("Since check #%d: %d gained, %d lost, %d moved, net %+d.", p.PreviousRunID, p.Gained, p.Lost, p.Moved, p.Net))
+	m.Title = fmt.Sprintf("Check #%d: %s", p.RunID, strings.Join(changes[:min(2, len(changes))], ", "))
+	m.Lines = append(m.Lines, fmt.Sprintf("Since check #%d, %s.", p.PreviousRunID, sentenceList(changes)))
 	for _, q := range p.Top {
-		var parts []string
-		for _, c := range []struct {
-			n    int
-			verb string
-		}{{q.Gained, "gained"}, {q.Lost, "lost"}, {q.Moved, "moved"}} {
-			if c.n > 0 {
-				parts = append(parts, fmt.Sprintf("%d %s", c.n, c.verb))
-			}
-		}
-		m.Lines = append(m.Lines, fmt.Sprintf("%s: %s", strings.Join(parts, ", "), q.Question))
+		m.Lines = append(m.Lines, fmt.Sprintf("“%s”: %s.", q.Question, sentenceList(changeParts(q.Gained, q.Lost, q.Moved, "AI app", "AI apps"))))
 	}
 	return m
+}
+
+// changeParts says how many answers, or AI apps, started naming you,
+// stopped, or put you in a different position, leaving out the zeros.
+func changeParts(gained, lost, moved int, one, many string) []string {
+	var parts []string
+	for _, c := range []struct {
+		n    int
+		what string
+	}{{gained, "started naming you"}, {lost, "stopped naming you"}, {moved, "moved your position"}} {
+		if c.n > 0 {
+			parts = append(parts, fmt.Sprintf("%s %s", count(c.n, one, many), c.what))
+		}
+	}
+	return parts
+}
+
+func count(n int, one, many string) string {
+	if n == 1 {
+		return "1 " + one
+	}
+	return fmt.Sprintf("%d %s", n, many)
+}
+
+// sentenceList joins items as a sentence does: "a", "a and b", "a, b and c".
+func sentenceList(items []string) string {
+	if len(items) < 2 {
+		return strings.Join(items, "")
+	}
+	return strings.Join(items[:len(items)-1], ", ") + " and " + items[len(items)-1]
 }
 
 type CheckRefusedPayload struct {
@@ -173,7 +197,7 @@ type CheckRefusedPayload struct {
 func (CheckRefusedPayload) Kind() Kind { return CheckRefused }
 
 func (p CheckRefusedPayload) message() Message {
-	return Message{Title: fmt.Sprintf("Check #%d stopped: Treg refused a call", p.RunID), Lines: []string{p.Message}, Path: "/runs"}
+	return Message{Title: fmt.Sprintf("Check #%d stopped: Treg refused a request", p.RunID), Lines: []string{p.Message, "Treg is the service that runs each question and bills you per answer. Fix what it reports, such as an empty balance, then press Check now."}, Path: "/settings/checks"}
 }
 
 type CheckFailedPayload struct {
@@ -184,7 +208,7 @@ type CheckFailedPayload struct {
 func (CheckFailedPayload) Kind() Kind { return CheckFailed }
 
 func (p CheckFailedPayload) message() Message {
-	return Message{Title: fmt.Sprintf("Check #%d failed", p.RunID), Lines: []string{p.Message}, Path: "/runs"}
+	return Message{Title: fmt.Sprintf("Check #%d failed", p.RunID), Lines: []string{p.Message}, Path: "/settings/checks"}
 }
 
 type SpendCapReachedPayload struct {
@@ -196,7 +220,7 @@ type SpendCapReachedPayload struct {
 func (SpendCapReachedPayload) Kind() Kind { return SpendCapReached }
 
 func (p SpendCapReachedPayload) message() Message {
-	return Message{Title: fmt.Sprintf("Check #%d reached its spend cap", p.RunID), Lines: []string{p.Message}, Path: "/runs"}
+	return Message{Title: fmt.Sprintf("Check #%d reached its spend cap", p.RunID), Lines: []string{p.Message}, Path: "/settings/checks"}
 }
 
 type PairPausedPayload struct {
@@ -213,11 +237,11 @@ func (p PairPausedPayload) message() Message {
 	if spec, ok := engines.Lookup(p.Surface); ok {
 		title = spec.Title
 	}
-	return Message{Title: fmt.Sprintf("Paused %s on %s", p.Model, title), Lines: []string{p.Reason}, Path: "/settings/surfaces"}
+	return Message{Title: fmt.Sprintf("Paused %s on %s", p.Model, title), Lines: []string{p.Reason}, Path: "/settings/ai-apps"}
 }
 
 // metricLabels names Search Console metrics in messages.
-var metricLabels = map[string]string{"clicks": "Clicks", "impressions": "Impressions", "non_brand_clicks": "Non-brand clicks"}
+var metricLabels = map[string]string{"clicks": "Google clicks", "impressions": "Appearances in Google results", "non_brand_clicks": "Clicks from searches without your name"}
 
 func metricLabel(m string) string {
 	if l, ok := metricLabels[m]; ok {
@@ -241,9 +265,9 @@ func (GoalReachedPayload) Kind() Kind { return GoalReached }
 
 func (p GoalReachedPayload) message() Message {
 	return Message{
-		Title: fmt.Sprintf("Goal reached: %s", strings.ToLower(metricLabel(p.Metric))),
-		Lines: []string{fmt.Sprintf("%g over %d days, against a target of %g due %s.", p.Value, p.WindowDays, p.Target, p.DueOn)},
-		Path:  "/search",
+		Title: fmt.Sprintf("Goal reached: %s", metricLabel(p.Metric)),
+		Lines: []string{fmt.Sprintf("%s reached %g over the last %d days, against a target of %g by %s.", metricLabel(p.Metric), p.Value, p.WindowDays, p.Target, p.DueOn)},
+		Path:  "/google/traffic",
 	}
 }
 
@@ -266,12 +290,12 @@ func (p SearchMovedPayload) message() Message {
 	return Message{
 		Title: fmt.Sprintf("%s %s over the last %d days", metricLabel(p.Metric), way, p.WindowDays),
 		Lines: []string{fmt.Sprintf("%g, against %g in the %d days before.", p.After, p.Before, p.WindowDays)},
-		Path:  "/search",
+		Path:  "/google/traffic",
 	}
 }
 
-// ChangeVerdictPayload is a change's final read against the control pages
-// (internal/changes). Detail is the read in one line.
+// ChangeVerdictPayload is a change's final result against the comparison
+// pages (internal/changes). Detail is the result in one line.
 type ChangeVerdictPayload struct {
 	ChangeID int64  `json:"change_id"`
 	URL      string `json:"url"`
@@ -286,8 +310,15 @@ func (p ChangeVerdictPayload) message() Message {
 	if p.Detail != "" {
 		lines = append(lines, p.Detail)
 	}
-	return Message{Title: fmt.Sprintf("Change verdict: %s", strings.ReplaceAll(p.Verdict, "_", " ")), Lines: lines, Path: "/changes"}
+	label, ok := verdictLabels[p.Verdict]
+	if !ok {
+		label = strings.ReplaceAll(p.Verdict, "_", " ")
+	}
+	return Message{Title: "Change result: " + label, Lines: lines, Path: fmt.Sprintf("/google/site-changes?chg=%d", p.ChangeID)}
 }
+
+// verdictLabels says each final result (internal/changes' Outcome) in plain words.
+var verdictLabels = map[string]string{"improved": "helped", "worsened": "hurt", "no_change": "no clear change", "insufficient_data": "not enough data"}
 
 // TokenExpiringPayload is the GitHub token for site changes nearing its
 // expiry (internal/changes).
@@ -344,47 +375,96 @@ type SocialDigestPayload struct {
 func (SocialDigestPayload) Kind() Kind { return SocialDigest }
 
 func (p SocialDigestPayload) message() Message {
-	when := "week of " + shortDay(p.From)
+	when := "in the week of " + shortDay(p.From)
 	if p.Cadence == "daily" {
-		when = shortDay(p.From)
+		when = "on " + shortDay(p.From)
 	}
 	m := Message{Path: "/social"}
-	switch p.Mentions {
-	case 0:
-		m.Title = "Social digest, " + when + ": no new mentions"
-	case 1:
-		m.Title = "Social digest, " + when + ": 1 new mention"
-	default:
-		m.Title = fmt.Sprintf("Social digest, %s: %d new mentions", when, p.Mentions)
+	if p.Mentions == 0 {
+		m.Title = "Social digest: no new posts named you " + when
+	} else {
+		m.Title = fmt.Sprintf("Social digest: %s named you %s", count(p.Mentions, "new post", "new posts"), when)
 	}
-	var counts []string
+	var active []SocialNetworkDigest
 	for _, n := range p.Networks {
-		counts = append(counts, fmt.Sprintf("%s %d", n.Title, n.Mentions))
-	}
-	if len(counts) > 0 {
-		m.Lines = append(m.Lines, strings.Join(counts, ", ")+".")
-	}
-	if p.Hidden > 0 {
-		m.Lines = append(m.Lines, fmt.Sprintf("%d more from accounts you left out.", p.Hidden))
-	}
-	for _, n := range p.Networks {
-		for _, post := range n.Top {
-			m.Lines = append(m.Lines, fmt.Sprintf("%s, %s (%d): %s %s", n.Title, post.Author, post.Engagement, post.Text, post.URL))
+		if n.Mentions > 0 {
+			active = append(active, n)
 		}
+	}
+	switch {
+	case len(active) == 1 && p.Mentions == 1:
+		m.Lines = append(m.Lines, fmt.Sprintf("It was on %s.", active[0].Title))
+	case len(active) == 1:
+		m.Lines = append(m.Lines, fmt.Sprintf("All %d were on %s.", p.Mentions, active[0].Title))
+	case len(active) > 1:
+		where := make([]string, len(active))
+		for i, n := range active {
+			verb := " "
+			if i == 0 && n.Mentions == 1 {
+				verb = " was "
+			} else if i == 0 {
+				verb = " were "
+			}
+			where[i] = fmt.Sprintf("%d%son %s", n.Mentions, verb, n.Title)
+		}
+		m.Lines = append(m.Lines, sentenceList(where)+".")
 	}
 	if p.NewAuthorsCount > 0 {
-		line := "New voices: " + strings.Join(p.NewAuthors, ", ")
-		if more := p.NewAuthorsCount - len(p.NewAuthors); more > 0 {
-			line += fmt.Sprintf(" and %d more", more)
+		who := count(p.NewAuthorsCount, "person who had not mentioned you before", "people who had not mentioned you before") + " posted about you"
+		names := slices.Clone(p.NewAuthors)
+		if more := p.NewAuthorsCount - len(names); more > 0 && len(names) > 0 {
+			names = append(names, count(more, "other", "others"))
 		}
-		m.Lines = append(m.Lines, line+".")
+		if len(names) > 0 {
+			who += ": " + sentenceList(names)
+		}
+		m.Lines = append(m.Lines, who+".")
 	}
-	spend := fmt.Sprintf("Searches cost $%.4f.", p.SpendUSD)
+	if p.Hidden == 1 {
+		m.Lines = append(m.Lines, "1 more post came from an account you left out, so it is not counted.")
+	} else if p.Hidden > 1 {
+		m.Lines = append(m.Lines, fmt.Sprintf("%d more posts came from accounts you left out, so they are not counted.", p.Hidden))
+	}
+	var top []string
+	for _, n := range p.Networks {
+		for _, post := range n.Top {
+			by := fmt.Sprintf("%s on %s", post.Author, n.Title)
+			if post.Engagement > 0 {
+				by += ", with " + count(post.Engagement, engagementNoun(n.Network, true), engagementNoun(n.Network, false))
+			}
+			top = append(top, fmt.Sprintf("%s: “%s” %s", by, post.Text, post.URL))
+		}
+	}
+	if len(top) > 0 {
+		m.Lines = append(m.Lines, "The posts people engaged with most:")
+		m.Lines = append(m.Lines, top...)
+	}
+	spend := fmt.Sprintf("Searching for posts cost $%.4f.", p.SpendUSD)
 	if p.SpendMissingCalls > 0 {
-		spend = fmt.Sprintf("Searches cost $%.4f, plus %d calls that reported no cost.", p.SpendUSD, p.SpendMissingCalls)
+		spend = fmt.Sprintf("Searching for posts cost $%.4f, plus %s that did not report a cost.", p.SpendUSD, count(p.SpendMissingCalls, "search", "searches"))
 	}
 	m.Lines = append(m.Lines, spend)
 	return m
+}
+
+// engagementNouns says what a post's engagement count adds up on each
+// network, as internal/social's Engagement.Total does.
+var engagementNouns = map[string][2]string{
+	"youtube":    {"view", "views"},
+	"hackernews": {"point or comment", "points and comments"},
+	"reddit":     {"upvote or comment", "upvotes and comments"},
+	"linkedin":   {"reaction or comment", "reactions and comments"},
+}
+
+func engagementNoun(network string, one bool) string {
+	n, ok := engagementNouns[network]
+	if !ok {
+		n = [2]string{"like, reply or repost", "likes, replies and reposts"}
+	}
+	if one {
+		return n[0]
+	}
+	return n[1]
 }
 
 func shortDay(day string) string {
@@ -402,8 +482,8 @@ func (testPayload) Kind() Kind { return "test" }
 
 func (testPayload) message() Message {
 	return Message{
-		Title: "Test notification from Byname",
-		Lines: []string{"This channel works. Alerts for the events it subscribes to will arrive here."},
-		Path:  "/settings/notifications",
+		Title: "Test alert from Byname",
+		Lines: []string{"Alerts reach this place. The alerts you chose for it will arrive here."},
+		Path:  "/settings/alerts",
 	}
 }

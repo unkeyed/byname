@@ -114,12 +114,22 @@ func TestACheckNotifiesEveryChannelWithTheComparison(t *testing.T) {
 	if gained == 0 || lost == 0 {
 		t.Fatalf("compare = %+v, want the check to gain and lose something", cmp)
 	}
-	title := fmt.Sprintf("Check #%d: %d gained, %d lost", second, gained, lost)
-	since := fmt.Sprintf("Since check #%d: %d gained, %d lost, %d moved, net %+d.", first, gained, lost, cmp.Counts["moved"], cmp.Net)
+	answers := func(n int) string {
+		if n == 1 {
+			return "1 answer"
+		}
+		return fmt.Sprintf("%d answers", n)
+	}
+	started, stopped := answers(gained)+" started naming you", answers(lost)+" stopped naming you"
+	title := fmt.Sprintf("Check #%d: %s, %s", second, started, stopped)
+	since := fmt.Sprintf("Since check #%d, %s and %s.", first, started, stopped)
+	if moved := cmp.Counts["moved"]; moved > 0 {
+		since = fmt.Sprintf("Since check #%d, %s, %s and %s moved your position.", first, started, stopped, answers(moved))
+	}
 
 	mail := r.smtp.Mail()
 	if len(mail) != 1 || mail[0].Subject != title || !strings.Contains(mail[0].Body, since) ||
-		!strings.Contains(mail[0].Body, fmt.Sprintf("%s/compare?before=%d&after=%d", testOrigin, first, second)) {
+		!strings.Contains(mail[0].Body, fmt.Sprintf("%s/ai/what-changed?before=%d&after=%d", testOrigin, first, second)) {
 		t.Fatalf("SMTP got %+v, want one message titled %q", mail, title)
 	}
 	emails := c.resend.Emails()
@@ -169,7 +179,7 @@ func TestACheckNotifiesEveryChannelWithTheComparison(t *testing.T) {
 	var alerts notify.AlertList
 	agent.call("GET", "/v1/alerts", nil, http.StatusOK, &alerts)
 	if alerts.Unread != 2 || len(alerts.Alerts) != 2 || alerts.Alerts[0].Title != title ||
-		alerts.Alerts[0].Path != fmt.Sprintf("/compare?before=%d&after=%d", first, second) || alerts.Alerts[1].Kind != notify.CheckCompleted {
+		alerts.Alerts[0].Path != fmt.Sprintf("/ai/what-changed?before=%d&after=%d", first, second) || alerts.Alerts[1].Kind != notify.CheckCompleted {
 		t.Fatalf("alerts = %+v, want both checks, newest first, unread", alerts)
 	}
 	var read notify.ReadResult

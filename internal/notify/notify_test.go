@@ -152,7 +152,7 @@ func TestWebhookSignatureVerifiesAndATamperedBodyFails(t *testing.T) {
 		t.Fatalf("requests = %+v, want one whose signature verifies", reqs)
 	}
 	var body notify.WebhookBody
-	if err := json.Unmarshal(reqs[0].Body, &body); err != nil || body.Kind != notify.CheckFailed || body.URL != "https://byname.example/runs" {
+	if err := json.Unmarshal(reqs[0].Body, &body); err != nil || body.Kind != notify.CheckFailed || body.URL != "https://byname.example/settings/checks" {
 		t.Fatalf("body = %+v, %v", body, err)
 	}
 
@@ -265,12 +265,12 @@ func TestEmailChannels(t *testing.T) {
 			m := mail[0]
 			if m.User != "alerts" || m.TLS != (mode != notifytest.Plain) || m.From != "alerts@northwind.example" || len(m.To) != 2 ||
 				m.Subject != "Check #9 reached its spend cap" || !strings.Contains(m.Body, "the spend cap per check is $5.00") ||
-				!strings.Contains(m.Body, "https://byname.example/runs") {
+				!strings.Contains(m.Body, "https://byname.example/settings/checks") {
 				t.Fatalf("mail = %+v", m)
 			}
 			emails := resend.Emails()
 			if len(emails) != 1 || emails[0].Subject != m.Subject || emails[0].To[0] != "ops@northwind.example" || emails[0].IdempotencyKey == "" ||
-				!strings.Contains(emails[0].Text, "https://byname.example/runs") {
+				!strings.Contains(emails[0].Text, "https://byname.example/settings/checks") {
 				t.Fatalf("Resend got %+v", emails)
 			}
 		})

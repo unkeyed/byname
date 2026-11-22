@@ -129,7 +129,7 @@ func (e envelope) text() string {
 	for _, l := range e.Message.Lines {
 		b.WriteString(l + "\n")
 	}
-	fmt.Fprintf(&b, "\n%s\n\n-- \nSent by Byname to the %q channel. Choose what it gets at %s\n", e.URL, e.Channel, e.Settings)
+	fmt.Fprintf(&b, "\n%s\n\n-- \nByname sent this to “%s”. Choose which alerts go there at %s\n", e.URL, e.Channel, e.Settings)
 	return b.String()
 }
 
