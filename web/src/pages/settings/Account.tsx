@@ -91,7 +91,7 @@ export function Account() {
   return (
     <>
       <SettingsHeader title="Account">
-        How you sign in to Byname. A passkey or a connected login signs you in on its own. A password always needs a second step.
+        How you sign in to Byname, and where you are signed in now. A passkey or a connected login signs you in on its own. A password always needs a second step.
       </SettingsHeader>
       <div className="space-y-3 empty:hidden">
         <UrlNotice providers={providers} />
@@ -124,7 +124,7 @@ function SingleMethodWarning({ a }: { a: AccountData }) {
     <Card className="flex items-start gap-2 border-warn p-3">
       <Icon name="key" className="mt-0.5 size-4 shrink-0 text-warn" />
       <p className="min-w-0 flex-1 text-sm">
-        You have one way to sign in. If you lose it, only someone who can run commands on Byname&apos;s server can let you back in with{" "}
+        You have one way to sign in. If you lose it, only someone with access to Byname&apos;s server can let you back in with{" "}
         <code className="font-mono text-xs">byname recover</code>. Add a second passkey below, such as your phone or a security key
         {a.identities.length === 0 ? ", or connect a login" : ""}.
       </p>
@@ -339,7 +339,7 @@ function ConnectedLogins({ a, providers }: { a: AccountData; providers: SignInPr
       <p className="-mt-1 mb-3 text-sm text-muted">Sign in with a provider account whose verified email you connect here.</p>
       {rows.length === 0 ? (
         <p className="rounded-control border border-line bg-subtle p-3 text-xs leading-relaxed text-muted">
-          No sign-in providers are configured on this server. Settings, Team lists the env vars that add Google, GitHub or OIDC.
+          No sign-in providers are set up on this server. Settings, Team lists the settings that add Google, GitHub or OIDC.
         </p>
       ) : (
         <Card>

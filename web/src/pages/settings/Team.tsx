@@ -19,8 +19,8 @@ export function Team() {
   return (
     <>
       <SettingsHeader title="Team">
-        Everyone here can sign in. A viewer reads results, an editor also runs checks and changes setup, and an admin also manages API keys, apps
-        and the team. Invite a teammate with a one-time link.
+        Who can use Byname and what each person may do. A viewer reads results. An editor also starts checks and changes setup. An admin also manages the team,
+        API keys and apps. Invite a teammate with a one-time link.
       </SettingsHeader>
       <Members />
 
