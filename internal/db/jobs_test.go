@@ -59,7 +59,7 @@ func jobsWritten(t *testing.T) []string {
 // job_run CHECK, as the migrations leave it, refuses.
 func TestJobCheckCoversEveryJob(t *testing.T) {
 	jobs := jobsWritten(t)
-	for _, want := range []string{"ai_check", "model_refresh", "gsc_sync", "source_fetch", "site_changes", "recrawl_watch", "verdicts"} {
+	for _, want := range []string{"ai_check", "model_refresh", "gsc_sync", "source_fetch", "site_changes", "recrawl_watch", "verdicts", "social_fetch"} {
 		if !slices.Contains(jobs, want) {
 			t.Errorf("found no INSERT for job %s; the scan of the code is broken", want)
 		}

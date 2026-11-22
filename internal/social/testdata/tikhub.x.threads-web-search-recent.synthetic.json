@@ -1,0 +1,87 @@
+{
+  "code": 200,
+  "message": "Request successful. This request will incur a charge.",
+  "router": "/api/v1/threads/web/search_recent",
+  "params": {
+    "query": "Northwind Cloud"
+  },
+  "data": {
+    "searchResults": {
+      "inform_module": null,
+      "edges": [
+        {
+          "node": {
+            "thread": {
+              "id": "3762810465238117345",
+              "thread_items": [
+                {
+                  "post": {
+                    "pk": "3762810465238117345",
+                    "id": "3762810465238117345_63551204",
+                    "code": "DQ4nW1vEk2x",
+                    "taken_at": 1795301400,
+                    "like_count": 42,
+                    "caption": {
+                      "text": "Northwind Cloud's new edge regions cut our p95 in half. Worth a look if you run APIs in Europe."
+                    },
+                    "user": {
+                      "pk": "63551204",
+                      "username": "priya.builds",
+                      "full_name": "Priya Raman",
+                      "is_verified": false
+                    },
+                    "text_post_app_info": {
+                      "direct_reply_count": 6,
+                      "repost_count": 3,
+                      "quote_count": 1
+                    }
+                  }
+                }
+              ]
+            },
+            "__typename": "XDTSearchThread"
+          },
+          "cursor": ""
+        },
+        {
+          "node": {
+            "thread": {
+              "id": "3762744418866213906",
+              "thread_items": [
+                {
+                  "post": {
+                    "pk": "3762744418866213906",
+                    "id": "3762744418866213906_71230987",
+                    "code": "DQ4YbU2kM8q",
+                    "taken_at": 1795293600,
+                    "like_count": 0,
+                    "caption": null,
+                    "user": {
+                      "pk": "71230987",
+                      "username": "Northwind.Cloud",
+                      "full_name": "Northwind Cloud",
+                      "is_verified": true
+                    },
+                    "text_post_app_info": {
+                      "direct_reply_count": 0,
+                      "repost_count": 0,
+                      "quote_count": 0
+                    }
+                  }
+                }
+              ]
+            },
+            "__typename": "XDTSearchThread"
+          },
+          "cursor": ""
+        }
+      ],
+      "page_info": {
+        "end_cursor": "QVFIUmN6dE5vcnRod2luZA",
+        "has_next_page": true,
+        "has_previous_page": false,
+        "start_cursor": null
+      }
+    }
+  }
+}
