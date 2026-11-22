@@ -107,7 +107,7 @@ export function Note({ tone, icon, children }: { tone: "info" | "warn" | "danger
   return (
     <div className={cx("flex items-start gap-2 rounded-surface px-3 py-2 text-xs", { info: "bg-info-soft text-info", warn: "bg-warn-soft text-warn", danger: "bg-danger-soft text-danger" }[tone])}>
       <Icon name={icon} className={cx("mt-px size-3.5", icon === "refresh" && "animate-spin")} />
-      <div className="min-w-0 [overflow-wrap:anywhere]">{children}</div>
+      <p className="min-w-0 [overflow-wrap:anywhere]">{children}</p>
     </div>
   );
 }

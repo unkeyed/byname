@@ -124,7 +124,7 @@ function PromptGaps({ filter }: { filter: ResultsFilter }) {
                             e.currentTarget.focus();
                             open(g);
                           }}
-                          className="text-left font-medium group-hover:underline after:absolute after:inset-0 focus-visible:outline-none focus-visible:after:outline-2 focus-visible:after:-outline-offset-2 focus-visible:after:outline-ring"
+                          className="-my-3 py-3 text-left font-medium group-hover:underline after:absolute md:my-0 md:py-0 after:inset-0 focus-visible:outline-none focus-visible:after:outline-2 focus-visible:after:-outline-offset-2 focus-visible:after:outline-ring"
                         >
                           {g.question.text}
                         </button>

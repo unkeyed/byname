@@ -239,7 +239,7 @@ function ChangeTable({ changes, zone }: { changes: Change[]; zone: Zone }) {
                 <span className="text-xs text-faint">{kindInfo[c.kind]}</span>
               </td>
               <td className="max-w-64 py-2 pr-3 align-top">
-                <ChangeSource c={c} className="relative z-[3] block truncate" />
+                <ChangeSource c={c} className="relative z-[3] -my-1 block truncate py-1" />
               </td>
               <td className={td}>{zone.date(c.merged_at)}</td>
               <td className={td}>{c.first_crawl_at ? zone.at(c.first_crawl_at) : <span className="text-muted">Not yet</span>}</td>

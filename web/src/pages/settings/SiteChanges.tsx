@@ -32,7 +32,7 @@ function Repo({ r }: { r: RepoStatus }) {
       <section>
         {r.connected ? (
           <details className="text-sm">
-            <summary className="cursor-pointer font-medium text-muted hover:text-fg">Replace the token or connect another repo</summary>
+            <summary className="cursor-pointer py-3.5 font-medium text-muted hover:text-fg md:py-0">Replace the token or connect another repo</summary>
             <p className="mt-3 mb-3 text-sm text-muted">The same repo keeps its path rules. Another repo starts over with none.</p>
             <ConnectForm initialRepo={r.repo} label="Replace" />
           </details>

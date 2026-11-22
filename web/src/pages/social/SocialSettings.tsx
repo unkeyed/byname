@@ -230,7 +230,7 @@ function LeftOutSection({ canEdit }: { canEdit: boolean }) {
                 {accounts.map((a) => (
                   <li key={a.id} className="flex items-center gap-1.5 rounded-control border border-line py-0.5 pr-1 pl-0.5 text-xs">
                     <NetworkMark network={a.network} className="size-5" />
-                    <a href={a.profile} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center [overflow-wrap:anywhere] hover:underline md:min-h-0">
+                    <a href={a.profile} target="_blank" rel="noreferrer" className="inline-flex min-h-11 min-w-11 items-center [overflow-wrap:anywhere] hover:underline md:min-h-0 md:min-w-0">
                       {a.handle}
                     </a>
                     <span className="text-faint tabular-nums" title="Stored mentions it hides">
