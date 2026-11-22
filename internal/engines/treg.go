@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -121,6 +122,46 @@ func validate(e Endpoint, r Request) error {
 	return nil
 }
 
+// ToolCall is one call to a Treg tool outside the surface registry, such
+// as a social network's post search. Query and Body are the provider's
+// own query string and JSON body.
+type ToolCall struct {
+	Method string
+	Tool   string
+	Query  url.Values
+	Body   any
+	// MaxCostUSD, when above 0, is sent as X-Treg-Route-Max-Cost, so Treg
+	// refuses any source dearer than it instead of failing over to one.
+	MaxCostUSD float64
+}
+
+// ToolResponse is the provider's answer to a ToolCall.
+type ToolResponse struct {
+	StatusCode int
+	Body       []byte
+	// CostUSD is nil when the call reported no cost, never 0 for unknown.
+	CostUSD *float64
+	CallID  string
+}
+
+// CallTool sends c through Treg. An error means there is no answer: the
+// connection failed or Treg refused the call (*Refusal). A provider error
+// is a ToolResponse with its status code.
+func (t Treg) CallTool(ctx context.Context, c ToolCall) (ToolResponse, error) {
+	req, err := t.newRequest(ctx, c.Method, c.Tool, providerRequest{Query: c.Query, Body: c.Body}, "")
+	if err != nil {
+		return ToolResponse{}, err
+	}
+	if c.MaxCostUSD > 0 {
+		req.Header.Set("X-Treg-Route-Max-Cost", strconv.FormatFloat(c.MaxCostUSD, 'f', -1, 64))
+	}
+	resp, body, err := t.send(req, c.Tool)
+	if err != nil {
+		return ToolResponse{}, err
+	}
+	return ToolResponse{StatusCode: resp.StatusCode, Body: body, CostUSD: chargedUSD(resp.Header), CallID: resp.Header.Get("X-Treg-Call-Id")}, nil
+}
+
 // do sends one call and returns the provider's response, or the Refusal
 // when Treg declined it.
 func (t Treg) do(ctx context.Context, method, tool string, pr providerRequest, idempotencyKey string) (*http.Response, []byte, error) {
@@ -128,6 +169,10 @@ func (t Treg) do(ctx context.Context, method, tool string, pr providerRequest, i
 	if err != nil {
 		return nil, nil, err
 	}
+	return t.send(httpReq, tool)
+}
+
+func (t Treg) send(httpReq *http.Request, tool string) (*http.Response, []byte, error) {
 	client := t.Client
 	if client == nil {
 		client = http.DefaultClient

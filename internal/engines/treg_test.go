@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -313,5 +314,61 @@ func TestTregListModels(t *testing.T) {
 	}
 	if _, err := tr.ListModels(context.Background(), GoogleAIMode); err == nil {
 		t.Error("an app surface returned a model list")
+	}
+}
+
+// A tool call outside the registry sends the provider's body with the
+// token and the cost ceiling, and reads the cost, call id and status back;
+// a missing cost header stays nil and a Treg refusal is a *Refusal.
+func TestTregCallTool(t *testing.T) {
+	cost := "1200"
+	srv, seen := tregServer(t, func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/call/refused.tool":
+			w.Header().Set("X-Treg-Error", "1")
+			w.WriteHeader(http.StatusPaymentRequired)
+			_, _ = w.Write([]byte(`{"error":"insufficient_balance","message":"top up"}`))
+			return
+		case "/call/provider.error":
+			w.WriteHeader(http.StatusBadGateway)
+			_, _ = w.Write([]byte(`{"error":"upstream"}`))
+			return
+		}
+		if cost != "" {
+			w.Header().Set("X-Treg-Cost-Micro", cost)
+		}
+		w.Header().Set("X-Treg-Call-Id", "call_7")
+		_, _ = w.Write([]byte(`{"rows":[]}`))
+	})
+	tr := Treg{BaseURL: srv.URL, Token: "treg_team", Client: srv.Client()}
+	ctx := context.Background()
+
+	res, err := tr.CallTool(ctx, ToolCall{Method: http.MethodPost, Tool: "anyapi.x.search.posts", Body: map[string]any{"query": "northwind"}, MaxCostUSD: 0.002})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.StatusCode != 200 || string(res.Body) != `{"rows":[]}` || res.CallID != "call_7" || res.CostUSD == nil || *res.CostUSD != 0.0012 {
+		t.Fatalf("response = %+v", res)
+	}
+	got := (*seen)[0]
+	if got.Method != http.MethodPost || got.Path != "/call/anyapi.x.search.posts" || got.Header.Get("X-Treg-Token") != "treg_team" ||
+		got.Header.Get("X-Treg-Route-Max-Cost") != "0.002" || !reflect.DeepEqual(got.Body, jsonValue(t, `{"query":"northwind"}`)) {
+		t.Fatalf("request = %+v", got)
+	}
+
+	cost = ""
+	res, err = tr.CallTool(ctx, ToolCall{Method: http.MethodGet, Tool: "tikhub.x.threads-web-search-recent", Query: url.Values{"query": {"northwind cloud"}}})
+	if err != nil || res.CostUSD != nil {
+		t.Fatalf("no cost header: %+v %v, want a nil cost", res, err)
+	}
+	if got := (*seen)[1]; got.Method != http.MethodGet || got.Query["query"][0] != "northwind cloud" || got.Body != nil || got.Header.Get("X-Treg-Route-Max-Cost") != "" {
+		t.Fatalf("GET with a query and no ceiling = %+v", got)
+	}
+	if res, err := tr.CallTool(ctx, ToolCall{Method: http.MethodPost, Tool: "provider.error"}); err != nil || res.StatusCode != http.StatusBadGateway {
+		t.Fatalf("provider error = %+v %v, want the provider's 502 as a response", res, err)
+	}
+	var refusal *Refusal
+	if _, err := tr.CallTool(ctx, ToolCall{Method: http.MethodPost, Tool: "refused.tool"}); !errors.As(err, &refusal) || refusal.Code != "insufficient_balance" {
+		t.Fatalf("refusal = %v, want *Refusal insufficient_balance", err)
 	}
 }
