@@ -13,8 +13,8 @@ Every API key and every MCP connection carries one or more of three scopes. Each
 | Scope | Allows |
 |---|---|
 | `results:read` | Read checks, answers, raw responses, questions, brands, Search Console data, goals, site changes, comparison pages, the repo connection, social mentions and digests, the left-out list, alerts and settings. Never a secret. |
-| `runs:write` | Queue a check, and pause and resume scheduled checks. |
-| `config:write` | Edit the brand, competitors, questions and question sets, AI apps and models, the schedule and limits, goals, branded search terms, site changes logged by hand, comparison pages, path rules, when change results fall and what counts as a move, the social search settings, and the people left out of social mentions. |
+| `runs:write` | Queue a check, pause and resume scheduled checks, and read past answers for other brands. |
+| `config:write` | Edit the brand, competitors, questions and question sets, AI apps and models, the schedule and limits, goals, branded search terms, site changes logged by hand, comparison pages, path rules, when change results fall and what counts as a move, the social search settings, the people left out of social mentions, which brands answers name are tracked or hidden, and the settings for finding other brands and their logos. |
 
 A key or connection never carries a scope its creator's role lacks. An Admin or Editor can grant all three. A Viewer can grant only `results:read`. If the creator's role later loses a scope, so do their keys and connections. [Sign-in](sign-in.md#roles-and-what-they-allow) describes the roles.
 
@@ -117,7 +117,7 @@ Keys live in Postgres by default, or in Unkey when `UNKEY_ROOT_KEY` and `UNKEY_A
 
 ## MCP tools
 
-Byname's MCP server has 73 tools. Every REST route an API key can call has one with the same scope, except `DELETE /v1/keys/current`, since MCP clients sign in with OAuth instead of a key. A test keeps the two in step. Read tools are marked read-only, and `delete_brand`, `delete_goal`, `delete_change`, `delete_control_page` and `remove_left_out_account` are marked destructive, so a client can ask before it runs them.
+Byname's MCP server has 83 tools. Every REST route an API key can call has one with the same scope, except `DELETE /v1/keys/current`, since MCP clients sign in with OAuth instead of a key, and `GET /v1/brands/{id}/logo`, an image for the browser. A test keeps the two in step. Read tools are marked read-only, and `delete_brand`, `delete_goal`, `delete_change`, `delete_control_page` and `remove_left_out_account` are marked destructive, so a client can ask before it runs them.
 
 | Tool | Scope | REST | What it does |
 |---|---|---|---|
@@ -140,6 +140,16 @@ Byname's MCP server has 73 tools. Every REST route an API key can call has one w
 | `update_social_settings` | `config:write` | `PUT /v1/social/settings` | Turn social searches on or off, replace the social search terms, the fetch period and the digest schedule, and turn networks on or off (read them with get_social_settings first). |
 | `leave_out_account` | `config:write` | `POST /v1/social/left-out` | Leave an account out of social mentions, or relabel one already left out; its past mentions are hidden too. |
 | `remove_left_out_account` | `config:write` | `DELETE /v1/social/left-out/{id}` | Take an account off the left-out list, so its mentions show again. |
+| `list_other_brands` | `results:read` | `GET /v1/other-brands` | The brands AI answers named that you don't track, most named first: how many answers in range named each, the questions it was named for most, and the change since the check before. They count in no score. |
+| `list_hidden_brands` | `results:read` | `GET /v1/other-brands/hidden` | The brands someone marked as not a competitor, with how many answers named each. |
+| `get_other_brands_settings` | `results:read` | `GET /v1/other-brands/settings` | Whether each new answer is read for other brands and what reading one costs, and whether logos are looked up, what one new brand costs and the monthly limit on new lookups. |
+| `get_brand_backfill` | `results:read` | `GET /v1/other-brands/backfill` | How many past answers were never read for other brands, what reading them would cost, and the latest pass someone started. |
+| `list_logos` | `results:read` | `GET /v1/logos` | Every brand with a logo, with its colour and domain. |
+| `track_brand` | `config:write` | `POST /v1/other-brands/{id}/track` | Track a brand AI answers named as a competitor. It counts from then on, and every past answer is scored again, locally and for free. |
+| `hide_brand` | `config:write` | `POST /v1/other-brands/{id}/hide` | Mark a brand AI answers named as not a competitor, so it leaves the list. |
+| `unhide_brand` | `config:write` | `POST /v1/other-brands/{id}/unhide` | Put a brand marked as not a competitor back on the list. |
+| `update_other_brands_settings` | `config:write` | `PUT /v1/other-brands/settings` | Turn reading answers for other brands and logo lookups on or off, and set the monthly limit on new lookups. |
+| `start_brand_backfill` | `runs:write` | `POST /v1/other-brands/backfill` | Read every past answer never read for other brands, as one job in Check history, within the monthly spend cap. |
 | `status` | `results:read` | `GET /v1/status` | Byname's version and whether onboarding is done. |
 | `get_costs` | `results:read` | `GET /v1/costs` | What Byname costs, in US dollars: one answer in each AI app, one check, a month of checks and of social searches, and what this month has spent against the monthly cap. See [Treg](engines/treg.md#cost). |
 | `list_alerts` | `results:read` | `GET /v1/alerts` | Alerts newest first: finished checks with the answers that started or stopped naming you, refused or failed checks, spend caps reached, paused models, Google search goals reached, Google clicks that moved, change results, an expiring GitHub token and social digests, each with whether the person this connection acts for has read it, and the unread count. |

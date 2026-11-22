@@ -22,7 +22,7 @@ const origin = "https://byname.dev";
 // The sidebar, in reading order. Every .md under docs/ must appear here.
 const sections = [
   { title: "Get started", pages: ["self-hosting", "deploy-unkey", "configuration", "sign-in"] },
-  { title: "AI apps", pages: ["engines/surfaces", "scores", "engines/treg", "engines/scraping-providers", "engines/model-providers", "engines/gateways"] },
+  { title: "AI apps", pages: ["engines/surfaces", "scores", "other-brands", "engines/treg", "engines/scraping-providers", "engines/model-providers", "engines/gateways"] },
   { title: "Connect", pages: ["search-console", "agents", "notifications", "changes", "social"] },
 ];
 const navLabels = {
