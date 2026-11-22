@@ -73,7 +73,7 @@ When a day or week ends, Byname raises the **Social digest** alert, once per per
 > 2 more posts came from accounts you left out, so they are not counted.
 > The posts people engaged with most:
 > @dana on X, with 40 likes, replies and reposts: “Northwind sorted our invoices” https://x.com/dana/status/1
-> Searching for posts cost $0.0138.
+> Searching for posts cost $0.04.
 
 The event's payload carries the same facts as numbers: the new mentions and how many more came from left-out accounts, the count per network with each network's most engaged posts, the new people, the accounts whose first mention fell in the period, and what the period's searches cost, with how many Treg calls reported no cost.
 

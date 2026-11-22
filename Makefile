@@ -19,6 +19,7 @@ lint:
 	@test -z "$$(gofmt -l .)" || { gofmt -l .; echo "run: gofmt -w ."; exit 1; }
 	go vet ./...
 	go vet -tags e2e ./e2e/
+	cd web && npm test
 
 web:
 	cd web && npm ci && npm run build

@@ -208,7 +208,7 @@ func addConfigTools(srv *mcp.Server, svc app.Services) {
 			return c.SaveStep(ctx, in.Step)
 		})
 	addTool(srv, core.ConfigWrite, &mcp.Tool{Name: "finish_onboarding", Annotations: mutates(false, true),
-		Description: "Finish onboarding once the required steps are saved and every AI app and model turned on has passed test_pair. Sets the first scheduled check, and with no monthly spend cap set, a cap of three times the monthly estimate (at least $5); queue a check now with run_now. POST /v1/onboarding/finish."},
+		Description: "Finish onboarding once the required steps are saved and every AI app and model turned on has passed test_pair. Sets the first scheduled check, and with no monthly spend cap set, a cap of three times the monthly estimate (at least $5.00); queue a check now with run_now. POST /v1/onboarding/finish."},
 		func(ctx context.Context, _ core.Actor, _ noInput) (config.Onboarding, error) {
 			return svc.Instance.FinishOnboarding(ctx)
 		})
