@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type ComponentProps, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type ButtonHTMLAttributes, type ReactNode } from "react";
 import { Link } from "react-router";
 import { ApiError } from "./api";
 import { absoluteTime, initials, relativeTime } from "./format";
@@ -89,7 +89,7 @@ export function buttonClass({ variant = "secondary", size = "md", icon }: Button
   );
 }
 
-export function Button({ variant, size, icon, className, ...props }: ComponentProps<"button"> & ButtonLook) {
+export function Button({ variant, size, icon, className, ...props }: ButtonHTMLAttributes<HTMLButtonElement> & ButtonLook) {
   return <button type="button" {...props} className={cx(buttonClass({ variant, size, icon }), className)} />;
 }
 
@@ -104,29 +104,6 @@ export function SteadyLabel({ labels, current }: { labels: string[]; current: st
       ))}
     </span>
   );
-}
-
-/**
- * Holds an element at the same place on screen across the next render, by
- * scrolling its scroller as far as the render moved it. Call mark() before
- * the change, such as a row inserted above the element.
- */
-export function useKeepOnScreen<T extends HTMLElement>() {
-  const ref = useRef<T>(null);
-  const top = useRef<number | null>(null);
-  useLayoutEffect(() => {
-    const el = ref.current;
-    if (!el || top.current === null) return;
-    const delta = el.getBoundingClientRect().top - top.current;
-    top.current = null;
-    let s = el.parentElement;
-    while (s && !(s.scrollHeight > s.clientHeight && /auto|scroll/.test(getComputedStyle(s).overflowY))) s = s.parentElement;
-    if (s) s.scrollTop += delta;
-  });
-  const mark = () => {
-    top.current = ref.current?.getBoundingClientRect().top ?? null;
-  };
-  return [ref, mark] as const;
 }
 
 export function Logo({ className = "size-6 text-xs" }: { className?: string }) {

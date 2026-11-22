@@ -4,7 +4,7 @@ import { api, type ChangeSettings, type PathRule, type RepoStatus } from "../../
 import { NumberField, SubmitButton } from "../../config/forms";
 import { formatNumber, parseNumber } from "../../config/rules";
 import { keys, useChangeSettings, useRepo, useSettings } from "../../queries";
-import { Badge, Button, Card, ConfirmButton, cx, ErrorNote, Field, Icon, inputClass, Pending, RelativeTime, useKeepOnScreen } from "../../ui";
+import { Badge, Button, Card, ConfirmButton, cx, ErrorNote, Field, Icon, inputClass, Pending, RelativeTime } from "../../ui";
 import { useZone } from "../changes/model";
 import { useReauthMutation } from "./Reauth";
 import { SettingsHeader, SettingsSubhead } from "./Settings";
@@ -230,7 +230,6 @@ function Rules({ r }: { r: RepoStatus }) {
   const domain = settings.data?.brand.domains[0] || "www.example.com";
   const [next, setNext] = useState(r.rules.length);
   const [added, setAdded] = useState<number>();
-  const [addRef, keepAdd] = useKeepOnScreen<HTMLButtonElement>();
   const [rows, setRows] = useState<Row[]>(() => r.rules.map((rule, key) => ({ ...rule, key })));
   const [path, setPath] = useState("");
   const save = useMutation({
@@ -251,9 +250,8 @@ function Rules({ r }: { r: RepoStatus }) {
     setRows(out);
   };
   const add = () => {
-    keepAdd();
     save.reset();
-    setRows([...rows, { glob: "", url: "", key: next }]);
+    setRows([{ glob: "", url: "", key: next }, ...rows]);
     setAdded(next);
     setNext(next + 1);
   };
@@ -283,6 +281,10 @@ function Rules({ r }: { r: RepoStatus }) {
         </ul>
       </div>
       <form onSubmit={submit} className="space-y-3">
+        <Button onClick={add} disabled={rows.length >= 50}>
+          <Icon name="plus" className="size-3.5" />
+          Add rule
+        </Button>
         {rows.length === 0 ? (
           <p className="rounded-surface border border-dashed border-line-strong px-4 py-6 text-center text-sm text-muted">No rules yet, so no merge maps to a page. Add one for each kind of page your site builds from files.</p>
         ) : (
@@ -309,10 +311,6 @@ function Rules({ r }: { r: RepoStatus }) {
             ))}
           </ol>
         )}
-        <Button ref={addRef} onClick={add} disabled={rows.length >= 50}>
-          <Icon name="plus" className="size-3.5" />
-          Add rule
-        </Button>
         {rows.length > 0 && (
           <div className="rounded-surface border border-line bg-header p-3">
             <Field label="Try a repo path" hint="Shows the page the rules above give it, saved or not.">
