@@ -1,5 +1,6 @@
 import { useState, type FormEvent, type ReactNode } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { Link } from "react-router";
 import { api, type ChangeSettings, type PathRule, type RepoStatus } from "../../api";
 import { NumberField, SubmitButton } from "../../config/forms";
 import { formatNumber, parseNumber } from "../../config/rules";
@@ -14,9 +15,16 @@ export function SiteChanges() {
   return (
     <>
       <SettingsHeader title="Site changes">
-        Byname reads merged pull requests from your site&apos;s GitHub repo every hour, maps the files each one changed to page URLs with your path rules, then
-        watches for Google&apos;s next crawl and compares each page with the control pages. Sites without GitHub can log changes by hand on the Changes page.
+        Did a change to your site help it in Google? Connect your site&apos;s GitHub repo and Byname finds each change you merge, waits until Google sees the changed
+        page, then compares its clicks before and after with comparison pages: a few steady pages you promise not to edit.
       </SettingsHeader>
+      <p className="-mt-3 mb-6 text-sm text-muted">
+        No GitHub? Log changes by hand under{" "}
+        <Link to="/google/site-changes" className="text-fg underline underline-offset-2">
+          Google search, Site changes
+        </Link>
+        .
+      </p>
       <div className="space-y-10">
         {repo.isPending ? <Pending /> : repo.isError ? <ErrorNote error={repo.error} /> : <Repo r={repo.data} />}
         <ReadSettings />
@@ -79,8 +87,8 @@ function Status({ r }: { r: RepoStatus }) {
       ),
     ],
     [
-      "Last check",
-      r.last_poll_at ? <RelativeTime iso={r.last_poll_at} /> : <span className="text-muted">{r.connected ? "Not yet. The first check runs within the hour." : "Never"}</span>,
+      "Last read",
+      r.last_poll_at ? <RelativeTime iso={r.last_poll_at} /> : <span className="text-muted">{r.connected ? "Not yet. Byname first reads the repo within the hour." : "Never"}</span>,
     ],
     ...(r.last_poll_error ? [["Last error", <span className="text-danger [overflow-wrap:anywhere]">{r.last_poll_error}</span>] as [string, ReactNode]] : []),
   ];
@@ -124,7 +132,7 @@ function Status({ r }: { r: RepoStatus }) {
         <ErrorNote error={test.error} />
         <ErrorNote error={disconnect.error} />
       </div>
-      {r.connected && <p className="mt-2 text-xs text-muted">Disconnecting deletes the token and stops the hourly check. The repo, its rules and the changes found stay.</p>}
+      {r.connected && <p className="mt-2 text-xs text-muted">Disconnecting deletes the token, and Byname stops reading the repo every hour. The repo, its rules and the changes found stay.</p>}
     </section>
   );
 }
@@ -265,7 +273,7 @@ function Rules({ r }: { r: RepoStatus }) {
     <section>
       <SettingsSubhead>Path rules</SettingsSubhead>
       <div className="mb-4 space-y-1.5 text-sm text-muted">
-        <p>Each rule maps the repo files a pull request changed to a page URL. The first rule a file matches wins; a file no rule matches is ignored. After you save changed rules, the next hourly check reads the last 30 days of merges again with them.</p>
+        <p>Each rule turns a file in the repo into the page on your site it builds, so Byname knows which page a change touched. The first rule a file matches wins; a file no rule matches is ignored. After you save changed rules, the next hourly read goes through the last 30 days of merges again with them.</p>
         <ul className="list-disc space-y-1 pl-5 text-xs">
           <li>
             <code className="font-mono text-fg">*</code> matches within one folder: <code className="font-mono">content/blog/*.mdx</code> matches <code className="font-mono">content/blog/launch.mdx</code>.
@@ -341,22 +349,30 @@ function Rules({ r }: { r: RepoStatus }) {
 type ReadKey = keyof ChangeSettings;
 const readKeys: ReadKey[] = ["interim_days", "verdict_days", "position", "ctr_points", "impressions_ratio"];
 
+const readLabels: Record<ReadKey, string> = {
+  interim_days: "First result",
+  verdict_days: "Final result",
+  position: "Average position",
+  ctr_points: "Click rate",
+  impressions_ratio: "Appearances",
+};
+
 const readHints: Record<ReadKey, string> = {
-  interim_days: "A provisional read, marked as such.",
-  verdict_days: "The verdict. Later than the interim read.",
-  position: "Average position, either way. Moving up is better.",
-  ctr_points: "Click-through rate, either way.",
-  impressions_ratio: "Up by this much, or down by its inverse.",
+  interim_days: "An early look, marked as early.",
+  verdict_days: "Whether the change helped. Later than the first result.",
+  position: "Your average spot in Google results, 1 is the top. Up or down by this much.",
+  ctr_points: "Clicks divided by appearances. Up or down by this much.",
+  impressions_ratio: "Times the page appeared in Google results. Up by this much, or down by its inverse.",
 };
 
 function ReadSettings() {
   const s = useChangeSettings();
   return (
     <section>
-      <SettingsSubhead>Reads</SettingsSubhead>
+      <SettingsSubhead>When results come, and what counts</SettingsSubhead>
       <p className="mb-4 text-sm text-muted">
-        When the interim and final reads fall, counted from Google&apos;s first crawl after a change, and how far a page must move against the control pages for a metric to
-        count. Changes already crawled keep their days; new reads use the new thresholds.
+        Each change gets a first result and a final result, counted in days from when Google saw the changed page. A number counts as moved only when the page moves this
+        much more than the comparison pages. Changes Google already saw keep their days; new results use the new amounts.
       </p>
       {s.isPending ? <Pending /> : s.isError ? <ErrorNote error={s.error} /> : <ReadSettingsForm initial={s.data} />}
     </section>
@@ -381,7 +397,7 @@ function ReadSettingsForm({ initial }: { initial: ChangeSettings }) {
     if ("error" in p) errors[k] = p.error;
     else body[k] = p.value ?? initial[k];
   }
-  if (!errors.interim_days && !errors.verdict_days && body.verdict_days <= body.interim_days) errors.verdict_days = "Must be more than the interim read.";
+  if (!errors.interim_days && !errors.verdict_days && body.verdict_days <= body.interim_days) errors.verdict_days = "Must be later than the first result.";
   const submit = (e: FormEvent) => {
     e.preventDefault();
     setTried(true);
@@ -400,6 +416,7 @@ function ReadSettingsForm({ initial }: { initial: ChangeSettings }) {
               setValues({ ...values, [k]: val });
             }}
             error={tried || values[k] !== formatNumber(initial[k]) ? errors[k] : undefined}
+            label={readLabels[k]}
             hint={readHints[k]}
           />
         ))}
