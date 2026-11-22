@@ -10,7 +10,7 @@ import { Login } from "./pages/Login";
 import { AcceptInvite } from "./pages/AcceptInvite";
 import { Setup } from "./pages/Setup";
 import { Consent } from "./pages/Consent";
-import { Overview } from "./pages/results/Overview";
+import { ThisWeek } from "./pages/results/ThisWeek";
 import { Competitors } from "./pages/results/Competitors";
 import { Questions } from "./pages/results/Questions";
 import { Missed } from "./pages/results/Missed";
@@ -34,7 +34,7 @@ const router = createBrowserRouter([
   {
     element: <Layout />,
     children: [
-      { index: true, element: <Overview /> },
+      { index: true, element: <ThisWeek /> },
       {
         path: "ai",
         element: <Section item={section("/ai")} />,
