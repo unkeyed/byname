@@ -199,7 +199,9 @@ export function CopyButton({ text, label = "Copy", className }: { text: string; 
   return (
     <Button size="sm" variant="ghost" onClick={() => copy(text)} className={className} aria-label={copied ? "Copied" : label}>
       <Icon name={copied ? "check" : "copy"} className={cx("size-3.5", copied && "text-success")} />
-      <span aria-live="polite">{copied ? "Copied" : label}</span>
+      <span aria-live="polite">
+        <SteadyLabel labels={[label, "Copied"]} current={copied ? "Copied" : label} />
+      </span>
     </Button>
   );
 }
