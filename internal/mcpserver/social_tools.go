@@ -27,7 +27,7 @@ func addSocialTools(srv *mcp.Server, svc app.Services) {
 			return svc.Social.Digest(ctx, in)
 		})
 	addTool(srv, core.ResultsRead, &mcp.Tool{Name: "get_social_settings", Annotations: readOnly(),
-		Description: "The social search terms, each network with whether it is on, its route (Treg or direct) and its latest call, how often searches run and when the digest goes out. GET /v1/social/settings."},
+		Description: "Whether social searches are on (they start off), the search terms, each network with whether it is on, its route (Treg or direct) and its latest call, how often searches run and when the digest goes out. GET /v1/social/settings."},
 		func(ctx context.Context, _ core.Actor, _ noInput) (social.Settings, error) {
 			return svc.Social.Settings(ctx)
 		})
@@ -39,7 +39,7 @@ func addSocialTools(srv *mcp.Server, svc app.Services) {
 		})
 
 	addTool(srv, core.ConfigWrite, &mcp.Tool{Name: "update_social_settings", Annotations: mutates(false, true),
-		Description: "Replace the social search terms, the fetch period and the digest schedule, and turn networks on or off (read them with get_social_settings first). PUT /v1/social/settings."},
+		Description: "Turn social searches on or off (enabled; omit it to keep the setting), replace the search terms, the fetch period and the digest schedule, and turn networks on or off (read them with get_social_settings first). Treg networks cost money per search and nothing runs before onboarding is finished. PUT /v1/social/settings."},
 		func(ctx context.Context, _ core.Actor, in social.SettingsInput) (social.Settings, error) {
 			return svc.Social.PutSettings(ctx, in)
 		})

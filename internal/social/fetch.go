@@ -50,10 +50,14 @@ func (s *Service) Fetch(ctx context.Context) error {
 	})
 }
 
-// fetchNow runs one social_fetch job when there is something to search:
-// a term, and a network turned on that can run, which without a Treg
-// token means a direct one. Otherwise it does nothing and logs nothing.
+// fetchNow runs one social_fetch job when social is on, onboarding is
+// finished and there is something to search: a term, and a network turned
+// on that can run, which without a Treg token means a direct one.
+// Otherwise it does nothing, calls nothing and logs nothing.
 func (s *Service) fetchNow(ctx context.Context, st settings) error {
+	if !st.on {
+		return nil
+	}
 	treg, token, err := s.keys.Treg(ctx)
 	if err != nil {
 		return err

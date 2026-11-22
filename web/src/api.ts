@@ -1197,6 +1197,8 @@ export interface SocialNetworkStatus {
 }
 
 export interface SocialSettings {
+  /** Off until someone turns it on; nothing runs before onboarding is finished either way. */
+  enabled: boolean;
   terms: string[];
   default_terms: string[];
   custom_terms: boolean;
@@ -1212,6 +1214,8 @@ export interface SocialSettings {
 }
 
 export interface SocialSettingsInput {
+  /** Omit to keep the current setting. */
+  enabled?: boolean;
   /** [] searches for the brand's name and primary domain. */
   terms: string[];
   fetch_every_hours: number;

@@ -100,9 +100,10 @@ type env struct {
 	now  time.Time
 }
 
-// newEnv is an instance whose brand is Northwind, searching for one term,
-// with a Treg token unless token is false, against a fake Treg and a fake
-// Bluesky. The clock starts on Wednesday 2026-11-18 at noon UTC.
+// newEnv is an onboarded instance whose brand is Northwind, with social
+// turned on, searching for one term, with a Treg token unless token is
+// false, against a fake Treg and a fake Bluesky. The clock starts on
+// Wednesday 2026-11-18 at noon UTC.
 func newEnv(t *testing.T, token bool) *env {
 	t.Helper()
 	e := &env{t: t, ctx: context.Background(), db: testdb.New(t), treg: tregtest.New(t), bsky: newFakeBluesky(t), now: time.Date(2026, 11, 18, 12, 0, 0, 0, time.UTC)}
@@ -120,7 +121,10 @@ func newEnv(t *testing.T, token bool) *env {
 	}
 	alerts := notify.New(e.db, results.New(e.db), notify.Options{Secrets: secretbox.ForTest()})
 	e.svc = social.New(e.db, e.cfg, social.Options{Alerts: alerts, BaseURLs: map[social.Network]string{social.Bluesky: e.bsky.URL}, Now: func() time.Time { return e.now }})
-	e.put(social.SettingsInput{Terms: []string{"Northwind Cloud"}})
+	if _, err := e.db.Exec(e.ctx, `UPDATE instance_settings SET onboarded_at = $1`, e.now); err != nil {
+		t.Fatal(err)
+	}
+	e.put(social.SettingsInput{Enabled: new(true), Terms: []string{"Northwind Cloud"}})
 	return e
 }
 
@@ -181,6 +185,50 @@ func (e *env) lastJob() (status, msg string) {
 		e.t.Fatal(err)
 	}
 	return status, msg
+}
+
+// Social searches cost money, so none runs until someone turns social on,
+// and none before onboarding is finished even then. Saving the Treg token
+// starts nothing.
+func TestSocialWaitsUntilTurnedOnAndOnboarded(t *testing.T) {
+	e := newEnv(t, true)
+	e.put(social.SettingsInput{Enabled: new(false), Terms: []string{"Northwind Cloud"}})
+	tick := func() {
+		t.Helper()
+		if err := e.svc.Tick(e.ctx); err != nil {
+			t.Fatal(err)
+		}
+		e.now = e.now.Add(24 * time.Hour)
+	}
+	tick()
+	if err := e.svc.Fetch(e.ctx); err != nil {
+		t.Fatal(err)
+	}
+	if n := len(e.treg.Calls()) + e.bsky.count() + e.count(`SELECT count(*) FROM social_call`); n != 0 {
+		t.Fatalf("%d calls with social off, want none", n)
+	}
+	if st := e.put(social.SettingsInput{Terms: []string{"Northwind Cloud"}}); st.Enabled || st.NextFetchAt != nil {
+		t.Fatalf("saving without enabled turned social on (%v) or scheduled a fetch (%v); leaving it out keeps it off", st.Enabled, st.NextFetchAt)
+	}
+
+	if _, err := e.db.Exec(e.ctx, `UPDATE instance_settings SET onboarded_at = NULL`); err != nil {
+		t.Fatal(err)
+	}
+	if st := e.put(social.SettingsInput{Enabled: new(true), Terms: []string{"Northwind Cloud"}}); !st.Enabled || st.NextFetchAt != nil {
+		t.Fatalf("on before onboarding: enabled %v next fetch %v, want on with nothing scheduled", st.Enabled, st.NextFetchAt)
+	}
+	tick()
+	if n := len(e.treg.Calls()) + e.bsky.count(); n != 0 {
+		t.Fatalf("%d calls before onboarding was finished, want none", n)
+	}
+
+	if _, err := e.db.Exec(e.ctx, `UPDATE instance_settings SET onboarded_at = $1`, e.now); err != nil {
+		t.Fatal(err)
+	}
+	tick()
+	if e.toolCalls("anyapi.x.search.posts") == 0 || e.bsky.count() == 0 {
+		t.Fatal("social on and onboarding finished, but the tick searched nothing")
+	}
 }
 
 // A first fetch pages each network back as far as its page cap allows and

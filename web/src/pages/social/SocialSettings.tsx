@@ -30,6 +30,7 @@ export function SocialSettings() {
 
 function SearchForm({ s, canEdit }: { s: Settings; canEdit: boolean }) {
   const qc = useQueryClient();
+  const [on, setOn] = useState(s.enabled);
   const [terms, setTerms] = useState<string[]>(s.custom_terms ? s.terms : []);
   const [enabled, setEnabled] = useState<Record<string, boolean>>(Object.fromEntries(s.networks.map((n) => [n.network, n.enabled])));
   const [every, setEvery] = useState(s.fetch_every_hours);
@@ -49,6 +50,7 @@ function SearchForm({ s, canEdit }: { s: Settings; canEdit: boolean }) {
     e.preventDefault();
     setSaved(false);
     save.mutate({
+      enabled: on,
       terms: cleaned,
       fetch_every_hours: every,
       digest_cadence: cadence,
@@ -60,6 +62,16 @@ function SearchForm({ s, canEdit }: { s: Settings; canEdit: boolean }) {
 
   return (
     <form onSubmit={submit} className="space-y-10">
+      <section>
+        <label className="flex items-start gap-3 text-sm">
+          <input type="checkbox" className="mt-1 size-3.5 accent-[var(--fg)]" checked={on} disabled={!canEdit} onChange={(e) => setOn(e.target.checked)} />
+          <span>
+            <span className="font-medium">Search social networks for posts that name you</span>
+            <span className="mt-0.5 block text-muted">Off until you turn it on. Searches through Treg cost money; Bluesky is free. Nothing runs before onboarding is finished.</span>
+          </span>
+        </label>
+      </section>
+
       <section>
         <SettingsSubhead>Search terms</SettingsSubhead>
         <p className="mb-3 text-sm text-muted">

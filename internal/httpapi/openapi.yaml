@@ -2275,7 +2275,7 @@ paths:
     put:
       tags: [social]
       operationId: putSocialSettings
-      summary: Replace the search terms, the fetch period and the digest schedule, and turn networks on or off.
+      summary: Turn social searches on or off, replace the search terms, the fetch period and the digest schedule, and turn networks on or off.
       security:
         - apiKey: [config:write]
         - session: [config:write]
@@ -6707,8 +6707,11 @@ components:
           description: Treg calls that reported no cost, left out of spend_usd rather than counted as $0.
     SocialSettings:
       type: object
-      required: [terms, default_terms, custom_terms, fetch_every_hours, digest_cadence, digest_weekday, time_zone, token_set, networks, last_fetch_at, next_fetch_at]
+      required: [enabled, terms, default_terms, custom_terms, fetch_every_hours, digest_cadence, digest_weekday, time_zone, token_set, networks, last_fetch_at, next_fetch_at]
       properties:
+        enabled:
+          type: boolean
+          description: Whether social searches run. Off until someone turns them on, because the Treg networks cost money. Nothing is searched before onboarding is finished either way.
         terms:
           type: array
           items:
@@ -6769,11 +6772,15 @@ components:
         next_fetch_at:
           type: [string, "null"]
           format: date-time
+          description: Null while nothing will be searched. Social is off, onboarding is not finished, there is no term, or no network that is on can run without the missing Treg token.
     SocialSettingsInput:
       type: object
       required: [terms, fetch_every_hours, digest_cadence, digest_weekday]
       additionalProperties: false
       properties:
+        enabled:
+          type: boolean
+          description: True to search, false to stop. Leave it out to keep the current setting.
         terms:
           type: array
           maxItems: 5

@@ -97,6 +97,9 @@ type NetworkToggle struct {
 
 // SettingsInput replaces the social settings.
 type SettingsInput struct {
+	// Enabled turns social searches on or off; nil keeps the current
+	// setting. They start off, because the Treg networks cost money.
+	Enabled         *bool           `json:"enabled,omitempty" jsonschema:"true to search, false to stop; omit to keep the current setting. Off until someone turns it on"`
 	Terms           []string        `json:"terms" jsonschema:"1 to 5 search terms, or [] to search for the brand's name and primary domain"`
 	FetchEveryHours int             `json:"fetch_every_hours" jsonschema:"1, 3, 6, 12 or 24"`
 	DigestCadence   Cadence         `json:"digest_cadence" jsonschema:"daily or weekly"`
@@ -120,6 +123,7 @@ type NetworkStatus struct {
 // Settings is what is searched, where, how often, and when the digest
 // goes out.
 type Settings struct {
+	Enabled         bool            `json:"enabled" jsonschema:"whether social searches run; off until someone turns them on, and nothing runs before onboarding is finished either way"`
 	Terms           []string        `json:"terms" jsonschema:"what each search looks for"`
 	DefaultTerms    []string        `json:"default_terms" jsonschema:"the brand's name and primary domain, searched when no terms are set"`
 	CustomTerms     bool            `json:"custom_terms" jsonschema:"false while terms are the default"`
@@ -130,11 +134,15 @@ type Settings struct {
 	TokenSet        bool            `json:"token_set" jsonschema:"whether a Treg token is stored; without one only direct networks are searched"`
 	Networks        []NetworkStatus `json:"networks"`
 	LastFetchAt     *time.Time      `json:"last_fetch_at"`
-	NextFetchAt     *time.Time      `json:"next_fetch_at" jsonschema:"null while nothing can be searched: no term, or no network on that can run without the missing Treg token"`
+	NextFetchAt     *time.Time      `json:"next_fetch_at" jsonschema:"null while nothing will be searched: social is off, onboarding is not finished, there is no term, or no network on can run without the missing Treg token"`
 }
 
 // settings is the stored settings with the time zone loaded.
 type settings struct {
+	// on is social turned on and onboarding finished: nothing is
+	// searched otherwise.
+	on           bool
+	enabled      bool
 	terms        []string
 	defaults     []string
 	custom       bool
@@ -144,7 +152,7 @@ type settings struct {
 	loc          *time.Location
 	sentThrough  *string
 	monthCap     *float64
-	enabled      map[Network]bool
+	networkOn    map[Network]bool
 	lastFetchAt  *time.Time
 	lastStartsAt *time.Time
 }
@@ -153,14 +161,16 @@ func (s *Service) settings(ctx context.Context) (settings, error) {
 	var st settings
 	var zone string
 	var stored []string
-	err := s.db.QueryRow(ctx, `SELECT social_terms, social_fetch_every_hours, social_digest_cadence, social_digest_weekday, time_zone,
+	var onboarded bool
+	err := s.db.QueryRow(ctx, `SELECT social_enabled, onboarded_at IS NOT NULL, social_terms, social_fetch_every_hours, social_digest_cadence, social_digest_weekday, time_zone,
 			to_char(social_digest_sent_through, 'YYYY-MM-DD'), spend_cap_month_usd::float8,
 			(SELECT max(started_at) FROM job_run WHERE job = 'social_fetch'),
 			(SELECT max(finished_at) FROM job_run WHERE job = 'social_fetch' AND status = 'completed')
-		FROM instance_settings`).Scan(&stored, &st.every, &st.cadence, &st.weekday, &zone, &st.sentThrough, &st.monthCap, &st.lastStartsAt, &st.lastFetchAt)
+		FROM instance_settings`).Scan(&st.enabled, &onboarded, &stored, &st.every, &st.cadence, &st.weekday, &zone, &st.sentThrough, &st.monthCap, &st.lastStartsAt, &st.lastFetchAt)
 	if err != nil {
 		return st, err
 	}
+	st.on = st.enabled && onboarded
 	if st.loc, err = time.LoadLocation(zone); err != nil {
 		st.loc = time.UTC
 	}
@@ -185,14 +195,14 @@ func (s *Service) settings(ctx context.Context) (settings, error) {
 	if err != nil {
 		return st, err
 	}
-	st.enabled = map[Network]bool{}
+	st.networkOn = map[Network]bool{}
 	for rows.Next() {
 		var n Network
 		var on bool
 		if err := rows.Scan(&n, &on); err != nil {
 			return st, err
 		}
-		st.enabled[n] = on
+		st.networkOn[n] = on
 	}
 	return st, rows.Err()
 }
@@ -202,7 +212,7 @@ func (s *Service) settings(ctx context.Context) (settings, error) {
 func (st settings) networks(token bool) []spec {
 	var out []spec
 	for _, n := range registry {
-		if st.enabled[n.Network] && (token || n.Route == Direct) {
+		if st.networkOn[n.Network] && (token || n.Route == Direct) {
 			out = append(out, n)
 		}
 	}
@@ -219,7 +229,7 @@ func (s *Service) Settings(ctx context.Context) (Settings, error) {
 	if err != nil {
 		return Settings{}, err
 	}
-	out := Settings{Terms: st.terms, DefaultTerms: st.defaults, CustomTerms: st.custom, FetchEveryHours: st.every, DigestCadence: st.cadence,
+	out := Settings{Enabled: st.enabled, Terms: st.terms, DefaultTerms: st.defaults, CustomTerms: st.custom, FetchEveryHours: st.every, DigestCadence: st.cadence,
 		DigestWeekday: st.weekday, TimeZone: st.loc.String(), TokenSet: token, LastFetchAt: st.lastFetchAt, Networks: []NetworkStatus{}}
 	rows, err := s.db.Query(ctx, `SELECT DISTINCT ON (network) network, called_at, coalesce(error, ''), status = 'unavailable'
 		FROM social_call ORDER BY network, called_at DESC, id DESC`)
@@ -244,13 +254,13 @@ func (s *Service) Settings(ctx context.Context) (Settings, error) {
 		return Settings{}, err
 	}
 	for _, n := range registry {
-		ns := NetworkStatus{Network: n.Network, Title: n.Title, Enabled: st.enabled[n.Network], Route: n.Route, Tool: n.Tool, CostPerCallUSD: n.CostUSD}
+		ns := NetworkStatus{Network: n.Network, Title: n.Title, Enabled: st.networkOn[n.Network], Route: n.Route, Tool: n.Tool, CostPerCallUSD: n.CostUSD}
 		if l, ok := latest[n.Network]; ok {
 			ns.LastCallAt, ns.LastError, ns.Unavailable = &l.at, l.err, l.unavailable
 		}
 		out.Networks = append(out.Networks, ns)
 	}
-	if len(st.terms) > 0 && len(st.networks(token)) > 0 {
+	if st.on && len(st.terms) > 0 && len(st.networks(token)) > 0 {
 		next := s.now()
 		if st.lastStartsAt != nil && st.lastStartsAt.Add(time.Duration(st.every)*time.Hour).After(next) {
 			next = st.lastStartsAt.Add(time.Duration(st.every) * time.Hour)
@@ -310,7 +320,8 @@ func (s *Service) PutSettings(ctx context.Context, in SettingsInput) (Settings, 
 	}
 	err = pgx.BeginFunc(ctx, s.db, func(tx pgx.Tx) error {
 		if _, err := tx.Exec(ctx, `UPDATE instance_settings SET social_terms = $1, social_fetch_every_hours = $2, social_digest_cadence = $3,
-				social_digest_weekday = $4, updated_at = now()`, stored, in.FetchEveryHours, in.DigestCadence, in.DigestWeekday); err != nil {
+				social_digest_weekday = $4, social_enabled = coalesce($5, social_enabled), updated_at = now()`,
+			stored, in.FetchEveryHours, in.DigestCadence, in.DigestWeekday, in.Enabled); err != nil {
 			return err
 		}
 		for _, t := range in.Networks {

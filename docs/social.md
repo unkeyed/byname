@@ -4,6 +4,8 @@ The **Social** page shows the public posts that name you on X, Reddit, Hacker Ne
 
 Six networks are searched through Treg with your Treg token. Bluesky is searched through its own public API, which needs no key and costs nothing. Without a Treg token, Byname searches Bluesky only.
 
+Social is off until someone turns it on under **Settings > Social**, because the Treg searches cost money. Saving the Treg token starts nothing, and nothing is searched before onboarding is finished, even with social on. An instance upgraded from a version before the switch, which had already searched, keeps social on.
+
 `internal/social` holds all of it, and this page follows that package.
 
 ## Where each network's posts come from
@@ -28,6 +30,7 @@ Each network's answer is parsed into one shape: the post, its link, the author's
 
 Anyone can read **Settings > Social**. An Editor or Admin can change it.
 
+- **Search social networks.** The switch. Off by default. With it off, the `social_fetch` job calls nothing at all.
 - **Search terms.** With no terms, Byname searches for your brand's name and primary domain from **Settings > General**. You can set up to 5 terms instead. Use the distinctive form, such as your full product name or your domain. A common word on its own matches posts about something else.
 - **Networks.** Each network can be turned on or off. All seven start on.
 - **Search every.** 1, 3, 6, 12 or 24 hours. The default is 6.
@@ -83,6 +86,8 @@ The digest is data only. Byname does not write a summary of it with a model.
 | `GET /v1/social/left-out` | `list_left_out_accounts` | `results:read` |
 | `POST /v1/social/left-out` | `leave_out_account` | `config:write` |
 | `DELETE /v1/social/left-out/{id}` | `remove_left_out_account` | `config:write` |
+
+`PUT /v1/social/settings` takes `enabled` to turn social on or off. Leave it out to keep the current setting. `next_fetch_at` is null while nothing will be searched: social is off, onboarding is not finished, there is no term, or no network that is on can run without a Treg token.
 
 `GET /v1/social/mentions` takes `network`, `since` (a day or a time), `include_hidden=true` and `limit` (1 to 500, default 100). `GET /v1/social/digest` takes `day`, any day in the period, and without it returns the latest period that has ended. See [Agents](agents.md) for keys and scopes.
 

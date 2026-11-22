@@ -13,6 +13,7 @@ import (
 
 	"github.com/unkeyed/byname/internal/checks/checkstest"
 	"github.com/unkeyed/byname/internal/core"
+	"github.com/unkeyed/byname/internal/social"
 )
 
 // socialFixtures is the body the fake Treg answers each social tool with,
@@ -56,6 +57,12 @@ func seedMentions(t *testing.T, c client) {
 		t.Fatal(err)
 	}
 	if _, err := c.svc.Config.SetCredential(ctx, "treg", "treg_test_token", ""); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.db.Exec(ctx, `UPDATE instance_settings SET onboarded_at = now()`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.svc.Social.PutSettings(ctx, social.SettingsInput{Enabled: new(true), FetchEveryHours: 6, DigestCadence: social.Weekly, DigestWeekday: 1}); err != nil {
 		t.Fatal(err)
 	}
 	if err := c.svc.Social.Fetch(ctx); err != nil {
@@ -110,6 +117,7 @@ func TestSocialOverHTTP(t *testing.T) {
 	agent.call("DELETE", fmt.Sprintf("/v1/social/left-out/%d", left.ID), nil, http.StatusNotFound, nil)
 
 	var st struct {
+		Enabled         bool   `json:"enabled"`
 		FetchEveryHours int    `json:"fetch_every_hours"`
 		DigestCadence   string `json:"digest_cadence"`
 		Networks        []struct {
@@ -117,8 +125,13 @@ func TestSocialOverHTTP(t *testing.T) {
 		} `json:"networks"`
 	}
 	agent.call("PUT", "/v1/social/settings", settings, http.StatusOK, &st)
-	if st.FetchEveryHours != 12 || st.DigestCadence != "daily" || len(st.Networks) != 7 {
-		t.Fatalf("settings = %+v", st)
+	if !st.Enabled || st.FetchEveryHours != 12 || st.DigestCadence != "daily" || len(st.Networks) != 7 {
+		t.Fatalf("settings = %+v, want social still on: leaving enabled out keeps it", st)
+	}
+	settings["enabled"] = false
+	agent.call("PUT", "/v1/social/settings", settings, http.StatusOK, &st)
+	if st.Enabled {
+		t.Fatal("enabled false left social on")
 	}
 	agent.call("PUT", "/v1/social/settings", map[string]any{"terms": []string{}, "fetch_every_hours": 5, "digest_cadence": "daily", "digest_weekday": 1}, http.StatusBadRequest, nil)
 }
