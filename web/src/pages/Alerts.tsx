@@ -2,33 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router";
 import { api, type Alert } from "../api";
 import { keys, useAlerts, useMe } from "../queries";
-import { Button, buttonClass, Card, cx, EmptyState, ErrorNote, Icon, PageHeader, Pending, RelativeTime } from "../ui";
-
-/** The alerts indicator: a bell with the unread count, linking to the alerts list. */
-export function AlertsBell({ className, onNavigate }: { className?: string; onNavigate?: () => void }) {
-  const alerts = useAlerts();
-  const unread = alerts.data?.unread ?? 0;
-  const label = unread ? `Alerts, ${unread} unread` : "Alerts";
-  return (
-    <Link to="/alerts" onClick={onNavigate} aria-label={label} title={label} className={cx(buttonClass({ variant: "ghost", size: "sm", icon: true }), "relative", className)}>
-      <BellIcon />
-      {unread > 0 && (
-        <span className="absolute -top-0.5 -right-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-danger px-1 text-[0.625rem] leading-none font-semibold text-surface tabular-nums">
-          {unread > 99 ? "99+" : unread}
-        </span>
-      )}
-    </Link>
-  );
-}
-
-function BellIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" className="size-4 shrink-0" aria-hidden="true">
-      <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
-      <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
-    </svg>
-  );
-}
+import { Button, Card, cx, EmptyState, ErrorNote, Icon, PageHeader, Pending, RelativeTime } from "../ui";
 
 /** Every alert this person may see, newest first. Opening one marks it read. */
 export function Alerts() {

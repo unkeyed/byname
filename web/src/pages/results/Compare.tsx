@@ -1,8 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { api, type Outcome, type PairChange, type Standing } from "../../api";
 import { shortDay, useLabels } from "../../lines";
-import { keys, useAnsweredRuns, useSurfaces } from "../../queries";
-import { Card, CardHeader, cx, EmptyState, ErrorNote, Icon, Pending, selectClass } from "../../ui";
+import { keys, useAnsweredRuns, useSettings, useSurfaces } from "../../queries";
+import { nextCheckDay } from "../../checks";
+import { Link } from "react-router";
+import { buttonClass, Card, CardHeader, cx, EmptyState, ErrorNote, Icon, Pending, selectClass, useLoading } from "../../ui";
 import { runTime, useView } from "../../view";
 import { Segmented, ViewHeader } from "./Header";
 import { outcomeMark } from "./QuestionsTable";
@@ -22,7 +24,7 @@ function StandingMark({ s }: { s: Standing | null }) {
   if (s.status === "failed") return <span className="text-faint">Failed</span>;
   if (s.status === "no_answer") return <span className="text-faint">No answer</span>;
   if (s.mentioned) return <span className="font-semibold text-success tabular-nums">#{s.position}</span>;
-  return <span className="text-muted">{s.cited ? "Cited, not named" : "Not named"}</span>;
+  return <span className="text-muted">{s.cited ? "Linked, not named" : "Not named"}</span>;
 }
 
 /** Places climbed: positive is up the list (#3 to #1), negative is down it. */
@@ -52,9 +54,13 @@ function ChangeMark({ p }: { p: PairChange }) {
 
 const rowGrid = "grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-0.5 md:grid-cols-[minmax(0,1fr)_8rem_8rem_8rem] md:items-center";
 
+/** AI answers > What changed: every question and AI app that gained, lost or moved between two checks. */
 export function Compare() {
   const view = useView();
   const runs = useAnsweredRuns();
+  const settings = useSettings();
+  useLoading(settings.isPending);
+  const next = settings.data?.next_check;
   const surfaces = useSurfaces();
   const labels = useLabels(surfaces.data);
   const list = runs.data ?? [];
@@ -68,8 +74,20 @@ export function Compare() {
   else if (runs.isError) body = <ErrorNote error={runs.error} />;
   else if (list.length < 2)
     body = (
-      <EmptyState icon="layers" title="Two checks needed">
-        Compare shows what changed between two checks. {list.length === 0 ? "No check has run yet." : "Only one check has run so far."}
+      <EmptyState
+        icon="layers"
+        title={list.length === 0 ? "No checks yet" : "One check so far"}
+        action={
+          list.length === 1 ? (
+            <Link to={`/ai/questions${view.filterSearch()}`} className={buttonClass()}>
+              Read the answers
+            </Link>
+          ) : undefined
+        }
+      >
+        What changed needs two checks to compare.{" "}
+        {next ? `Your next one runs ${nextCheckDay(next)}.` : settings.data?.checks_paused ? "Scheduled checks are paused." : ""}
+        {list.length === 1 && " Until then, read the answers on Questions."}
       </EmptyState>
     );
   else {
@@ -133,11 +151,14 @@ export function Compare() {
                 </div>
               </Card>
             </div>
+            <p className="text-xs text-muted">
+              Gained: an AI app named you and did not before. Lost: the reverse. Moved: it named you both times, in a different position. Net change is gained minus lost.
+            </p>
             <Card>
               <CardHeader
                 title={
                   <>
-                    Questions and pairs{" "}
+                    Questions and AI apps{" "}
                     <span className="font-normal text-muted">
                       ({pairs.length} of {cmp.data.pairs.length})
                     </span>
@@ -148,15 +169,15 @@ export function Compare() {
               </CardHeader>
               {pairs.length > 0 && (
                 <p className="border-t border-line px-4 py-2 text-xs text-muted md:hidden">
-                  Each pair shows where you stood in check #{cmp.data.before}, then in check #{cmp.data.after}.
+                  Each AI app shows where you stood in check #{cmp.data.before}, then in check #{cmp.data.after}.
                 </p>
               )}
               {pairs.length > 0 && (
                 <div className={cx(rowGrid, "hidden border-y border-line px-4 py-2 text-xs font-medium text-muted md:grid")} aria-hidden="true">
-                  <span>Question, then each surface and model</span>
+                  <span>Question, then each AI app</span>
                   <span>Check #{cmp.data.before}</span>
                   <span>Check #{cmp.data.after}</span>
-                  <span>Change</span>
+                  <span>What changed</span>
                 </div>
               )}
               <ul className="divide-y divide-line border-t border-line md:border-t-0">
@@ -168,7 +189,7 @@ export function Compare() {
                         <span className="block font-medium">{q.question.text}</span>
                         <span className="block text-xs text-faint">{q.question.group}</span>
                       </button>
-                      <ul aria-label={`Pairs for ${q.question.text}`}>
+                      <ul aria-label={`AI apps for ${q.question.text}`}>
                         {group.map((p) => (
                           <li key={p.pair_id}>
                             <button type="button" onClick={() => openPair(p)} className={cx(rowGrid, "w-full px-4 py-1.5 text-left text-xs hover:bg-subtle")}>
@@ -203,7 +224,12 @@ export function Compare() {
 
   return (
     <>
-      <ViewHeader title="Compare" subtitle="Pick two checks to see every question and pair you gained, lost or moved on, and the net change." range={false} scope={false} />
+      <ViewHeader
+        title="What changed"
+        subtitle="Pick two checks to see where AI apps started naming you, stopped, or moved you up or down. Some movement between checks is normal; watch for changes that last."
+        range={false}
+        scope={false}
+      />
       <div className="relative min-h-0 flex-1 overflow-auto px-3 py-4 md:px-5 md:py-5">
         <div className="mx-auto max-w-6xl">{body}</div>
       </div>

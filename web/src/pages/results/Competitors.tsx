@@ -29,14 +29,14 @@ export function Competitors() {
   else
     body = (
       <div className={cx("space-y-4", comp.isPlaceholderData && "opacity-60")}>
-        <ShareOfVoice data={comp.data} />
+        <ShareOfMentions data={comp.data} />
         <Heatmap data={comp.data} />
         <WhereYouLose run={runs.data[0].id} />
       </div>
     );
   return (
     <>
-      <ViewHeader title="Competitors" subtitle={`Who AI answers name instead of ${brand}, on which surfaces.`} />
+      <ViewHeader title="Competitors" subtitle={`Which brands AI answers name, how ${brand} compares, and the questions where a competitor was named and ${brand} was not.`} />
       <div className="relative min-h-0 flex-1 overflow-auto px-3 py-4 md:px-5 md:py-5">
         <div className="mx-auto max-w-6xl">{body}</div>
       </div>
@@ -56,7 +56,7 @@ function useBrandColor() {
   };
 }
 
-function ShareOfVoice({ data }: { data: Data }) {
+function ShareOfMentions({ data }: { data: Data }) {
   const color = useBrandColor();
   const self = data.brands.find((b) => b.kind === "self");
   const named = data.brands.filter((b) => b.mentions > 0);
@@ -67,11 +67,11 @@ function ShareOfVoice({ data }: { data: Data }) {
   return (
     <Card>
       <CardHeader
-        title="Share of voice"
-        description={`Each brand's share of the ${data.mentions} mentions of you and your competitors over ${data.runs} ${data.runs === 1 ? "check" : "checks"}. Technologies are left out.`}
+        title="Share of mentions"
+        description={`Of all the times AI named you or a competitor, how often it was each brand: ${data.mentions} mentions over ${data.runs} ${data.runs === 1 ? "check" : "checks"}. Technologies are left out.`}
       />
       <div className="flex flex-col items-center gap-6 px-4 pb-4 sm:flex-row sm:items-start">
-        <Donut segments={segments} label={`Share of voice: ${segments.map((s) => s.label).join(", ")}`}>
+        <Donut segments={segments} label={`Share of mentions: ${segments.map((s) => s.label).join(", ")}`}>
           <div>
             {self?.rank ? (
               <>
@@ -127,9 +127,9 @@ function Heatmap({ data }: { data: Data }) {
   if (data.columns.length === 0) return null;
   return (
     <Card>
-      <CardHeader title="Named by surface" description="Each cell is the share of that line's answers naming the brand, on the scale below. Hover or focus a cell for the count, or open a column for that line's detail." />
+      <CardHeader title="Named by each AI app" description="Each cell is the share of that AI app's answers naming the brand, on the scale below. Tap or focus a cell for the count, or open a column for that AI app." />
       <div className="px-4 pb-4">
-        <ScrollX label="brands by surface">
+        <ScrollX label="brands by AI app">
           <table className="w-full table-fixed border-separate border-spacing-0.5 text-xs" style={{ minWidth: `calc(7.5rem + ${data.columns.length} * 5.5rem)` }}>
             <colgroup>
               <col className="w-30 md:w-44" />
@@ -225,7 +225,7 @@ function WhereYouLose({ run }: { run: number }) {
   const losses = gaps.data.gaps.filter((g) => g.named_on_miss.length > 0);
   return (
     <Card>
-      <CardHeader title="Where you lose" description={`Questions in check #${gaps.data.run_id} where a surface and model named a competitor but not you, with who was named instead. Covers every surface.`} />
+      <CardHeader title="Where you lose" description={`Questions in check #${gaps.data.run_id} where an AI app named a competitor but not you, with who was named instead. Covers every AI app.`} />
       {losses.length === 0 ? (
         <p className="px-4 pb-6 text-sm text-muted">No answer in the latest check named a competitor without naming you.</p>
       ) : (
@@ -238,7 +238,7 @@ function WhereYouLose({ run }: { run: number }) {
                   <span className="block text-xs text-faint">{g.question.group}</span>
                 </span>
                 <span className="shrink-0 text-xs text-muted tabular-nums">
-                  Missed by {g.engines - g.named} of {g.engines} pairs
+                  Not named in {g.engines - g.named} of {g.engines} AI apps
                 </span>
                 <span className="flex shrink-0 flex-wrap gap-1">
                   {g.named_on_miss.map((n) => (

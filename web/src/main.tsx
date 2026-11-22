@@ -12,8 +12,8 @@ import { Setup } from "./pages/Setup";
 import { Consent } from "./pages/Consent";
 import { Overview } from "./pages/results/Overview";
 import { Competitors } from "./pages/results/Competitors";
-import { Prompts } from "./pages/results/Prompts";
-import { Gaps } from "./pages/results/Gaps";
+import { Questions } from "./pages/results/Questions";
+import { Missed } from "./pages/results/Missed";
 import { Compare } from "./pages/results/Compare";
 import { Alerts } from "./pages/Alerts";
 import { Search } from "./pages/search/Search";
@@ -40,9 +40,9 @@ const router = createBrowserRouter([
         element: <Section item={section("/ai")} />,
         children: [
           { index: true, element: <Moved to="/ai/questions" /> },
-          { path: "questions", element: <Prompts /> },
+          { path: "questions", element: <Questions /> },
           { path: "competitors", element: <Competitors /> },
-          { path: "missed", element: <Gaps /> },
+          { path: "missed", element: <Missed /> },
           { path: "what-changed", element: <Compare /> },
         ],
       },

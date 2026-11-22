@@ -1,9 +1,9 @@
 import type { Fidelity, PairRef, Series, Surface } from "./api";
 
 export const fidelityInfo: Record<Fidelity, { label: string; detail: string }> = {
-  app: { label: "App answer", detail: "What a person sees in the app, read by a scraping provider." },
-  model_match: { label: "Same model and search", detail: "An API call with the model the tool uses and the same web search." },
-  approximation: { label: "Approximation", detail: "The closest stand-in available, not what the surface itself shows." },
+  app: { label: "Real app answer", detail: "What a person sees in the app itself." },
+  model_match: { label: "Same model, not the full tool", detail: "The model the tool uses, with the same web search, but without the tool's own instructions." },
+  approximation: { label: "Stand-in (not the real app)", detail: "The closest stand-in available. The real app may answer differently." },
 };
 
 /** A line's identity: its pair, or its surface when the line combines a surface's models. */

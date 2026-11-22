@@ -6,7 +6,7 @@ import { fidelityInfo, palette, pct, shortDay, useLabels } from "../../lines";
 import { keys, useSurfaces } from "../../queries";
 import { Badge, Button, Card, cx, ErrorNote, Icon, LoadBoundary, Pending, useModal } from "../../ui";
 import { useFilter, useView } from "../../view";
-import { Instead } from "./Prompts";
+import { Instead } from "./Questions";
 
 const fidelities: Fidelity[] = ["app", "model_match", "approximation"];
 
@@ -25,7 +25,7 @@ export function useOpenEngine() {
   return (s: Series) => view.set({ eng: engineParam(s) }, { push: true });
 }
 
-/** One surface or surface and model line: open wherever ?eng= names one. */
+/** One AI app, or one AI app and model: open wherever ?eng= names one. */
 export function EngineDrawer() {
   const view = useView();
   const line = parseEngine(view.get("eng"));
@@ -36,7 +36,7 @@ export function EngineDrawer() {
       ref={ref}
       onClose={close}
       onClick={(e) => e.target === ref.current && close()}
-      aria-label="Surface"
+      aria-label="AI app"
       data-drawer
       className="m-0 ml-auto h-dvh max-h-none w-full max-w-3xl border-0 border-l border-line bg-bg p-0 text-fg shadow-floating"
     >
@@ -66,13 +66,13 @@ function Body({ line, onClose }: { line: Line; onClose: () => void }) {
   const labels = useLabels(surfaces.data);
   const color = palette(surfaces.data);
   const engine = useQuery({ queryKey: keys.engine(line, filter.since), queryFn: () => api.engine(line, filter.since) });
-  const openPrompt = (p: EnginePrompt) => view.set({ q: p.question.id, qa: p.answer_id, qv: null }, { push: true });
+  const openQuestion = (p: EnginePrompt) => view.set({ q: p.question.id, qa: p.answer_id, qv: null }, { push: true });
   const title = engine.data ? labels.line(engine.data.pair, engine.data.models) : labels.line({ id: line.pair, surface: line.surface, model: "" });
 
   let body;
   if (engine.isPending) body = <Pending />;
   else if (engine.isError) body = <ErrorNote error={engine.error} />;
-  else if (engine.data.runs === 0) body = <p className="text-sm text-muted">This line has no answers in this range. Widen the date range in the page header.</p>;
+  else if (engine.data.runs === 0) body = <p className="text-sm text-muted">This AI app has no answers in this range. Widen the date range in the page header.</p>;
   else {
     const e = engine.data;
     const xs = e.points.map((p) => ({ key: String(p.run_id), label: `#${p.run_id}`, title: `Check #${p.run_id}, ${shortDay(p.run_started_at)}` }));
@@ -84,28 +84,28 @@ function Body({ line, onClose }: { line: Line; onClose: () => void }) {
     body = (
       <div className="space-y-6">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <Kpi label="Visibility" value={pct(e.visibility)} detail={`${e.named} of ${e.answered} answers named you in check #${e.latest_run_id}`} />
-          <Kpi label="Visible in" value={`${e.visible_prompts} of ${e.prompts}`} detail="prompts named you" />
-          <Kpi label="Average position" value={e.average_position == null ? "–" : `#${e.average_position.toFixed(1)}`} detail={e.average_position == null ? "Not named in the latest check" : "Where it named you"} />
+          <Kpi label="Named you" value={pct(e.visibility)} detail={`${e.named} of ${e.answered} answers named you in check #${e.latest_run_id}`} />
+          <Kpi label="Questions" value={`${e.visible_prompts} of ${e.prompts}`} detail="questions where it named you" />
+          <Kpi label="Average position" value={e.average_position == null ? "–" : `#${e.average_position.toFixed(1)}`} detail={e.average_position == null ? "It did not name you in the latest check" : "Among the brands it named. #1 is first."} />
         </div>
 
         <section>
-          <h3 className="mb-2 text-sm font-semibold">Visibility by check</h3>
+          <h3 className="mb-2 text-sm font-semibold">Named you, by check</h3>
           <Card className="px-3 py-3">
             <LineChart
               xs={xs}
               lines={[{ key: "v", label: title, color: color(e.pair), approx: e.fidelity === "approximation", values: e.points.map((p) => p.mention_rate) }]}
               format={(v) => pct(v)}
               height={180}
-              label={`Visibility of ${title} by check`}
+              label={`How often ${title} named you, by check`}
             />
           </Card>
         </section>
 
         <section>
-          <h3 className="mb-2 text-sm font-semibold">Brand ranking</h3>
+          <h3 className="mb-2 text-sm font-semibold">Brands it names most</h3>
           <p className="mb-2 text-xs text-muted">
-            Answers on this line naming each brand over {e.runs} {e.runs === 1 ? "check" : "checks"}. Technologies are left out.
+            Answers from this AI app naming each brand over {e.runs} {e.runs === 1 ? "check" : "checks"}. Technologies are left out.
           </p>
           {top.length === 0 ? (
             <p className="text-sm text-muted">No brand was named.</p>
@@ -128,23 +128,23 @@ function Body({ line, onClose }: { line: Line; onClose: () => void }) {
           )}
         </section>
 
-        <PromptSection
-          title={`Not mentioned in ${e.not_mentioned.length} ${e.not_mentioned.length === 1 ? "prompt" : "prompts"}`}
-          empty="It named you on every prompt in the latest check."
+        <QuestionSection
+          title={`Did not name you in ${e.not_mentioned.length} ${e.not_mentioned.length === 1 ? "question" : "questions"}`}
+          empty="It named you in every question in the latest check."
           prompts={e.not_mentioned}
-          onOpen={openPrompt}
+          onOpen={openQuestion}
           aside={(p) => (
             <span className="flex flex-wrap items-center justify-end gap-1">
-              {p.cited && <Badge tone="info">Cited you</Badge>}
+              {p.cited && <Badge tone="info">Linked</Badge>}
               <Instead names={p.instead} />
             </span>
           )}
         />
-        <PromptSection
-          title={`Visible in ${e.visible.length} ${e.visible.length === 1 ? "prompt" : "prompts"}`}
-          empty="It did not name you on any prompt in the latest check."
+        <QuestionSection
+          title={`Named you in ${e.visible.length} ${e.visible.length === 1 ? "question" : "questions"}`}
+          empty="It did not name you in any question in the latest check."
           prompts={e.visible}
-          onOpen={openPrompt}
+          onOpen={openQuestion}
           aside={(p) => <span className="inline-flex h-5 items-center rounded-control bg-success-soft px-1.5 text-xs font-semibold text-success tabular-nums">#{p.position}</span>}
         />
       </div>
@@ -155,13 +155,11 @@ function Body({ line, onClose }: { line: Line; onClose: () => void }) {
     <div className="flex h-full flex-col">
       <div className="flex shrink-0 items-start gap-3 border-b border-line px-4 py-3">
         <div className="min-w-0 flex-1">
-          <div className="text-xs text-muted">{line.pair ? "Surface and model" : "Surface"}</div>
+          <div className="text-xs text-muted">{line.pair ? "AI app and model" : "AI app"}</div>
           <h2 className="text-base font-semibold [overflow-wrap:anywhere]">{title}</h2>
           <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted">
-            <Badge tone={line.fidelity === "approximation" ? "warn" : "outline"} title={fidelityInfo[line.fidelity].detail}>
-              {fidelityInfo[line.fidelity].label}
-            </Badge>
-            <span>Figures cover this line alone, never mixing fidelities.</span>
+            <Badge tone={line.fidelity === "approximation" ? "warn" : "outline"}>{fidelityInfo[line.fidelity].label}</Badge>
+            <span>{fidelityInfo[line.fidelity].detail}</span>
           </div>
         </div>
         <Button variant="ghost" size="sm" onClick={onClose} aria-label="Close" icon>
@@ -173,7 +171,7 @@ function Body({ line, onClose }: { line: Line; onClose: () => void }) {
   );
 }
 
-function PromptSection({ title, empty, prompts, onOpen, aside }: { title: string; empty: string; prompts: EnginePrompt[]; onOpen: (p: EnginePrompt) => void; aside: (p: EnginePrompt) => ReactNode }) {
+function QuestionSection({ title, empty, prompts, onOpen, aside }: { title: string; empty: string; prompts: EnginePrompt[]; onOpen: (p: EnginePrompt) => void; aside: (p: EnginePrompt) => ReactNode }) {
   return (
     <section>
       <h3 className="mb-2 text-sm font-semibold">{title}</h3>
