@@ -65,7 +65,7 @@ func (s *Service) scoredAnswers(ctx context.Context, where string, args ...any) 
 }
 
 func (s *Service) brands(ctx context.Context) ([]panel.Brand, error) {
-	rows, err := s.db.Query(ctx, `SELECT id, name, aliases, domains, kind FROM brand`)
+	rows, err := s.db.Query(ctx, `SELECT id, name, aliases, domains, kind FROM tracked_brand`)
 	if err != nil {
 		return nil, err
 	}

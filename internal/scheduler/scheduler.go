@@ -33,6 +33,9 @@ type Scheduler struct {
 	social    Social
 	socialing sync.WaitGroup
 	fetching  atomic.Bool
+	brands    []Ticker
+	branding  sync.WaitGroup
+	finding   atomic.Bool
 }
 
 type Options struct {
@@ -48,6 +51,15 @@ type Options struct {
 	Changes SiteChanges
 	// Social is social mentions, nil when not wired.
 	Social Social
+	// OtherBrands reads past answers for other brands and looks up
+	// logos, in order; empty when not wired.
+	OtherBrands []Ticker
+}
+
+// Ticker is a job that decides itself what is due on each tick and holds
+// its own advisory lock: internal/discovery and internal/logos.
+type Ticker interface {
+	Tick(ctx context.Context) error
 }
 
 // SearchSync is internal/gsc's daily sync: it does nothing until it is due
@@ -77,7 +89,7 @@ func New(c *checks.Service, cfg *config.Service, o Options) *Scheduler {
 	if o.Log == nil {
 		o.Log = slog.Default()
 	}
-	return &Scheduler{checks: c, config: cfg, log: o.Log, ticks: o.Ticks, now: o.Now, sources: o.Sources, search: o.Search, changes: o.Changes, social: o.Social}
+	return &Scheduler{checks: c, config: cfg, log: o.Log, ticks: o.Ticks, now: o.Now, sources: o.Sources, search: o.Search, changes: o.Changes, social: o.Social, brands: o.OtherBrands}
 }
 
 // Run ticks once at start, which resumes a run a previous process left
@@ -88,6 +100,7 @@ func New(c *checks.Service, cfg *config.Service, o Options) *Scheduler {
 func (s *Scheduler) Run(ctx context.Context) {
 	defer s.searching.Wait()
 	defer s.socialing.Wait()
+	defer s.branding.Wait()
 	ticks := s.ticks
 	if ticks == nil {
 		t := time.NewTicker(time.Minute)
@@ -145,6 +158,18 @@ func (s *Scheduler) Tick(ctx context.Context) {
 			defer s.fetching.Store(false)
 			if err := s.social.Tick(ctx); err != nil && ctx.Err() == nil {
 				s.log.Warn("social mentions failed", "err", err)
+			}
+		})
+	}
+	// Other brands: reading past answers and looking up logos call slow
+	// paid tools, so they too run on their own goroutine.
+	if len(s.brands) > 0 && s.finding.CompareAndSwap(false, true) {
+		s.branding.Go(func() {
+			defer s.finding.Store(false)
+			for _, t := range s.brands {
+				if err := t.Tick(ctx); err != nil && ctx.Err() == nil {
+					s.log.Warn("other brands failed", "err", err)
+				}
 			}
 		})
 	}

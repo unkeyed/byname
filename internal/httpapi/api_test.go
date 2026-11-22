@@ -26,10 +26,12 @@ import (
 	"github.com/unkeyed/byname/internal/checks"
 	"github.com/unkeyed/byname/internal/config"
 	"github.com/unkeyed/byname/internal/core"
+	"github.com/unkeyed/byname/internal/discovery"
 	"github.com/unkeyed/byname/internal/engines/tregtest"
 	"github.com/unkeyed/byname/internal/gsc"
 	"github.com/unkeyed/byname/internal/gsc/gsctest"
 	"github.com/unkeyed/byname/internal/instance"
+	"github.com/unkeyed/byname/internal/logos"
 	"github.com/unkeyed/byname/internal/mcpserver"
 	"github.com/unkeyed/byname/internal/notify"
 	"github.com/unkeyed/byname/internal/notify/notifytest"
@@ -192,7 +194,10 @@ func serve(t *testing.T, srv *httptest.Server, publicURL string, mod ...func(*au
 	github := githubtest.New(t, "northwind", "site", githubToken)
 	site := changes.New(pool, search, changes.Options{Secrets: cfg.Secrets, Alerts: alerts, GitHubBaseURL: github.URL})
 	mentions := social.New(pool, settings, social.Options{Alerts: alerts, BaseURLs: map[social.Network]string{social.Bluesky: fakeBluesky(t)}})
-	svc := app.Services{Instance: instance.New("test", pool, settings, mentions), Config: settings, Checks: checks.New(pool, settings, checks.Options{Alerts: alerts}), Results: res, Notify: alerts, GSC: search, Changes: site, Social: mentions}
+	found := discovery.New(pool, settings, discovery.Options{})
+	svc := app.Services{Instance: instance.New("test", pool, settings, mentions, found), Config: settings,
+		Checks: checks.New(pool, settings, checks.Options{Alerts: alerts, Finder: found}), Results: res, Notify: alerts, GSC: search, Changes: site, Social: mentions,
+		Discovery: found, Logos: logos.New(pool, settings, logos.Options{})}
 	mux := NewMux(svc, authn, slog.New(slog.DiscardHandler))
 	mux.Handle("/mcp", mcpserver.Handler(svc, authn.OAuth, "test"))
 	srv.Config.Handler = mux
@@ -619,7 +624,7 @@ func TestKeyStoreOutageIs503(t *testing.T) {
 		t.Fatal(err)
 	}
 	authn := &auth.Authenticator{Keys: downKeys{}, Users: users, OAuth: auth.NewOAuthServer(pool, u)}
-	srv := httptest.NewServer(NewMux(app.Services{Instance: instance.New("test", nil, nil, nil)}, authn, slog.New(slog.DiscardHandler)))
+	srv := httptest.NewServer(NewMux(app.Services{Instance: instance.New("test", nil, nil, nil, nil)}, authn, slog.New(slog.DiscardHandler)))
 	t.Cleanup(srv.Close)
 	r := client{t: t, base: srv.URL, key: "byn_whatever"}.do("GET", "/v1/status", nil)
 	var e struct {

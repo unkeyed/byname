@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../api";
 import { BrandForm } from "../../config/BrandForm";
 import { BrandTable } from "../../config/BrandTable";
+import { OtherBrandsSettings } from "../../config/OtherBrandsSettings";
 import { CredentialForm, ProviderKeyList, testTone, useCredentials } from "../../config/Credentials";
 import { QuestionEditor } from "../../config/QuestionEditor";
 import { RunSettingsForm } from "../../config/RunSettings";
@@ -30,10 +31,13 @@ export function Competitors() {
   return (
     <>
       <SettingsHeader title="Competitors">
-        Brands people buy instead of you. Share of mentions compares you with these. Mark a brand as a technology when it is named alongside you but nobody buys it instead of you. Changes
-        apply from the next check.
+        Brands people buy instead of you. Share of mentions compares you with these. Mark a brand as a technology when it is named alongside you but nobody buys it instead of you. A change
+        applies to every answer, past ones included.
       </SettingsHeader>
-      <BrandTable />
+      <div className="space-y-6">
+        <BrandTable />
+        <OtherBrandsSettings />
+      </div>
     </>
   );
 }
@@ -254,14 +258,15 @@ export function MonthSpend() {
             </div>
           )}
           <p className="mt-1 text-xs text-muted">
-            {money(m.checks_usd)} on checks and {money(m.social_usd)} on social searches.
+            {money(m.checks_usd)} on checks, {money(m.social_usd)} on social searches and {money(m.brands_usd)} on finding other brands and their logos.
             {m.missing_cost_calls > 0 && ` ${m.missing_cost_calls} answers reported no price, so the real spend is a little higher.`}
           </p>
         </div>
         <dl className="grid gap-x-6 gap-y-2 sm:grid-cols-[auto_1fr]">
           <dt className="text-muted">One check</dt>
           <dd className="first-letter:uppercase">
-            {price.amount}: {e.questions} questions in {appCount(c)} AI apps, {e.calls} answers.
+            {price.amount}: {e.questions} questions in {appCount(c)} AI apps, {e.calls} answers
+            {e.find_brands ? `, with ${money(e.find_brands.cost_usd)} to read them for other brands.` : "."}
             {price.unknown && <span className="text-muted"> {price.unknown}</span>}
           </dd>
           <dt className="text-muted">Expected this month</dt>

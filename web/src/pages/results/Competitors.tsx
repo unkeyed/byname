@@ -1,12 +1,14 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api, type BrandStanding, type Competitors as Data } from "../../api";
+import { BrandMark } from "../../brandmark";
 import { Donut, type Segment } from "../../charts";
 import { lineKey, pct, useLabels } from "../../lines";
 import { keys, useAnsweredRuns, useBrands, useSettings, useSurfaces } from "../../queries";
 import { Badge, Card, CardHeader, cx, EmptyState, ErrorNote, Pending, scrollArea, ScrollX, useLoading } from "../../ui";
 import { useFilter, useView } from "../../view";
 import { useOpenEngine } from "./EngineDrawer";
+import { AlsoNamed } from "./AlsoNamed";
 import { ViewHeader } from "./Header";
 
 export function Competitors() {
@@ -30,6 +32,7 @@ export function Competitors() {
     body = (
       <div className={cx("space-y-4", comp.isPlaceholderData && "opacity-60")}>
         <ShareOfMentions data={comp.data} />
+        <AlsoNamed filter={filter} />
         <Heatmap data={comp.data} />
         <WhereYouLose run={runs.data[0].id} />
       </div>
@@ -94,12 +97,13 @@ function ShareOfMentions({ data }: { data: Data }) {
             </tr>
           </thead>
           <tbody className="divide-y divide-line">
-            {data.brands.map((b) => (
+            {steady(data.brands).map((b) => (
               <tr key={b.brand_id} className={b.kind === "self" ? "font-semibold" : undefined}>
                 <td className="py-1.5 text-muted tabular-nums">{b.rank ? `#${b.rank}` : "–"}</td>
                 <td className="py-1.5">
                   <span className="flex items-center gap-2">
                     <span className="size-2.5 shrink-0 rounded-[3px]" style={{ background: top.includes(b) ? color(b) : "var(--line-hover)" }} aria-hidden="true" />
+                    <BrandMark id={b.brand_id} name={b.name} />
                     {b.name}
                     {b.kind === "self" && <Badge>You</Badge>}
                   </span>
@@ -114,6 +118,12 @@ function ShareOfMentions({ data }: { data: Data }) {
     </Card>
   );
 }
+
+/**
+ * You first, then by name, so changing the date range never reorders the
+ * rows under the reader; the rank is its own column.
+ */
+const steady = (brands: BrandStanding[]) => [...brands].sort((a, b) => Number(b.kind === "self") - Number(a.kind === "self") || a.name.localeCompare(b.name));
 
 /** A rate's step on the sequential ramp in index.css; 0 stays off the ramp so "never named" reads as empty. */
 const heatStep = (rate: number) => Math.min(12, Math.max(0, Math.round(rate * 12)));
@@ -159,9 +169,14 @@ function Heatmap({ data }: { data: Data }) {
             <tbody>
               {rows.map((b) => (
                 <tr key={b.brand_id}>
-                  <th data-sticky scope="row" className={cx("sticky left-0 z-[1] truncate bg-surface pr-2 text-left", b.kind === "self" ? "font-semibold" : "font-normal text-muted")} title={b.name}>
-                    {b.name}
-                    {b.kind === "self" && " (you)"}
+                  <th data-sticky scope="row" className={cx("sticky left-0 z-[1] bg-surface pr-2 text-left", b.kind === "self" ? "font-semibold" : "font-normal text-muted")} title={b.name}>
+                    <span className="flex min-w-0 items-center gap-1.5">
+                      <BrandMark id={b.brand_id} name={b.name} size={16} />
+                      <span className="truncate">
+                        {b.name}
+                        {b.kind === "self" && " (you)"}
+                      </span>
+                    </span>
                   </th>
                   {data.columns.map((c) => {
                     const cell = c.cells.find((x) => x.brand_id === b.brand_id);

@@ -194,7 +194,16 @@ type AnswerSummary struct {
 	CostUSD       *float64    `json:"cost_usd" jsonschema:"null when the call reported no cost"`
 	CitationCount int         `json:"citation_count"`
 	Mentions      []Mention   `json:"mentions"`
-	AnsweredAt    time.Time   `json:"answered_at"`
+	// Others are the brands the answer named that you don't track, in the
+	// order it named them. They count in no score.
+	Others     []OtherMention `json:"others" jsonschema:"brands the answer named that you don't track, in answer order; they count in no score"`
+	AnsweredAt time.Time      `json:"answered_at"`
+}
+
+// OtherMention is a brand an answer named that you don't track.
+type OtherMention struct {
+	BrandID int64  `json:"brand_id"`
+	Name    string `json:"name"`
 }
 
 // Answer is one answer with its text, raw response and citations.
@@ -226,7 +235,7 @@ func scanAnswer(row pgx.CollectableRow) (AnswerSummary, error) {
 	err := row.Scan(&a.ID, &a.RunID, &a.Question.ID, &a.Question.Group, &a.Question.Text, &a.Question.CountsInScores, &a.Pair.ID, &a.Pair.Surface, &a.Pair.Model,
 		&a.Endpoint, &a.Fidelity, &a.ReportedModel, &a.Status, &a.Error, &a.Attempts, &a.Mentioned, &a.Cited, &a.Position,
 		&a.CostUSD, &a.CitationCount, &a.AnsweredAt)
-	a.Mentions = []Mention{}
+	a.Mentions, a.Others = []Mention{}, []OtherMention{}
 	return a, err
 }
 
@@ -266,6 +275,22 @@ func (s *Service) addMentions(ctx context.Context, answers []AnswerSummary) erro
 			return err
 		}
 		byID[id].Mentions = append(byID[id].Mentions, m)
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	rows, err = s.db.Query(ctx, `SELECT d.answer_id, b.id, b.name FROM discovered_mention d JOIN brand b ON b.id = d.brand_id
+		WHERE d.answer_id = ANY($1) AND b.kind = 'untracked' ORDER BY d.answer_id, d.ord`, ids)
+	if err != nil {
+		return err
+	}
+	for rows.Next() {
+		var id int64
+		var o OtherMention
+		if err := rows.Scan(&id, &o.BrandID, &o.Name); err != nil {
+			return err
+		}
+		byID[id].Others = append(byID[id].Others, o)
 	}
 	return rows.Err()
 }
@@ -323,14 +348,14 @@ func (s *Service) Answer(ctx context.Context, id int64) (Answer, error) {
 // Job is one entry of the jobs log.
 type Job struct {
 	ID         int64      `json:"id"`
-	Job        string     `json:"job" jsonschema:"ai_check, model_refresh or source_fetch"`
+	Job        string     `json:"job" jsonschema:"ai_check, model_refresh, source_fetch, gsc_sync, site_changes, recrawl_watch, verdicts, social_fetch, other_brands (reading answers for other brands) or brand_logos"`
 	Trigger    string     `json:"trigger"`
 	RunID      *int64     `json:"run_id"`
 	Status     string     `json:"status"`
 	StartedAt  time.Time  `json:"started_at"`
 	FinishedAt *time.Time `json:"finished_at"`
 	Error      string     `json:"error"`
-	SpendUSD   *float64   `json:"spend_usd" jsonschema:"the run's spend, for an AI check"`
+	SpendUSD   *float64   `json:"spend_usd" jsonschema:"what the job spent: an AI check's answers and its reads for other brands, or a job's calls for other brands; null for a job that spends nothing"`
 }
 
 // Jobs lists the jobs log newest first.
@@ -342,7 +367,8 @@ func (s *Service) Jobs(ctx context.Context, limit int) ([]Job, error) {
 		return nil, fmt.Errorf("%w: limit must be 1 to 200", core.ErrInvalid)
 	}
 	rows, err := s.db.Query(ctx, `SELECT j.id, j.job, j.trigger, j.run_id, j.status, j.started_at, j.finished_at,
-			coalesce(j.error, ''), r.spend_usd::float8
+			coalesce(j.error, ''), (CASE WHEN r.id IS NOT NULL THEN r.spend_usd + coalesce((SELECT sum(c.cost_usd) FROM brand_call c WHERE c.run_id = r.id), 0)
+				WHEN j.job IN ('other_brands', 'brand_logos') THEN coalesce((SELECT sum(c.cost_usd) FROM brand_call c WHERE c.job_run_id = j.id), 0) END)::float8
 		FROM job_run j LEFT JOIN run r ON r.id = j.run_id ORDER BY j.started_at DESC, j.id DESC LIMIT $1`, limit)
 	if err != nil {
 		return nil, err

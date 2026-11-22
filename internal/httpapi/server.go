@@ -152,6 +152,20 @@ var routes = []route{
 	{"POST /v1/social/left-out", needs(core.ConfigWrite), (*server).leaveOut},
 	{"DELETE /v1/social/left-out/{id}", needs(core.ConfigWrite), (*server).removeLeftOut},
 
+	// Other brands: the brands answers name that you don't track, and
+	// logos (internal/discovery, internal/logos).
+	{"GET /v1/other-brands", needs(core.ResultsRead), (*server).otherBrands},
+	{"GET /v1/other-brands/hidden", needs(core.ResultsRead), (*server).hiddenBrands},
+	{"POST /v1/other-brands/{id}/track", needs(core.ConfigWrite), (*server).trackBrand},
+	{"POST /v1/other-brands/{id}/hide", needs(core.ConfigWrite), (*server).hideBrand},
+	{"POST /v1/other-brands/{id}/unhide", needs(core.ConfigWrite), (*server).unhideBrand},
+	{"GET /v1/other-brands/settings", needs(core.ResultsRead), (*server).otherBrandsSettings},
+	{"PUT /v1/other-brands/settings", needs(core.ConfigWrite), (*server).putOtherBrandsSettings},
+	{"GET /v1/other-brands/backfill", needs(core.ResultsRead), (*server).brandBackfill},
+	{"POST /v1/other-brands/backfill", needs(core.RunsWrite), (*server).startBrandBackfill},
+	{"GET /v1/logos", needs(core.ResultsRead), (*server).listLogos},
+	{"GET /v1/brands/{id}/logo", needs(core.ResultsRead), (*server).brandLogo},
+
 	{"GET /v1/keys", admin, (*server).listKeys},
 	{"POST /v1/keys", admin, (*server).createKey},
 	{"DELETE /v1/keys/{id}", admin, (*server).revokeKey},

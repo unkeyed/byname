@@ -96,6 +96,12 @@ export function Review({ nav }: { nav: StepNav }) {
             {socialMonth > 0 ? <>, plus {money(socialMonth, "about")} a month for social mentions.</> : "."}
             {est.unknown_pairs > 0 && ` ${plural(est.unknown_pairs, "AI app")} ${est.unknown_pairs === 1 ? "has" : "have"} no price yet, so the first check will tell.`}
           </p>
+          {est.find_brands && (
+            <p className="text-muted">
+              Each check also reads its answers for every brand they name, so you can see competitors you didn&apos;t know about: about {money(est.find_brands.cost_usd)} a check, included above.
+              Logos for those brands cost about {money(c.other_brands.logos.cost_per_brand_usd)} each, once, at most {c.other_brands.logos.month_limit} new brands a month. Both can be turned off in Settings &gt; Competitors.
+            </p>
+          )}
           <p className="text-muted">
             {s.spend_cap_month_usd == null ? (
               <>

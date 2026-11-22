@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/unkeyed/byname/internal/config"
+	"github.com/unkeyed/byname/internal/discovery"
 	"github.com/unkeyed/byname/internal/social"
 )
 
@@ -36,15 +37,22 @@ type Social interface {
 	CostEstimate(context.Context) (social.CostEstimate, error)
 }
 
+// OtherBrands is internal/discovery's settings, with what reading answers
+// and looking up logos cost.
+type OtherBrands interface {
+	Settings(context.Context) (discovery.Settings, error)
+}
+
 type Service struct {
 	version string
 	db      *pgxpool.Pool
 	config  Config
 	social  Social
+	brands  OtherBrands
 }
 
-func New(version string, db *pgxpool.Pool, cfg Config, soc Social) *Service {
-	return &Service{version: version, db: db, config: cfg, social: soc}
+func New(version string, db *pgxpool.Pool, cfg Config, soc Social, brands OtherBrands) *Service {
+	return &Service{version: version, db: db, config: cfg, social: soc, brands: brands}
 }
 
 func (s *Service) Status(ctx context.Context) (Status, error) {
@@ -59,8 +67,12 @@ func (s *Service) Status(ctx context.Context) (Status, error) {
 // expected figure is an estimate.
 type Costs struct {
 	PerAnswer []config.AnswerCost `json:"per_answer" jsonschema:"one answer on each surface, on its current route, in onboarding order"`
-	Checks    config.CheckCosts   `json:"checks"`
+	Checks    config.CheckCosts   `json:"checks" jsonschema:"each check's estimate includes reading its answers for other brands while that is on"`
 	Social    social.CostEstimate `json:"social"`
+	// OtherBrands is reading answers for other brands, which checks.check
+	// already counts, and looking up logos, at most a set number of new
+	// brands a month.
+	OtherBrands discovery.Settings `json:"other_brands" jsonschema:"what reading answers for other brands and looking up logos cost, and whether each is on"`
 	// MonthEstimateUSD is checks plus social searches in an average month.
 	MonthEstimateUSD float64 `json:"month_estimate_usd" jsonschema:"checks.month_usd plus social.month_usd"`
 	// DefaultMonthCapUSD is what finishing onboarding sets as the monthly
@@ -73,9 +85,10 @@ type Costs struct {
 // instance's time zone, which the monthly spend cap counts.
 type MonthCost struct {
 	Start     time.Time `json:"start" jsonschema:"the first moment of the month in the instance's time zone"`
-	ChecksUSD float64   `json:"checks_usd" jsonschema:"what this month's checks spent"`
+	ChecksUSD float64   `json:"checks_usd" jsonschema:"what this month's checks spent on answers"`
 	SocialUSD float64   `json:"social_usd" jsonschema:"what this month's social searches spent"`
-	SpentUSD  float64   `json:"spent_usd" jsonschema:"checks_usd plus social_usd, what the monthly cap counts"`
+	BrandsUSD float64   `json:"brands_usd" jsonschema:"what this month spent finding other brands: reading answers, in checks or later, and looking up logos"`
+	SpentUSD  float64   `json:"spent_usd" jsonschema:"checks_usd plus social_usd plus brands_usd, what the monthly cap counts"`
 	// MissingCostCalls are answered calls that reported no cost, which no
 	// figure here can count.
 	MissingCostCalls int      `json:"missing_cost_calls" jsonschema:"answered calls this month that reported no cost, so spent_usd is a floor"`
@@ -94,6 +107,9 @@ func (s *Service) Costs(ctx context.Context) (Costs, error) {
 	if out.Social, err = s.social.CostEstimate(ctx); err != nil {
 		return out, err
 	}
+	if out.OtherBrands, err = s.brands.Settings(ctx); err != nil {
+		return out, err
+	}
 	out.MonthEstimateUSD = out.Checks.MonthUSD + out.Social.MonthUSD
 	out.DefaultMonthCapUSD = config.DefaultMonthCap(out.MonthEstimateUSD)
 	st, err := s.config.Settings(ctx)
@@ -104,12 +120,14 @@ func (s *Service) Costs(ctx context.Context) (Costs, error) {
 	local := time.Now().In(loc)
 	out.Month = MonthCost{Start: time.Date(local.Year(), local.Month(), 1, 0, 0, 0, 0, loc), CapUSD: st.SpendCapMonthUSD}
 	err = s.db.QueryRow(ctx, `SELECT
-			coalesce((SELECT sum(spend_usd) FROM run WHERE started_at >= $1), 0)::float8,
-			coalesce((SELECT sum(cost_usd) FROM social_call WHERE called_at >= $1), 0)::float8,
+			coalesce((SELECT sum(usd) FROM spend WHERE at >= $1 AND source = 'checks'), 0)::float8,
+			coalesce((SELECT sum(usd) FROM spend WHERE at >= $1 AND source = 'social'), 0)::float8,
+			coalesce((SELECT sum(usd) FROM spend WHERE at >= $1 AND source = 'brands'), 0)::float8,
 			coalesce((SELECT sum(spend_missing_calls) FROM run WHERE started_at >= $1), 0)::int
-			+ (SELECT count(*) FROM social_call WHERE called_at >= $1 AND cost_usd IS NULL AND status = 'ok')::int`,
-		out.Month.Start).Scan(&out.Month.ChecksUSD, &out.Month.SocialUSD, &out.Month.MissingCostCalls)
-	out.Month.SpentUSD = out.Month.ChecksUSD + out.Month.SocialUSD
+			+ (SELECT count(*) FROM social_call WHERE called_at >= $1 AND cost_usd IS NULL AND status = 'ok')::int
+			+ (SELECT count(*) FROM brand_call WHERE called_at >= $1 AND cost_usd IS NULL AND status = 'ok')::int`,
+		out.Month.Start).Scan(&out.Month.ChecksUSD, &out.Month.SocialUSD, &out.Month.BrandsUSD, &out.Month.MissingCostCalls)
+	out.Month.SpentUSD = out.Month.ChecksUSD + out.Month.SocialUSD + out.Month.BrandsUSD
 	return out, err
 }
 

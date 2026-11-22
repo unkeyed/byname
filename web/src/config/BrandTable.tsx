@@ -6,6 +6,7 @@ import { Badge, Button, Card, ConfirmButton, cx, EmptyState, ErrorNote, Field, I
 import { FieldNote, NoteSlot } from "./forms";
 import { forgetNaming, useCommonWords } from "./naming";
 import { parseHosts, splitList } from "./rules";
+import { BrandMark } from "../brandmark";
 
 type Kind = BrandInput["kind"];
 
@@ -85,6 +86,7 @@ function BrandRow({ b, canEdit, onEdit }: { b: BrandEntry; canEdit: boolean; onE
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <div className="min-w-0 flex-1 basis-48">
           <div className="flex flex-wrap items-center gap-2">
+            <BrandMark id={b.id} name={b.name} />
             <span className="font-medium [overflow-wrap:anywhere]">{b.name}</span>
             <Badge tone={kind === "technology" ? "outline" : "neutral"} title={kindInfo[kind].detail}>
               {kindInfo[kind].label}

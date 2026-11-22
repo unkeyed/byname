@@ -61,6 +61,11 @@ var nonPublic = []netip.Prefix{
 // and, unless allowPrivate, refuses to connect to a non-public address.
 // The check runs on the address being dialled, after DNS, so a name that
 // resolves to 127.0.0.1 or rebinds between lookups is refused too.
+// PublicClient is the client cited sources are fetched with, which other
+// fetches of addresses Byname did not choose share, such as logo images:
+// it refuses private and loopback addresses unless allowPrivate is set.
+func PublicClient(allowPrivate bool) *http.Client { return newClient(allowPrivate) }
+
 func newClient(allowPrivate bool) *http.Client {
 	dialer := &net.Dialer{Timeout: 10 * time.Second}
 	if !allowPrivate {

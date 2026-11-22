@@ -1,6 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import type { ReactNode } from "react";
+import { Link } from "react-router";
 import { api, type Answer, type BrandEntry, type HistoryPoint, type HistorySeries } from "../../api";
+import { BrandMark } from "../../brandmark";
 import { fidelityInfo, lineKey, shortDay, useLabels } from "../../lines";
 import { money } from "../../money";
 import { keys, useBrands, useSettings, useSurfaces } from "../../queries";
@@ -288,6 +290,25 @@ function Analysis({ series: s, point, label, onRaw }: { series: HistorySeries; p
               </ul>
             )}
           </div>
+          {answer.data.others.length > 0 && (
+            <div>
+              <h3 className="text-sm font-semibold">Other brands it named</h3>
+              <p className="mb-2 text-xs text-muted">
+                You don't track these, so they count in no score.{" "}
+                <Link to="/ai/competitors#also-named" className="inline-flex h-11 items-center font-medium text-fg hover:underline md:h-auto">
+                  Track one
+                </Link>
+              </p>
+              <ul className="flex flex-wrap gap-1.5">
+                {answer.data.others.map((o) => (
+                  <li key={o.brand_id} className="inline-flex h-6 items-center gap-1.5 rounded-control border border-dashed border-line-strong pr-1.5 pl-1 text-xs text-muted">
+                    <BrandMark id={o.brand_id} name={o.name} size={14} />
+                    {o.name}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           <div>
             <h3 className="mb-2 text-sm font-semibold">Pages it linked to</h3>
             {answer.data.citations.length === 0 ? (
@@ -341,6 +362,13 @@ function SeriesSummary({ s, label }: { s: HistorySeries; label: string }) {
 
 const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
+/** How the answer text marks you, a competitor, and a brand you don't track. */
+const markClass = {
+  self: "bg-you font-semibold text-you-fg",
+  competitor: "bg-subtle-strong text-fg",
+  other: "bg-transparent text-fg underline decoration-dashed decoration-line-strong underline-offset-2",
+};
+
 function AnswerView({ id }: { id: number }) {
   const answer = useQuery({ queryKey: keys.answer(id), queryFn: () => api.answer(id), placeholderData: (prev) => prev });
   const brands = useBrands();
@@ -348,8 +376,9 @@ function AnswerView({ id }: { id: number }) {
   if (answer.isPending) return <Pending />;
   if (answer.isError) return <ErrorNote error={answer.error} />;
   const a: Answer = answer.data;
-  const names = new Map<string, "self" | "competitor">();
-  const add = (b: Pick<BrandEntry, "name" | "aliases">, kind: "self" | "competitor") => [b.name, ...(b.aliases ?? [])].filter(Boolean).forEach((n) => names.set(n, kind));
+  const names = new Map<string, "self" | "competitor" | "other">();
+  const add = (b: Pick<BrandEntry, "name" | "aliases">, kind: "self" | "competitor" | "other") => [b.name, ...(b.aliases ?? [])].filter(Boolean).forEach((n) => names.set(n, kind));
+  for (const o of a.others) add({ name: o.name, aliases: [] }, "other");
   for (const b of brands.data ?? []) if (b.kind === "competitor") add(b, "competitor");
   for (const b of brands.data ?? []) if (b.kind === "self") add(b, "self");
   if (settings.data) add(settings.data.brand, "self");
@@ -359,7 +388,7 @@ function AnswerView({ id }: { id: number }) {
     brandRe
       ? text.split(brandRe).map((p, i) =>
           i % 2 === 1 ? (
-            <mark key={i} className={cx("rounded-inner px-0.5", names.get(p) === "self" ? "bg-you font-semibold text-you-fg" : "bg-subtle-strong text-fg")}>
+            <mark key={i} className={cx("rounded-inner px-0.5", markClass[names.get(p) ?? "other"])}>
               {p}
             </mark>
           ) : (
@@ -378,6 +407,7 @@ function AnswerView({ id }: { id: number }) {
         <span className="ml-auto flex items-center gap-2">
           <mark className="rounded-inner bg-you px-1 font-semibold text-you-fg">You</mark>
           <mark className="rounded-inner bg-subtle-strong px-1 text-fg">Competitor</mark>
+          {a.others.length > 0 && <mark className={cx("rounded-inner px-1", markClass.other)}>Not tracked</mark>}
         </span>
       </div>
       {a.status === "failed" ? (

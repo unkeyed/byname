@@ -8,6 +8,10 @@ An answer names you when its text has your brand's name or one of its aliases as
 
 Linking to one of your domains, or a subdomain of one, counts apart. An answer that links to your site without saying your name is linked, not named.
 
+Scores count only the brands you track: your own, your competitors and your technologies. Byname also lists the other brands answers name, under **AI answers > Competitors > Also named in answers**, but those count in no score until you track one. [Other brands and logos](other-brands.md) covers them.
+
+Changing a tracked brand scores every stored answer again, locally and for free: adding, changing or removing a competitor or technology, or changing your brand's name, aliases, domains or the match mode. A competitor you add today counts in last month's answers too, and where it was named ahead of you, your position in that answer drops a place.
+
 ## Questions that name your brand
 
 A question such as "Is Northwind a good invoicing app?" puts your name in front of the AI, so its answers name you almost every time. Counted, that one question can lift how often AI apps named you and make you look like the leader against competitors when no buyer would ever ask that way.

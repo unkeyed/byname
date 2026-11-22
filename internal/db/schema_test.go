@@ -64,7 +64,7 @@ func TestPanelChecksMatchEngines(t *testing.T) {
 		"key":        surfaces,
 		"fidelity":   {string(engines.FidelityApp), string(engines.FidelityModelMatch), string(engines.FidelityApproximation)},
 		"match_mode": {string(panel.MatchWholeWord), string(panel.MatchSelfAnywhere)},
-		"kind":       {string(panel.KindSelf), string(panel.KindCompetitor), string(panel.KindTechnology)},
+		"kind":       kindStrings(panel.TrackedKinds),
 	} {
 		check := regexp.MustCompile(`CHECK \(` + column + ` IN \(([^)]*)\)`)
 		found := check.FindAllStringSubmatch(string(sql), -1)
@@ -81,6 +81,46 @@ func TestPanelChecksMatchEngines(t *testing.T) {
 			if !slices.Equal(got, want) {
 				t.Errorf("CHECK (%s IN ...) lists %v, the Go code has %v", column, got, want)
 			}
+		}
+	}
+}
+
+func kindStrings(kinds []panel.BrandKind) []string {
+	out := make([]string, len(kinds))
+	for i, k := range kinds {
+		out[i] = string(k)
+	}
+	return out
+}
+
+// TestBrandKindsMatchPanel fails when 011_other_brands.sql's brand kind
+// CHECK lists other kinds than internal/panel, or its tracked_brand view
+// other kinds than panel.TrackedKinds.
+func TestBrandKindsMatchPanel(t *testing.T) {
+	sql, err := os.ReadFile("migrations/011_other_brands.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range []struct {
+		re   string
+		want []string
+	}{
+		{`CHECK \(kind IN \(([^)]*)\)\)`, kindStrings(append(slices.Clone(panel.TrackedKinds), panel.KindUntracked, panel.KindHidden))},
+		{`FROM brand WHERE kind IN \(([^)]*)\)`, kindStrings(panel.TrackedKinds)},
+	} {
+		m := regexp.MustCompile(c.re).FindStringSubmatch(string(sql))
+		if m == nil {
+			t.Errorf("no %s in 011_other_brands.sql", c.re)
+			continue
+		}
+		var got []string
+		for _, v := range strings.Split(m[1], ",") {
+			got = append(got, strings.Trim(strings.TrimSpace(v), "'"))
+		}
+		slices.Sort(got)
+		slices.Sort(c.want)
+		if !slices.Equal(got, c.want) {
+			t.Errorf("%s lists %v, internal/panel has %v", c.re, got, c.want)
 		}
 	}
 }

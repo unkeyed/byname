@@ -63,7 +63,7 @@ func scanBrand(row pgx.Row) (Brand, error) {
 
 // Brands lists the brand table, your own brand first, then by name.
 func (s *Service) Brands(ctx context.Context) ([]Brand, error) {
-	rows, err := s.db.Query(ctx, `SELECT `+brandColumns+` FROM brand ORDER BY kind <> 'self', lower(name)`)
+	rows, err := s.db.Query(ctx, `SELECT `+brandColumns+` FROM tracked_brand ORDER BY kind <> 'self', lower(name)`)
 	if err != nil {
 		return nil, err
 	}
@@ -89,7 +89,8 @@ func (s *Service) PanelBrands(ctx context.Context) ([]panel.Brand, error) {
 }
 
 // UpsertBrand adds a competitor or technology, or replaces the one with the
-// same name ignoring case.
+// same name ignoring case. A brand found in answers under that name
+// becomes it, keeping its logo.
 func (s *Service) UpsertBrand(ctx context.Context, in BrandInput) (Brand, error) {
 	if err := in.validate(); err != nil {
 		return Brand{}, err
@@ -98,9 +99,13 @@ func (s *Service) UpsertBrand(ctx context.Context, in BrandInput) (Brand, error)
 	err := s.brandChange(ctx, func(tx pgx.Tx) (err error) {
 		b, err = scanBrand(tx.QueryRow(ctx, `INSERT INTO brand (name, aliases, domains, kind) VALUES ($1, $2, $3, $4)
 			ON CONFLICT (lower(name)) DO UPDATE SET name = excluded.name, aliases = excluded.aliases,
-				domains = excluded.domains, kind = excluded.kind, updated_at = now()
+				domains = excluded.domains, kind = excluded.kind, key = NULL, updated_at = now()
 			WHERE brand.kind <> 'self'
 			RETURNING `+brandColumns, in.Name, in.Aliases, in.Domains, in.Kind))
+		if err != nil {
+			return err
+		}
+		_, err = tx.Exec(ctx, `DELETE FROM discovered_mention WHERE brand_id = $1`, b.ID)
 		return err
 	})
 	if errors.Is(err, core.ErrNotFound) {
@@ -109,15 +114,23 @@ func (s *Service) UpsertBrand(ctx context.Context, in BrandInput) (Brand, error)
 	return b, err
 }
 
-// brandChange runs a change to the brand table and marks the questions
-// again, since another brand's longer name can hide yours in a question.
+// brandChange runs a change to the tracked brands and brings what they
+// decide up to date: the questions that name you, since another brand's
+// longer name can hide yours in a question, and every stored answer's
+// score.
 func (s *Service) brandChange(ctx context.Context, f func(pgx.Tx) error) error {
 	return pgx.BeginFunc(ctx, s.db, func(tx pgx.Tx) error {
 		if err := f(tx); err != nil {
 			return err
 		}
-		return markBrandQuestions(ctx, tx)
+		return rederive(ctx, tx)
 	})
+}
+
+// BrandChange is brandChange for internal/discovery, which turns a found
+// brand into a competitor.
+func (s *Service) BrandChange(ctx context.Context, f func(pgx.Tx) error) error {
+	return s.brandChange(ctx, f)
 }
 
 // UpdateBrand replaces a competitor or technology by id, which can rename it.
@@ -127,8 +140,11 @@ func (s *Service) UpdateBrand(ctx context.Context, id int64, in BrandInput) (Bra
 	}
 	var b Brand
 	err := s.brandChange(ctx, func(tx pgx.Tx) (err error) {
+		if err := freeName(ctx, tx, in.Name); err != nil {
+			return err
+		}
 		b, err = scanBrand(tx.QueryRow(ctx, `UPDATE brand SET name = $2, aliases = $3, domains = $4, kind = $5, updated_at = now()
-			WHERE id = $1 AND kind <> 'self' RETURNING `+brandColumns, id, in.Name, in.Aliases, in.Domains, in.Kind))
+			WHERE id = $1 AND kind IN ('competitor', 'technology') RETURNING `+brandColumns, id, in.Name, in.Aliases, in.Domains, in.Kind))
 		return err
 	})
 	if isUniqueViolation(err, "brand_name") {
@@ -140,7 +156,7 @@ func (s *Service) UpdateBrand(ctx context.Context, id int64, in BrandInput) (Bra
 // DeleteBrand removes a competitor or technology and its recorded mentions.
 func (s *Service) DeleteBrand(ctx context.Context, id int64) error {
 	return s.brandChange(ctx, func(tx pgx.Tx) error {
-		tag, err := tx.Exec(ctx, `DELETE FROM brand WHERE id = $1 AND kind <> 'self'`, id)
+		tag, err := tx.Exec(ctx, `DELETE FROM brand WHERE id = $1 AND kind IN ('competitor', 'technology')`, id)
 		if err == nil && tag.RowsAffected() == 0 {
 			return fmt.Errorf("%w: no such competitor or technology; your own brand is edited with PUT /v1/settings", core.ErrNotFound)
 		}
