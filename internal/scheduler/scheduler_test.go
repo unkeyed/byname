@@ -3,8 +3,11 @@ package scheduler_test
 import (
 	"context"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -16,6 +19,7 @@ import (
 	"github.com/unkeyed/byname/internal/engines/tregtest"
 	"github.com/unkeyed/byname/internal/scheduler"
 	"github.com/unkeyed/byname/internal/secretbox"
+	"github.com/unkeyed/byname/internal/social"
 	"github.com/unkeyed/byname/internal/sources"
 	"github.com/unkeyed/byname/internal/testdb"
 )
@@ -278,5 +282,53 @@ func TestSiteChangesFollowTheSearchSync(t *testing.T) {
 	defer f.mu.Unlock()
 	if strings.Join(f.steps, ",") != "sync,changes" {
 		t.Fatalf("steps = %v, want the sync then site changes", f.steps)
+	}
+}
+
+// TestNothingPaidRunsBeforeOnboarding ticks every job on an instance set
+// up all the way but for finishing onboarding, with a Treg token, social
+// turned on and even a schedule that is due: no AI check, no social search
+// and no other paid call happens until onboarding is finished. Model lists
+// are free. Cited pages are fetched directly, for free, and only once a
+// check has cited them, so the sources job is left out here: it would
+// fetch the fixtures' real sites.
+func TestNothingPaidRunsBeforeOnboarding(t *testing.T) {
+	e := setup(t)
+	p := e.process(nil)
+	clock := func() time.Time { return now }
+	var bsky atomic.Int32
+	bluesky := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		bsky.Add(1)
+		_, _ = w.Write([]byte(`{"posts":[]}`))
+	}))
+	t.Cleanup(bluesky.Close)
+	mentions := social.New(e.db, p.cfg, social.Options{Now: clock, BaseURLs: map[social.Network]string{social.Bluesky: bluesky.URL}})
+	sched := scheduler.New(p.checks, p.cfg, scheduler.Options{Now: clock, Social: mentions})
+	if _, err := mentions.PutSettings(context.Background(), social.SettingsInput{Enabled: new(true), FetchEveryHours: 1, DigestCadence: social.Daily}); err != nil {
+		t.Fatal(err)
+	}
+	e.exec(t, `UPDATE instance_settings SET onboarded_at = NULL, next_check_at = $1`, now.Add(-time.Minute))
+	e.treg.Reset()
+
+	// Run with a done context ticks once more and returns after waiting
+	// for the social search the tick started on its own goroutine.
+	tick := func() {
+		sched.Tick(context.Background())
+		done, cancel := context.WithCancel(context.Background())
+		cancel()
+		sched.Run(done)
+	}
+	tick()
+	if n := e.treg.Answers(); n != 0 {
+		t.Fatalf("%d paid Treg calls before onboarding was finished, want 0: %+v", n, e.treg.Calls())
+	}
+	if n := e.count(t, `SELECT count(*) FROM run`) + e.count(t, `SELECT count(*) FROM social_call`) + int(bsky.Load()); n != 0 {
+		t.Fatalf("%d runs, social calls or Bluesky searches before onboarding was finished, want 0", n)
+	}
+
+	e.exec(t, `UPDATE instance_settings SET onboarded_at = $1, next_check_at = $2`, now, now.Add(-time.Minute))
+	tick()
+	if e.count(t, `SELECT count(*) FROM run`) != 1 || e.count(t, `SELECT count(*) FROM social_call WHERE route = 'treg'`) == 0 || bsky.Load() == 0 {
+		t.Fatal("once onboarding was finished the tick ran no check or no social search")
 	}
 }
