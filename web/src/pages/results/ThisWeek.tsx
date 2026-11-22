@@ -286,7 +286,7 @@ const todoRules: ((d: WeekData) => Item[])[] = [
       to: `/?q=${g.question.id}`,
       action: "Read the answers",
     }));
-    if (never.length > 3) shown.push({ key: "never-more", icon: "alert", text: `${never.length - 3} more questions where no AI app named you.`, to: "/ai/missed", action: "See all missed questions" });
+    if (never.length > 3) shown.push({ key: "never-more", icon: "alert", text: `${never.length - 3} more ${never.length === 4 ? "question" : "questions"} where no AI app named you.`, to: "/ai/missed", action: "See all missed questions" });
     return shown;
   },
   (d) => {
