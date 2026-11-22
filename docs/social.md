@@ -12,14 +12,14 @@ Social is off until someone turns it on, in onboarding's optional **Social menti
 
 Treg has no single search across social networks, so Byname pins one search per network, the same way it pins one endpoint per AI app.
 
-| Network | Searched through | Endpoint | Price per call | What a mention is |
+| Network | Searched through | Endpoint | Price per 1,000 searches | What a mention is |
 |---|---|---|---|---|
-| X | Treg | `anyapi.x.search.posts` | $0.00075 | A post. Retweets are left out. |
-| Reddit | Treg | `crawl4ai.reddit.search.posts` | $0.0009 | A post, title and text. |
-| Hacker News | Treg | `crawl4ai.hackernews.search.stories` | $0.00015 | A story. Comments are not searched. |
-| LinkedIn | Treg | `anyapi.linkedin.search.posts` | $0.002 | A post. |
-| YouTube | Treg | `crawl4ai.youtube.search.videos` | $0.0009 | A video whose title or description names you. The channel is the author. |
-| Threads | Treg | `tikhub.x.threads-web-search-recent` | $0.002 | A post. |
+| X | Treg | `anyapi.x.search.posts` | $0.75 | A post. Retweets are left out. |
+| Reddit | Treg | `crawl4ai.reddit.search.posts` | $0.90 | A post, title and text. |
+| Hacker News | Treg | `crawl4ai.hackernews.search.stories` | $0.15 | A story. Comments are not searched. |
+| LinkedIn | Treg | `anyapi.linkedin.search.posts` | $2.00 | A post. |
+| YouTube | Treg | `crawl4ai.youtube.search.videos` | $0.90 | A video whose title or description names you. The channel is the author. |
+| Threads | Treg | `tikhub.x.threads-web-search-recent` | $2.00 | A post. |
 | Bluesky | Bluesky's public API | `app.bsky.feed.searchPosts` on `https://api.bsky.app` | Free | A post. |
 
 The prices are the Treg catalog's, checked on November 22, 2026. Every Treg call sends `X-Treg-Route-Max-Cost`, a ceiling a few times the listed price, so Treg refuses a dearer fallback source instead of charging for it. What a call cost is read from Treg's `X-Treg-Cost-Micro` header. A Treg call without that header is recorded as a missing cost, never as $0. A Bluesky call is recorded as a known $0, which is not a missing cost.

@@ -2,8 +2,8 @@ import { useState, type FormEvent, type ReactNode } from "react";
 import type { Costs, Settings, SettingsView } from "../api";
 import { useCan, useCosts, useSettings } from "../queries";
 import { cx, ErrorNote, inputClass, labelClass, Pending } from "../ui";
-import { usd } from "../lines";
-import { about, monthOfChecks } from "./costs";
+import { money } from "../money";
+import { monthOfChecks } from "./costs";
 import { defaultFooter, Disclosure, NumberField, ReadOnlyNote, SubmitButton, useSaveSettings, type Footer } from "./forms";
 import { formatNumber, parseNumber, type NumberKey } from "./rules";
 
@@ -105,10 +105,10 @@ function Body({
   const capEmpty = !(values.spend_cap_month_usd ?? "").trim();
   const estimate: Partial<Record<NumberKey, string>> = costs
     ? {
-        check_every_days: `${hints.check_every_days} At every ${days === 1 ? "day" : `${days} days`}, checks cost ${about(checksMonth)} a month.`,
-        spend_cap_run_usd: `One check is estimated at ${about(perCheck)}. ${hints.spend_cap_run_usd}`,
-        spend_cap_month_usd: `Estimated at ${about(checksMonth + socialMonth)} a month${socialMonth > 0 ? ", social searches included" : ""}. ${
-          capEmpty && !initial.onboarded_at ? `Leave it empty and finishing setup sets ${usd(costs.default_month_cap_usd)}, which you can change.` : hints.spend_cap_month_usd
+        check_every_days: `${hints.check_every_days} At every ${days === 1 ? "day" : `${days} days`}, checks cost ${money(checksMonth, "about")} a month.`,
+        spend_cap_run_usd: `One check costs ${money(perCheck, "about")}. ${hints.spend_cap_run_usd}`,
+        spend_cap_month_usd: `A month costs ${money(checksMonth + socialMonth, "about")}${socialMonth > 0 ? ", social searches included" : ""}. ${
+          capEmpty && !initial.onboarded_at ? `Leave it empty and finishing setup sets ${money(costs.default_month_cap_usd)}, which you can change.` : hints.spend_cap_month_usd
         }`,
       }
     : {};

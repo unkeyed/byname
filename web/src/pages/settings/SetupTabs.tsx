@@ -8,7 +8,8 @@ import { CredentialForm, ProviderKeyList, testTone, useCredentials } from "../..
 import { QuestionEditor } from "../../config/QuestionEditor";
 import { RunSettingsForm } from "../../config/RunSettings";
 import { WherePeopleAsk as Surfaces } from "../../config/WherePeopleAsk";
-import { appCount, checkPrice, money, scheduleLine } from "../../checks";
+import { appCount, checkPrice, scheduleLine } from "../../checks";
+import { money } from "../../money";
 import { keys, useCan, useCosts, useSettings } from "../../queries";
 import { Badge, Button, Card, CardHeader, cx, ErrorNote, Icon, Pending, RelativeTime, SteadyLabel } from "../../ui";
 import { RunNowButton } from "../results/RunNow";
@@ -70,7 +71,7 @@ export function Treg() {
   return (
     <>
       <SettingsHeader title="Treg">
-        Treg is the service that runs each question in each AI app and bills you per answer, usually under half a cent. One Treg token covers every AI app. It is stored encrypted and never shown
+        Treg is the service that runs each question in each AI app and bills you for each answer. Settings, Schedule and limits shows what a check and a month cost. One Treg token covers every AI app. It is stored encrypted and never shown
         again after you save it.
       </SettingsHeader>
       {list.isPending ? (
@@ -259,13 +260,13 @@ export function MonthSpend() {
         </div>
         <dl className="grid gap-x-6 gap-y-2 sm:grid-cols-[auto_1fr]">
           <dt className="text-muted">One check</dt>
-          <dd>
-            {price.amount[0].toUpperCase() + price.amount.slice(1)}: {e.questions} questions in {appCount(c)} AI apps, {e.calls} answers.
+          <dd className="first-letter:uppercase">
+            {price.amount}: {e.questions} questions in {appCount(c)} AI apps, {e.calls} answers.
             {price.unknown && <span className="text-muted"> {price.unknown}</span>}
           </dd>
           <dt className="text-muted">Expected this month</dt>
-          <dd>
-            About {money(c.month_estimate_usd)}:{" "}
+          <dd className="first-letter:uppercase">
+            {money(c.month_estimate_usd, "about")}:{" "}
             {c.checks.paused ? "no scheduled checks while paused" : `${money(c.checks.month_usd)} for a check every ${c.checks.check_every_days === 1 ? "day" : `${c.checks.check_every_days} days`}`}
             {c.social.enabled ? `, plus ${money(c.social.month_usd)} for social searches` : ", with social searches off"}.
           </dd>

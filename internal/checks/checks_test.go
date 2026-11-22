@@ -105,7 +105,7 @@ func TestRunCheckStoresEveryAnswer(t *testing.T) {
 		t.Fatalf("run = %+v, want completed with 2 questions x 6 pairs and its job_run completed", r)
 	}
 	if !near(r.Spend, 0.10) || r.Missing != 2 {
-		t.Fatalf("spend $%v with %d missing, want $0.10 from 10 priced calls and Perplexity's 2 calls counted missing, not $0", r.Spend, r.Missing)
+		t.Fatalf("spend %v with %d missing, want $0.10 from 10 priced calls and Perplexity's 2 calls counted missing, not $0", r.Spend, r.Missing)
 	}
 	if n := e.treg.Answers(); n != 12 {
 		t.Fatalf("Treg got %d answer calls, want 12", n)

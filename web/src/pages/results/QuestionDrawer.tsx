@@ -1,7 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { api, type Answer, type BrandEntry, type HistoryPoint, type HistorySeries } from "../../api";
-import { fidelityInfo, lineKey, shortDay, usd, useLabels } from "../../lines";
+import { fidelityInfo, lineKey, shortDay, useLabels } from "../../lines";
+import { money } from "../../money";
 import { keys, useBrands, useSettings, useSurfaces } from "../../queries";
 import { Markdown } from "../../markdown";
 import { Badge, Button, cx, ErrorNote, Icon, LoadBoundary, Pending, ScrollX, selectClass, useModal } from "../../ui";
@@ -373,7 +374,7 @@ function AnswerView({ id }: { id: number }) {
         {a.mentioned ? <Badge tone="success">Named you at #{a.position}</Badge> : <Badge>Not named</Badge>}
         {a.cited && <Badge tone="info">Linked to your site</Badge>}
         {a.reported_model && <span>Model {a.reported_model}</span>}
-        <span>{a.cost_usd == null ? <span className="text-warn">No price reported</span> : usd(a.cost_usd)}</span>
+        <span>{a.cost_usd == null ? <span className="text-warn">No price reported</span> : money(a.cost_usd)}</span>
         <span className="ml-auto flex items-center gap-2">
           <mark className="rounded-inner bg-you px-1 font-semibold text-you-fg">You</mark>
           <mark className="rounded-inner bg-subtle-strong px-1 text-fg">Competitor</mark>

@@ -3,7 +3,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router";
 import { api, type Change, type Competitors, type Costs, type Gap, type Grouping, type LeftOut, type QuestionSet, type ResultsFilter, type RunSummary, type Series, type SettingsView, type SocialSettings, type Sources } from "../../api";
 import { LineChart, LineKey, Sparkline, type ChartLine } from "../../charts";
-import { money, nextCheckDay, nextCheckPhrase } from "../../checks";
+import { nextCheckDay, nextCheckPhrase } from "../../checks";
+import { money } from "../../money";
 import { fidelityInfo, lineKey, palette, pct, shortDay, useLabels } from "../../lines";
 import { keys, useAnsweredRuns, useChanges, useCosts, useGsc, useLeftOut, useMe, useQuestions, useRuns, useSettings, useSocialSettings, useSurfaces } from "../../queries";
 import { Card, CardHeader, cx, EmptyState, ErrorNote, Icon, Pending, ScrollX, useLoading, type IconName } from "../../ui";
@@ -340,7 +341,7 @@ const setupRules: ((d: WeekData) => Item[])[] = [
           {
             key: "cap",
             icon: "key",
-            text: `Add a monthly spend cap, so checks and social searches stop when they reach it.${d.costs ? ` You can expect about ${money(d.costs.month_estimate_usd)} a month.` : ""}`,
+            text: `Add a monthly spend cap, so checks and social searches stop when they reach it.${d.costs ? ` You can expect ${money(d.costs.month_estimate_usd, "about")} a month.` : ""}`,
             to: "/settings/schedule",
             action: "Add a cap",
           },
@@ -403,7 +404,7 @@ function Footer({ d }: { d: WeekData }) {
         <span>
           Spent <span className="font-medium text-fg tabular-nums">{money(m.spent_usd)}</span>
           {m.cap_usd != null ? ` of your ${money(m.cap_usd)} cap` : ""} this month
-          {d.costs && `, about ${money(d.costs.month_estimate_usd)} expected`}
+          {d.costs && `, ${money(d.costs.month_estimate_usd, "about")} expected`}
         </span>
       )}
       <Link to="/settings/schedule" className="inline-flex h-11 items-center gap-1 font-medium text-fg hover:underline sm:ml-auto md:h-auto">

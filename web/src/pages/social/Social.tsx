@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router";
 import type { Costs, LeftOut, SocialDigest, SocialMention, SocialNetwork, SocialSettings } from "../../api";
+import { money } from "../../money";
 import { useCan, useCosts, useIsAdmin, useLeftOut, useSocialDigest, useSocialMentions, useSocialSettings } from "../../queries";
 import { Badge, Button, buttonClass, Card, CardHeader, cx, EmptyState, ErrorNote, Icon, Pending, RelativeTime, selectClass, useLoading } from "../../ui";
 import { ViewHeader } from "../results/Header";
@@ -195,7 +196,7 @@ function DigestCard() {
 }
 
 function searchCost(d: SocialDigest): string {
-  const cost = `Its ${d.calls} searches cost $${d.spend_usd.toFixed(4)}`;
+  const cost = `Its ${d.calls} searches cost ${money(d.spend_usd)}`;
   return d.spend_missing_calls > 0 ? `${cost}, plus ${d.spend_missing_calls} that reported no cost.` : `${cost}.`;
 }
 

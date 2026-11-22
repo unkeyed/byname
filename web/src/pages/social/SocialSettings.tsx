@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { Link, useLocation } from "react-router";
 import type { Costs, SocialSettings as Settings } from "../../api";
 import { ReadOnlyNote, SubmitButton } from "../../config/forms";
+import { money } from "../../money";
 import { useCan, useCosts, useIsAdmin, useLeftOut, useSocialSettings } from "../../queries";
 import { Badge, Button, cx, EmptyState, ErrorNote, Field, Icon, inputClass, Pending, RelativeTime, selectClass } from "../../ui";
 import { SettingsHeader, SettingsSubhead } from "../settings/Settings";
@@ -149,7 +150,11 @@ function SearchForm({ s, costs, canEdit }: { s: Settings; costs: Costs["social"]
                 <span className="min-w-0 flex-1 text-sm">
                   <span className="flex flex-wrap items-center gap-2 font-medium">
                     {n.title}
-                    {n.route === "direct" ? <Badge tone="success">Free, no token</Badge> : <Badge tone="outline">${n.cost_per_call_usd} a call through Treg</Badge>}
+                    {n.route === "direct" ? (
+                      <Badge tone="success">Free, no token</Badge>
+                    ) : (
+                      <Badge tone="outline">{costs ? `${money(n.cost_per_call_usd * costs.terms * costs.fetches_per_month, "about")} a month through Treg` : "Through Treg"}</Badge>
+                    )}
                     {n.unavailable && <Badge tone="warn">Unavailable</Badge>}
                   </span>
                   <span className="mt-0.5 block text-xs text-muted [overflow-wrap:anywhere]">

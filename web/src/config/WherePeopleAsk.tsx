@@ -2,10 +2,10 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router";
 import { api, type Costs, type Fidelity, type Pair, type PairTest, type Route, type RouteOption, type SearchControl, type Surface, type SurfaceGroup, type SurfaceInput, type SurfaceKey } from "../api";
-import { fidelityInfo, usd } from "../lines";
+import { fidelityInfo } from "../lines";
+import { money } from "../money";
 import { keys, useCan, useCosts, useIsAdmin, useSurfaces } from "../queries";
 import { Badge, Button, Card, cx, ErrorNote, errorMessage, Icon, inputClass, labelClass, Pending, RelativeTime, Spinner, SteadyLabel, useLoading, type Tone } from "../ui";
-import { about } from "./costs";
 import { CredentialForm, useCredentials } from "./Credentials";
 import { Disclosure, FieldNote, NoteSlot, type Footer } from "./forms";
 
@@ -106,9 +106,20 @@ export function WherePeopleAsk({ prefillDefaults, onContinue, footer }: { prefil
   return <Body surfaces={surfaces.data ?? []} costs={costs.data} prefillDefaults={prefillDefaults} onContinue={onContinue} footer={footer} />;
 }
 
-/** "about $0.004 an answer", from GET /v1/costs. */
+/** One answer's estimated cost in US dollars, from GET /v1/costs. */
 function answerCost(costs: Costs | undefined, key: SurfaceKey): number | null {
   return costs?.per_answer.find((a) => a.surface === key)?.cost_per_answer_usd ?? null;
+}
+
+/** What an AI app adds at the saved questions and schedule: "about $0.04 a check, about $0.40 a month". */
+function appCost(costs: Costs | undefined, key: SurfaceKey): string | null {
+  const answer = answerCost(costs, key);
+  if (answer == null || !costs) return null;
+  const questions = costs.checks.check.questions;
+  if (questions === 0) return `${money(answer * 1000, "about")} per 1,000 answers`;
+  const check = answer * questions;
+  const month = costs.checks.checks_per_month;
+  return month > 0 ? `${money(check, "about")} a check, ${money(check * month, "about")} a month` : `${money(check, "about")} a check`;
 }
 
 /** How many times an AI app's answer a developer tool's answer costs, on average. */
@@ -263,7 +274,7 @@ function Body({
     ) : dirty.length === 0 && ticked.length > 0 && failing.length === 0 && allPairs.length > 0 ? (
       <FieldNote tone="info">Every AI app here passed its test.</FieldNote>
     ) : (
-      <FieldNote tone="info">Byname asks each AI app one short test question. It takes up to a minute{testCost > 0 && <> and costs {about(testCost)}</>}.</FieldNote>
+      <FieldNote tone="info">Byname asks each AI app one short test question. It takes up to a minute{testCost > 0 && <> and costs {money(testCost, "about")}</>}.</FieldNote>
     );
 
   return (
@@ -304,7 +315,7 @@ function Body({
                   draft={draftOf(s)}
                   dirty={dirty.includes(s)}
                   onboarding={onboarding}
-                  cost={answerCost(costs, s.key)}
+                  cost={appCost(costs, s.key)}
                   canEdit={canEdit}
                   onChange={(patch) => setDraft(s, patch)}
                   advancedOpen={advanced[s.key] ?? false}
@@ -391,7 +402,7 @@ function TregToken({ needed, onNoTreg, canEdit }: { needed: boolean; onNoTreg: (
         )}
       </div>
       <p className="mb-3 text-sm text-muted">
-        Byname asks ChatGPT, Gemini, Google and the others through Treg, a service that runs each question and bills you per answer, usually under half a cent. One Treg
+        Byname asks ChatGPT, Gemini, Google and the others through Treg, a service that runs each question and bills you for each answer. Each AI app below shows what it adds to a check and a month. One Treg
         token covers every AI app below. Treg bills you, not Byname.{" "}
         <a href="https://treg.to" target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center gap-1 font-medium text-fg underline underline-offset-2 md:min-h-0">
           Get a token at treg.to
@@ -457,7 +468,7 @@ function SurfaceRow({
   draft: Draft;
   dirty: boolean;
   onboarding: boolean;
-  cost: number | null;
+  cost: string | null;
   canEdit: boolean;
   onChange: (patch: Partial<Draft>) => void;
   advancedOpen: boolean;
@@ -487,8 +498,8 @@ function SurfaceRow({
             {draft.route !== "treg" && <Badge tone="outline">{opt.provider || routeInfo[draft.route].title}</Badge>}
             {dirty && !onboarding && <Badge tone="info">Unsaved</Badge>}
             {cost != null && (
-              <span className="basis-full text-xs whitespace-nowrap text-muted tabular-nums sm:ml-auto sm:basis-auto">
-                {about(cost)} an answer{opt.takes_model && " per model"}
+              <span className="basis-full text-xs text-muted tabular-nums sm:ml-auto sm:basis-auto sm:whitespace-nowrap">
+                {cost}{opt.takes_model && " per model"}
               </span>
             )}
           </div>
@@ -694,7 +705,7 @@ function PairRow({ p, result, error, testing, canTest, onTest }: { p: Pair; resu
 
 function TestDetails({ r }: { r: PairTest }) {
   const facts = [
-    r.cost_reported && r.cost_usd != null ? `Cost ${usd(r.cost_usd)}` : "Cost not reported (billed by tokens)",
+    r.cost_reported && r.cost_usd != null ? `Cost ${money(r.cost_usd)}` : "Cost not reported (billed by tokens)",
     r.searched ? "searched the web" : "didn't search the web",
     r.cited ? `linked to ${r.citations} ${r.citations === 1 ? "page" : "pages"}` : "linked to nothing",
     r.reported_model ? `answered with ${r.reported_model}` : "no model reported",

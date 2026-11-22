@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, type Costs, type Engagement, type SocialMention, type SocialNetwork, type SocialSettings, type SocialSettingsInput } from "../../api";
+import { money } from "../../money";
 import { keys } from "../../queries";
 import { cx, Icon, type IconName } from "../../ui";
 
@@ -34,11 +35,9 @@ export function useSaveSocial(onSaved?: () => void) {
   });
 }
 
-const cents = new Intl.NumberFormat(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 2 });
-
 /** What social searching costs a month at the saved settings, in a sentence or two. */
 export function socialCost(s: SocialSettings, c: Costs["social"]): string {
-  const month = c.treg_month_usd < 0.01 ? "less than a cent a month" : `about ${cents.format(c.treg_month_usd)} a month`;
+  const month = `${money(c.treg_month_usd, "about")} a month`;
   if (!s.token_set)
     return `The paid networks need a Treg token. Treg is the service that carries out each search and bills you for it, ${month} at these settings. Bluesky is free and needs no token.`;
   if (c.treg_networks === 0) return "The networks that are on are free.";

@@ -38,9 +38,5 @@ const pctFmt = new Intl.NumberFormat(undefined, { style: "percent", maximumFract
 const pct1Fmt = new Intl.NumberFormat(undefined, { style: "percent", maximumFractionDigits: 1 });
 export const pct = (v: number | null | undefined) => (v == null ? "–" : v > 0 && v < 0.1 ? pct1Fmt.format(v) : pctFmt.format(v));
 
-export function usd(v: number): string {
-  return new Intl.NumberFormat(undefined, { style: "currency", currency: "USD", maximumFractionDigits: v !== 0 && Math.abs(v) < 1 ? 4 : 2 }).format(v);
-}
-
 const dayFmt = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" });
 export const shortDay = (iso: string) => dayFmt.format(new Date(iso));
