@@ -33,6 +33,23 @@ export function SearchConsoleStep({ onPicked, footer }: { onPicked: () => void; 
 function Connection({ s, onPicked }: { s: GscStatus; onPicked: () => void }) {
   const [picking, setPicking] = useState(false);
   useGscProperties(s.connected);
+  if (!s.connected && !s.oauth_available)
+    return (
+      <Card className="space-y-4 p-4">
+        <div>
+          <h3 className="mb-1 text-sm font-semibold">Connect with a Google service account</h3>
+          <ol className="list-decimal space-y-1 pl-5 text-sm text-muted">
+            <li>In Google Cloud, create a service account and download a JSON key for it.</li>
+            <li>In Search Console, add the service account&apos;s email as a user on your site. Restricted access is enough.</li>
+            <li>Paste the whole key file below.</li>
+          </ol>
+        </div>
+        <ServiceAccountForm />
+        <p className="border-t border-line pt-3 text-xs text-muted">
+          Not set up with Google Cloud? Skip this step. Whoever runs your Google account can connect it later in Settings &gt; Search Console.
+        </p>
+      </Card>
+    );
   if (!s.connected)
     return (
       <Card className="space-y-5 p-4">
