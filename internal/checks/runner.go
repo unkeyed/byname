@@ -33,7 +33,8 @@ type plan struct {
 	settings config.SettingsView
 	brands   []panel.Brand
 	calls    []call
-	// monthBase is what the month's other runs have spent.
+	// monthBase is what the month's other runs and social searches have
+	// spent, since the monthly cap covers both.
 	monthBase float64
 }
 
@@ -177,7 +178,8 @@ func (s *Service) plan(ctx context.Context, runID, setID int64) (plan, *outcome,
 	loc := p.settings.Schedule().Location
 	local := s.now().In(loc)
 	monthStart := time.Date(local.Year(), local.Month(), 1, 0, 0, 0, 0, loc)
-	err = s.db.QueryRow(ctx, `SELECT coalesce(sum(spend_usd), 0)::float8 FROM run WHERE id <> $1 AND started_at >= $2`, runID, monthStart).Scan(&p.monthBase)
+	err = s.db.QueryRow(ctx, `SELECT coalesce((SELECT sum(spend_usd) FROM run WHERE id <> $1 AND started_at >= $2), 0)::float8
+		+ coalesce((SELECT sum(cost_usd) FROM social_call WHERE called_at >= $2), 0)::float8`, runID, monthStart).Scan(&p.monthBase)
 	return p, nil, err
 }
 
@@ -189,7 +191,7 @@ func (s *Service) overBudget(p plan, out *outcome) bool {
 		return true
 	}
 	if month := p.settings.SpendCapMonthUSD; month != nil && p.monthBase+spent >= *month {
-		out.stop(Capped, fmt.Sprintf("this month's checks have spent $%.4f, the monthly spend cap is $%.2f", p.monthBase+spent, *month), "")
+		out.stop(Capped, fmt.Sprintf("this month's checks and social searches have spent $%.4f, the monthly spend cap is $%.2f", p.monthBase+spent, *month), "")
 		return true
 	}
 	return false

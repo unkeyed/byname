@@ -12,7 +12,7 @@ const tuningKeys = ["concurrency", "retries", "timeout_s"] as const satisfies Nu
 const hints: Partial<Record<NumberKey, string>> = {
   check_every_days: "1 to 30. One setting for every surface and question.",
   spend_cap_run_usd: "Stops queueing new calls once a check has spent this much.",
-  spend_cap_month_usd: "Optional. Leave empty for no monthly cap.",
+  spend_cap_month_usd: "Optional. Covers AI checks and social searches together. Leave empty for no monthly cap.",
   concurrency: "1 to 32. Default 8.",
   retries: "0 to 3. Default 1.",
   timeout_s: "30 to 600. Default 180.",

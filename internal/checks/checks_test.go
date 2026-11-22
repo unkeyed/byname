@@ -206,6 +206,22 @@ func TestMonthlyCapStopsARunBeforeItStarts(t *testing.T) {
 	}
 }
 
+func TestMonthlyCapCountsSocialSearches(t *testing.T) {
+	ctx := context.Background()
+	e := setup(t, func(s *config.Settings) { s.SpendCapMonthUSD = new(0.05) })
+	if _, err := e.db.Exec(ctx, `INSERT INTO social_call (network, route, term, tool, status, cost_usd, called_at)
+		VALUES ('x', 'treg', 'northwind', 'anyapi.x.search.posts', 'ok', 0.05, now())`); err != nil {
+		t.Fatal(err)
+	}
+	id := e.runNow(t)
+	if err := e.checks.Work(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if r := e.run(t, id); r.Status != checks.Capped || r.Answers != 0 || !strings.Contains(r.Error, "social searches") {
+		t.Fatalf("run = %+v, want capped before asking anything, since social searches spent the month's cap", r)
+	}
+}
+
 func TestTregRefusalStopsTheRun(t *testing.T) {
 	ctx := context.Background()
 	e := setup(t, nil)
