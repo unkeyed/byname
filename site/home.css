@@ -263,8 +263,9 @@
 .verdict { display: grid; grid-template-columns: minmax(0, 0.72fr) minmax(0, 1fr); gap: 32px 56px; align-items: start; margin-top: 40px; }
 .verdict-text { padding-top: 10px; }
 .verdict-k { margin: 0; font: 400 13px/1.4 var(--mono); color: var(--ink-3); overflow-wrap: anywhere; }
-.verdict-v { margin: 14px 0 14px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; font: 400 40px/1.1 var(--serif); letter-spacing: -0.02em; }
+.verdict-v { margin: 14px 0 14px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 30px; font: 400 40px/1.1 var(--serif); letter-spacing: -0.02em; }
 .verdict-v .mk { color: var(--you); --sw: 2; }
+.li-t b.mk[data-mark="circle"] { margin-right: .55em; }
 .exp { font: 500 12px/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-2); padding: 6px 8px; border: 1px dashed var(--rule-2); border-radius: 6px; }
 .verdict-text > p:not(.verdict-k):not(.verdict-v) { margin: 0 0 12px; font-size: 16px; color: var(--ink-2); }
 .verdict-text .verdict-how { font: italic 400 13.5px/1.6 var(--mono) !important; color: var(--ink-3) !important; }
