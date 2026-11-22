@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Navigate, NavLink, Outlet, useLocation, useNavigate, type RouteObject } from "react-router";
 import { useMe } from "../../queries";
-import { cx, LoadBoundary, PageHeader, selectClass } from "../../ui";
+import { cx, LoadBoundary, PageHeader, scrollArea, selectClass } from "../../ui";
 import { Account } from "./Account";
 import { Apps } from "./Apps";
 import { ApiKeys } from "./ApiKeys";
@@ -83,7 +83,7 @@ export function Settings() {
   return (
     <>
       <PageHeader title="Settings" />
-      <div className="relative min-h-0 flex-1 scroll-pb-36 overflow-auto">
+      <div className={cx("relative min-h-0 flex-1 scroll-pb-36", scrollArea)}>
         <div className="mx-auto max-w-3xl lg:grid lg:max-w-5xl lg:grid-cols-[12rem_minmax(0,1fr)] lg:gap-8 lg:px-8">
           <nav aria-label="Settings" className="bg-bg px-4 pt-4 md:px-8 lg:sticky lg:top-0 lg:self-start lg:px-0 lg:py-8">
             <select aria-label="Settings page" className={cx(selectClass, "w-full lg:hidden")} value={current} onChange={(e) => void navigate(e.target.value)}>

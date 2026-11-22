@@ -5,7 +5,7 @@ import { fidelityInfo, lineKey, shortDay, useLabels } from "../../lines";
 import { money } from "../../money";
 import { keys, useBrands, useSettings, useSurfaces } from "../../queries";
 import { Markdown } from "../../markdown";
-import { Badge, Button, cx, ErrorNote, Icon, LoadBoundary, Pending, ScrollX, selectClass, useModal } from "../../ui";
+import { Badge, Button, cx, ErrorNote, Icon, LoadBoundary, Pending, scrollArea, ScrollX, selectClass, useModal } from "../../ui";
 import { useFilter, useView } from "../../view";
 import { PageMark } from "./Missed";
 import { Segmented } from "./Header";
@@ -125,7 +125,7 @@ function Body({ question, onClose }: { question: number; onClose: () => void }) 
           <Segmented className="self-start sm:self-auto" label="View" value={raw ? "raw" : "analysis"} options={[{ id: "analysis", label: "Summary" }, { id: "raw", label: "Full answer" }]} onChange={(v) => view.set({ qv: v === "raw" ? "raw" : null })} />
         </div>
       )}
-      <div className="min-h-0 flex-1 space-y-6 overflow-auto px-4 py-4">
+      <div className={cx("min-h-0 flex-1 space-y-6 px-4 py-4", scrollArea)}>
         {!selSeries || !selPoint ? (
           <p className="text-sm text-muted">No answers to this question in this range.</p>
         ) : raw ? (
@@ -385,7 +385,7 @@ function AnswerView({ id }: { id: number }) {
       ) : a.status === "no_answer" ? (
         <p className="px-3 py-3 text-sm text-muted">This AI app showed no AI answer for this question.</p>
       ) : (
-        <div className="max-h-[28rem] overflow-auto px-3 py-3 text-sm leading-relaxed [overflow-wrap:anywhere]">
+        <div className={cx("max-h-[28rem] px-3 py-3 text-sm leading-relaxed [overflow-wrap:anywhere]", scrollArea)}>
           <Markdown text={a.text} mark={mark} />
         </div>
       )}

@@ -7,7 +7,7 @@ import { nextCheckDay, nextCheckPhrase } from "../../checks";
 import { money } from "../../money";
 import { fidelityInfo, lineKey, palette, pct, shortDay, useLabels } from "../../lines";
 import { keys, useAnsweredRuns, useChanges, useCosts, useGsc, useLeftOut, useMe, useQuestions, useRuns, useSettings, useSocialSettings, useSurfaces } from "../../queries";
-import { Card, CardHeader, cx, EmptyState, ErrorNote, Icon, Pending, ScrollX, useLoading, type IconName } from "../../ui";
+import { Card, CardHeader, cx, EmptyState, ErrorNote, Icon, Pending, scrollArea, ScrollX, useLoading, type IconName } from "../../ui";
 import { runTime, useFilter, useView, type RangeID } from "../../view";
 import { DailyChart } from "../search/DailyChart";
 import { day, figureInfo, searchState, spanFrom, useSearchDaily, type SearchState } from "../search/model";
@@ -54,7 +54,7 @@ export function ThisWeek() {
         scope={false}
         action={canRun && answered.data?.length ? <RunNowButton variant="secondary" /> : undefined}
       />
-      <div className="relative min-h-0 flex-1 overflow-auto px-3 py-4 md:px-5 md:py-5">
+      <div className={cx("relative min-h-0 flex-1 px-3 py-4 md:px-5 md:py-5", scrollArea)}>
         <div className="mx-auto max-w-6xl">{body}</div>
       </div>
     </>
@@ -497,7 +497,7 @@ function RatesCard({ filter, by }: { filter: ResultsFilter; by: Grouping }) {
             </p>
           )}
           <LineChart xs={xs} lines={lines} format={(v) => pct(v)} label={`${metric === "mention" ? "Named you" : "Linked to your site"} per check, one line per ${by === "surface" ? "AI app" : "AI app and model"}`} />
-          <ul aria-label="AI apps, with each one's latest value. Open one for its detail." className="-mx-1.5 space-y-0.5 self-start text-xs lg:max-h-60 lg:overflow-y-auto">
+          <ul aria-label="AI apps, with each one's latest value. Open one for its detail." className={cx("-mx-1.5 space-y-0.5 self-start text-xs lg:max-h-60", scrollArea)}>
             {lines.map((l) => (
               <li key={l.key}>
                 <button type="button" onClick={() => openEngine(l.series)} title={`${l.models.length ? `${l.models.join(", ")}. ` : ""}Open ${l.label}`} className="flex w-full items-start gap-2 rounded-control px-1.5 py-1.5 text-left hover:bg-subtle md:py-1">

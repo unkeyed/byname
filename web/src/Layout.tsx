@@ -10,7 +10,7 @@ import { EngineDrawer } from "./pages/results/EngineDrawer";
 import { useView } from "./view";
 import { nav } from "./nav";
 import { useTheme, type ThemeMode } from "./theme";
-import { Avatar, Button, buttonClass, Crumbs, cx, EmptyState, ErrorNote, Icon, LoadBoundary, Logo, NavMenu, PageHeader, Spinner, useModal, useWide, type IconName } from "./ui";
+import { Avatar, Button, buttonClass, Crumbs, cx, EmptyState, ErrorNote, Icon, LoadBoundary, Logo, NavMenu, PageHeader, scrollArea, Spinner, useModal, useWide, type IconName } from "./ui";
 
 const themes: { mode: ThemeMode; icon: IconName; label: string }[] = [
   { mode: "system", icon: "monitor", label: "System theme" },
@@ -233,7 +233,7 @@ export function NotFound({
   return (
     <>
       <PageHeader title={parent ? <Crumbs parent={parent.label} to={parent.to} current="Not found" /> : "Not found"} />
-      <div className="relative min-h-0 flex-1 overflow-auto px-4 py-16">
+      <div className={cx("relative min-h-0 flex-1 px-4 py-16", scrollArea)}>
         <div className="mx-auto max-w-md">
           <EmptyState
             icon="search"

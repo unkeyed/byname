@@ -1,6 +1,6 @@
 import type { Day, SearchDay } from "../../api";
 import { LineChart, LineKey, niceTicks, type ChartMarker } from "../../charts";
-import { ScrollX } from "../../ui";
+import { cx, scrollArea, ScrollX } from "../../ui";
 import { compact, count, ctr, day, figureInfo, fillDays, longDay, position } from "./model";
 
 type Measure = "clicks" | "impressions";
@@ -88,7 +88,7 @@ export function DailyChart({
       )}
       <details className="text-xs">
         <summary className="cursor-pointer py-3.5 text-muted hover:text-fg md:py-0">Show as a table</summary>
-        <div className="mt-2 max-h-72 overflow-y-auto">
+        <div className={cx("mt-2 max-h-72", scrollArea)}>
           <ScrollX label="daily table">
             <table className="w-full min-w-max text-left tabular-nums">
               <thead className="sticky top-0 bg-surface text-muted">

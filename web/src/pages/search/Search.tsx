@@ -3,7 +3,7 @@ import { Link } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import { api, type GscStatus, type SearchPeriod } from "../../api";
 import { keys, useGsc, useMe } from "../../queries";
-import { buttonClass, Card, CardHeader, cx, EmptyState, ErrorNote, Icon, Pending, RelativeTime, Spinner, useLoading } from "../../ui";
+import { buttonClass, Card, CardHeader, cx, EmptyState, ErrorNote, Icon, Pending, RelativeTime, scrollArea, Spinner, useLoading } from "../../ui";
 import { useView } from "../../view";
 import { Segmented, ViewHeader } from "../results/Header";
 import { BrandCard } from "./BrandCard";
@@ -35,7 +35,7 @@ export function Search() {
         range={false}
         scope={false}
       />
-      <div className="relative min-h-0 flex-1 overflow-auto px-3 py-4 md:px-5 md:py-5">
+      <div className={cx("relative min-h-0 flex-1 px-3 py-4 md:px-5 md:py-5", scrollArea)}>
         <div className="mx-auto max-w-6xl">{body}</div>
       </div>
     </>

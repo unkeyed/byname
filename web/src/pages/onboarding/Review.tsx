@@ -213,8 +213,7 @@ function PairsTable({
             <th className={th}>Asked through</th>
             <th className={th}>Accuracy</th>
             <th className={th}>Test</th>
-            <th className={`${th} text-right`}>A check</th>
-            <th className={`${th} text-right`}>A month</th>
+            <th className={`${th} text-right`}>Cost</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-line">
@@ -244,16 +243,16 @@ function PairsTable({
                     <span className="text-danger">Failed</span>
                   )}
                 </td>
-                {r.cost_usd != null ? (
-                  <>
-                    <td className={`${td} text-right whitespace-nowrap tabular-nums`}>{money(r.cost_usd)}</td>
-                    <td className={`${td} text-right whitespace-nowrap tabular-nums`}>{money(r.cost_usd * checksPerMonth)}</td>
-                  </>
-                ) : (
-                  <td colSpan={2} className={`${td} text-right text-muted`}>
-                    No price yet
-                  </td>
-                )}
+                <td className={`${td} text-right whitespace-nowrap tabular-nums`}>
+                  {r.cost_usd != null ? (
+                    <>
+                      {money(r.cost_usd)} a check
+                      <span className="block text-xs text-muted">{money(r.cost_usd * checksPerMonth)} a month</span>
+                    </>
+                  ) : (
+                    <span className="text-muted">No price yet</span>
+                  )}
+                </td>
               </tr>
             );
           })}

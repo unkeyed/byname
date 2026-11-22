@@ -4,7 +4,7 @@ import { shortDay, useLabels } from "../../lines";
 import { keys, useAnsweredRuns, useSettings, useSurfaces } from "../../queries";
 import { nextCheckDay } from "../../checks";
 import { Link } from "react-router";
-import { buttonClass, Card, CardHeader, cx, EmptyState, ErrorNote, Icon, Pending, selectClass, useLoading } from "../../ui";
+import { buttonClass, Card, CardHeader, cx, EmptyState, ErrorNote, Icon, Pending, scrollArea, selectClass, useLoading } from "../../ui";
 import { runTime, useView } from "../../view";
 import { Segmented, ViewHeader } from "./Header";
 import { outcomeMark } from "./QuestionsTable";
@@ -230,7 +230,7 @@ export function Compare() {
         range={false}
         scope={false}
       />
-      <div className="relative min-h-0 flex-1 overflow-auto px-3 py-4 md:px-5 md:py-5">
+      <div className={cx("relative min-h-0 flex-1 px-3 py-4 md:px-5 md:py-5", scrollArea)}>
         <div className="mx-auto max-w-6xl">{body}</div>
       </div>
     </>
