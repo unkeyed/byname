@@ -412,7 +412,7 @@ function TregToken({ needed, onNoTreg, canEdit }: { needed: boolean; onNoTreg: (
           <CredentialForm kind="treg" title="Treg" set={!!treg?.set} org={treg?.org} compact onDone={() => setReplacing(false)} onCancel={treg?.set ? () => setReplacing(false) : undefined} />
         )
       ) : (
-        <p className="text-xs text-muted">An admin pastes the Treg token, here or under Settings &gt; Credentials.</p>
+        <p className="text-xs text-muted">An admin pastes the Treg token, here or under Settings &gt; Treg.</p>
       )}
     </Card>
   );
@@ -763,13 +763,13 @@ function RoutePicker({ s, draft, canEdit, onChange }: { s: Surface; draft: Draft
       ) : admin ? (
         cred?.set ? (
           <p className="text-xs text-muted">
-            The {cred.title} key is saved. Replace or test it under Settings &gt; Credentials.
+            The {cred.title} key is saved. Replace or test it under Settings &gt; Provider keys.
           </p>
         ) : (
           <CredentialForm kind={opt.credential} title={cred?.title ?? opt.provider} hint={cred?.hint} set={false} compact />
         )
       ) : (
-        <p className="text-xs text-muted">This route calls with the {opt.provider || routeInfo[draft.route].title} key. An admin must set it under Settings &gt; Credentials.</p>
+        <p className="text-xs text-muted">This route calls with the {opt.provider || routeInfo[draft.route].title} key. An admin must set it under Settings &gt; Provider keys.</p>
       )}
     </>
   );

@@ -246,7 +246,7 @@ func TestEmailChannels(t *testing.T) {
 			e.channel(t, notify.ChannelInput{Name: "Resend", Kind: notify.EmailAPI, Events: []notify.Kind{notify.SpendCapReached},
 				Settings: obj(map[string]any{"from": "alerts@northwind.example", "to": []string{"ops@northwind.example"}}),
 				Secrets:  obj(map[string]string{"api_key": "re_secret"})})
-			ev := notify.Event{Subject: "run/9", Payload: notify.SpendCapReachedPayload{RunID: 9, SpendUSD: 5.01, Message: "stopped queueing calls at $5.0100, the spend cap per check is $5.00"}}
+			ev := notify.Event{Subject: "run/9", Payload: notify.SpendCapReachedPayload{RunID: 9, SpendUSD: 5.01, Message: "stopped asking questions at $5.0100; the spend cap for one check is $5.00"}}
 			if err := e.notify.Emit(ctx, ev); err != nil {
 				t.Fatal(err)
 			}
@@ -264,7 +264,7 @@ func TestEmailChannels(t *testing.T) {
 			}
 			m := mail[0]
 			if m.User != "alerts" || m.TLS != (mode != notifytest.Plain) || m.From != "alerts@northwind.example" || len(m.To) != 2 ||
-				m.Subject != "Check #9 reached its spend cap" || !strings.Contains(m.Body, "the spend cap per check is $5.00") ||
+				m.Subject != "Check #9 reached its spend cap" || !strings.Contains(m.Body, "the spend cap for one check is $5.00") ||
 				!strings.Contains(m.Body, "https://byname.example/settings/checks") {
 				t.Fatalf("mail = %+v", m)
 			}

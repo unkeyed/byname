@@ -22,14 +22,14 @@ const origin = "https://byname.dev";
 // The sidebar, in reading order. Every .md under docs/ must appear here.
 const sections = [
   { title: "Get started", pages: ["self-hosting", "deploy-unkey", "configuration", "sign-in"] },
-  { title: "Where people ask", pages: ["engines/surfaces", "engines/treg", "engines/scraping-providers", "engines/model-providers", "engines/gateways"] },
+  { title: "AI apps", pages: ["engines/surfaces", "scores", "engines/treg", "engines/scraping-providers", "engines/model-providers", "engines/gateways"] },
   { title: "Connect", pages: ["search-console", "agents", "notifications", "changes", "social"] },
 ];
 const navLabels = {
   "self-hosting": "Self-host",
   "deploy-unkey": "Deploy on Unkey",
   agents: "Agents",
-  "engines/surfaces": "Surfaces and fidelity",
+  "engines/surfaces": "AI apps and accuracy labels",
 };
 
 const escape = (s) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
@@ -182,7 +182,7 @@ const footer = `<footer class="foot">
     </ul></nav>
     <nav aria-labelledby="f-docs"><h2 id="f-docs">Docs</h2><ul>
       <li><a href="/docs/self-hosting">Self-host</a></li>
-      <li><a href="/docs/engines/surfaces">Surfaces and fidelity</a></li>
+      <li><a href="/docs/engines/surfaces">AI apps and accuracy labels</a></li>
       <li><a href="/docs/search-console">Search Console</a></li>
       <li><a href="/docs/agents">Agents</a></li>
       <li><a href="/docs/notifications">Notifications</a></li>

@@ -36,7 +36,7 @@ const actorKey = "actor"
 // so a client can tell which tools its connection may call.
 const ScopeMeta = "byname.dev/scope"
 
-const instructions = `Byname tracks how this team's brand shows up in AI answers and in Google Search Console. It asks a fixed panel of questions on surfaces (the places people ask, such as the ChatGPT app or Claude Code), each with one or more models; a surface and model pair is a series with its own fidelity label (app, model_match or approximation), and series are never averaged together. A run asks every question on every pair. Start with list_runs, then compare_runs for what was gained or lost, gaps for questions where you were not named, and question_history for one question over time. Mentions (your name in the text) and citations (a link to your domains) are separate. Each tool's _meta names the scope it needs ("byname.dev/scope"); a tool your connection lacks the scope for fails, and the person who approved this connection can reconnect it with more.`
+const instructions = `Byname tracks how this team's brand shows up in AI answers and in Google Search Console. It asks a fixed panel of questions in AI apps (the places people ask, such as the ChatGPT app or Claude Code, which the API calls surfaces), each with one or more models; an AI app and model is a line with its own accuracy label (fidelity: app, model_match or approximation), and lines are never averaged together. A check (a run in the API) asks every question in every AI app and model. Start with list_runs, then compare_runs for what was gained or lost, gaps for missed questions, where you were not named, and question_history for one question over time. Naming you (your name in the text, a mention) and linking to your site (a link to your domains, a citation) are separate. Each tool's _meta names the scope it needs ("byname.dev/scope"); a tool your connection lacks the scope for fails, and the person who approved this connection can reconnect it with more.`
 
 // AccessTokens verifies the OAuth access tokens /mcp accepts:
 // auth.OAuthServer in production.
@@ -181,7 +181,7 @@ func addTools(srv *mcp.Server, svc app.Services) {
 			return svc.Instance.Status(ctx)
 		})
 	addTool(srv, core.ResultsRead, &mcp.Tool{Name: "get_costs", Annotations: readOnly(),
-		Description: "What Byname costs, in US dollars: the estimated cost of one answer on each surface, of one check, of a month of checks at the schedule and of social searches at their settings (Treg networks, and Bluesky, which is free), and what this month has spent against the monthly spend cap. GET /v1/costs."},
+		Description: "What Byname costs, in US dollars: the estimated cost of one answer in each AI app, of one check, of a month of checks at the schedule and of social searches at their settings (Treg networks, and Bluesky, which is free), and what this month has spent against the monthly spend cap. GET /v1/costs."},
 		func(ctx context.Context, _ core.Actor, _ noInput) (instance.Costs, error) {
 			return svc.Instance.Costs(ctx)
 		})

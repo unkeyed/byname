@@ -62,11 +62,11 @@ type updateBrandInput struct {
 }
 
 type surfaceKey struct {
-	Surface engines.Surface `json:"surface" jsonschema:"a surface key from list_surfaces, such as claude_code"`
+	Surface engines.Surface `json:"surface" jsonschema:"an AI app's key (surface) from list_surfaces, such as claude_code"`
 }
 
 type surfaceModelsInput struct {
-	Surface engines.Surface `json:"surface" jsonschema:"a surface key from list_surfaces, such as claude_code"`
+	Surface engines.Surface `json:"surface" jsonschema:"an AI app's key (surface) from list_surfaces, such as claude_code"`
 	config.ModelsQuery
 }
 
@@ -80,37 +80,37 @@ type stepInput struct {
 }
 
 type updateSurfaceInput struct {
-	Surface engines.Surface `json:"surface" jsonschema:"a surface key from list_surfaces, such as claude_code"`
+	Surface engines.Surface `json:"surface" jsonschema:"an AI app's key (surface) from list_surfaces, such as claude_code"`
 	config.SurfaceInput
 }
 
 type scopedInput struct {
-	Since *time.Time `json:"since,omitempty" jsonschema:"only runs started at or after this RFC 3339 time; omit for all time"`
+	Since *time.Time `json:"since,omitempty" jsonschema:"only checks started at or after this RFC 3339 time; omit for all time"`
 	results.Scope
 }
 
 type linesInput struct {
 	scopedInput
-	By results.Grouping `json:"by,omitempty" jsonschema:"pair (default): one line per surface and model pair; surface: one per surface, combining its models only where they share an endpoint and fidelity"`
+	By results.Grouping `json:"by,omitempty" jsonschema:"pair (default): one line per AI app and model; surface: one per AI app, combining its models only where they share an endpoint and accuracy label"`
 }
 
 type runQuestionsInput struct {
-	ID int64 `json:"id" jsonschema:"the run's id"`
+	ID int64 `json:"id" jsonschema:"the check's id"`
 	results.Scope
 }
 
 type compareInput struct {
-	Before int64 `json:"before" jsonschema:"the earlier run's id"`
-	After  int64 `json:"after" jsonschema:"the later run's id"`
+	Before int64 `json:"before" jsonschema:"the earlier check's id"`
+	After  int64 `json:"after" jsonschema:"the later check's id"`
 }
 
 type historyInput struct {
 	QuestionID int64      `json:"question_id"`
-	Since      *time.Time `json:"since,omitempty" jsonschema:"only runs started at or after this RFC 3339 time; omit for all time"`
+	Since      *time.Time `json:"since,omitempty" jsonschema:"only checks started at or after this RFC 3339 time; omit for all time"`
 }
 
 type gapsInput struct {
-	RunID int64 `json:"run_id,omitempty" jsonschema:"omit for the latest run with answers on the pairs in scope"`
+	RunID int64 `json:"run_id,omitempty" jsonschema:"omit for the latest check with answers from the AI apps and models in scope"`
 	results.Scope
 }
 
@@ -120,13 +120,13 @@ type limitInput struct {
 
 type runNowResult struct {
 	checks.Run
-	Created bool `json:"created" jsonschema:"false when a run was already queued or running and is returned instead"`
+	Created bool `json:"created" jsonschema:"false when a check was already queued or running and is returned instead"`
 }
 
 func addConfigTools(srv *mcp.Server, svc app.Services) {
 	c := svc.Config
 	addTool(srv, core.ResultsRead, &mcp.Tool{Name: "get_settings", Annotations: readOnly(),
-		Description: "The instance's settings: your brand, market, language, schedule (with the next and last check), spend caps and run limits. GET /v1/settings."},
+		Description: "The instance's settings: your brand, market, language, schedule (with the next and last check), spend caps and check limits. GET /v1/settings."},
 		func(ctx context.Context, _ core.Actor, _ noInput) (config.SettingsView, error) {
 			return c.Settings(ctx)
 		})
@@ -181,24 +181,24 @@ func addConfigTools(srv *mcp.Server, svc app.Services) {
 		})
 
 	addTool(srv, core.ResultsRead, &mcp.Tool{Name: "list_surfaces", Annotations: readOnly(),
-		Description: "Every surface Byname can ask on: its current route (Treg, a scraping provider's own key, a direct provider key, or a gateway) and endpoint, the routes it can take with the fidelity each gives, whether it is on, and its surface and model pairs with their last test. GET /v1/surfaces."},
+		Description: "Every AI app Byname can ask: its current route (Treg, a scraping provider's own key, a direct provider key, or a gateway) and endpoint, the routes it can take with the accuracy label (fidelity) each gives, whether it is on, and its models with their last test. GET /v1/surfaces."},
 		func(ctx context.Context, _ core.Actor, _ noInput) (surfaceList, error) {
 			v, err := c.Surfaces(ctx)
 			return surfaceList{v}, err
 		})
 	addTool(srv, core.ConfigWrite, &mcp.Tool{Name: "update_surface", Annotations: mutates(false, true),
-		Description: "Turn a surface on or off, move it to another route, and, when models is given, set its models (each checked against the route's live list). App surfaces read by Treg or a scraping key take no models; on a provider or gateway route they need one. Moving route resets each pair's test. Keys are set by an admin in the UI. PUT /v1/surfaces/{key}."},
+		Description: "Turn an AI app on or off, move it to another route, and, when models is given, set its models (each checked against the route's live list). Apps read by Treg or a scraping key take no models; on a provider or gateway route they need one. Moving route resets each model's test. Keys are set by an admin in the UI. PUT /v1/surfaces/{key}."},
 		func(ctx context.Context, _ core.Actor, in updateSurfaceInput) (config.Surface, error) {
 			return c.PutSurface(ctx, in.Surface, in.SurfaceInput)
 		})
 	addTool(srv, core.ResultsRead, &mcp.Tool{Name: "list_surface_models", Annotations: readOnly(),
-		Description: "A surface's live model list on its current route, or on another route given in route, read for free. GET /v1/surfaces/{key}/models."},
+		Description: "An AI app's live model list on its current route, or on another route given in route, read for free. GET /v1/surfaces/{key}/models."},
 		func(ctx context.Context, _ core.Actor, in surfaceModelsInput) (modelList, error) {
 			v, err := c.LiveModels(ctx, in.Surface, in.ModelsQuery)
 			return modelList{v}, err
 		})
 	addTool(srv, core.ResultsRead, &mcp.Tool{Name: "get_onboarding", Annotations: readOnly(),
-		Description: "How far onboarding has come: each step and whether it is saved, when it was finished, and what still blocks finishing. GET /v1/onboarding."},
+		Description: "How far onboarding has come: each step and whether it is saved, when it was finished, what still blocks finishing, and the scheduled check finishing now would set. GET /v1/onboarding."},
 		func(ctx context.Context, _ core.Actor, _ noInput) (config.Onboarding, error) {
 			return c.Onboarding(ctx)
 		})
@@ -208,17 +208,17 @@ func addConfigTools(srv *mcp.Server, svc app.Services) {
 			return c.SaveStep(ctx, in.Step)
 		})
 	addTool(srv, core.ConfigWrite, &mcp.Tool{Name: "finish_onboarding", Annotations: mutates(false, true),
-		Description: "Finish onboarding once the required steps are saved and every enabled pair has passed test_pair. Sets the first scheduled check, and with no monthly spend cap set, a cap of three times the monthly estimate (at least $5); queue a check now with run_now. POST /v1/onboarding/finish."},
+		Description: "Finish onboarding once the required steps are saved and every AI app and model turned on has passed test_pair. Sets the first scheduled check, and with no monthly spend cap set, a cap of three times the monthly estimate (at least $5); queue a check now with run_now. POST /v1/onboarding/finish."},
 		func(ctx context.Context, _ core.Actor, _ noInput) (config.Onboarding, error) {
 			return svc.Instance.FinishOnboarding(ctx)
 		})
 	addTool(srv, core.ConfigWrite, &mcp.Tool{Name: "test_pair", Annotations: &mcp.ToolAnnotations{DestructiveHint: new(false), IdempotentHint: true, OpenWorldHint: new(true)},
-		Description: "Make one short paid call for a surface and model pair through its route. Reports the status, the reported cost, whether it searched and cited, and sets the pair's fidelity from what it showed. POST /v1/pairs/{id}/test."},
+		Description: "Make one short paid call for an AI app and model through its route. Reports the status, the reported cost, whether it searched and linked to sources, and sets its accuracy label (fidelity) from what it showed. POST /v1/pairs/{id}/test."},
 		func(ctx context.Context, _ core.Actor, in byID) (config.PairTest, error) {
 			return c.TestPair(ctx, in.ID)
 		})
 	addTool(srv, core.ResultsRead, &mcp.Tool{Name: "estimate_cost", Annotations: readOnly(),
-		Description: "The estimated cost of one check: calls (questions times enabled pairs) and each pair's cost per call from its endpoint's past answers or the sampled cost, with pairs that have neither counted as unknown. GET /v1/estimate."},
+		Description: "The estimated cost of one check: calls (questions times each AI app and model turned on) and each one's cost per call from its endpoint's past answers or the sampled cost, with those that have neither counted as unknown. GET /v1/estimate."},
 		func(ctx context.Context, _ core.Actor, _ noInput) (config.Estimate, error) {
 			return c.Estimate(ctx)
 		})
@@ -234,7 +234,7 @@ func addConfigTools(srv *mcp.Server, svc app.Services) {
 		})
 
 	addTool(srv, core.RunsWrite, &mcp.Tool{Name: "run_now", Annotations: &mcp.ToolAnnotations{DestructiveHint: new(false), IdempotentHint: true, OpenWorldHint: new(true)},
-		Description: "Queue an AI check now without moving the schedule. It runs in the background and spends Treg credit; follow it with get_run. When a run is already queued or running, that run is returned. POST /v1/runs."},
+		Description: "Queue an AI check now without moving the schedule. It runs in the background and spends Treg credit; follow it with get_run. When a check is already queued or running, that check is returned. POST /v1/runs."},
 		func(ctx context.Context, _ core.Actor, _ noInput) (runNowResult, error) {
 			run, created, err := svc.Checks.RunNow(ctx)
 			return runNowResult{run, created}, err
@@ -254,63 +254,63 @@ func addConfigTools(srv *mcp.Server, svc app.Services) {
 func addResultTools(srv *mcp.Server, svc app.Services) {
 	r := svc.Results
 	addTool(srv, core.ResultsRead, &mcp.Tool{Name: "list_runs", Annotations: readOnly(),
-		Description: "Runs newest first, with status, spend, calls with no reported cost, how many answers named you, and success rate per endpoint. GET /v1/runs."},
+		Description: "Checks newest first, with status, spend, calls with no reported cost, how many answers named you, and success rate per endpoint. GET /v1/runs."},
 		func(ctx context.Context, _ core.Actor, in results.RunsQuery) (runList, error) {
 			v, err := r.Runs(ctx, in)
 			return runList{v}, err
 		})
 	addTool(srv, core.ResultsRead, &mcp.Tool{Name: "get_run", Annotations: readOnly(),
-		Description: "One run by id. GET /v1/runs/{id}."},
+		Description: "One check by id. GET /v1/runs/{id}."},
 		func(ctx context.Context, _ core.Actor, in byID) (results.Run, error) { return r.Run(ctx, in.ID) })
 	addTool(srv, core.ResultsRead, &mcp.Tool{Name: "list_run_answers", Annotations: readOnly(),
-		Description: "A run's answers: each question and pair with whether it named or cited you, your position, the brands named and the cost. GET /v1/runs/{id}/answers."},
+		Description: "A check's answers: each question, AI app and model with whether it named you or linked to your site, your position, the brands named and the cost. GET /v1/runs/{id}/answers."},
 		func(ctx context.Context, _ core.Actor, in byID) (answerList, error) {
 			v, err := r.RunAnswers(ctx, in.ID)
 			return answerList{v}, err
 		})
 	addTool(srv, core.ResultsRead, &mcp.Tool{Name: "get_answer", Annotations: readOnly(),
-		Description: "One answer in full: its text, citations, the engine's own searches and the raw provider response. GET /v1/answers/{id}."},
+		Description: "One answer in full: its text, links (citations), the AI app's own searches and the raw provider response. GET /v1/answers/{id}."},
 		func(ctx context.Context, _ core.Actor, in byID) (results.Answer, error) { return r.Answer(ctx, in.ID) })
 	addTool(srv, core.ResultsRead, &mcp.Tool{Name: "compare_runs", Annotations: readOnly(),
-		Description: "Every question and pair gained, lost, moved or unchanged from one run to a later one, with counts and the net change. GET /v1/compare?before=&after=."},
+		Description: "Every question, AI app and model that started naming you (gained), stopped (lost), moved your position or stayed the same from one check to a later one, with counts and the net change. GET /v1/compare?before=&after=."},
 		func(ctx context.Context, _ core.Actor, in compareInput) (results.Comparison, error) {
 			return r.Compare(ctx, in.Before, in.After)
 		})
 	addTool(srv, core.ResultsRead, &mcp.Tool{Name: "question_history", Annotations: readOnly(),
-		Description: "One question's answers across runs, one series per pair, with a one-line change summary per run. GET /v1/questions/{id}/history."},
+		Description: "One question's answers across checks, one line per AI app and model, with a one-line change summary per check. GET /v1/questions/{id}/history."},
 		func(ctx context.Context, _ core.Actor, in historyInput) (results.History, error) {
 			return r.QuestionHistory(ctx, in.QuestionID, in.Since)
 		})
 	addTool(srv, core.ResultsRead, &mcp.Tool{Name: "run_questions", Annotations: readOnly(),
-		Description: "One run as the questions table: a row per question and a column per pair, each cell named, cited and position with its change since the previous run, and per row how many pairs named you and your best position. GET /v1/runs/{id}/questions."},
+		Description: "One check as the questions table: a row per question and a column per AI app and model, each cell named you, linked to your site and position with its change since the previous check, and per row how many named you and your best position. GET /v1/runs/{id}/questions."},
 		func(ctx context.Context, _ core.Actor, in runQuestionsInput) (results.QuestionTable, error) {
 			return r.RunQuestions(ctx, in.ID, in.Scope)
 		})
 	addTool(srv, core.ResultsRead, &mcp.Tool{Name: "mention_rates", Annotations: readOnly(),
-		Description: "Mention rate and citation rate per run for each line: one per pair, or per surface with by=surface. Filter by surface and model. GET /v1/metrics/rates."},
+		Description: "How often answers named you (mention_rate) and linked to your site (citation_rate), per check for each line: one per AI app and model, or per AI app with by=surface. Filter by AI app (surface) and model. GET /v1/metrics/rates."},
 		func(ctx context.Context, _ core.Actor, in linesInput) (rateList, error) {
 			v, err := r.Rates(ctx, in.Since, in.Scope, in.By)
 			return rateList{v}, err
 		})
 	addTool(srv, core.ResultsRead, &mcp.Tool{Name: "share_of_mentions", Annotations: readOnly(),
-		Description: "Each brand's share of mentions against your competitors, per run for each series. Technologies are left out. Filter by surface and model. GET /v1/metrics/share."},
+		Description: "Each brand's share of mentions against your competitors, per check for each line. Technologies are left out. Filter by AI app (surface) and model. GET /v1/metrics/share."},
 		func(ctx context.Context, _ core.Actor, in scopedInput) (shareList, error) {
 			v, err := r.Share(ctx, in.Since, in.Scope)
 			return shareList{v}, err
 		})
 	addTool(srv, core.ResultsRead, &mcp.Tool{Name: "results_summary", Annotations: readOnly(),
-		Description: "The headline per run: how many question and pair answers named or cited you out of those answered, and your share of brand mentions. Filter by surface and model. GET /v1/metrics/summary."},
+		Description: "The headline per check: how many answers named you or linked to your site out of those answered, and your share of mentions. Filter by AI app (surface) and model. GET /v1/metrics/summary."},
 		func(ctx context.Context, _ core.Actor, in scopedInput) (summaryList, error) {
 			v, err := r.Summary(ctx, in.Since, in.Scope)
 			return summaryList{v}, err
 		})
 	addTool(srv, core.ResultsRead, &mcp.Tool{Name: "competitors", Annotations: readOnly(),
-		Description: "Share of voice over the runs in range: each brand's mentions, share and rank, and how often each line's answers named each brand. Technologies are left out. GET /v1/metrics/competitors."},
+		Description: "Share of mentions over the checks in range: each brand's mentions, share and rank, and how often each line's answers named each brand. Technologies are left out. GET /v1/metrics/competitors."},
 		func(ctx context.Context, _ core.Actor, in linesInput) (results.Competitors, error) {
 			return r.Competitors(ctx, in.Since, in.Scope, in.By)
 		})
 	addTool(srv, core.ResultsRead, &mcp.Tool{Name: "gaps", Annotations: readOnly(),
-		Description: "Questions where at least one pair did not name you on a run, ranked by opportunity, with the competitors named instead and each pair's answer with the web searches its engine ran, where the endpoint exposes them. Filter by surface and model. GET /v1/gaps."},
+		Description: "Missed questions, where at least one AI app did not name you on a check, ranked by the share of AI apps that left you out and by search demand where Byname has a figure, with the competitors named instead and each AI app's answer with the web searches it ran, where the endpoint exposes them. Filter by AI app (surface) and model. GET /v1/gaps."},
 		func(ctx context.Context, _ core.Actor, in gapsInput) (results.Gaps, error) {
 			return r.Gaps(ctx, in.RunID, in.Scope)
 		})

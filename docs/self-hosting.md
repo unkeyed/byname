@@ -33,7 +33,7 @@ You need Docker with Compose v2.
 
    Open the link, enter your name and email, and register a passkey with your fingerprint, face or device PIN. You are the first user and an Admin. The link works once. [Sign-in](sign-in.md) covers providers, roles, two-factor and passwords.
 
-4. Finish onboarding. Byname opens it after you sign in. It asks for your brand and domain, competitors, questions, the AI apps to ask with a Treg token or your own keys, Search Console, social mentions, and the schedule and spend caps. The last step shows what a check and a month cost, and the monthly spend cap finishing sets. Nothing runs until you finish, and a test call for each surface and model pair must pass before you can.
+4. Finish onboarding. Byname opens it after you sign in. It asks for your brand and domain, competitors, questions, the AI apps to ask with a Treg token or your own keys, Search Console, social mentions, and the schedule and spend caps. The last step shows what a check and a month cost, and the monthly spend cap finishing sets. Nothing runs until you finish, and a test call for each AI app and model must pass before you can.
 
 Postgres keeps its data in the `db` volume that `docker-compose.yml` declares. `docker compose down` stops the stack and keeps the data. `docker compose down -v` also deletes the data.
 

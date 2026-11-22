@@ -438,7 +438,7 @@ func (s *Service) UpsertControlPage(ctx context.Context, in ControlInput) (Contr
 func (s *Service) DeleteControlPage(ctx context.Context, id int64) error {
 	tag, err := s.db.Exec(ctx, `DELETE FROM control_page WHERE id = $1`, id)
 	if err == nil && tag.RowsAffected() == 0 {
-		return fmt.Errorf("%w: no control page %d", core.ErrNotFound, id)
+		return fmt.Errorf("%w: no comparison page %d", core.ErrNotFound, id)
 	}
 	return err
 }

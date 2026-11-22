@@ -233,12 +233,13 @@ func (s *Service) storeRead(ctx context.Context, c Change, r Read) error {
 	})
 }
 
-// verdictDetail is the read in one line, for the alert.
+// verdictDetail is the read in one line, for the alert, with the figures
+// named as the change drawer names them.
 func verdictDetail(r Read) string {
 	if r.Deltas == nil {
-		return "Insufficient data: " + r.Reason + "."
+		return "Not enough data: " + r.Reason + "."
 	}
 	d := r.Deltas
-	return fmt.Sprintf("Against %d control pages over %d days: position %+.1f, CTR %+.2f points, impressions ×%.2f.",
+	return fmt.Sprintf("Compared with %d comparison pages over %d days: average position %+.1f places (negative is better), click rate %+.2f points, appearances ×%.2f (above 1 means the page gained on them).",
 		len(r.Controls), r.After.Days, d.Position, d.CTRPoints, d.ImpressionsRatio)
 }

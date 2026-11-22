@@ -349,14 +349,6 @@ function Rules({ r }: { r: RepoStatus }) {
 type ReadKey = keyof ChangeSettings;
 const readKeys: ReadKey[] = ["interim_days", "verdict_days", "position", "ctr_points", "impressions_ratio"];
 
-const readLabels: Record<ReadKey, string> = {
-  interim_days: "First result",
-  verdict_days: "Final result",
-  position: "Average position",
-  ctr_points: "Click rate",
-  impressions_ratio: "Appearances",
-};
-
 const readHints: Record<ReadKey, string> = {
   interim_days: "An early look, marked as early.",
   verdict_days: "Whether the change helped. Later than the first result.",
@@ -416,7 +408,6 @@ function ReadSettingsForm({ initial }: { initial: ChangeSettings }) {
               setValues({ ...values, [k]: val });
             }}
             error={tried || values[k] !== formatNumber(initial[k]) ? errors[k] : undefined}
-            label={readLabels[k]}
             hint={readHints[k]}
           />
         ))}

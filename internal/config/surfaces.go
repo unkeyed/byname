@@ -282,7 +282,7 @@ func (s *Service) PutSurface(ctx context.Context, key engines.Surface, in Surfac
 		var id int64
 		err := s.db.QueryRow(ctx, `SELECT id FROM credential WHERE kind = $1`, rs.Credential()).Scan(&id)
 		if err == pgx.ErrNoRows {
-			return Surface{}, fmt.Errorf("%w: the %s route needs a %s key; an admin sets it under Settings > Credentials", core.ErrInvalid, route, credentialTitle(rs.Credential()))
+			return Surface{}, fmt.Errorf("%w: the %s route needs a %s key; an admin sets it under Settings > Provider keys", core.ErrInvalid, route, credentialTitle(rs.Credential()))
 		}
 		if err != nil {
 			return Surface{}, err

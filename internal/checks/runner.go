@@ -187,11 +187,11 @@ func (s *Service) plan(ctx context.Context, runID, setID int64) (plan, *outcome,
 func (s *Service) overBudget(p plan, out *outcome) bool {
 	spent := out.spentSoFar()
 	if spent >= p.settings.SpendCapRunUSD {
-		out.stop(Capped, fmt.Sprintf("stopped queueing calls at $%.4f, the spend cap per check is $%.2f", spent, p.settings.SpendCapRunUSD), "")
+		out.stop(Capped, fmt.Sprintf("stopped asking questions at $%.4f; the spend cap for one check is $%.2f", spent, p.settings.SpendCapRunUSD), "")
 		return true
 	}
 	if month := p.settings.SpendCapMonthUSD; month != nil && p.monthBase+spent >= *month {
-		out.stop(Capped, fmt.Sprintf("this month's checks and social searches have spent $%.4f, the monthly spend cap is $%.2f", p.monthBase+spent, *month), "")
+		out.stop(Capped, fmt.Sprintf("stopped asking questions: checks and social searches have spent $%.4f this month; the monthly spend cap is $%.2f", p.monthBase+spent, *month), "")
 		return true
 	}
 	return false

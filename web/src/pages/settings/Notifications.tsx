@@ -405,8 +405,8 @@ function DeliveryLog() {
 }
 
 /**
- * Picks which channels get alerts, for onboarding step 6: each channel with
- * an on switch, and Add channel. With none, alerts are in the app only.
+ * Picks the places alerts go, for onboarding's schedule step: each place
+ * with an on switch, and Add a place. With none, alerts are in the app only.
  * Admin only, like Settings > Alerts, which manages them later.
  */
 export function ChannelPicker() {
@@ -431,9 +431,9 @@ function PickerBody() {
   return (
     <div className="space-y-2">
       {channels.length === 0 ? (
-        <p className="text-sm text-muted">No channels yet, so alerts show in the app only.</p>
+        <p className="text-sm text-muted">No places added yet, so alerts show in the app only.</p>
       ) : (
-        <ul aria-label="Alert channels" className="space-y-1.5">
+        <ul aria-label="Where alerts go" className="space-y-1.5">
           {channels.map((c) => (
             <li key={c.id}>
               <label className="flex items-start gap-2 text-sm">
@@ -450,9 +450,9 @@ function PickerBody() {
       <ErrorNote error={toggle.error} />
       <Button size="sm" onClick={() => setAdding(true)}>
         <Icon name="plus" className="size-3.5" />
-        Add channel
+        Add a place
       </Button>
-      <Dialog open={adding} onClose={() => setAdding(false)} title="Add a channel" wide>
+      <Dialog open={adding} onClose={() => setAdding(false)} title="Add a place to send alerts" wide>
         {adding && <ChannelForm events={events} onDone={() => setAdding(false)} />}
       </Dialog>
     </div>

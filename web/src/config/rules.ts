@@ -202,11 +202,11 @@ export const numberFields = {
   retries: { label: "Retries", unit: "per call", min: 0, max: 3, int: true },
   timeout_s: { label: "Timeout", unit: "seconds per call", min: 30, max: 600, int: true },
   raw_retention_days: { label: "Keep raw responses for", unit: "days", min: 1, int: true, optional: true },
-  interim_days: { label: "Interim read", unit: "days after the first crawl", min: 7, max: 90, int: true },
-  verdict_days: { label: "Final read", unit: "days after the first crawl", min: 14, max: 180, int: true },
-  position: { label: "Position", unit: "places", above: 0, max: 50 },
-  ctr_points: { label: "CTR", unit: "percentage points", above: 0, max: 50 },
-  impressions_ratio: { label: "Impressions", unit: "times, against the controls", above: 1, max: 100 },
+  interim_days: { label: "First result", unit: "days after Google saw the change", min: 7, max: 90, int: true },
+  verdict_days: { label: "Final result", unit: "days after Google saw the change", min: 14, max: 180, int: true },
+  position: { label: "Average position", unit: "places", above: 0, max: 50 },
+  ctr_points: { label: "Click rate", unit: "percentage points", above: 0, max: 50 },
+  impressions_ratio: { label: "Appearances", unit: "times, against the comparison pages", above: 1, max: 100 },
 } satisfies Record<string, NumberRule>;
 
 interface NumberRule {

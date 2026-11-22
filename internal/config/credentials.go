@@ -50,6 +50,15 @@ func credentialTitle(kind engines.CredentialKind) string {
 	return string(kind)
 }
 
+// settingsPage is where an admin sets a key of kind: Treg has its own page,
+// every other key is under Provider keys.
+func settingsPage(kind engines.CredentialKind) string {
+	if kind == engines.CredentialTreg {
+		return "Treg"
+	}
+	return "Provider keys"
+}
+
 func parseCredentialKind(raw string) (engines.CredentialKind, error) {
 	k := engines.CredentialKind(raw)
 	if !slices.Contains(engines.CredentialKinds, k) {
@@ -213,7 +222,7 @@ func (s *Service) conn(ctx context.Context, kind engines.CredentialKind) (engine
 	var sealed, org string
 	err := s.db.QueryRow(ctx, `SELECT ciphertext, org FROM credential WHERE kind = $1`, kind).Scan(&sealed, &org)
 	if err == pgx.ErrNoRows {
-		return engines.Conn{}, fmt.Errorf("%w: no %s key is set; an admin sets it under Settings > Credentials", core.ErrInvalid, credentialTitle(kind))
+		return engines.Conn{}, fmt.Errorf("%w: no %s key is set; an admin sets it under Settings > %s", core.ErrInvalid, credentialTitle(kind), settingsPage(kind))
 	}
 	if err != nil {
 		return engines.Conn{}, err

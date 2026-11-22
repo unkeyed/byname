@@ -37,15 +37,15 @@ func addSearchTools(srv *mcp.Server, svc app.Services) {
 		Description: "Whether Search Console is connected, the property synced, the last sync and its error, the latest day Google has finalized and the partial days the next sync overwrites. Never the credential. GET /v1/gsc."},
 		func(ctx context.Context, _ core.Actor, _ noInput) (gsc.Status, error) { return svc.GSC.Status(ctx) })
 	addTool(srv, core.ResultsRead, &mcp.Tool{Name: "search_summary", Annotations: readOnly(),
-		Description: "The Search Console headline: clicks, impressions, CTR, position, and brand, non-brand and anonymized clicks over the latest 28 days ending on the latest final day, with the 28 days before for the trend. GET /v1/search/summary."},
+		Description: "The Search Console headline: clicks, appearances (impressions), click rate (CTR), average position, and clicks from searches with your name, without it (non-brand) and anonymized over the latest 28 days ending on the latest final day, with the 28 days before for the trend. GET /v1/search/summary."},
 		func(ctx context.Context, _ core.Actor, _ noInput) (gsc.Summary, error) { return svc.GSC.Summary(ctx) })
 	addTool(srv, core.ResultsRead, &mcp.Tool{Name: "search_daily", Annotations: readOnly(),
-		Description: "The site's Search Console clicks, impressions, CTR and position per day, partial days marked final false. Defaults to the 90 days ending on the latest day stored. GET /v1/search/daily."},
+		Description: "The site's Search Console clicks, appearances (impressions), click rate (CTR) and average position per day, partial days marked final false. Defaults to the 90 days ending on the latest day stored. GET /v1/search/daily."},
 		func(ctx context.Context, _ core.Actor, in gsc.Range) (gsc.DailySeries, error) {
 			return svc.GSC.Daily(ctx, in)
 		})
 	addTool(srv, core.ResultsRead, &mcp.Tool{Name: "search_brand_split", Annotations: readOnly(),
-		Description: "Brand against non-brand Search Console clicks over trailing 28-day windows, one per day, ending on final days only. Anonymized clicks are never non-brand. GET /v1/search/brand."},
+		Description: "Clicks from searches with your name against searches without it (non-brand) over trailing 28-day windows, one per day, ending on final days only. Anonymized clicks are never non-brand. GET /v1/search/brand."},
 		func(ctx context.Context, _ core.Actor, in gsc.Range) (gsc.BrandSeries, error) {
 			return svc.GSC.Brand(ctx, in)
 		})

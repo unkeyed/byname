@@ -110,8 +110,8 @@ func (s *Service) readiness(ctx context.Context) ([]string, error) {
 	}{
 		{brand, "your brand and domain"},
 		{questions, "at least one question"},
-		{pairs, "at least one surface where people ask, turned on with its models"},
-		{token, "the Treg token, which an admin sets under Settings > Credentials, or every surface on its own key or a gateway"},
+		{pairs, "at least one AI app, turned on with its models"},
+		{token, "the Treg token, which an admin sets under Settings > Treg, or every AI app on its own key or a gateway"},
 	} {
 		if !m.ok {
 			missing = append(missing, m.what)

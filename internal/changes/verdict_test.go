@@ -61,15 +61,15 @@ func TestAssess(t *testing.T) {
 		},
 		{
 			name: "insufficient: under a week", s: func() sample { s := sampleOf(flat, flat, flat, flat); s.after.Days, s.before.Days = 5, 5; return s }(),
-			want: InsufficientData, reason: "fewer than 7 final days since the first crawl",
+			want: InsufficientData, reason: "fewer than 7 days of final Google data since Google saw the change",
 		},
 		{
 			name: "insufficient: no controls", s: func() sample { s := sampleOf(flat, flat, flat, flat); s.controls = 0; return s }(),
-			want: InsufficientData, reason: "no control pages to compare against",
+			want: InsufficientData, reason: "no comparison pages to measure against",
 		},
 		{
 			name: "insufficient: page without impressions", s: sampleOf(side(0, 0, 0), flat, flat, flat),
-			want: InsufficientData, reason: "the page had no impressions in one of the windows",
+			want: InsufficientData, reason: "the page did not appear in Google results before or after the change",
 		},
 		{
 			name: "insufficient: history too short", s: func() sample { s := sampleOf(flat, flat, flat, flat); s.firstDay = "2026-09-10"; return s }(),

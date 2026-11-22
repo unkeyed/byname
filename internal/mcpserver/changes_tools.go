@@ -31,13 +31,13 @@ type rulesInput struct {
 // repo stays with a signed-in admin, so no tool sets or reads the token.
 func addChangeTools(srv *mcp.Server, svc app.Services) {
 	addTool(srv, core.ResultsRead, &mcp.Tool{Name: "list_changes", Annotations: readOnly(),
-		Description: "Every site change, the latest merge first: the page, the pull request or manual log, Google's first crawl after the merge, the interim and verdict days, the page's before-period numbers, and the interim and final difference-in-differences reads against the control pages. GET /v1/changes."},
+		Description: "Every site change, the latest merge first: the page, the pull request or manual log, when Google first saw the change after the merge (first crawl), when the first and final results fall (interim_on, verdict_on), the page's before-period numbers, and the first and final difference-in-differences results against the comparison pages. GET /v1/changes."},
 		func(ctx context.Context, _ core.Actor, _ noInput) (changeList, error) {
 			v, err := svc.Changes.List(ctx)
 			return changeList{v}, err
 		})
 	addTool(srv, core.ResultsRead, &mcp.Tool{Name: "get_change", Annotations: readOnly(),
-		Description: "One site change with its timeline (merge, URL inspections, first crawl, interim and verdict days) and the full reads. GET /v1/changes/{id}."},
+		Description: "One site change with its timeline (merge, URL inspections, when Google first saw it, the days of the first and final results) and the full results. GET /v1/changes/{id}."},
 		func(ctx context.Context, _ core.Actor, in byID) (changes.Detail, error) {
 			return svc.Changes.Get(ctx, in.ID)
 		})
@@ -48,12 +48,12 @@ func addChangeTools(srv *mcp.Server, svc app.Services) {
 			return markerList{v}, err
 		})
 	addTool(srv, core.ResultsRead, &mcp.Tool{Name: "change_settings", Annotations: readOnly(),
-		Description: "When a change's interim and final reads fall, in days after the first crawl, and the thresholds a move must pass against the control pages. GET /v1/changes/settings."},
+		Description: "When a change's first and final results fall, in days after Google first saw it, and the thresholds a move must pass against the comparison pages. GET /v1/changes/settings."},
 		func(ctx context.Context, _ core.Actor, _ noInput) (changes.Settings, error) {
 			return svc.Changes.Settings(ctx)
 		})
 	addTool(srv, core.ResultsRead, &mcp.Tool{Name: "list_control_pages", Annotations: readOnly(),
-		Description: "The control pages verdicts compare against, each with its hold date; a page past it is inactive and drops out of the control set. GET /v1/control-pages."},
+		Description: "The comparison pages, which the API calls control pages, that change results compare against, each with its hold date; a page past it is inactive and drops out of the comparison set. GET /v1/control-pages."},
 		func(ctx context.Context, _ core.Actor, _ noInput) (controlList, error) {
 			v, err := svc.Changes.ControlPages(ctx)
 			return controlList{v}, err
@@ -65,7 +65,7 @@ func addChangeTools(srv *mcp.Server, svc app.Services) {
 		})
 
 	addTool(srv, core.ConfigWrite, &mcp.Tool{Name: "log_change", Annotations: mutates(false, false),
-		Description: "Log a change to one page made outside GitHub, so recrawl watch and verdicts follow it. POST /v1/changes."},
+		Description: "Log a change to one page made outside GitHub, so recrawl watch and change results follow it. POST /v1/changes."},
 		func(ctx context.Context, _ core.Actor, in changes.ManualChange) (changes.Detail, error) {
 			return svc.Changes.LogChange(ctx, in)
 		})
@@ -75,17 +75,17 @@ func addChangeTools(srv *mcp.Server, svc app.Services) {
 			return deleted{in.ID}, svc.Changes.DeleteChange(ctx, in.ID)
 		})
 	addTool(srv, core.ConfigWrite, &mcp.Tool{Name: "update_change_settings", Annotations: mutates(false, true),
-		Description: "Replace the interim and verdict days and the thresholds. Changes already crawled keep their days. PUT /v1/changes/settings."},
+		Description: "Replace the days of the first and final results and the thresholds. Changes Google has already seen keep their days. PUT /v1/changes/settings."},
 		func(ctx context.Context, _ core.Actor, in changes.Settings) (changes.Settings, error) {
 			return svc.Changes.PutSettings(ctx, in)
 		})
 	addTool(srv, core.ConfigWrite, &mcp.Tool{Name: "upsert_control_page", Annotations: mutates(false, true),
-		Description: "Add a control page, or change the hold date and note of the one with the same URL. POST /v1/control-pages."},
+		Description: "Add a comparison page, or change the hold date and note of the one with the same URL. POST /v1/control-pages."},
 		func(ctx context.Context, _ core.Actor, in changes.ControlInput) (changes.ControlPage, error) {
 			return svc.Changes.UpsertControlPage(ctx, in)
 		})
 	addTool(srv, core.ConfigWrite, &mcp.Tool{Name: "delete_control_page", Annotations: mutates(true, true),
-		Description: "Remove a control page. DELETE /v1/control-pages/{id}."},
+		Description: "Remove a comparison page. DELETE /v1/control-pages/{id}."},
 		func(ctx context.Context, _ core.Actor, in byID) (deleted, error) {
 			return deleted{in.ID}, svc.Changes.DeleteControlPage(ctx, in.ID)
 		})

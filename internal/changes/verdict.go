@@ -180,15 +180,15 @@ func assess(s sample, t Thresholds) (Outcome, string, *Deltas, []Signal) {
 	b, a := s.before, s.after
 	switch {
 	case a.Days < minWindowDays:
-		return InsufficientData, "fewer than 7 final days since the first crawl", nil, []Signal{}
+		return InsufficientData, "fewer than 7 days of final Google data since Google saw the change", nil, []Signal{}
 	case s.firstDay == "" || b.From < s.firstDay:
 		return InsufficientData, "Search Console history does not reach back to " + b.From, nil, []Signal{}
 	case s.controls == 0:
-		return InsufficientData, "no control pages to compare against", nil, []Signal{}
+		return InsufficientData, "no comparison pages to measure against", nil, []Signal{}
 	case b.Page.Impressions == 0 || a.Page.Impressions == 0:
-		return InsufficientData, "the page had no impressions in one of the windows", nil, []Signal{}
+		return InsufficientData, "the page did not appear in Google results before or after the change", nil, []Signal{}
 	case b.Control.Impressions == 0 || a.Control.Impressions == 0:
-		return InsufficientData, "the control pages had no impressions in one of the windows", nil, []Signal{}
+		return InsufficientData, "the comparison pages did not appear in Google results before or after the change", nil, []Signal{}
 	}
 	d := &Deltas{
 		Position:  round((a.Page.Position - b.Page.Position) - (a.Control.Position - b.Control.Position)),
