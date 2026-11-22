@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api, type Cell, type Outcome, type QuestionRow, type ResultsFilter, type Run, type Series } from "../../api";
 import { fidelityInfo, shortDay, useLabels } from "../../lines";
 import { keys, useSurfaces } from "../../queries";
-import { cx, ErrorNote, Icon, inputClass, PageSpinner, ScrollX, selectClass, useWide } from "../../ui";
+import { cx, ErrorNote, Icon, inputClass, Pending, ScrollX, selectClass, useWide } from "../../ui";
 import { runTime, useView } from "../../view";
 
 /** Status marks always pair an icon with words, never colour alone. */
@@ -106,7 +106,7 @@ export function QuestionsTable({ run, filter }: { run: Run; filter: ResultsFilte
   const surfaces = useSurfaces();
   const labels = useLabels(surfaces.data);
   const table = useQuery({ queryKey: keys.questions(run.id, filter), queryFn: () => api.runs.questions(run.id, filter) });
-  if (table.isPending) return <PageSpinner />;
+  if (table.isPending) return <Pending />;
   if (table.isError) return <ErrorNote error={table.error} />;
   const { columns, rows, previous_run_id } = table.data;
 

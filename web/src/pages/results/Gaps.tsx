@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api, type Gap, type GapPair, type PageCheck, type ResultsFilter, type SourcePage } from "../../api";
 import { useLabels } from "../../lines";
 import { keys, useAnsweredRuns, useMe, useSettings, useSurfaces } from "../../queries";
-import { Badge, Button, Card, CardHeader, cx, EmptyState, ErrorNote, Icon, PageSpinner, ScrollX } from "../../ui";
+import { Badge, Button, Card, CardHeader, cx, EmptyState, ErrorNote, Icon, Pending, ScrollX, useLoading } from "../../ui";
 import { useFilter, useView } from "../../view";
 import { ViewHeader } from "./Header";
 import { Instead } from "./Prompts";
@@ -20,9 +20,10 @@ export function Gaps() {
   const { filter, ready } = useFilter();
   const tab = useTab(tabs);
   const brand = settings.data?.brand.name || "you";
+  useLoading(settings.isPending);
 
   let body;
-  if (runs.isPending || !ready) body = <PageSpinner />;
+  if (runs.isPending || !ready) body = <Pending />;
   else if (runs.isError) body = <ErrorNote error={runs.error} />;
   else if (!runs.data?.length)
     body = (
@@ -87,7 +88,7 @@ function PromptGaps({ filter }: { filter: ResultsFilter }) {
   const me = useMe();
   const canWrite = me.data?.scopes.includes("config:write") ?? false;
   const gaps = useQuery({ queryKey: keys.gaps(0, filter), queryFn: () => api.gaps(undefined, filter), placeholderData: (p) => p });
-  if (gaps.isPending) return <PageSpinner />;
+  if (gaps.isPending) return <Pending />;
   if (gaps.isError) return <ErrorNote error={gaps.error} />;
   const list = gaps.data.gaps;
   const hasDemand = list.some((g) => g.demand != null);
@@ -207,7 +208,7 @@ function CitedSources({ filter }: { filter: ResultsFilter }) {
   const view = useView();
   const [all, setAll] = useState(false);
   const sources = useQuery({ queryKey: keys.sources(filter), queryFn: () => api.sources(filter), placeholderData: (p) => p });
-  if (sources.isPending) return <PageSpinner />;
+  if (sources.isPending) return <Pending />;
   if (sources.isError) return <ErrorNote error={sources.error} />;
   const s = sources.data;
   if (s.citations === 0) return <Card className="px-4 py-10 text-center text-sm text-muted">No answer in this range cited a page.</Card>;

@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api, type Run, type RunStatus } from "../../api";
 import { pct, usd } from "../../lines";
 import { keys, useRuns, useSurfaces } from "../../queries";
-import { Badge, Card, cx, EmptyState, ErrorNote, Icon, PageSpinner, RelativeTime, type Tone } from "../../ui";
+import { Badge, Card, cx, EmptyState, ErrorNote, Icon, Pending, RelativeTime, type Tone } from "../../ui";
 import { runTime, useFilter } from "../../view";
 import { ViewHeader } from "./Header";
 import { RunNowButton, runStatus, RunStatusBadge, useCanRun } from "./RunNow";
@@ -133,7 +133,7 @@ export function Runs() {
   const shown = (runs.data ?? []).filter((r) => !filter.since || runTime(r) >= filter.since);
 
   let body;
-  if (runs.isPending) body = <PageSpinner />;
+  if (runs.isPending) body = <Pending />;
   else if (runs.isError) body = <ErrorNote error={runs.error} />;
   else if (runs.data.length === 0)
     body = (
@@ -183,7 +183,7 @@ export function Runs() {
 
 function Jobs() {
   const jobs = useQuery({ queryKey: keys.jobs, queryFn: () => api.jobs(20) });
-  if (jobs.isPending) return <PageSpinner />;
+  if (jobs.isPending) return <Pending />;
   if (jobs.isError) return <ErrorNote error={jobs.error} />;
   if (jobs.data.length === 0) return null;
   return (

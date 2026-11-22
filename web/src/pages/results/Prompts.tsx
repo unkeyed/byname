@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api, type AnswerSummary, type Dot, type DotState, type PromptRow, type ResultsFilter, type Run, type RunRef } from "../../api";
 import { fidelityInfo, shortDay, useLabels } from "../../lines";
 import { keys, useAnsweredRuns, useSettings, useSurfaces } from "../../queries";
-import { Badge, Card, cx, EmptyState, ErrorNote, inputClass, PageSpinner, ScrollX, selectClass, useWide } from "../../ui";
+import { Badge, Card, cx, EmptyState, ErrorNote, inputClass, Pending, ScrollX, selectClass, useLoading, useWide } from "../../ui";
 import { runTime, useFilter, useView } from "../../view";
 import { ViewHeader } from "./Header";
 import { CellMark } from "./QuestionsTable";
@@ -19,9 +19,10 @@ export function Prompts() {
   const { filter, ready } = useFilter();
   const tab = useTab(tabs);
   const brand = settings.data?.brand.name || "you";
+  useLoading(settings.isPending);
 
   let body;
-  if (runs.isPending || !ready) body = <PageSpinner />;
+  if (runs.isPending || !ready) body = <Pending />;
   else if (runs.isError) body = <ErrorNote error={runs.error} />;
   else if (!runs.data?.length)
     body = (
@@ -112,7 +113,7 @@ function PromptList({ filter }: { filter: ResultsFilter }) {
   const surfaces = useSurfaces();
   const labels = useLabels(surfaces.data);
   const prompts = useQuery({ queryKey: keys.prompts(filter), queryFn: () => api.prompts(filter), placeholderData: (p) => p });
-  if (prompts.isPending) return <PageSpinner />;
+  if (prompts.isPending) return <Pending />;
   if (prompts.isError) return <ErrorNote error={prompts.error} />;
   const { rows, runs, latest_run_id } = prompts.data;
   if (rows.length === 0) return <Card className="px-4 py-10 text-center text-sm text-muted">No answers in this range. Widen the date range to see the questions.</Card>;
@@ -228,7 +229,7 @@ function AnswerList({ run, filter }: { run: Run; filter: ResultsFilter }) {
   const surfaces = useSurfaces();
   const labels = useLabels(surfaces.data);
   const answers = useQuery({ queryKey: keys.answers(run.id), queryFn: () => api.runs.answers(run.id) });
-  if (answers.isPending) return <PageSpinner />;
+  if (answers.isPending) return <Pending />;
   if (answers.isError) return <ErrorNote error={answers.error} />;
   const search = view.get("search").toLowerCase();
   const shown = answers.data.filter(

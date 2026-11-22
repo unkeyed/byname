@@ -4,7 +4,7 @@ import { Link, useNavigate } from "react-router";
 import { api, type EstimateRow, type StepKey, type Surface } from "../../api";
 import { fidelityInfo, usd } from "../../lines";
 import { keys, useBrands, useOnboarding, useQuestions, useSettings, useSurfaces } from "../../queries";
-import { Badge, Button, buttonClass, Card, CardHeader, ErrorNote, Icon, PageSpinner, RelativeTime, ScrollX } from "../../ui";
+import { Badge, Button, buttonClass, Card, CardHeader, ErrorNote, Icon, Pending, RelativeTime, ScrollX } from "../../ui";
 import { FidelityBadge, routeInfo } from "../../config/WherePeopleAsk";
 import type { StepNav } from "./Onboarding";
 
@@ -58,7 +58,7 @@ export function Review({ nav }: { nav: StepNav }) {
     onError: () => qc.invalidateQueries({ queryKey: keys.onboarding }),
   });
 
-  if (settings.isPending || brands.isPending || questions.isPending || surfaces.isPending) return <PageSpinner />;
+  if (settings.isPending || brands.isPending || questions.isPending || surfaces.isPending) return <Pending />;
   const error = settings.error ?? brands.error ?? questions.error ?? surfaces.error;
   if (error || !settings.data || !brands.data || questions.data === undefined || !surfaces.data) return <ErrorNote error={error} />;
 
@@ -105,7 +105,7 @@ export function Review({ nav }: { nav: StepNav }) {
 
       <Card>
         {estimate.isPending ? (
-          <PageSpinner />
+          <Pending />
         ) : estimate.isError ? (
           <div className="p-4">
             <ErrorNote error={estimate.error} />

@@ -2,7 +2,7 @@ import { useState, type FormEvent } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, type ControlInput, type ControlPage } from "../../api";
 import { keys, useControlPages } from "../../queries";
-import { Badge, Button, Card, CardHeader, ConfirmButton, Dialog, DialogBody, EmptyState, ErrorNote, Field, Icon, inputClass, PageSpinner } from "../../ui";
+import { Badge, Button, Card, CardHeader, ConfirmButton, Dialog, DialogBody, EmptyState, ErrorNote, Field, Icon, inputClass, Pending } from "../../ui";
 import { fullDay } from "../search/model";
 
 /** The pages verdicts compare against, with add, edit and delete for editors. */
@@ -14,7 +14,7 @@ export function ControlPagesCard({ canEdit }: { canEdit: boolean }) {
   const active = pages.data?.filter((p) => p.active).length ?? 0;
 
   let body;
-  if (pages.isPending) body = <PageSpinner />;
+  if (pages.isPending) body = <Pending />;
   else if (pages.isError) body = <div className="px-4 pb-4"><ErrorNote error={pages.error} /></div>;
   else if (pages.data.length === 0)
     body = (

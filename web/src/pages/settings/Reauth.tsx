@@ -2,7 +2,7 @@ import { createContext, useContext, useState, type FormEvent, type ReactNode } f
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, needsReauth, oauthURL, type Account as AccountData, type SignInProvider } from "../../api";
 import { keys, useAccount, useAuthOptions } from "../../queries";
-import { Button, Dialog, DialogBody, ErrorNote, Field, Icon, inputClass, PageSpinner } from "../../ui";
+import { Button, Dialog, DialogBody, ErrorNote, Field, Icon, inputClass, Pending } from "../../ui";
 import { assertPasskey } from "../../webauthn";
 
 /** Asks for a fresh sign-in, then runs retry. Null outside settings, where nothing can ask. */
@@ -54,7 +54,7 @@ export function useReauthMutation<V = void, D = unknown>({ mutationFn, onSuccess
 function Confirm({ onConfirmed }: { onConfirmed: () => void }) {
   const account = useAccount();
   const options = useAuthOptions();
-  if (account.isPending || options.isPending) return <PageSpinner />;
+  if (account.isPending || options.isPending) return <Pending />;
   if (account.isError || options.isError) {
     return (
       <DialogBody>

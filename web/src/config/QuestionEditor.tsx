@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type Question, type QuestionSet, type QuestionsInput } from "../api";
 import { absoluteTime } from "../format";
 import { keys, useCan, useQuestions, useSettings } from "../queries";
-import { Badge, Button, Card, CardHeader, cx, Dialog, DialogBody, EmptyState, ErrorNote, Field, Icon, inputClass, labelClass, PageSpinner, RelativeTime, selectClass } from "../ui";
+import { Badge, Button, Card, CardHeader, cx, Dialog, DialogBody, EmptyState, ErrorNote, Field, Icon, inputClass, labelClass, Pending, RelativeTime, selectClass } from "../ui";
 import { defaultFooter, FieldNote, ReadOnlyNote, SubmitButton, type Footer } from "./forms";
 import { dedupe, namesIn, normalizeQuestion, questionError, questionLength, questionsFromCSV, questionsFromLines, type DraftQuestion } from "./rules";
 
@@ -35,7 +35,7 @@ type Mode = (typeof modes)[number]["id"];
 export function QuestionEditor({ footer = defaultFooter, onSaved, submitLabel, history }: { footer?: Footer; onSaved?: () => unknown; submitLabel?: string; history?: boolean }) {
   const current = useQuestions();
   const settings = useSettings();
-  if (current.isPending || settings.isPending) return <PageSpinner />;
+  if (current.isPending || settings.isPending) return <Pending />;
   if (current.isError || settings.isError) return <ErrorNote error={current.error ?? settings.error} />;
   const names = [settings.data.brand.name, ...settings.data.brand.aliases].filter(Boolean);
   return (
@@ -529,7 +529,7 @@ function CarryDialog({
 function Versions() {
   const versions = useQuery({ queryKey: keys.questionSets, queryFn: async () => (await api.questions.versions()) ?? [] });
   let body: ReactNode;
-  if (versions.isPending) body = <PageSpinner />;
+  if (versions.isPending) body = <Pending />;
   else if (versions.isError) body = <div className="p-4"><ErrorNote error={versions.error} /></div>;
   else if (versions.data.length === 0) body = <p className="px-4 pb-4 text-sm text-muted">No versions yet. Saving the questions makes version 1.</p>;
   else

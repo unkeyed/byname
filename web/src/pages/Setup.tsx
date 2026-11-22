@@ -3,7 +3,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useParams } from "react-router";
 import { api, ApiError } from "../api";
 import { keys, useAuthOptions } from "../queries";
-import { Button, ErrorNote, Field, Icon, inputClass, PageSpinner } from "../ui";
+import { Button, ErrorNote, Field, Icon, inputClass, Pending } from "../ui";
 import { createPasskey } from "../webauthn";
 import { SignInLink } from "./AcceptInvite";
 import { AuthShell, OrDivider, ProviderButtons, useSignIn } from "./Login";
@@ -34,7 +34,7 @@ export function Setup() {
   if (check.isPending) {
     return (
       <AuthShell title="Set up Byname">
-        <PageSpinner />
+        <Pending />
       </AuthShell>
     );
   }

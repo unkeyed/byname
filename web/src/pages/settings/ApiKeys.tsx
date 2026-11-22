@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useReauthMutation } from "./Reauth";
 import { api, scopeInfo, scopes, type CreatedKey, type Key, type Scope } from "../../api";
 import { keys } from "../../queries";
-import { Badge, Button, Card, ConfirmButton, CopyField, EmptyState, ErrorNote, Icon, inputClass, PageSpinner, RelativeTime, selectClass } from "../../ui";
+import { Badge, Button, Card, ConfirmButton, CopyField, EmptyState, ErrorNote, Icon, inputClass, Pending, RelativeTime, selectClass } from "../../ui";
 import { SettingsHeader } from "./Settings";
 
 /** Lifetimes offered when creating a key, in days; 0 is until revoked. */
@@ -109,7 +109,7 @@ export function ApiKeys() {
 
       <div className="mt-6">
         {list.isPending ? (
-          <PageSpinner />
+          <Pending />
         ) : list.data?.length === 0 ? (
           <EmptyState icon="key" title="No keys yet">
             Create one above for each agent or backend, so you can revoke them one at a time.

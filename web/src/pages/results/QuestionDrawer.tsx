@@ -4,7 +4,7 @@ import { api, type Answer, type BrandEntry, type HistoryPoint, type HistorySerie
 import { fidelityInfo, lineKey, shortDay, usd, useLabels } from "../../lines";
 import { keys, useBrands, useSettings, useSurfaces } from "../../queries";
 import { Markdown } from "../../markdown";
-import { Badge, Button, cx, ErrorNote, Icon, PageSpinner, ScrollX, selectClass, useModal } from "../../ui";
+import { Badge, Button, cx, ErrorNote, Icon, LoadBoundary, Pending, ScrollX, selectClass, useModal } from "../../ui";
 import { useFilter, useView } from "../../view";
 import { PageMark } from "./Gaps";
 import { Segmented } from "./Header";
@@ -24,7 +24,11 @@ export function QuestionDrawer() {
       data-drawer
       className="m-0 ml-auto h-dvh max-h-none w-full max-w-3xl border-0 border-l border-line bg-bg p-0 text-fg shadow-floating"
     >
-      {q > 0 && <Body question={q} onClose={close} />}
+      {q > 0 && (
+        <LoadBoundary key={q} className="h-full">
+          <Body question={q} onClose={close} />
+        </LoadBoundary>
+      )}
     </dialog>
   );
 }
@@ -63,7 +67,7 @@ function Body({ question, onClose }: { question: number; onClose: () => void }) 
   const labels = useLabels(surfaces.data);
   const history = useQuery({ queryKey: keys.history(question, filter.since), queryFn: () => api.history(question, filter.since) });
 
-  if (history.isPending) return <PageSpinner />;
+  if (history.isPending) return <Pending />;
   if (history.isError)
     return (
       <div className="space-y-3 p-4">
@@ -251,7 +255,7 @@ function Analysis({ series: s, point, label, onRaw }: { series: HistorySeries; p
         </button>
       </p>
       {answer.isPending ? (
-        <PageSpinner />
+        <Pending />
       ) : answer.isError ? (
         <ErrorNote error={answer.error} />
       ) : answer.data.status !== "ok" ? (
@@ -345,7 +349,7 @@ function AnswerView({ id }: { id: number }) {
   const answer = useQuery({ queryKey: keys.answer(id), queryFn: () => api.answer(id) });
   const brands = useBrands();
   const settings = useSettings();
-  if (answer.isPending) return <PageSpinner />;
+  if (answer.isPending) return <Pending />;
   if (answer.isError) return <ErrorNote error={answer.error} />;
   const a: Answer = answer.data;
   const names = new Map<string, "self" | "competitor">();

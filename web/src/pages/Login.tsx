@@ -3,21 +3,23 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useSearchParams } from "react-router";
 import { api, ApiError, oauthURL, type OAuthStart, type SecondFactor, type SignInProvider, type SignInResponse } from "../api";
 import { keys, useAuthOptions } from "../queries";
-import { Button, ErrorNote, Field, Icon, inputClass, Logo, PageSpinner } from "../ui";
+import { Button, ErrorNote, Field, Icon, inputClass, LoadBoundary, Logo, Pending } from "../ui";
 import { assertPasskey } from "../webauthn";
 
 export function AuthShell({ title, subtitle, children }: { title: string; subtitle?: ReactNode; children: ReactNode }) {
   return (
-    <main className="grid min-h-full place-items-center bg-bg px-4 py-12">
-      <div className="w-full max-w-sm">
+    <main className="min-h-full bg-bg px-4 py-12 md:pt-[12vh]">
+      <div className="mx-auto w-full max-w-sm">
         <div className="mb-6 flex items-center gap-2">
           <Logo className="size-7 text-sm" />
           <span className="text-base font-semibold">Byname</span>
         </div>
         <div className="rounded-overlay border border-line bg-surface p-6 shadow-raised">
-          <h1 className="text-lg font-semibold">{title}</h1>
-          {subtitle && <p className="mt-1 text-sm text-muted">{subtitle}</p>}
-          <div className="mt-5">{children}</div>
+          <LoadBoundary>
+            <h1 className="text-lg font-semibold">{title}</h1>
+            {subtitle && <p className="mt-1 text-sm text-muted">{subtitle}</p>}
+            <div className="mt-5">{children}</div>
+          </LoadBoundary>
         </div>
       </div>
     </main>
@@ -89,7 +91,7 @@ export function Login() {
   if (awaitingFactor && pending.isPending) {
     return (
       <AuthShell title="Sign in">
-        <PageSpinner />
+        <Pending />
       </AuthShell>
     );
   }
@@ -125,7 +127,7 @@ function FirstFactorStep({ expired }: { expired: boolean }) {
   if (options.isPending) {
     return (
       <AuthShell title="Sign in">
-        <PageSpinner />
+        <Pending />
       </AuthShell>
     );
   }

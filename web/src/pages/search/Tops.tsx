@@ -2,7 +2,7 @@ import { useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api, type GscStatus, type SearchTotals } from "../../api";
 import { dataVersion, keys } from "../../queries";
-import { Badge, Button, Card, CardHeader, cx, ErrorNote, Icon, PageSpinner, ScrollX } from "../../ui";
+import { Badge, Button, Card, CardHeader, cx, ErrorNote, Icon, Pending, ScrollX } from "../../ui";
 import { count, ctr, dayRange, position } from "./model";
 
 const shortLimit = 10;
@@ -96,7 +96,7 @@ function TopCard({
 }) {
   let body;
   if (error) body = <div className="px-4 pb-4"><ErrorNote error={error} /></div>;
-  else if (!rows) body = <PageSpinner />;
+  else if (!rows) body = <Pending />;
   else if (rows.length === 0) body = <p className="px-4 pb-6 text-sm text-muted">No {what === "page" ? "pages" : "queries"} had impressions in these 28 days.</p>;
   else
     body = (

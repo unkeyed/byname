@@ -4,7 +4,7 @@ import { api, type ChangeSettings, type PathRule, type RepoStatus } from "../../
 import { NumberField, SubmitButton } from "../../config/forms";
 import { formatNumber, parseNumber } from "../../config/rules";
 import { keys, useChangeSettings, useRepo, useSettings } from "../../queries";
-import { Badge, Button, Card, ConfirmButton, cx, ErrorNote, Field, Icon, inputClass, PageSpinner, RelativeTime } from "../../ui";
+import { Badge, Button, Card, ConfirmButton, cx, ErrorNote, Field, Icon, inputClass, Pending, RelativeTime } from "../../ui";
 import { useZone } from "../changes/model";
 import { useReauthMutation } from "./Reauth";
 import { SettingsHeader, SettingsSubhead } from "./Settings";
@@ -18,7 +18,7 @@ export function SiteChanges() {
         watches for Google&apos;s next crawl and compares each page with the control pages. Sites without GitHub can log changes by hand on the Changes page.
       </SettingsHeader>
       <div className="space-y-10">
-        {repo.isPending ? <PageSpinner /> : repo.isError ? <ErrorNote error={repo.error} /> : <Repo r={repo.data} />}
+        {repo.isPending ? <Pending /> : repo.isError ? <ErrorNote error={repo.error} /> : <Repo r={repo.data} />}
         <ReadSettings />
       </div>
     </>
@@ -356,7 +356,7 @@ function ReadSettings() {
         When the interim and final reads fall, counted from Google&apos;s first crawl after a change, and how far a page must move against the control pages for a metric to
         count. Changes already crawled keep their days; new reads use the new thresholds.
       </p>
-      {s.isPending ? <PageSpinner /> : s.isError ? <ErrorNote error={s.error} /> : <ReadSettingsForm initial={s.data} />}
+      {s.isPending ? <Pending /> : s.isError ? <ErrorNote error={s.error} /> : <ReadSettingsForm initial={s.data} />}
     </section>
   );
 }

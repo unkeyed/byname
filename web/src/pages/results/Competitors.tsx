@@ -4,7 +4,7 @@ import { api, type BrandStanding, type Competitors as Data } from "../../api";
 import { Donut, type Segment } from "../../charts";
 import { fidelityInfo, lineKey, pct, useLabels } from "../../lines";
 import { keys, useAnsweredRuns, useBrands, useSettings, useSurfaces } from "../../queries";
-import { Badge, Card, CardHeader, cx, EmptyState, ErrorNote, PageSpinner, ScrollX } from "../../ui";
+import { Badge, Card, CardHeader, cx, EmptyState, ErrorNote, Pending, ScrollX, useLoading } from "../../ui";
 import { useFilter, useView } from "../../view";
 import { useOpenEngine } from "./EngineDrawer";
 import { ViewHeader } from "./Header";
@@ -15,9 +15,10 @@ export function Competitors() {
   const { filter, by, ready } = useFilter();
   const comp = useQuery({ queryKey: keys.competitors(filter, by), queryFn: () => api.metrics.competitors(filter, by), enabled: ready, placeholderData: (p) => p });
   const brand = settings.data?.brand.name || "you";
+  useLoading(settings.isPending);
 
   let body;
-  if (!ready || comp.isPending || runs.isPending) body = <PageSpinner />;
+  if (!ready || comp.isPending || runs.isPending) body = <Pending />;
   else if (comp.isError) body = <ErrorNote error={comp.error} />;
   else if (!runs.data?.length)
     body = (
@@ -219,7 +220,7 @@ function HeatKey() {
 function WhereYouLose({ run }: { run: number }) {
   const view = useView();
   const gaps = useQuery({ queryKey: keys.gaps(run), queryFn: () => api.gaps(run) });
-  if (gaps.isPending) return <PageSpinner />;
+  if (gaps.isPending) return <Pending />;
   if (gaps.isError) return <ErrorNote error={gaps.error} />;
   const losses = gaps.data.gaps.filter((g) => g.named_on_miss.length > 0);
   return (

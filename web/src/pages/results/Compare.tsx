@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api, type Outcome, type PairChange, type Standing } from "../../api";
 import { shortDay, useLabels } from "../../lines";
 import { keys, useAnsweredRuns, useSurfaces } from "../../queries";
-import { Card, CardHeader, cx, EmptyState, ErrorNote, Icon, PageSpinner, selectClass } from "../../ui";
+import { Card, CardHeader, cx, EmptyState, ErrorNote, Icon, Pending, selectClass } from "../../ui";
 import { runTime, useView } from "../../view";
 import { Segmented, ViewHeader } from "./Header";
 import { outcomeMark } from "./QuestionsTable";
@@ -64,7 +64,7 @@ export function Compare() {
   const show = view.get("show") || "changed";
 
   let body;
-  if (runs.isPending) body = <PageSpinner />;
+  if (runs.isPending) body = <Pending />;
   else if (runs.isError) body = <ErrorNote error={runs.error} />;
   else if (list.length < 2)
     body = (
@@ -106,7 +106,7 @@ export function Compare() {
           </select>
         </div>
         {cmp.isError && <ErrorNote error={cmp.error} />}
-        {cmp.isPending && <PageSpinner />}
+        {cmp.isPending && <Pending />}
         {cmp.data && (
           <>
             <div className={cx("grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6", cmp.isPlaceholderData && "opacity-60")} aria-label="Counts">

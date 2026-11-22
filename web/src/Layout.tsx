@@ -10,7 +10,7 @@ import { EngineDrawer } from "./pages/results/EngineDrawer";
 import { AlertsBell } from "./pages/Alerts";
 import { useView } from "./view";
 import { useTheme, type ThemeMode } from "./theme";
-import { Avatar, Button, buttonClass, Crumbs, cx, EmptyState, ErrorNote, Icon, Logo, NavMenu, PageHeader, Spinner, useModal, useWide, type IconName } from "./ui";
+import { Avatar, Button, buttonClass, Crumbs, cx, EmptyState, ErrorNote, Icon, LoadBoundary, Logo, NavMenu, PageHeader, Spinner, useModal, useWide, type IconName } from "./ui";
 
 /** The app's pages. soon is what a page will show, for those not built yet. */
 export const nav: { to: string; label: string; icon: IconName; soon?: string }[] = [
@@ -78,14 +78,16 @@ export function Layout() {
           <MenuSheet open={menuOpen} onClose={() => setMenuOpen(false)} label={me.data.name} theme={theme} />
         )}
         <main className="flex min-w-0 flex-1 flex-col overflow-hidden bg-bg">
-          {notSetUp ? (
-            <>
-              <PageHeader title="Byname" />
-              <NotSetUp />
-            </>
-          ) : (
-            <Outlet />
-          )}
+          <LoadBoundary key={notSetUp ? "not-set-up" : pageKey(location.pathname)} className="flex min-h-0 flex-1 flex-col">
+            {notSetUp ? (
+              <>
+                <PageHeader title="Byname" />
+                <NotSetUp />
+              </>
+            ) : (
+              <Outlet />
+            )}
+          </LoadBoundary>
         </main>
       </div>
       <EngineDrawer />
@@ -94,6 +96,9 @@ export function Layout() {
     </NavMenu.Provider>
   );
 }
+
+/** Settings tabs share one boundary here, and each tab holds its own inside the settings page. */
+const pageKey = (path: string) => (path.startsWith("/settings") ? "/settings" : path);
 
 function MenuSheet({ open, onClose, label, theme }: { open: boolean; onClose: () => void; label: string; theme: ThemeState }) {
   const ref = useModal(open);

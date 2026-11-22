@@ -4,7 +4,7 @@ import { api, type Grouping, type ResultsFilter, type Run, type RunSummary, type
 import { LineChart, LineKey, Sparkline, type ChartLine } from "../../charts";
 import { fidelityInfo, lineKey, palette, pct, shortDay, usd, useLabels } from "../../lines";
 import { keys, useAnsweredRuns, useGsc, useMe, useRuns, useSettings, useSurfaces } from "../../queries";
-import { Badge, Card, CardHeader, cx, EmptyState, ErrorNote, Icon, PageSpinner, RelativeTime, ScrollX, Spinner } from "../../ui";
+import { Badge, Card, CardHeader, cx, EmptyState, ErrorNote, Icon, Pending, RelativeTime, ScrollX, Spinner, useLoading } from "../../ui";
 import { runTime, useFilter, useView, type RangeID } from "../../view";
 import { DailyChart } from "../search/DailyChart";
 import { change, count, day, dayRange, searchState, spanFrom, useSearchBrand, useSearchDaily, useSearchSummary, type SearchState } from "../search/model";
@@ -19,11 +19,14 @@ export function Overview() {
   const runs = useRuns();
   const answered = useAnsweredRuns();
   const canRun = useCanRun();
+  // Asked here as well as in the cards, so it loads alongside the runs instead of after them.
+  useGsc();
   const { filter, by, ready } = useFilter();
   const brand = settings.data?.brand.name || "your brand";
+  useLoading(settings.isPending);
 
   let body;
-  if (runs.isPending || !ready) body = <PageSpinner />;
+  if (runs.isPending || !ready) body = <Pending />;
   else if (runs.isError) body = <ErrorNote error={runs.error} />;
   else if (!answered.data?.length)
     body = (
@@ -141,7 +144,7 @@ function Tile({ label, value, detail, delta, trend }: { label: string; value: st
 
 function Tiles({ filter }: { filter: ResultsFilter }) {
   const summary = useQuery({ queryKey: keys.summary(filter), queryFn: () => api.metrics.summary(filter) });
-  if (summary.isPending) return <PageSpinner />;
+  if (summary.isPending) return <Pending />;
   if (summary.isError) return <ErrorNote error={summary.error} />;
   const all: RunSummary[] = summary.data;
   const cur = all[all.length - 1];
@@ -169,8 +172,9 @@ function SearchTile() {
   const brand = useSearchBrand(gsc.data, undefined);
   const me = useMe();
   const cur = summary.data?.current;
+  const waiting = gsc.isPending || (!!gsc.data?.first_day && summary.isPending);
+  useLoading(waiting || (!!gsc.data?.first_day && brand.isPending));
   if (!gsc.data?.first_day || !cur) {
-    const waiting = gsc.isPending || (gsc.data?.first_day && summary.isPending);
     return (
       <Card className="flex flex-col gap-1 px-3 py-3 sm:px-4">
         <h3 className="text-xs font-medium text-muted">Search Console clicks</h3>
@@ -229,7 +233,7 @@ function SearchConsoleCard() {
   const from = s?.first_day ? spanFrom(s, searchSpan[range]) : undefined;
   const daily = useSearchDaily(s, from);
   let body;
-  if (gsc.isPending) body = <PageSpinner />;
+  if (gsc.isPending) body = <Pending />;
   else if (gsc.isError) body = <div className="px-4 pb-4"><ErrorNote error={gsc.error} /></div>;
   else if (searchState(gsc.data) !== "ready")
     body = (
@@ -237,7 +241,7 @@ function SearchConsoleCard() {
         <NotReady state={searchState(gsc.data) as Exclude<SearchState, "ready">} status={gsc.data} admin={me.data?.role === "admin"} />
       </div>
     );
-  else if (daily.isPending) body = <PageSpinner />;
+  else if (daily.isPending) body = <Pending />;
   else if (daily.isError) body = <div className="px-4 pb-4"><ErrorNote error={daily.error} /></div>;
   else
     body = (
@@ -267,7 +271,7 @@ function RatesCard({ filter, by }: { filter: ResultsFilter; by: Grouping }) {
   const rates = useQuery({ queryKey: keys.rates(filter, by), queryFn: () => api.metrics.rates(filter, by), placeholderData: (prev) => prev });
 
   let body;
-  if (rates.isPending) body = <PageSpinner />;
+  if (rates.isPending) body = <Pending />;
   else if (rates.isError) body = <ErrorNote error={rates.error} />;
   else {
     const runIDs = [...new Set(rates.data.flatMap((s) => s.points.map((p) => p.run_id)))].sort((a, b) => a - b);
@@ -360,7 +364,7 @@ function RatesCard({ filter, by }: { filter: ResultsFilter; by: Grouping }) {
 function ShareCard({ filter }: { filter: ResultsFilter }) {
   const view = useView();
   const comp = useQuery({ queryKey: keys.competitors(filter, "surface"), queryFn: () => api.metrics.competitors(filter, "surface") });
-  if (comp.isPending) return <PageSpinner />;
+  if (comp.isPending) return <Pending />;
   if (comp.isError) return <ErrorNote error={comp.error} />;
   const self = comp.data.brands.find((b) => b.kind === "self");
   const top = comp.data.brands.filter((b) => b.mentions > 0).slice(0, 6);

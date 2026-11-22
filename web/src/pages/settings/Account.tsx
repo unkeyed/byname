@@ -15,7 +15,7 @@ import {
   Field,
   Icon,
   inputClass,
-  PageSpinner,
+  Pending,
   RelativeTime,
 } from "../../ui";
 import { createPasskey } from "../../webauthn";
@@ -83,7 +83,7 @@ export function Account() {
   const options = useAuthOptions();
   const confirm = useConfirmIdentity();
 
-  if (account.isPending || options.isPending) return <PageSpinner />;
+  if (account.isPending || options.isPending) return <Pending />;
   if (account.isError || options.isError) return <ErrorNote error={account.error ?? options.error} />;
   const a = account.data;
   const providers = options.data.providers;

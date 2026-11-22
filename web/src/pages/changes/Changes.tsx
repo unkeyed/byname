@@ -3,7 +3,7 @@ import { Link } from "react-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, type Change, type ChangeKind, type GscStatus, type RepoStatus } from "../../api";
 import { keys, useChanges, useChangeSettings, useGsc, useMe, useRepo } from "../../queries";
-import { Badge, Button, buttonClass, Card, CardHeader, cx, Dialog, DialogBody, EmptyState, ErrorNote, Field, Icon, inputClass, PageSpinner, RelativeTime, ScrollX, selectClass, useWide } from "../../ui";
+import { Badge, Button, buttonClass, Card, CardHeader, cx, Dialog, DialogBody, EmptyState, ErrorNote, Field, Icon, inputClass, Pending, RelativeTime, ScrollX, selectClass, useLoading, useWide } from "../../ui";
 import { ViewHeader } from "../results/Header";
 import { fullDay } from "../search/model";
 import { Note, settingsPath as searchConsolePath } from "../search/Search";
@@ -20,6 +20,7 @@ export function Changes() {
   const gsc = useGsc();
   const zone = useZone();
   const [logging, setLogging] = useState(false);
+  useLoading(gsc.isPending);
   return (
     <>
       <ViewHeader
@@ -122,10 +123,11 @@ function ChangesCard({
   const wide = useWide();
   const settings = useChangeSettings();
   const s = settings.data;
+  useLoading(settings.isPending);
   const source = feed(repo);
   let body;
   if (error) body = <div className="px-4 pb-4"><ErrorNote error={error} /></div>;
-  else if (!changes || !repo || !zone.ready) body = <PageSpinner />;
+  else if (!changes || !repo || !zone.ready) body = <Pending />;
   else if (changes.length === 0) {
     body = (
       <div className="px-4 pb-4">

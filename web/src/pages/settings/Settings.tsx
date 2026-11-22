@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
-import { Navigate, NavLink, Outlet, type RouteObject } from "react-router";
+import { Navigate, NavLink, Outlet, useLocation, type RouteObject } from "react-router";
 import { useMe } from "../../queries";
-import { cx, PageHeader } from "../../ui";
+import { cx, LoadBoundary, PageHeader } from "../../ui";
 import { Account } from "./Account";
 import { Apps } from "./Apps";
 import { ApiKeys } from "./ApiKeys";
@@ -43,6 +43,7 @@ export const settingsRoutes: RouteObject[] = [
  */
 export function Settings() {
   const me = useMe();
+  const { pathname } = useLocation();
   const shown = tabs.filter((t) => !t.admin || me.data?.role === "admin");
   return (
     <>
@@ -69,7 +70,9 @@ export function Settings() {
           </nav>
           <div className="min-w-0 px-4 py-6 pb-16 md:px-8 md:py-8 lg:px-0">
             <ReauthProvider>
-              <Outlet />
+              <LoadBoundary key={pathname}>
+                <Outlet />
+              </LoadBoundary>
             </ReauthProvider>
           </div>
         </div>

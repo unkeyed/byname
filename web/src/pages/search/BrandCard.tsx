@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, type BrandPoint, type Day, type GscStatus } from "../../api";
 import { LineChart, LineKey, niceTicks, type ChartLine } from "../../charts";
 import { keys, useSettings } from "../../queries";
-import { Badge, Button, Card, CardHeader, cx, Dialog, DialogBody, ErrorNote, Icon, inputClass, PageSpinner, ScrollX } from "../../ui";
+import { Badge, Button, Card, CardHeader, cx, Dialog, DialogBody, ErrorNote, Icon, inputClass, Pending, ScrollX } from "../../ui";
 import { compact, count, day, longDay, useSearchBrand } from "./model";
 
 /** The three kinds of click a window splits into, in legend order. Your brand is drawn in ink, as everywhere. */
@@ -18,7 +18,7 @@ export function BrandCard({ status, from, canEdit }: { status: GscStatus; from: 
   const [editing, setEditing] = useState(false);
 
   let body;
-  if (brand.isPending) body = <PageSpinner />;
+  if (brand.isPending) body = <Pending />;
   else if (brand.isError) body = <div className="px-4 pb-4"><ErrorNote error={brand.error} /></div>;
   else if (brand.data.points.length === 0) body = <p className="px-4 pb-6 text-sm text-muted">A window needs 28 days of data. This shows once 28 days are stored.</p>;
   else {
@@ -122,7 +122,7 @@ function TermsForm({ onDone }: { onDone: () => void }) {
       onDone();
     },
   });
-  if (settings.isPending) return <PageSpinner />;
+  if (settings.isPending) return <Pending />;
   if (settings.isError) return <DialogBody><ErrorNote error={settings.error} /></DialogBody>;
   const list = terms ?? settings.data.branded_terms;
   const pending = draft.trim().toLowerCase();

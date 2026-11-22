@@ -4,7 +4,7 @@ import { Link, Navigate, useLocation, useNavigate, useParams } from "react-route
 import { api, ApiError, type OnboardingStep, type StepKey } from "../../api";
 import { keys, useCan, useMe, useOnboarding } from "../../queries";
 import { useTheme } from "../../theme";
-import { Button, buttonClass, cx, Dialog, EmptyState, ErrorNote, Icon, Logo, Spinner, useWide } from "../../ui";
+import { Button, buttonClass, cx, Dialog, EmptyState, ErrorNote, Icon, LoadBoundary, Logo, Spinner, useWide } from "../../ui";
 import { AlertsSlot } from "../../config/AlertsSlot";
 import { BrandForm } from "../../config/BrandForm";
 import { BrandTable } from "../../config/BrandTable";
@@ -250,7 +250,7 @@ function Wizard({ steps, finished }: { steps: OnboardingStep[]; finished: boolea
         </p>
         <h1 className="mt-1 text-lg font-semibold">{step.title}</h1>
         <p className="mt-1 mb-6 text-sm text-muted">{view.intro}</p>
-        <div key={step.key}>{view.render(nav)}</div>
+        <LoadBoundary key={step.key}>{view.render(nav)}</LoadBoundary>
       </div>
       {!wide && (
         <Dialog open={menu} onClose={() => setMenu(false)} title="Setup steps">

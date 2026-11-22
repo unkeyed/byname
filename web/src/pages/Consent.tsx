@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "react-router";
 import { api, scopeInfo, type Actor, type ConsentRequest, type Scope } from "../api";
 import { keys, useMe } from "../queries";
-import { Badge, Button, cx, ErrorNote, Icon, PageSpinner } from "../ui";
+import { Badge, Button, cx, ErrorNote, Icon, Pending } from "../ui";
 import { ReauthProvider, useReauthMutation } from "./settings/Reauth";
 import { AuthShell } from "./Login";
 
@@ -33,18 +33,18 @@ export function Consent() {
   }
   return (
     <ReauthProvider>
-      <Pending handle={handle} />
+      <ConsentRequest handle={handle} />
     </ReauthProvider>
   );
 }
 
-function Pending({ handle }: { handle: string }) {
+function ConsentRequest({ handle }: { handle: string }) {
   const req = useQuery({ queryKey: keys.consent(handle), queryFn: () => api.consent.get(handle), staleTime: Infinity, retry: false });
   const me = useMe();
   if (req.isPending || me.isPending) {
     return (
       <AuthShell title="Connect an app">
-        <PageSpinner />
+        <Pending />
       </AuthShell>
     );
   }

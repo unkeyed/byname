@@ -358,3 +358,9 @@
     animation: none !important;
   }
 }
+
+@keyframes appear {
+  from {
+    opacity: 0;
+  }
+}

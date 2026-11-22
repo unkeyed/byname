@@ -302,7 +302,65 @@ export function Spinner({ className = "size-4" }: { className?: string }) {
   return <span role="status" aria-label="Loading" className={cx("inline-block animate-spin rounded-full border-2 border-line-strong border-t-fg", className)} />;
 }
 
-export function PageSpinner() {
+type Hold = { add: () => () => void };
+const Holding = createContext<Hold | null>(null);
+
+/**
+ * Keeps its content invisible behind one spinner until nothing inside is
+ * loading, then shows it in a single frame, so a page never assembles itself
+ * card by card under the reader. It reveals once: anything that loads later
+ * shows its own Pending in place. A boundary inside another holds the outer
+ * one until it reveals. Content stays laid out while hidden, so charts and
+ * scrollers measure their real width. An element marked data-load-visible
+ * (the page's title bar) shows throughout.
+ */
+export function LoadBoundary({ children, className }: { children: ReactNode; className?: string }) {
+  const count = useRef(0);
+  const [, recount] = useState(0);
+  const [shown, setShown] = useState(false);
+  const shownRef = useRef(false);
+  const [hold] = useState<Hold>(() => ({
+    add: () => {
+      if (shownRef.current) return () => {};
+      count.current++;
+      return () => {
+        count.current--;
+        recount((n) => n + 1);
+      };
+    },
+  }));
+  useLoading(!shown);
+  useLayoutEffect(() => {
+    if (!shownRef.current && count.current === 0) {
+      shownRef.current = true;
+      setShown(true);
+    }
+  });
+  return (
+    <Holding.Provider value={hold}>
+      <div className={cx("relative", className)}>
+        <div className={cx("contents", !shown && "invisible [&_[data-load-visible]]:visible")} aria-busy={!shown || undefined}>
+          {children}
+        </div>
+        {!shown && (
+          <div className="pointer-events-none absolute inset-x-0 top-0 grid h-full max-h-96 min-h-40 animate-[appear_0s_200ms_both] place-items-center">
+            <Spinner />
+          </div>
+        )}
+      </div>
+    </Holding.Provider>
+  );
+}
+
+/** Holds the nearest LoadBoundary while pending is true, for data a component shows without a Pending of its own. */
+export function useLoading(pending: boolean) {
+  const hold = useContext(Holding);
+  useLayoutEffect(() => (pending && hold ? hold.add() : undefined), [pending, hold]);
+}
+
+/** Stands in for content whose data is loading. Inside a LoadBoundary that has not revealed yet, it holds the boundary. */
+export function Pending() {
+  useLoading(true);
   return (
     <div className="grid h-40 place-items-center">
       <Spinner />
@@ -376,7 +434,7 @@ export function Dialog({ open, onClose, title, children, wide }: { open: boolean
               <Icon name="x" />
             </Button>
           </div>
-          {children}
+          <LoadBoundary className="flex min-h-0 flex-col">{children}</LoadBoundary>
         </div>
       )}
     </dialog>
@@ -474,7 +532,7 @@ export const NavMenu = createContext<(() => void) | null>(null);
 export function PageHeader({ title, children }: { title: ReactNode; children?: ReactNode }) {
   const openNav = useContext(NavMenu);
   return (
-    <header className="flex h-12 shrink-0 items-center gap-3 border-b border-line px-3 md:px-5">
+    <header data-load-visible className="flex h-12 shrink-0 items-center gap-3 border-b border-line px-3 md:px-5">
       {openNav && (
         <Button variant="ghost" size="sm" onClick={openNav} aria-label="Open menu" className="-ml-1 w-8 px-0">
           <Icon name="menu" />

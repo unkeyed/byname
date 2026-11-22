@@ -4,7 +4,7 @@ import { api, type EnginePrompt, type Fidelity, type Line, type Series } from ".
 import { LineChart } from "../../charts";
 import { fidelityInfo, palette, pct, shortDay, useLabels } from "../../lines";
 import { keys, useSurfaces } from "../../queries";
-import { Badge, Button, Card, cx, ErrorNote, Icon, PageSpinner, useModal } from "../../ui";
+import { Badge, Button, Card, cx, ErrorNote, Icon, LoadBoundary, Pending, useModal } from "../../ui";
 import { useFilter, useView } from "../../view";
 import { Instead } from "./Prompts";
 
@@ -40,7 +40,11 @@ export function EngineDrawer() {
       data-drawer
       className="m-0 ml-auto h-dvh max-h-none w-full max-w-3xl border-0 border-l border-line bg-bg p-0 text-fg shadow-floating"
     >
-      {line && <Body line={line} onClose={close} />}
+      {line && (
+        <LoadBoundary key={view.get("eng")} className="h-full">
+          <Body line={line} onClose={close} />
+        </LoadBoundary>
+      )}
     </dialog>
   );
 }
@@ -66,7 +70,7 @@ function Body({ line, onClose }: { line: Line; onClose: () => void }) {
   const title = engine.data ? labels.line(engine.data.pair, engine.data.models) : labels.line({ id: line.pair, surface: line.surface, model: "" });
 
   let body;
-  if (engine.isPending) body = <PageSpinner />;
+  if (engine.isPending) body = <Pending />;
   else if (engine.isError) body = <ErrorNote error={engine.error} />;
   else if (engine.data.runs === 0) body = <p className="text-sm text-muted">This line has no answers in this range. Widen the date range in the page header.</p>;
   else {

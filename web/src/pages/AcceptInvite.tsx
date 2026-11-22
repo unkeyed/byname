@@ -3,7 +3,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router";
 import { api, ApiError, roleInfo } from "../api";
 import { keys, useAuthOptions } from "../queries";
-import { Button, ErrorNote, Field, Icon, inputClass, PageSpinner } from "../ui";
+import { Button, ErrorNote, Field, Icon, inputClass, Pending } from "../ui";
 import { createPasskey } from "../webauthn";
 import { AuthShell, OrDivider, ProviderButtons, useSignIn } from "./Login";
 
@@ -38,7 +38,7 @@ export function AcceptInvite() {
   if (invite.isPending) {
     return (
       <AuthShell title="Join your team on Byname">
-        <PageSpinner />
+        <Pending />
       </AuthShell>
     );
   }

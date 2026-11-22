@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type Change, type ChangeOutcome, type ChangeRead, type ChangeStep, type ChangeWindow, type UrlInspection } from "../../api";
 import { keys } from "../../queries";
-import { Badge, Button, Card, ConfirmButton, cx, ErrorNote, Icon, PageSpinner, ScrollX, useModal } from "../../ui";
+import { Badge, Button, Card, ConfirmButton, cx, ErrorNote, Icon, LoadBoundary, Pending, ScrollX, useModal } from "../../ui";
 import { useView } from "../../view";
 import { count, ctr, dayRange, fullDay, position } from "../search/model";
 import { changeStatus, deltaMetrics, kindInfo, outcomeInfo, stepInfo, useZone, type Zone } from "./model";
@@ -28,7 +28,11 @@ export function ChangeDrawer({ changes, canEdit }: { changes: Change[] | undefin
       data-drawer
       className="m-0 ml-auto h-dvh max-h-none w-full max-w-3xl border-0 border-l border-line bg-bg p-0 text-fg shadow-floating"
     >
-      {id > 0 && <Body id={id} listed={changes?.find((c) => c.id === id)} canEdit={canEdit} onClose={close} />}
+      {id > 0 && (
+        <LoadBoundary key={id} className="h-full">
+          <Body id={id} listed={changes?.find((c) => c.id === id)} canEdit={canEdit} onClose={close} />
+        </LoadBoundary>
+      )}
     </dialog>
   );
 }
@@ -49,7 +53,7 @@ function Body({ id, listed, canEdit, onClose }: { id: number; listed: Change | u
   if (!c) {
     return (
       <div className="space-y-3 p-4">
-        {detail.isPending ? <PageSpinner /> : <ErrorNote error={detail.error} />}
+        {detail.isPending ? <Pending /> : <ErrorNote error={detail.error} />}
         {!detail.isPending && <Button onClick={onClose}>Close</Button>}
       </div>
     );
@@ -93,7 +97,7 @@ function Body({ id, listed, canEdit, onClose }: { id: number; listed: Change | u
         {detail.isError ? (
           <ErrorNote error={detail.error} />
         ) : !detail.data ? (
-          <PageSpinner />
+          <Pending />
         ) : (
           <>
             <Timeline c={c} steps={detail.data.timeline} zone={zone} />

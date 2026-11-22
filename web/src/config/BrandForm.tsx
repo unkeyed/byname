@@ -2,7 +2,7 @@ import { useState, type FormEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { api, type MatchMode, type Settings, type SettingsView } from "../api";
 import { keys, useCan, useSettings } from "../queries";
-import { Button, cx, ErrorNote, Field, Icon, inputClass, labelClass, PageSpinner, selectClass } from "../ui";
+import { Button, cx, ErrorNote, Field, Icon, inputClass, labelClass, Pending, selectClass } from "../ui";
 import { defaultFooter, FieldNote, NumberField, ReadOnlyNote, SubmitButton, useSaveSettings, type Footer } from "./forms";
 import { browserTimeZone, commonWordAliases, formatNumber, languages, markets, parseHost, parseHosts, parseNumber, splitList, timeZones } from "./rules";
 
@@ -28,7 +28,7 @@ type TermsEdit = null | { follow: true } | { text: string };
  */
 export function BrandForm({ retention, footer = defaultFooter, onSaved, submitLabel }: { retention?: boolean; footer?: Footer; onSaved?: () => unknown; submitLabel?: string }) {
   const settings = useSettings();
-  if (settings.isPending) return <PageSpinner />;
+  if (settings.isPending) return <Pending />;
   if (settings.isError) return <ErrorNote error={settings.error} />;
   return <BrandFormBody initial={settings.data} retention={retention} footer={footer} onSaved={onSaved} submitLabel={submitLabel} />;
 }

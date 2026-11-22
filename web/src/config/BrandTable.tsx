@@ -2,7 +2,7 @@ import { useState, type FormEvent } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, type BrandEntry, type BrandInput } from "../api";
 import { keys, useBrands, useCan } from "../queries";
-import { Badge, Button, Card, ConfirmButton, cx, EmptyState, ErrorNote, Field, Icon, inputClass, PageSpinner, selectClass } from "../ui";
+import { Badge, Button, Card, ConfirmButton, cx, EmptyState, ErrorNote, Field, Icon, inputClass, Pending, selectClass } from "../ui";
 import { FieldNote } from "./forms";
 import { commonWordAliases, parseHosts, splitList } from "./rules";
 
@@ -31,7 +31,7 @@ export function BrandTable() {
   const brands = useBrands();
   const canEdit = useCan("config:write");
   const [editing, setEditing] = useState<number | null>(null);
-  if (brands.isPending) return <PageSpinner />;
+  if (brands.isPending) return <Pending />;
   if (brands.isError) return <ErrorNote error={brands.error} />;
   const all = brands.data;
   const others = all.filter((b) => b.kind !== "self");

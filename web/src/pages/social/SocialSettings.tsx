@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, type LeftOut, type SocialNetwork, type SocialSettings as Settings, type SocialSettingsInput } from "../../api";
 import { ReadOnlyNote, SubmitButton } from "../../config/forms";
 import { keys, useCan, useLeftOut, useSocialSettings } from "../../queries";
-import { Badge, Button, ConfirmButton, cx, EmptyState, ErrorNote, Field, Icon, inputClass, labelClass, PageSpinner, RelativeTime, selectClass } from "../../ui";
+import { Badge, Button, ConfirmButton, cx, EmptyState, ErrorNote, Field, Icon, inputClass, labelClass, Pending, RelativeTime, selectClass } from "../../ui";
 import { SettingsHeader, SettingsSubhead } from "../settings/Settings";
 import { NetworkMark, networkOrder, networks, weekdays } from "./model";
 
@@ -21,7 +21,7 @@ export function SocialSettings() {
       </SettingsHeader>
       {!canEdit && <ReadOnlyNote />}
       <div className="space-y-10">
-        {settings.isPending ? <PageSpinner /> : settings.isError ? <ErrorNote error={settings.error} /> : <SearchForm key={JSON.stringify(settings.data)} s={settings.data} canEdit={canEdit} />}
+        {settings.isPending ? <Pending /> : settings.isError ? <ErrorNote error={settings.error} /> : <SearchForm key={JSON.stringify(settings.data)} s={settings.data} canEdit={canEdit} />}
         <LeftOutSection canEdit={canEdit} />
       </div>
     </>
@@ -210,7 +210,7 @@ function LeftOutSection({ canEdit }: { canEdit: boolean }) {
         Posts by these accounts are hidden from the Social page and the digest, past posts included. Byname keeps them, so taking an account off the list brings its posts back.
       </p>
       {list.isPending ? (
-        <PageSpinner />
+        <Pending />
       ) : list.isError ? (
         <ErrorNote error={list.error} />
       ) : groups.size === 0 ? (

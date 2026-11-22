@@ -2,7 +2,7 @@ import { useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, goalMetrics, goalWindows, type Goal, type GoalInput, type GoalMetric, type GoalWindow, type GscStatus } from "../../api";
 import { dataVersion, keys } from "../../queries";
-import { Badge, Button, Card, CardHeader, ConfirmButton, Dialog, DialogBody, EmptyState, ErrorNote, Field, Icon, inputClass, PageSpinner, selectClass } from "../../ui";
+import { Badge, Button, Card, CardHeader, ConfirmButton, Dialog, DialogBody, EmptyState, ErrorNote, Field, Icon, inputClass, Pending, selectClass } from "../../ui";
 import { count, dayRange, fullDay, metricInfo, windowInfo } from "./model";
 
 /** Goal KPIs: each goal's metric over its trailing window against the target, with add, edit and delete for editors. */
@@ -13,7 +13,7 @@ export function GoalsCard({ status, canEdit }: { status: GscStatus; canEdit: boo
   const remove = useMutation({ mutationFn: api.goals.remove, onSuccess: () => qc.invalidateQueries({ queryKey: ["search", "goals"] }) });
 
   let body;
-  if (goals.isPending) body = <PageSpinner />;
+  if (goals.isPending) body = <Pending />;
   else if (goals.isError) body = <div className="px-4 pb-4"><ErrorNote error={goals.error} /></div>;
   else if (goals.data.length === 0)
     body = (

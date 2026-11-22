@@ -17,7 +17,7 @@ import {
   Field,
   Icon,
   inputClass,
-  PageSpinner,
+  Pending,
   RelativeTime,
   selectClass,
   type IconName,
@@ -62,7 +62,7 @@ export function Notifications() {
 function Channels() {
   const list = useChannels();
   const [editing, setEditing] = useState<NotificationChannel | "new" | null>(null);
-  if (list.isPending) return <PageSpinner />;
+  if (list.isPending) return <Pending />;
   if (list.isError) return <ErrorNote error={list.error} />;
   const { channels, events } = list.data;
   return (
@@ -367,7 +367,7 @@ function DeliveryLog() {
     <Card className="mt-10">
       <CardHeader title="Delivery log" description="Each alert sent to each channel, newest first. A failed send is retried with backoff, up to 5 attempts. Tests show on their channel." />
       {log.isPending ? (
-        <PageSpinner />
+        <Pending />
       ) : log.isError ? (
         <div className="px-4 pb-3">
           <ErrorNote error={log.error} />
@@ -425,7 +425,7 @@ function PickerBody() {
     mutationFn: (c: NotificationChannel) => api.channels.update(c.id, { name: c.name, kind: c.kind, settings: c.settings, events: c.events, enabled: !c.enabled }),
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.channels }),
   });
-  if (list.isPending) return <PageSpinner />;
+  if (list.isPending) return <Pending />;
   if (list.isError) return <ErrorNote error={list.error} />;
   const { channels, events } = list.data;
   return (

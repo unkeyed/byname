@@ -4,7 +4,7 @@ import { useReauthMutation } from "./Reauth";
 import { useNavigate } from "react-router";
 import { api, inviteURL, roleInfo, roles, type Email, type Role } from "../../api";
 import { keys, useAuthOptions, useMe } from "../../queries";
-import { Avatar, Badge, Button, Card, ConfirmButton, CopyField, cx, ErrorNote, inputClass, PageSpinner, RelativeTime, selectClass } from "../../ui";
+import { Avatar, Badge, Button, Card, ConfirmButton, CopyField, cx, ErrorNote, inputClass, Pending, RelativeTime, selectClass } from "../../ui";
 import { SettingsHeader, SettingsSubhead } from "./Settings";
 
 /** An invite made on this page. The API cannot list invites, so only these are shown. */
@@ -70,7 +70,7 @@ function Members() {
       return qc.invalidateQueries({ queryKey: keys.users });
     },
   });
-  if (users.isPending) return <PageSpinner />;
+  if (users.isPending) return <Pending />;
   if (users.isError) return <ErrorNote error={users.error} />;
   return (
     <>
@@ -131,7 +131,7 @@ function Members() {
 
 function SignInMethods() {
   const options = useAuthOptions();
-  if (options.isPending) return <PageSpinner />;
+  if (options.isPending) return <Pending />;
   if (options.isError) return <ErrorNote error={options.error} />;
   const { providers, password_login } = options.data;
   return (

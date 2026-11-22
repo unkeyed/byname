@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from "react";
 import type { GscStatus } from "../api";
 import { useGsc, useIsAdmin } from "../queries";
-import { Button, Card, ErrorNote, PageSpinner } from "../ui";
+import { Button, Card, ErrorNote, Pending } from "../ui";
 import { GoogleButton, GoogleReturn, PropertyPicker, ServiceAccountForm } from "../pages/settings/SearchConsole";
 
 /**
@@ -24,7 +24,7 @@ export function SearchConsoleStep({ onPicked, footer }: { onPicked: () => void; 
   return (
     <div className="space-y-5">
       <GoogleReturn s={gsc.data} />
-      {gsc.isPending ? <PageSpinner /> : gsc.isError ? <ErrorNote error={gsc.error} /> : <Connection s={gsc.data} onPicked={onPicked} />}
+      {gsc.isPending ? <Pending /> : gsc.isError ? <ErrorNote error={gsc.error} /> : <Connection s={gsc.data} onPicked={onPicked} />}
       {footer(!!gsc.data?.connected && !!gsc.data.property)}
     </div>
   );

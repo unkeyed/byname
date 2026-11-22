@@ -2,7 +2,7 @@ import { Link } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../api";
 import { keys, useMe } from "../../queries";
-import { Badge, Card, CodeBlock, ConfirmButton, EmptyState, ErrorNote, Icon, PageSpinner, RelativeTime } from "../../ui";
+import { Badge, Card, CodeBlock, ConfirmButton, EmptyState, ErrorNote, Icon, Pending, RelativeTime } from "../../ui";
 import { SettingsHeader, SettingsSubhead } from "./Settings";
 
 export function snippets(origin: string) {
@@ -68,7 +68,7 @@ function ConnectedApps() {
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.apps }),
   });
 
-  if (list.isPending) return <PageSpinner />;
+  if (list.isPending) return <Pending />;
   return (
     <>
       {list.data?.length === 0 ? (

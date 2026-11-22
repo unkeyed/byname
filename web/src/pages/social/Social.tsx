@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router";
 import type { SocialDigest, SocialMention, SocialNetwork, SocialSettings } from "../../api";
 import { useCan, useIsAdmin, useSocialDigest, useSocialMentions, useSocialSettings } from "../../queries";
-import { Badge, buttonClass, Card, CardHeader, cx, EmptyState, ErrorNote, Icon, PageSpinner, RelativeTime, selectClass } from "../../ui";
+import { Badge, buttonClass, Card, CardHeader, cx, EmptyState, ErrorNote, Icon, Pending, RelativeTime, selectClass, useLoading } from "../../ui";
 import { ViewHeader } from "../results/Header";
 import { Note } from "../search/Search";
 import { authorLabel, engagementParts, formatCount, NetworkMark, networkOrder, networks, periodLabel, postLink, settingsPath } from "./model";
@@ -30,7 +30,7 @@ export function Social() {
       <div className="relative min-h-0 flex-1 overflow-auto px-3 py-4 md:px-5 md:py-5">
         <div className="mx-auto max-w-4xl space-y-4">
           {settings.isPending ? (
-            <PageSpinner />
+            <Pending />
           ) : settings.isError ? (
             <ErrorNote error={settings.error} />
           ) : (
@@ -75,6 +75,7 @@ function Notices({ s }: { s: SocialSettings }) {
 
 function DigestCard() {
   const digest = useSocialDigest();
+  useLoading(digest.isPending);
   if (digest.isPending) return null;
   if (digest.isError) return <ErrorNote error={digest.error} />;
   const d = digest.data;
@@ -160,7 +161,7 @@ function MentionsCard({ s }: { s: SocialSettings }) {
   const l = mentions.data;
 
   let body;
-  if (mentions.isPending) body = <PageSpinner />;
+  if (mentions.isPending) body = <Pending />;
   else if (mentions.isError) body = <div className="px-4 pb-4"><ErrorNote error={mentions.error} /></div>;
   else if (l!.total + l!.hidden === 0) body = <div className="px-4 pb-4"><Empty s={s} filtered={network !== ""} runnable={runnable.length} on={on.length} /></div>;
   else if (l!.mentions.length === 0)

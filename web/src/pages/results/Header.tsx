@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { useSurfaces } from "../../queries";
-import { cx, PageHeader, selectClass } from "../../ui";
+import { cx, PageHeader, selectClass, useLoading } from "../../ui";
 import { ranges, useView } from "../../view";
 
 export function Segmented<T extends string>({
@@ -52,6 +52,7 @@ const filterSelect = cx(selectClass, "h-8 w-full text-xs md:w-auto");
 export function ViewHeader({ title, subtitle, action, range = true, scope = true }: { title: string; subtitle: ReactNode; action?: ReactNode; range?: boolean; scope?: boolean }) {
   const view = useView();
   const surfaces = useSurfaces();
+  useLoading(scope && surfaces.isPending);
   const used = surfaces.data?.filter((s) => s.pairs.length > 0) ?? [];
   const models = [...new Set(used.flatMap((s) => s.pairs.map((p) => p.model)).filter(Boolean))].sort();
   const modelValue = view.get("model") || (view.get("by") === "model" ? "_by" : "");

@@ -1,7 +1,7 @@
 import { useState, type FormEvent, type ReactNode } from "react";
 import type { Settings, SettingsView } from "../api";
 import { useCan, useSettings } from "../queries";
-import { cx, ErrorNote, inputClass, labelClass, PageSpinner } from "../ui";
+import { cx, ErrorNote, inputClass, labelClass, Pending } from "../ui";
 import { defaultFooter, Disclosure, NumberField, ReadOnlyNote, SubmitButton, useSaveSettings, type Footer } from "./forms";
 import { formatNumber, parseNumber, type NumberKey } from "./rules";
 
@@ -40,7 +40,7 @@ export function RunSettingsForm({
   submitLabel?: string;
 }) {
   const settings = useSettings();
-  if (settings.isPending) return <PageSpinner />;
+  if (settings.isPending) return <Pending />;
   if (settings.isError) return <ErrorNote error={settings.error} />;
   return <Body initial={settings.data} schedule={schedule} limits={limits} tuningCollapsed={tuningCollapsed} extra={extra} footer={footer} onSaved={onSaved} submitLabel={submitLabel} />;
 }

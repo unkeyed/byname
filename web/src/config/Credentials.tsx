@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type Credential, type CredentialKind } from "../api";
 import { keys, useIsAdmin, useSurfaces } from "../queries";
 import { useReauthMutation } from "../pages/settings/Reauth";
-import { Badge, Button, Card, ConfirmButton, ErrorNote, Field, Icon, inputClass, PageSpinner, RelativeTime } from "../ui";
+import { Badge, Button, Card, ConfirmButton, ErrorNote, Field, Icon, inputClass, Pending, RelativeTime } from "../ui";
 
 /** Every credential, set or not. Admins only: the server refuses everyone else. */
 export const useCredentials = () => {
@@ -83,7 +83,7 @@ export function CredentialForm({ kind, title, hint, set, org, onDone, compact }:
 /** Settings > Credentials: the Treg token and every provider key, as rows. */
 export function Credentials() {
   const list = useCredentials();
-  if (list.isPending) return <PageSpinner />;
+  if (list.isPending) return <Pending />;
   if (list.isError) return <ErrorNote error={list.error} />;
   return (
     <Card>

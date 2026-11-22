@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "react-router";
 import { api, type GscProperty, type GscStatus } from "../../api";
 import { keys, useGsc } from "../../queries";
-import { Badge, Button, Card, ConfirmButton, ErrorNote, Field, Icon, PageSpinner, RelativeTime, Spinner, cx } from "../../ui";
+import { Badge, Button, Card, ConfirmButton, ErrorNote, Field, Icon, Pending, RelativeTime, Spinner, cx } from "../../ui";
 import { dayList, dayRange } from "../search/model";
 import { useReauthMutation } from "./Reauth";
 import { SettingsHeader, SettingsSubhead } from "./Settings";
@@ -24,7 +24,7 @@ export function SearchConsole() {
         or with a service account if this instance has no Google OAuth client. The numbers stay when you disconnect.
       </SettingsHeader>
       <GoogleReturn s={gsc.data} />
-      {gsc.isPending ? <PageSpinner /> : gsc.isError ? <ErrorNote error={gsc.error} /> : gsc.data.connected ? <Connected s={gsc.data} /> : <Connect s={gsc.data} />}
+      {gsc.isPending ? <Pending /> : gsc.isError ? <ErrorNote error={gsc.error} /> : gsc.data.connected ? <Connected s={gsc.data} /> : <Connect s={gsc.data} />}
     </>
   );
 }
@@ -281,7 +281,7 @@ export function PropertyPicker({ s, onDone, onCancel, submitLabel }: { s: GscSta
       onDone();
     },
   });
-  if (props.isPending) return <PageSpinner />;
+  if (props.isPending) return <Pending />;
   if (props.isError) return <ErrorNote error={props.error} />;
   if (props.data.length === 0)
     return (

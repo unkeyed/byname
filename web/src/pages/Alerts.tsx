@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router";
 import { api, type Alert } from "../api";
 import { keys, useAlerts, useMe } from "../queries";
-import { Button, buttonClass, Card, cx, EmptyState, ErrorNote, Icon, PageHeader, PageSpinner, RelativeTime } from "../ui";
+import { Button, buttonClass, Card, cx, EmptyState, ErrorNote, Icon, PageHeader, Pending, RelativeTime } from "../ui";
 
 /** The alerts indicator: a bell with the unread count, linking to the alerts list. */
 export function AlertsBell({ className, onNavigate }: { className?: string; onNavigate?: () => void }) {
@@ -69,7 +69,7 @@ export function Alerts() {
           </p>
           <ErrorNote error={alerts.error ?? read.error} />
           {alerts.isPending ? (
-            <PageSpinner />
+            <Pending />
           ) : alerts.data?.alerts.length === 0 ? (
             <EmptyState icon="check" title="No alerts yet">
               The first one arrives when a check finishes.

@@ -3,7 +3,7 @@ import { Link } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import { api, type GscStatus, type SearchPeriod } from "../../api";
 import { keys, useGsc, useMe } from "../../queries";
-import { buttonClass, Card, CardHeader, cx, EmptyState, ErrorNote, Icon, PageSpinner, RelativeTime, Spinner } from "../../ui";
+import { buttonClass, Card, CardHeader, cx, EmptyState, ErrorNote, Icon, Pending, RelativeTime, Spinner } from "../../ui";
 import { useView } from "../../view";
 import { Segmented, ViewHeader } from "../results/Header";
 import { BrandCard } from "./BrandCard";
@@ -21,7 +21,7 @@ export function Search() {
   const admin = me.data?.role === "admin";
 
   let body;
-  if (gsc.isPending) body = <PageSpinner />;
+  if (gsc.isPending) body = <Pending />;
   else if (gsc.isError) body = <ErrorNote error={gsc.error} />;
   else {
     const state = searchState(gsc.data);
@@ -166,7 +166,7 @@ function Notices({ status: s, admin }: { status: GscStatus; admin: boolean }) {
 
 function Headline({ status }: { status: GscStatus }) {
   const summary = useSearchSummary(status);
-  if (summary.isPending) return <PageSpinner />;
+  if (summary.isPending) return <Pending />;
   if (summary.isError) return <ErrorNote error={summary.error} />;
   const cur = summary.data.current;
   if (!cur) return null;
@@ -215,7 +215,7 @@ function DailyCard({ status, from }: { status: GscStatus; from: string }) {
   const to = lastDay(status);
   const markers = useQuery({ queryKey: keys.changeMarkers(from, to), queryFn: () => api.changes.markers(from, to), placeholderData: (p) => p });
   let body;
-  if (daily.isPending) body = <PageSpinner />;
+  if (daily.isPending) body = <Pending />;
   else if (daily.isError) body = <div className="px-4 pb-4"><ErrorNote error={daily.error} /></div>;
   else
     body = (

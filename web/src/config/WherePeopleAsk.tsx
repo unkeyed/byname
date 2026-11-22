@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type Fidelity, type Pair, type PairTest, type Route, type RouteOption, type SearchControl, type Surface, type SurfaceGroup, type SurfaceInput, type SurfaceKey } from "../api";
 import { fidelityInfo, usd } from "../lines";
 import { keys, useCan, useIsAdmin, useSurfaces } from "../queries";
-import { Badge, Button, Card, cx, ErrorNote, Icon, inputClass, labelClass, PageSpinner, RelativeTime, Spinner, type Tone } from "../ui";
+import { Badge, Button, Card, cx, ErrorNote, Icon, inputClass, labelClass, Pending, RelativeTime, Spinner, type Tone } from "../ui";
 import { CredentialForm, testTone, useCredentials } from "./Credentials";
 import { Disclosure, FieldNote } from "./forms";
 
@@ -89,7 +89,7 @@ export interface Readiness {
  */
 export function WherePeopleAsk({ prefillDefaults, footer }: { prefillDefaults?: boolean; footer?: (ready: Readiness) => ReactNode }) {
   const surfaces = useSurfaces();
-  if (surfaces.isPending) return <PageSpinner />;
+  if (surfaces.isPending) return <Pending />;
   if (surfaces.isError) return <ErrorNote error={surfaces.error} />;
   return <Body surfaces={surfaces.data ?? []} prefillDefaults={prefillDefaults} footer={footer} />;
 }
@@ -270,7 +270,7 @@ function TregToken({ needed, onNoTreg, canEdit }: { needed: boolean; onNoTreg: (
       </p>
       {admin ? (
         creds.isPending ? (
-          <PageSpinner />
+          <Pending />
         ) : creds.isError ? (
           <ErrorNote error={creds.error} />
         ) : treg?.set && !replacing ? (
