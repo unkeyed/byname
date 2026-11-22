@@ -55,12 +55,12 @@ export function Gaps() {
 function CreateBrief() {
   const id = useId();
   return (
-    <span tabIndex={0} aria-describedby={id} className="group relative inline-flex cursor-not-allowed rounded-control outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={(e) => e.stopPropagation()}>
+    <span tabIndex={0} aria-describedby={id} className="group/brief relative inline-flex cursor-not-allowed rounded-control outline-none focus-visible:ring-2 focus-visible:ring-ring">
       <Button size="sm" disabled aria-disabled="true" tabIndex={-1} className="opacity-60">
         <Icon name="pencil" className="size-3.5" />
         Create brief
       </Button>
-      <span id={id} role="tooltip" className="pointer-events-none absolute right-0 bottom-full z-10 mb-1 hidden w-max rounded-surface bg-surface px-2 py-1 text-xs text-muted shadow-floating group-hover:block group-focus-visible:block">
+      <span id={id} role="tooltip" className="pointer-events-none absolute right-0 bottom-full z-10 mb-1 hidden w-max rounded-surface bg-surface px-2 py-1 text-xs text-muted shadow-floating group-hover/brief:block group-focus/brief:block">
         Coming later
       </span>
     </span>
@@ -112,17 +112,26 @@ function PromptGaps({ filter }: { filter: ResultsFilter }) {
           <CardHeader title={`${list.length} prompt ${list.length === 1 ? "gap" : "gaps"}`} description={`Check #${gaps.data.run_id}. Open a question to read each answer.`} />
           <ul className="divide-y divide-line border-t border-line">
             {list.map((g) => (
-              <li key={g.question.id}>
-                <div role="button" tabIndex={0} onClick={() => open(g)} onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), open(g))} className="flex cursor-pointer gap-3 px-4 py-3 outline-none hover:bg-subtle focus-visible:bg-subtle sm:gap-4">
+              <li key={g.question.id} className="group relative">
+                <div className="flex gap-3 px-4 py-3 group-hover:bg-subtle sm:gap-4">
                   <Score value={g.opportunity} max={max} />
                   <div className="min-w-0 flex-1 space-y-2">
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
                       <div className="min-w-0 flex-1">
-                        <div className="font-medium">{g.question.text}</div>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.currentTarget.focus();
+                            open(g);
+                          }}
+                          className="text-left font-medium group-hover:underline after:absolute after:inset-0 focus-visible:outline-none focus-visible:after:outline-2 focus-visible:after:-outline-offset-2 focus-visible:after:outline-ring"
+                        >
+                          {g.question.text}
+                        </button>
                         <div className="text-xs text-faint">{g.question.group}</div>
                       </div>
                       {canWrite && (
-                        <div className="shrink-0">
+                        <div className="relative z-[1] shrink-0">
                           <CreateBrief />
                         </div>
                       )}

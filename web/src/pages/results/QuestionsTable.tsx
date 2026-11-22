@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api, type Cell, type Outcome, type QuestionRow, type ResultsFilter, type Run, type Series } from "../../api";
 import { fidelityInfo, shortDay, useLabels } from "../../lines";
 import { keys, useSurfaces } from "../../queries";
-import { cx, ErrorNote, Icon, inputClass, Pending, ScrollX, selectClass, useWide } from "../../ui";
+import { cx, ErrorNote, Icon, inputClass, Pending, RowButton, ScrollX, selectClass, useWide } from "../../ui";
 import { runTime, useView } from "../../view";
 
 /** Status marks always pair an icon with words, never colour alone. */
@@ -202,11 +202,9 @@ export function QuestionsTable({ run, filter }: { run: Run; filter: ResultsFilte
             </thead>
             <tbody className="divide-y divide-line">
               {shown.map((r) => (
-                <tr key={r.question.id} className="group cursor-pointer hover:bg-subtle" onClick={() => open(r)}>
+                <tr key={r.question.id} className="group relative hover:bg-subtle">
                   <td data-sticky className="sticky left-0 z-[1] w-64 min-w-64 bg-surface px-3 py-2 shadow-[inset_-1px_0_0_var(--line)] group-hover:bg-[color-mix(in_oklab,var(--surface),var(--fg)_5%)]">
-                    <button type="button" className="text-left font-medium hover:underline" onClick={(e) => (e.stopPropagation(), open(r))}>
-                      {r.question.text}
-                    </button>
+                    <div className="font-medium group-hover:underline">{r.question.text}</div>
                     <div className="text-xs text-faint">{r.question.group}</div>
                   </td>
                   {r.cells.map((c, i) => (
@@ -215,6 +213,7 @@ export function QuestionsTable({ run, filter }: { run: Run; filter: ResultsFilte
                     </td>
                   ))}
                   <td className="px-3 py-2 whitespace-nowrap tabular-nums">
+                    <RowButton label={r.question.text} onClick={() => open(r)} />
                     {r.named} <span className="text-faint">of {r.answered}</span>
                   </td>
                   <td className="px-3 py-2 tabular-nums">{r.best_position ? `#${r.best_position}` : <span className="text-faint">–</span>}</td>

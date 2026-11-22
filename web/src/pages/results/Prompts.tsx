@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api, type AnswerSummary, type Dot, type DotState, type PromptRow, type ResultsFilter, type Run, type RunRef } from "../../api";
 import { fidelityInfo, shortDay, useLabels } from "../../lines";
 import { keys, useAnsweredRuns, useSettings, useSurfaces } from "../../queries";
-import { Badge, Card, cx, EmptyState, ErrorNote, inputClass, Pending, ScrollX, selectClass, useLoading, useWide } from "../../ui";
+import { Badge, Card, cx, EmptyState, ErrorNote, inputClass, Pending, RowButton, ScrollX, selectClass, useLoading, useWide } from "../../ui";
 import { runTime, useFilter, useView } from "../../view";
 import { ViewHeader } from "./Header";
 import { CellMark } from "./QuestionsTable";
@@ -159,14 +159,13 @@ function PromptList({ filter }: { filter: ResultsFilter }) {
             </thead>
             <tbody className="divide-y divide-line">
               {shown.map((r) => (
-                <tr key={r.question.id} className="group cursor-pointer hover:bg-subtle" onClick={() => open(r)}>
+                <tr key={r.question.id} className="group relative hover:bg-subtle">
                   <td data-sticky className="sticky left-0 z-[1] w-72 min-w-72 max-w-72 bg-surface px-3 py-2 shadow-[inset_-1px_0_0_var(--line)] group-hover:bg-[color-mix(in_oklab,var(--surface),var(--fg)_5%)]">
-                    <button type="button" className="text-left font-medium hover:underline" onClick={(e) => (e.stopPropagation(), open(r))}>
-                      {r.question.text}
-                    </button>
+                    <div className="font-medium group-hover:underline">{r.question.text}</div>
                     <div className="text-xs text-faint">{r.question.group}</div>
                   </td>
                   <td className="max-w-64 px-3 py-2 align-top">
+                    <RowButton label={r.question.text} onClick={() => open(r)} />
                     <div className="tabular-nums">
                       {r.named_by.length} <span className="text-faint">of {r.answered}</span>
                     </div>
@@ -267,11 +266,10 @@ function AnswerList({ run, filter }: { run: Run; filter: ResultsFilter }) {
             </thead>
             <tbody className="divide-y divide-line">
               {shown.map((a) => (
-                <tr key={a.id} className="cursor-pointer hover:bg-subtle" onClick={() => open(a)}>
+                <tr key={a.id} className="group relative hover:bg-subtle">
                   <td className="max-w-80 px-3 py-2">
-                    <button type="button" className="text-left font-medium hover:underline" onClick={(e) => (e.stopPropagation(), open(a))}>
-                      {a.question.text}
-                    </button>
+                    <RowButton label={a.question.text} onClick={() => open(a)} />
+                    <span className="font-medium group-hover:underline">{a.question.text}</span>
                   </td>
                   <td className="px-3 py-2 text-xs" title={fidelityInfo[a.fidelity].detail}>
                     {pairLabel(a)}

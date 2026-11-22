@@ -522,6 +522,27 @@ export function ScrollX({ children, startAtEnd, label }: { children: ReactNode; 
   );
 }
 
+/**
+ * A table row's one control, laid over the whole row (the row must be
+ * relative), so the row is the target while controls in other cells stay
+ * clickable above it. It sits in a cell that is not sticky, since a sticky
+ * cell would contain it. It takes focus when clicked, so the drawer it opens
+ * hands focus back to it on closing.
+ */
+export function RowButton({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      onClick={(e) => {
+        e.currentTarget.focus();
+        onClick();
+      }}
+      className="absolute inset-0 z-[2] focus-visible:-outline-offset-2"
+    />
+  );
+}
+
 export function EmptyState({ icon, title, children, action }: { icon?: IconName; title: string; children?: ReactNode; action?: ReactNode }) {
   return (
     <div className="flex flex-col items-center gap-2 rounded-surface border border-dashed border-line-strong px-4 py-10 text-center">

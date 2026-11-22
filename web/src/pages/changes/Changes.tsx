@@ -3,7 +3,7 @@ import { Link } from "react-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, type Change, type ChangeKind, type GscStatus, type RepoStatus } from "../../api";
 import { keys, useChanges, useChangeSettings, useGsc, useMe, useRepo } from "../../queries";
-import { Badge, Button, buttonClass, Card, CardHeader, cx, Dialog, DialogBody, EmptyState, ErrorNote, Field, Icon, inputClass, Pending, RelativeTime, ScrollX, selectClass, useLoading, useWide } from "../../ui";
+import { Badge, Button, buttonClass, Card, CardHeader, cx, Dialog, DialogBody, EmptyState, ErrorNote, Field, Icon, inputClass, Pending, RelativeTime, RowButton, ScrollX, selectClass, useLoading, useWide } from "../../ui";
 import { ViewHeader } from "../results/Header";
 import { fullDay } from "../search/model";
 import { Note, settingsPath as searchConsolePath } from "../search/Search";
@@ -232,15 +232,14 @@ function ChangeTable({ changes, zone }: { changes: Change[]; zone: Zone }) {
         </thead>
         <tbody className="divide-y divide-line">
           {changes.map((c) => (
-            <tr key={c.id} className="cursor-pointer hover:bg-subtle" onClick={(e) => !(e.target as Element).closest("a, button") && open(c.id)}>
+            <tr key={c.id} className="group relative hover:bg-subtle">
               <td className="max-w-72 py-2 pr-3 pl-4 align-top">
-                <button type="button" onClick={() => open(c.id)} title={c.url} className="block max-w-full truncate text-left font-medium hover:underline">
-                  {pagePath(c.url)}
-                </button>
+                <RowButton label={pagePath(c.url)} onClick={() => open(c.id)} />
+                <span className="block max-w-full truncate font-medium group-hover:underline">{pagePath(c.url)}</span>
                 <span className="text-xs text-faint">{kindInfo[c.kind]}</span>
               </td>
               <td className="max-w-64 py-2 pr-3 align-top">
-                <ChangeSource c={c} className="block truncate" />
+                <ChangeSource c={c} className="relative z-[3] block truncate" />
               </td>
               <td className={td}>{zone.date(c.merged_at)}</td>
               <td className={td}>{c.first_crawl_at ? zone.at(c.first_crawl_at) : <span className="text-muted">Not yet</span>}</td>
