@@ -3924,7 +3924,7 @@ components:
             type: string
         path:
           type: string
-          description: The page it links to, relative to the app's address, such as /compare?before=11&after=12.
+          description: The page it links to, relative to the app's address, such as /ai/what-changed?before=11&after=12.
         payload:
           type: object
           description: The event's data. Its shape depends on kind; check_completed carries the same counts GET /v1/compare returns.

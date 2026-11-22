@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
 import { Navigate, NavLink, Outlet, useLocation, useNavigate, type RouteObject } from "react-router";
-import { Moved } from "../../nav";
 import { useMe } from "../../queries";
 import { cx, LoadBoundary, PageHeader, selectClass } from "../../ui";
 import { Account } from "./Account";
@@ -65,18 +64,9 @@ const sections: { label: string; pages: Page[] }[] = [
   },
 ];
 
-/** Settings pages that were renamed or merged. */
-const moved: [from: string, to: string][] = [
-  ["surfaces", "ai-apps"],
-  ["limits", "schedule"],
-  ["credentials", "treg"],
-  ["notifications", "alerts"],
-];
-
 export const settingsRoutes: RouteObject[] = [
   { index: true, element: <Navigate to="general" replace /> },
   ...sections.flatMap((s) => s.pages).map((p) => ({ path: p.path, element: p.element })),
-  ...moved.map(([from, to]) => ({ path: from, element: <Moved to={`/settings/${to}`} /> })),
 ];
 
 /**

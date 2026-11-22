@@ -538,7 +538,7 @@ func TestOAuthSignInSetsCookiesAndRedirects(t *testing.T) {
 	}
 
 	iss.SetNext(authtest.Identity{Subject: "mallory", Email: "mallory@evil.com", EmailVerified: true})
-	res := get(c.base + "/auth/oauth/oidc/start?next=/prompts")
+	res := get(c.base + "/auth/oauth/oidc/start?next=/ai/questions")
 	res = get(res.Header.Get("Location"))
 	res = get(toServer(res.Header.Get("Location")))
 	if loc := res.Header.Get("Location"); !strings.HasPrefix(loc, "/login?error=") {
@@ -546,7 +546,7 @@ func TestOAuthSignInSetsCookiesAndRedirects(t *testing.T) {
 	}
 
 	iss.SetNext(authtest.Identity{Subject: "admin", Email: adminEmail, EmailVerified: true})
-	res = get(c.base + "/auth/oauth/oidc/start?next=/prompts")
+	res = get(c.base + "/auth/oauth/oidc/start?next=/ai/questions")
 	if res.StatusCode != http.StatusSeeOther || !strings.HasPrefix(res.Header.Get("Location"), iss.URL+"/authorize") {
 		t.Fatalf("start = %d to %q", res.StatusCode, res.Header.Get("Location"))
 	}
@@ -563,7 +563,7 @@ func TestOAuthSignInSetsCookiesAndRedirects(t *testing.T) {
 	}
 
 	res = get(callback)
-	if res.StatusCode != http.StatusSeeOther || res.Header.Get("Location") != "/login?second_factor=1&next=%2Fprompts" {
+	if res.StatusCode != http.StatusSeeOther || res.Header.Get("Location") != "/login?second_factor=1&next=%2Fai%2Fquestions" {
 		t.Fatalf("callback = %d to %q, want 303 to the second factor step: the admin has a passkey and this login matched by email", res.StatusCode, res.Header.Get("Location"))
 	}
 	jarCookie := func(name string) string {
@@ -667,7 +667,7 @@ func TestSecurityHeaders(t *testing.T) {
 		mux.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = io.WriteString(w, "<!doctype html>") }))
 		srv := httptest.NewServer(SecurityHeaders(u, mux))
 		t.Cleanup(srv.Close)
-		for _, path := range []string{"/", "/prompts", "/healthz", "/v1/nope"} {
+		for _, path := range []string{"/", "/ai/questions", "/healthz", "/v1/nope"} {
 			h := client{t: t, base: srv.URL}.do("GET", path, nil).header
 			if h.Get("Content-Security-Policy") != csp || h.Get("X-Content-Type-Options") != "nosniff" ||
 				h.Get("Referrer-Policy") != "same-origin" || h.Get("X-Frame-Options") != "DENY" {
@@ -676,7 +676,7 @@ func TestSecurityHeaders(t *testing.T) {
 			if hsts := h.Get("Strict-Transport-Security"); (hsts != "") != (u.Scheme == "https") {
 				t.Errorf("%s %s: Strict-Transport-Security %q", publicURL, path, hsts)
 			}
-			if path != "/" && path != "/prompts" && (h.Get("Cache-Control") != "no-store" || h.Get("Vary") != "Cookie, Authorization") {
+			if path != "/" && path != "/ai/questions" && (h.Get("Cache-Control") != "no-store" || h.Get("Vary") != "Cookie, Authorization") {
 				t.Errorf("%s %s: Cache-Control %q, Vary %q, want no-store varying on Cookie and Authorization", publicURL, path, h.Get("Cache-Control"), h.Get("Vary"))
 			}
 		}

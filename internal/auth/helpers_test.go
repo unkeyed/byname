@@ -172,7 +172,7 @@ func (f *fixture) exec(sql string, args ...any) {
 
 func (f *fixture) oauth(provider, intent, token string, cur *Current) (OAuthResult, error) {
 	f.t.Helper()
-	to, state, err := f.users.StartOAuth(f.ctx, OAuthStart{Provider: provider, Intent: intent, Token: token, Next: "/prompts"}, cur)
+	to, state, err := f.users.StartOAuth(f.ctx, OAuthStart{Provider: provider, Intent: intent, Token: token, Next: "/ai/questions"}, cur)
 	if err != nil {
 		return OAuthResult{}, err
 	}

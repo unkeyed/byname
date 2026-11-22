@@ -5,7 +5,7 @@ import { createBrowserRouter, RouterProvider } from "react-router";
 import { ApiError } from "./api";
 import { keys } from "./queries";
 import { Layout, NotFound } from "./Layout";
-import { moved, Moved, section, Section } from "./nav";
+import { FirstTab, section, Section } from "./nav";
 import { Login } from "./pages/Login";
 import { AcceptInvite } from "./pages/AcceptInvite";
 import { Setup } from "./pages/Setup";
@@ -39,7 +39,7 @@ const router = createBrowserRouter([
         path: "ai",
         element: <Section item={section("/ai")} />,
         children: [
-          { index: true, element: <Moved to="/ai/questions" /> },
+          { index: true, element: <FirstTab item={section("/ai")} /> },
           { path: "questions", element: <Questions /> },
           { path: "competitors", element: <Competitors /> },
           { path: "missed", element: <Missed /> },
@@ -50,7 +50,7 @@ const router = createBrowserRouter([
         path: "google",
         element: <Section item={section("/google")} />,
         children: [
-          { index: true, element: <Moved to="/google/traffic" /> },
+          { index: true, element: <FirstTab item={section("/google")} /> },
           { path: "traffic", element: <Search /> },
           { path: "site-changes", element: <Changes /> },
         ],
@@ -58,7 +58,6 @@ const router = createBrowserRouter([
       { path: "social", element: <Social /> },
       { path: "alerts", element: <Alerts /> },
       { path: "settings", element: <Settings />, children: settingsRoutes },
-      ...moved.map(([from, to]) => ({ path: from, element: <Moved to={to} /> })),
       { path: "*", element: <NotFound /> },
     ],
   },

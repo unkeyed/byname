@@ -43,21 +43,10 @@ export const nav: NavItem[] = [
 
 export const section = (to: string) => nav.find((n) => n.to === to)!;
 
-/** Pages that moved when the navigation was regrouped. Old links and bookmarks land on the new page with their query. */
-export const moved: [from: string, to: string][] = [
-  ["prompts", "/ai/questions"],
-  ["competitors", "/ai/competitors"],
-  ["gaps", "/ai/missed"],
-  ["compare", "/ai/what-changed"],
-  ["search", "/google/traffic"],
-  ["changes", "/google/site-changes"],
-  ["runs", "/settings/checks"],
-];
-
-/** Redirects to `to`, keeping the query and hash, so a moved link opens the same view. */
-export function Moved({ to }: { to: string }) {
+/** A section's bare path opens its first tab, keeping the query so the filters carry over. */
+export function FirstTab({ item }: { item: NavItem }) {
   const { search, hash } = useLocation();
-  return <Navigate to={to + search + hash} replace />;
+  return <Navigate to={`${item.to}/${item.tabs![0].path}${search}${hash}`} replace />;
 }
 
 const Current = createContext<NavItem | null>(null);

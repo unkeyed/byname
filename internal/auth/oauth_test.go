@@ -87,7 +87,7 @@ func TestSocialSignInAgainstFakeIssuer(t *testing.T) {
 	iss.SetNext(authtest.Identity{Subject: "ada-sso", Email: "ADA@example.com", EmailVerified: true, Name: "Ada"})
 	res, err := f.oauth("oidc", IntentLogin, "", nil)
 	f.must(err)
-	if res.SignIn.Pending == "" || res.Redirect != "/login?second_factor=1&next=%2Fprompts" {
+	if res.SignIn.Pending == "" || res.Redirect != "/login?second_factor=1&next=%2Fai%2Fquestions" {
 		t.Fatalf("verified email of an existing user with a passkey: %+v, want a pending login", res)
 	}
 	in, err := f.passkeySecondFactor(res.SignIn.Pending, adminPasskey)
@@ -232,17 +232,17 @@ func TestGitHubNeverJoinsByDomain(t *testing.T) {
 
 func TestSafeNext(t *testing.T) {
 	for next, want := range map[string]string{
-		"/prompts":           "/prompts",
-		"/prompts?q=ada#top": "/prompts?q=ada#top",
-		"":                   "/",
-		"prompts":            "/",
-		"//evil.com":         "/",
-		"/\\evil.com":        "/",
-		"/\t/evil.com":       "/",
-		"/\n/evil.com":       "/",
-		"/%09/evil.com":      "/%09/evil.com",
-		"https://evil.com":   "/",
-		"/ok\\..":            "/",
+		"/ai/questions":           "/ai/questions",
+		"/ai/questions?q=ada#top": "/ai/questions?q=ada#top",
+		"":                        "/",
+		"prompts":                 "/",
+		"//evil.com":              "/",
+		"/\\evil.com":             "/",
+		"/\t/evil.com":            "/",
+		"/\n/evil.com":            "/",
+		"/%09/evil.com":           "/%09/evil.com",
+		"https://evil.com":        "/",
+		"/ok\\..":                 "/",
 	} {
 		if got := SafeNext(next); got != want {
 			t.Errorf("SafeNext(%q) = %q, want %q", next, got, want)
