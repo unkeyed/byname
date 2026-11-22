@@ -656,6 +656,80 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "503":
           $ref: "#/components/responses/Unavailable"
+  /v1/questions/{id}/scoring:
+    parameters:
+      - $ref: "#/components/parameters/id"
+    put:
+      tags: [config]
+      operationId: setQuestionScoring
+      summary: Count a question's answers in scores, leave them out, or go back to the default.
+      description: >-
+        A question whose text names your brand is still asked and its answers
+        shown, but by default they count in no score, because an answer
+        naming you is no news when the question did. Every other question
+        counts by default. The choice covers the earlier versions the
+        question carries on, and later versions carry it on. Only a question
+        of the current set takes it.
+      security:
+        - apiKey: [config:write]
+        - session: [config:write]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QuestionScoringInput"
+      responses:
+        "200":
+          description: The question.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Question"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /v1/naming-check:
+    post:
+      tags: [config]
+      operationId: checkNaming
+      summary: Check text while someone types it, before anything is saved.
+      description: >-
+        For each question text, the brands it names by the rules answers are
+        scored with, and whether it names your brand, which leaves its
+        answers out of scores by default. For each alias, whether it is a
+        common English word that everyday text would match. Stores nothing.
+      security:
+        - apiKey: [results:read]
+        - session: [results:read]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NamingCheckInput"
+      responses:
+        "200":
+          description: What each text names.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NamingCheck"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/Unavailable"
   /v1/runs:
     post:
       tags: [runs]
@@ -4601,7 +4675,7 @@ components:
           default: competitor
     Question:
       type: object
-      required: [id, group, text]
+      required: [id, group, text, names_brand, count_in_scores]
       properties:
         id:
           type: integer
@@ -4612,6 +4686,70 @@ components:
         text:
           type: string
           description: Sent to every surface as written.
+        names_brand:
+          type: boolean
+          description: The text names your brand, by the rules answers are scored with.
+        count_in_scores:
+          type: boolean
+          description: Whether its answers count in scores. False by default when the text names your brand, true otherwise. Set with PUT /v1/questions/{id}/scoring.
+    QuestionScoringInput:
+      type: object
+      required: [count_in_scores]
+      additionalProperties: false
+      properties:
+        count_in_scores:
+          type: [boolean, "null"]
+          description: True to count its answers in scores, false to leave them out, null for the default.
+    NamingCheckInput:
+      type: object
+      additionalProperties: false
+      properties:
+        questions:
+          type: array
+          maxItems: 100
+          description: Question texts to check against the brand table.
+          items:
+            type: string
+        aliases:
+          type: array
+          maxItems: 50
+          description: Brand names or aliases to check for common words.
+          items:
+            type: string
+    NamingCheck:
+      type: object
+      required: [brand, questions, aliases]
+      properties:
+        brand:
+          type: string
+          description: Your brand's name. Empty before it is set.
+        questions:
+          type: array
+          items:
+            type: object
+            required: [text, names_brand, brands]
+            properties:
+              text:
+                type: string
+              names_brand:
+                type: boolean
+                description: The text names your brand, so its answers are left out of scores by default.
+              brands:
+                type: array
+                description: Every brand the text names, yours and competitors', in order of first mention.
+                items:
+                  type: string
+        aliases:
+          type: array
+          items:
+            type: object
+            required: [alias, common_word]
+            properties:
+              alias:
+                type: string
+              common_word:
+                type: boolean
+                description: A common English word, so everyday text would count as naming the brand.
     QuestionLink:
       type: object
       required: [from, to]
@@ -5019,7 +5157,7 @@ components:
     Run:
       type: object
       description: One check with what it cost and how each endpoint did.
-      required: [id, status, trigger, question_set_id, question_set_version, queued_at, started_at, finished_at, spend_usd, spend_missing_calls, calls, succeeded, mentioned, cited, error, refusal_code, endpoints]
+      required: [id, status, trigger, question_set_id, question_set_version, queued_at, started_at, finished_at, spend_usd, spend_missing_calls, calls, succeeded, scored, mentioned, cited, error, refusal_code, endpoints]
       properties:
         id:
           type: integer
@@ -5052,12 +5190,15 @@ components:
         succeeded:
           type: integer
           description: Answers that did not fail.
+        scored:
+          type: integer
+          description: Answers that did not fail and count in scores. Answers to a question that names your brand are left out unless it is counted anyway.
         mentioned:
           type: integer
-          description: Question and pair answers that named you.
+          description: Of the scored answers, those that named you.
         cited:
           type: integer
-          description: Question and pair answers that cited one of your domains. Counted apart from mentioned.
+          description: Of the scored answers, those that cited one of your domains. Counted apart from mentioned.
         error:
           type: string
           description: Why the run stopped early, if it did. Empty otherwise.
@@ -5070,7 +5211,7 @@ components:
             $ref: "#/components/schemas/EndpointStats"
     QuestionRef:
       type: object
-      required: [id, group, text]
+      required: [id, group, text, counts_in_scores]
       properties:
         id:
           type: integer
@@ -5078,6 +5219,9 @@ components:
           type: string
         text:
           type: string
+        counts_in_scores:
+          type: boolean
+          description: False when its answers are left out of scores, as for a question that names your brand. Its answers are still shown.
     PairRef:
       type: object
       description: Names a surface and model pair.

@@ -571,6 +571,8 @@ var mcpTools = map[string]string{
 	"POST /v1/onboarding/finish":      "finish_onboarding",
 	"POST /v1/pairs/{id}/test":        "test_pair",
 	"GET /v1/estimate":                "estimate_cost",
+	"PUT /v1/questions/{id}/scoring":  "set_question_scoring",
+	"POST /v1/naming-check":           "check_naming",
 
 	"POST /v1/runs":          "run_now",
 	"POST /v1/checks/pause":  "pause_checks",

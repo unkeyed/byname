@@ -41,14 +41,17 @@ type Run struct {
 	SpendUSD           float64    `json:"spend_usd"`
 	// SpendMissingCalls counts answered calls that reported no cost. Their
 	// cost is unknown, not $0.
-	SpendMissingCalls int             `json:"spend_missing_calls"`
-	Calls             int             `json:"calls" jsonschema:"answers stored, failed ones included"`
-	Succeeded         int             `json:"succeeded" jsonschema:"answers that did not fail"`
-	Mentioned         int             `json:"mentioned" jsonschema:"question and pair answers that named you"`
-	Cited             int             `json:"cited" jsonschema:"question and pair answers that cited your domains"`
-	Error             string          `json:"error" jsonschema:"why the run stopped early, if it did"`
-	RefusalCode       string          `json:"refusal_code" jsonschema:"Treg's error code when it refused a call"`
-	Endpoints         []EndpointStats `json:"endpoints"`
+	SpendMissingCalls int `json:"spend_missing_calls"`
+	Calls             int `json:"calls" jsonschema:"answers stored, failed ones included"`
+	Succeeded         int `json:"succeeded" jsonschema:"answers that did not fail"`
+	// Scored, Mentioned and Cited leave out answers that count in no
+	// score, such as those to a question that names your brand.
+	Scored      int             `json:"scored" jsonschema:"answers that did not fail and count in scores"`
+	Mentioned   int             `json:"mentioned" jsonschema:"of the scored answers, those that named you"`
+	Cited       int             `json:"cited" jsonschema:"of the scored answers, those that cited your domains"`
+	Error       string          `json:"error" jsonschema:"why the run stopped early, if it did"`
+	RefusalCode string          `json:"refusal_code" jsonschema:"Treg's error code when it refused a call"`
+	Endpoints   []EndpointStats `json:"endpoints"`
 }
 
 // EndpointStats is one endpoint's calls in a run, so a flaky provider
@@ -73,13 +76,15 @@ type RunsQuery struct {
 const runSelect = `SELECT r.id, r.status, r.trigger, r.question_set_id, qs.version, r.queued_at, r.started_at, r.finished_at,
 		r.spend_usd::float8, r.spend_missing_calls, coalesce(r.error, ''), coalesce(r.refusal_code, ''),
 		count(a.id), count(a.id) FILTER (WHERE a.status <> 'failed'),
-		count(a.id) FILTER (WHERE a.mentioned), count(a.id) FILTER (WHERE a.cited)
-	FROM run r JOIN question_set qs ON qs.id = r.question_set_id LEFT JOIN answer a ON a.run_id = r.id`
+		count(a.id) FILTER (WHERE a.status <> 'failed' AND q.counts_in_scores),
+		count(a.id) FILTER (WHERE a.mentioned AND q.counts_in_scores), count(a.id) FILTER (WHERE a.cited AND q.counts_in_scores)
+	FROM run r JOIN question_set qs ON qs.id = r.question_set_id LEFT JOIN answer a ON a.run_id = r.id
+	LEFT JOIN question q ON q.id = a.question_id`
 
 func scanRun(row pgx.CollectableRow) (Run, error) {
 	var r Run
 	err := row.Scan(&r.ID, &r.Status, &r.Trigger, &r.QuestionSetID, &r.QuestionSetVersion, &r.QueuedAt, &r.StartedAt, &r.FinishedAt,
-		&r.SpendUSD, &r.SpendMissingCalls, &r.Error, &r.RefusalCode, &r.Calls, &r.Succeeded, &r.Mentioned, &r.Cited)
+		&r.SpendUSD, &r.SpendMissingCalls, &r.Error, &r.RefusalCode, &r.Calls, &r.Succeeded, &r.Scored, &r.Mentioned, &r.Cited)
 	r.Endpoints = []EndpointStats{}
 	return r, err
 }
@@ -149,6 +154,10 @@ type QuestionRef struct {
 	ID    int64  `json:"id"`
 	Group string `json:"group"`
 	Text  string `json:"text"`
+	// CountsInScores is false for a question that names your brand, unless
+	// someone counted it anyway. Its answers are shown, and left out of
+	// every score.
+	CountsInScores bool `json:"counts_in_scores" jsonschema:"false when its answers are left out of scores, as for a question that names your brand"`
 }
 
 // PairRef names a surface and model pair. Model is empty on app surfaces.
@@ -207,14 +216,14 @@ type Citation struct {
 	Page *PageCheck `json:"page"`
 }
 
-const answerSelect = `SELECT a.id, a.run_id, q.id, q.group_name, q.text, m.id, m.surface_key, coalesce(m.model, ''),
+const answerSelect = `SELECT a.id, a.run_id, q.id, q.group_name, q.text, q.counts_in_scores, m.id, m.surface_key, coalesce(m.model, ''),
 		a.endpoint, a.fidelity, a.reported_model, a.status, a.error, a.attempts, a.mentioned, a.cited, a.position,
 		a.cost_usd::float8, (SELECT count(*) FROM citation c WHERE c.answer_id = a.id), a.answered_at
 	FROM answer a JOIN question q ON q.id = a.question_id JOIN surface_model m ON m.id = a.surface_model_id`
 
 func scanAnswer(row pgx.CollectableRow) (AnswerSummary, error) {
 	var a AnswerSummary
-	err := row.Scan(&a.ID, &a.RunID, &a.Question.ID, &a.Question.Group, &a.Question.Text, &a.Pair.ID, &a.Pair.Surface, &a.Pair.Model,
+	err := row.Scan(&a.ID, &a.RunID, &a.Question.ID, &a.Question.Group, &a.Question.Text, &a.Question.CountsInScores, &a.Pair.ID, &a.Pair.Surface, &a.Pair.Model,
 		&a.Endpoint, &a.Fidelity, &a.ReportedModel, &a.Status, &a.Error, &a.Attempts, &a.Mentioned, &a.Cited, &a.Position,
 		&a.CostUSD, &a.CitationCount, &a.AnsweredAt)
 	a.Mentions = []Mention{}

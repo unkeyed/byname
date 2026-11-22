@@ -76,6 +76,9 @@ var routes = []route{
 	{"POST /v1/onboarding/finish", needs(core.ConfigWrite), (*server).finishOnboarding},
 	{"POST /v1/pairs/{id}/test", needs(core.ConfigWrite), (*server).testPair},
 	{"GET /v1/estimate", needs(core.ResultsRead), (*server).estimate},
+	// Questions that name your brand, and checking names while typing.
+	{"PUT /v1/questions/{id}/scoring", needs(core.ConfigWrite), (*server).setQuestionScoring},
+	{"POST /v1/naming-check", needs(core.ResultsRead), (*server).checkNaming},
 
 	{"POST /v1/runs", needs(core.RunsWrite), (*server).runNow},
 	{"POST /v1/checks/pause", needs(core.RunsWrite), (*server).pauseChecks},

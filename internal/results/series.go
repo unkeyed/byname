@@ -25,23 +25,27 @@ type scoredAnswer struct {
 	id, runID int64
 	started   time.Time
 	question  panel.QuestionID
-	series    Series
-	reported  string
-	fanOut    []string
-	scored    panel.Scored
+	// counted is false for an answer to a question that names your brand,
+	// unless someone counted it anyway: it is shown but scores skip it.
+	counted  bool
+	series   Series
+	reported string
+	fanOut   []string
+	scored   panel.Scored
 }
 
 // scoredAnswers loads answers as panel.Scored, in run order.
 func (s *Service) scoredAnswers(ctx context.Context, where string, args ...any) ([]scoredAnswer, error) {
-	rows, err := s.db.Query(ctx, `SELECT a.id, a.run_id, coalesce(r.started_at, r.queued_at), a.question_id,
+	rows, err := s.db.Query(ctx, `SELECT a.id, a.run_id, coalesce(r.started_at, r.queued_at), a.question_id, q.counts_in_scores,
 			m.id, m.surface_key, coalesce(m.model, ''), a.endpoint, a.fidelity, a.reported_model, a.fan_out,
 			a.status, a.mentioned, a.cited, coalesce(a.position, 0),
 			coalesce(array_agg(bm.brand_id ORDER BY bm.position NULLS LAST, bm.brand_id) FILTER (WHERE bm.brand_id IS NOT NULL), '{}'),
 			coalesce(array_agg(coalesce(bm.position, 0) ORDER BY bm.position NULLS LAST, bm.brand_id) FILTER (WHERE bm.brand_id IS NOT NULL), '{}')
 		FROM answer a JOIN run r ON r.id = a.run_id JOIN surface_model m ON m.id = a.surface_model_id
+		JOIN question q ON q.id = a.question_id
 		LEFT JOIN brand_mention bm ON bm.answer_id = a.id
 		WHERE `+where+`
-		GROUP BY a.id, r.id, m.id ORDER BY a.run_id, a.id`, args...)
+		GROUP BY a.id, r.id, m.id, q.id ORDER BY a.run_id, a.id`, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -49,7 +53,7 @@ func (s *Service) scoredAnswers(ctx context.Context, where string, args ...any) 
 		var a scoredAnswer
 		var brands []int64
 		var positions []int
-		err := r.Scan(&a.id, &a.runID, &a.started, &a.question, &a.series.Pair.ID, &a.series.Pair.Surface, &a.series.Pair.Model,
+		err := r.Scan(&a.id, &a.runID, &a.started, &a.question, &a.counted, &a.series.Pair.ID, &a.series.Pair.Surface, &a.series.Pair.Model,
 			&a.series.Endpoint, &a.series.Fidelity, &a.reported, &a.fanOut, &a.scored.Status, &a.scored.Mentioned, &a.scored.Cited,
 			&a.scored.Position, &brands, &positions)
 		for i, b := range brands {
@@ -90,7 +94,9 @@ type PairChange struct {
 }
 
 // Comparison is every question and pair across two runs, with counts per
-// outcome and the net change (gained minus lost).
+// outcome and the net change (gained minus lost). Pairs list every
+// question, but the counts and the net leave out questions that count in
+// no score, such as one that names your brand.
 type Comparison struct {
 	Before int64                 `json:"before"`
 	After  int64                 `json:"after"`
@@ -147,9 +153,9 @@ func (s *Service) Compare(ctx context.Context, before, after int64) (Comparison,
 		}
 	}
 	c := panel.Compare(runs[before], runs[after], m)
-	out := Comparison{Before: before, After: after, Counts: map[panel.Outcome]int{}, Net: c.Net(), Pairs: []PairChange{}}
+	out := Comparison{Before: before, After: after, Counts: map[panel.Outcome]int{}, Pairs: []PairChange{}}
 	for _, o := range []panel.Outcome{panel.Gained, panel.Lost, panel.Moved, panel.Unchanged, panel.NotComparable} {
-		out.Counts[o] = c.Counts[o]
+		out.Counts[o] = 0
 	}
 	reverse := map[panel.QuestionID]panel.QuestionID{}
 	for old, now := range m {
@@ -181,7 +187,11 @@ func (s *Service) Compare(ctx context.Context, before, after int64) (Comparison,
 			}
 		}
 		out.Pairs = append(out.Pairs, pc)
+		if pc.Question.CountsInScores {
+			out.Counts[p.Outcome]++
+		}
 	}
+	out.Net = out.Counts[panel.Gained] - out.Counts[panel.Lost]
 	return out, nil
 }
 

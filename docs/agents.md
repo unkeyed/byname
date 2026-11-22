@@ -117,7 +117,7 @@ Keys live in Postgres by default, or in Unkey when `UNKEY_ROOT_KEY` and `UNKEY_A
 
 ## MCP tools
 
-Byname's MCP server has 70 tools. Every REST route an API key can call has one with the same scope, except `DELETE /v1/keys/current`, since MCP clients sign in with OAuth instead of a key. A test keeps the two in step. Read tools are marked read-only, and `delete_brand`, `delete_goal`, `delete_change`, `delete_control_page` and `remove_left_out_account` are marked destructive, so a client can ask before it runs them.
+Byname's MCP server has 72 tools. Every REST route an API key can call has one with the same scope, except `DELETE /v1/keys/current`, since MCP clients sign in with OAuth instead of a key. A test keeps the two in step. Read tools are marked read-only, and `delete_brand`, `delete_goal`, `delete_change`, `delete_control_page` and `remove_left_out_account` are marked destructive, so a client can ask before it runs them.
 
 | Tool | Scope | REST | What it does |
 |---|---|---|---|
@@ -135,9 +135,9 @@ Byname's MCP server has 70 tools. Every REST route an API key can call has one w
 | `update_path_rules` | `config:write` | `PUT /v1/repo/rules` | Replace the rules that map a pull request's changed files to page URLs. |
 | `list_social_mentions` | `results:read` | `GET /v1/social/mentions` | Posts that mention the brand on X, Reddit, Hacker News, LinkedIn, YouTube, Threads and Bluesky, newest first, each with its author, text, engagement and link, without those by left-out accounts unless include_hidden is set, with how many match and how many are hidden. |
 | `get_social_digest` | `results:read` | `GET /v1/social/digest` | One day's or week's social mentions grouped by network with the most engaged first, the authors new in it, and what the searches cost, without left-out accounts; the latest period that has ended unless day names one. |
-| `get_social_settings` | `results:read` | `GET /v1/social/settings` | The social search terms, each network with whether it is on, its route (Treg or direct) and its latest call, how often searches run and when the digest goes out. |
+| `get_social_settings` | `results:read` | `GET /v1/social/settings` | Whether social searches are on (they start off), the social search terms, each network with whether it is on, its route (Treg or direct) and its latest call, how often searches run and when the digest goes out. |
 | `list_left_out_accounts` | `results:read` | `GET /v1/social/left-out` | The accounts whose mentions are hidden, such as teammates and the company's own accounts, each with its label and how many stored mentions it hides. |
-| `update_social_settings` | `config:write` | `PUT /v1/social/settings` | Replace the social search terms, the fetch period and the digest schedule, and turn networks on or off (read them with get_social_settings first). |
+| `update_social_settings` | `config:write` | `PUT /v1/social/settings` | Turn social searches on or off, replace the social search terms, the fetch period and the digest schedule, and turn networks on or off (read them with get_social_settings first). |
 | `leave_out_account` | `config:write` | `POST /v1/social/left-out` | Leave an account out of social mentions, or relabel one already left out; its past mentions are hidden too. |
 | `remove_left_out_account` | `config:write` | `DELETE /v1/social/left-out/{id}` | Take an account off the left-out list, so its mentions show again. |
 | `status` | `results:read` | `GET /v1/status` | Byname's version and whether onboarding is done. |
@@ -164,10 +164,12 @@ Byname's MCP server has 70 tools. Every REST route an API key can call has one w
 | `finish_onboarding` | `config:write` | `POST /v1/onboarding/finish` | Finish onboarding once the required steps are saved and every enabled pair has passed test_pair. |
 | `test_pair` | `config:write` | `POST /v1/pairs/{id}/test` | Make one short paid call for a surface and model pair through its route. |
 | `estimate_cost` | `results:read` | `GET /v1/estimate` | The estimated cost of one check: calls (questions times enabled pairs) and each pair's cost per call from its endpoint's past answers or the sampled cost, with pairs that have neither counted as unknown. |
+| `set_question_scoring` | `config:write` | `PUT /v1/questions/{id}/scoring` | Count a question's answers in scores, leave them out, or go back to the default, which leaves out a question whose text names your brand. See [How answers are scored](scores.md). |
+| `check_naming` | `results:read` | `POST /v1/naming-check` | Check text before saving it: which brands each question names, and whether each alias is a common English word. Stores nothing. |
 | `run_now` | `runs:write` | `POST /v1/runs` | Queue an AI check now without moving the schedule. |
 | `pause_checks` | `runs:write` | `POST /v1/checks/pause` | Pause scheduled checks, keeping the schedule. |
 | `resume_checks` | `runs:write` | `POST /v1/checks/resume` | Resume scheduled checks. |
-| `list_runs` | `results:read` | `GET /v1/runs` | Runs newest first, with status, spend, calls with no reported cost, how many answers named you, and success rate per endpoint. |
+| `list_runs` | `results:read` | `GET /v1/runs` | Runs newest first, with status, spend, calls with no reported cost, how many scored answers named you, and success rate per endpoint. |
 | `get_run` | `results:read` | `GET /v1/runs/{id}` | One run by id. |
 | `list_run_answers` | `results:read` | `GET /v1/runs/{id}/answers` | A run's answers: each question and pair with whether it named or cited you, your position, the brands named and the cost. |
 | `get_answer` | `results:read` | `GET /v1/answers/{id}` | One answer in full: its text, citations, the engine's own searches and the raw provider response. |

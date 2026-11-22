@@ -46,11 +46,15 @@ func (g Grouping) check() error {
 
 // scopedFrom and scopedWhere select the answers of runs started at or after
 // $1 (null for all time) on the pairs in scope ($2 surface, $3 model, each
-// ” for all). Joins go between the two.
+// ” for all). Joins go between the two. counted, after them, keeps only
+// answers that count in scores: not those to a question that names your
+// brand, unless someone counted it anyway.
 const (
-	scopedFrom  = ` FROM answer a JOIN run r ON r.id = a.run_id JOIN surface_model m ON m.id = a.surface_model_id `
+	scopedFrom = ` FROM answer a JOIN run r ON r.id = a.run_id JOIN surface_model m ON m.id = a.surface_model_id
+	JOIN question q ON q.id = a.question_id `
 	scopedWhere = ` WHERE ($1::timestamptz IS NULL OR coalesce(r.started_at, r.queued_at) >= $1)
 	AND ($2::text = '' OR m.surface_key = $2) AND ($3::text = '' OR m.model = $3) `
+	counted = ` AND q.counts_in_scores `
 )
 
 // lineKey selects the five columns of the Series a row belongs to under

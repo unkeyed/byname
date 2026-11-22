@@ -48,7 +48,7 @@ func (s *Service) Rates(ctx context.Context, since *time.Time, sc Scope, by Grou
 	}
 	rows, err := s.db.Query(ctx, `SELECT `+lineKey+`, a.run_id, coalesce(r.started_at, r.queued_at), min(m.id), `+lineModels+`,
 			count(*), count(*) FILTER (WHERE a.status <> 'failed'), count(*) FILTER (WHERE a.mentioned), count(*) FILTER (WHERE a.cited)`+
-		scopedFrom+scopedWhere+`GROUP BY 1, 2, 3, 4, 5, 6, 7 ORDER BY 6`, scopeArgs(since, sc, by)...)
+		scopedFrom+scopedWhere+counted+`GROUP BY 1, 2, 3, 4, 5, 6, 7 ORDER BY 6`, scopeArgs(since, sc, by)...)
 	if err != nil {
 		return nil, err
 	}
@@ -131,7 +131,7 @@ func (s *Service) Share(ctx context.Context, since *time.Time, sc Scope) ([]Shar
 	brands := map[key][]BrandShare{}
 	rows, err := s.db.Query(ctx, `SELECT `+lineKey+`, a.run_id, b.id, b.name, b.kind, count(*)`+scopedFrom+`
 			JOIN brand_mention bm ON bm.answer_id = a.id JOIN brand b ON b.id = bm.brand_id AND b.kind <> 'technology'`+
-		scopedWhere+`GROUP BY 1, 2, 3, 4, 5, 6, 7 ORDER BY count(*) DESC, b.name`, scopeArgs(since, sc, ByPair)...)
+		scopedWhere+counted+`GROUP BY 1, 2, 3, 4, 5, 6, 7 ORDER BY count(*) DESC, b.name`, scopeArgs(since, sc, ByPair)...)
 	if err != nil {
 		return nil, err
 	}
@@ -168,6 +168,7 @@ func (s *Service) Share(ctx context.Context, since *time.Time, sc Scope) ([]Shar
 // RunSummary is one run's headline over the pairs in scope: how many
 // question and pair answers named or cited you, and your share of the
 // brand mentions. It counts pairs; it is not an average of line rates.
+// Answers to questions that name your brand are left out unless counted.
 type RunSummary struct {
 	RunID        int64     `json:"run_id"`
 	RunStartedAt time.Time `json:"run_started_at"`
@@ -190,7 +191,7 @@ func (s *Service) Summary(ctx context.Context, since *time.Time, sc Scope) ([]Ru
 			coalesce(sum(n.brands), 0)::int, coalesce(sum(n.self), 0)::int`+scopedFrom+`
 			CROSS JOIN LATERAL (SELECT count(*) AS brands, count(*) FILTER (WHERE b.kind = 'self') AS self
 				FROM brand_mention bm JOIN brand b ON b.id = bm.brand_id AND b.kind <> 'technology' WHERE bm.answer_id = a.id) n`+
-		scopedWhere+`GROUP BY 1, 2 ORDER BY 1`, scopeArgs(since, sc, "")[:3]...)
+		scopedWhere+counted+`GROUP BY 1, 2 ORDER BY 1`, scopeArgs(since, sc, "")[:3]...)
 	if err != nil {
 		return nil, err
 	}
@@ -246,7 +247,8 @@ type Gaps struct {
 
 // Gaps ranks the questions some pair in scope did not name you on, highest
 // opportunity first, for one run, or the latest run with answers in scope
-// when runID is 0.
+// when runID is 0. A question that names your brand is no gap, unless it
+// is counted in scores anyway.
 func (s *Service) Gaps(ctx context.Context, runID int64, sc Scope) (Gaps, error) {
 	if err := sc.check(); err != nil {
 		return Gaps{}, err
@@ -268,7 +270,7 @@ func (s *Service) Gaps(ctx context.Context, runID int64, sc Scope) (Gaps, error)
 	if err != nil {
 		return Gaps{}, err
 	}
-	answers = slices.DeleteFunc(answers, func(a scoredAnswer) bool { return !sc.holds(a.series.Pair) })
+	answers = slices.DeleteFunc(answers, func(a scoredAnswer) bool { return !a.counted || !sc.holds(a.series.Pair) })
 	byQuestion := map[panel.QuestionID][]scoredAnswer{}
 	var order []panel.QuestionID
 	for _, a := range answers {
@@ -304,13 +306,13 @@ func (s *Service) Gaps(ctx context.Context, runID int64, sc Scope) (Gaps, error)
 }
 
 func (s *Service) questionRefs(ctx context.Context, ids []panel.QuestionID) (map[panel.QuestionID]QuestionRef, error) {
-	rows, err := s.db.Query(ctx, `SELECT id, group_name, text FROM question WHERE id = ANY($1)`, ids)
+	rows, err := s.db.Query(ctx, `SELECT id, group_name, text, counts_in_scores FROM question WHERE id = ANY($1)`, ids)
 	if err != nil {
 		return nil, err
 	}
 	refs, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (QuestionRef, error) {
 		var q QuestionRef
-		return q, r.Scan(&q.ID, &q.Group, &q.Text)
+		return q, r.Scan(&q.ID, &q.Group, &q.Text, &q.CountsInScores)
 	})
 	out := map[panel.QuestionID]QuestionRef{}
 	for _, q := range refs {

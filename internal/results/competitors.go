@@ -54,7 +54,7 @@ type Competitors struct {
 
 // Competitors adds up brand mentions over every run started since (nil for
 // all time) on the pairs in scope, with one heatmap column per line (by).
-// Technologies are left out.
+// Technologies are left out, and so are answers that count in no score.
 func (s *Service) Competitors(ctx context.Context, since *time.Time, sc Scope, by Grouping) (Competitors, error) {
 	if by == "" {
 		by = ByPair
@@ -64,7 +64,7 @@ func (s *Service) Competitors(ctx context.Context, since *time.Time, sc Scope, b
 	}
 	args := scopeArgs(since, sc, by)
 	rows, err := s.db.Query(ctx, `SELECT `+lineKey+`, min(m.id), `+lineModels+`, count(*) FILTER (WHERE a.status <> 'failed'),
-			array_agg(DISTINCT a.run_id)`+scopedFrom+scopedWhere+`GROUP BY 1, 2, 3, 4, 5`, args...)
+			array_agg(DISTINCT a.run_id)`+scopedFrom+scopedWhere+counted+`GROUP BY 1, 2, 3, 4, 5`, args...)
 	if err != nil {
 		return Competitors{}, err
 	}
@@ -106,7 +106,7 @@ func (s *Service) Competitors(ctx context.Context, since *time.Time, sc Scope, b
 	}
 	rows, err = s.db.Query(ctx, `SELECT `+lineKey+`, b.id, b.name, b.kind, count(*)`+scopedFrom+`
 			JOIN brand_mention bm ON bm.answer_id = a.id JOIN brand b ON b.id = bm.brand_id AND b.kind <> 'technology'`+
-		scopedWhere+`AND a.status <> 'failed' GROUP BY 1, 2, 3, 4, 5, 6, 7, 8`, args...)
+		scopedWhere+counted+`AND a.status <> 'failed' GROUP BY 1, 2, 3, 4, 5, 6, 7, 8`, args...)
 	if err != nil {
 		return Competitors{}, err
 	}

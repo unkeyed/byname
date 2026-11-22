@@ -405,6 +405,9 @@ func run(log *slog.Logger) error {
 	if err := announceSetup(ctx, log, users, cfg.SetupToken); err != nil {
 		return err
 	}
+	if err := settings.MarkBrandQuestions(ctx); err != nil {
+		return err
+	}
 	authn := &auth.Authenticator{Keys: auth.NewKeyStore(pool, cfg.Unkey), Users: users, OAuth: auth.NewOAuthServer(pool, cfg.Auth.PublicURL)}
 
 	services := app.Services{Instance: instance.New(version, settings), Config: settings, Checks: runs, Results: res, Notify: alerts, GSC: search, Changes: site, Social: mentions}

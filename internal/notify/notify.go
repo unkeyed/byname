@@ -172,7 +172,7 @@ func (s *Service) RunFinished(ctx context.Context, runID int64) error {
 // checkCompleted compares a run with the previous run that has answers,
 // through the same results.Compare that GET /v1/compare serves.
 func (s *Service) checkCompleted(ctx context.Context, r results.Run) (Payload, error) {
-	p := CheckCompletedPayload{RunID: r.ID, Named: r.Mentioned, Answered: r.Succeeded, SpendUSD: r.SpendUSD, Top: []QuestionChange{}}
+	p := CheckCompletedPayload{RunID: r.ID, Named: r.Mentioned, Answered: r.Scored, SpendUSD: r.SpendUSD, Top: []QuestionChange{}}
 	table, err := s.results.RunQuestions(ctx, r.ID, results.Scope{})
 	if err != nil || table.PreviousRunID == nil {
 		return p, err
@@ -187,6 +187,7 @@ func (s *Service) checkCompleted(ctx context.Context, r results.Run) (Payload, e
 	rows := slices.Clone(table.Rows)
 	changed := func(r results.QuestionRow) int { return r.Gained + r.Lost + r.Moved }
 	slices.SortStableFunc(rows, func(a, b results.QuestionRow) int { return changed(b) - changed(a) })
+	rows = slices.DeleteFunc(rows, func(r results.QuestionRow) bool { return !r.Question.CountsInScores })
 	for _, row := range rows {
 		if len(p.Top) == topQuestions || changed(row) == 0 {
 			break

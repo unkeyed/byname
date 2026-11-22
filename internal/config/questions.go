@@ -18,6 +18,18 @@ type Question struct {
 	ID    int64  `json:"id"`
 	Group string `json:"group"`
 	Text  string `json:"text"`
+	// NamesBrand and CountInScores: a question naming your brand is still
+	// asked, but its answers are left out of scores unless someone counts
+	// it with PUT /v1/questions/{id}/scoring.
+	NamesBrand    bool `json:"names_brand" jsonschema:"the text names your brand, by the rules answers are scored with"`
+	CountInScores bool `json:"count_in_scores" jsonschema:"whether its answers count in scores: false by default when the text names your brand, true otherwise"`
+}
+
+const questionColumns = `id, group_name, text, names_brand, counts_in_scores`
+
+func scanQuestion(r pgx.CollectableRow) (Question, error) {
+	var q Question
+	return q, r.Scan(&q.ID, &q.Group, &q.Text, &q.NamesBrand, &q.CountInScores)
 }
 
 // QuestionSet is one version of the questions. Carried says which question
@@ -148,14 +160,11 @@ func (s *Service) Questions(ctx context.Context, setID int64) ([]Question, error
 }
 
 func questions(ctx context.Context, q querier, setID int64) ([]Question, error) {
-	rows, err := q.Query(ctx, `SELECT id, group_name, text FROM question WHERE set_id = $1 ORDER BY ord`, setID)
+	rows, err := q.Query(ctx, `SELECT `+questionColumns+` FROM question WHERE set_id = $1 ORDER BY ord`, setID)
 	if err != nil {
 		return nil, err
 	}
-	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (Question, error) {
-		var qu Question
-		return qu, r.Scan(&qu.ID, &qu.Group, &qu.Text)
-	})
+	return pgx.CollectRows(rows, scanQuestion)
 }
 
 // QuestionSets lists every version, newest first.
@@ -213,6 +222,14 @@ func (s *Service) PutQuestions(ctx context.Context, in QuestionsInput) (Question
 			if _, err := tx.Exec(ctx, `INSERT INTO question_map (old_question_id, new_question_id) VALUES ($1, $2)`, old, ids[i]); err != nil {
 				return err
 			}
+		}
+		if _, err := tx.Exec(ctx, `UPDATE question n SET count_in_scores_override = o.count_in_scores_override
+			FROM question_map m JOIN question o ON o.id = m.old_question_id
+			WHERE m.new_question_id = n.id AND n.set_id = $1`, setID); err != nil {
+			return err
+		}
+		if err := markBrandQuestions(ctx, tx); err != nil {
+			return err
 		}
 		out, err = questionSet(ctx, tx, `$1`, cur.Version+1)
 		return err

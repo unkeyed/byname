@@ -68,6 +68,7 @@ type Engine struct {
 }
 
 // Engine reads one line over the runs started since (nil for all time).
+// Answers that count in no score are left out of all of it.
 func (s *Service) Engine(ctx context.Context, since *time.Time, l Line) (Engine, error) {
 	out := Engine{Series: Series{Pair: PairRef{ID: l.PairID, Surface: l.Surface}, Endpoint: l.Endpoint, Fidelity: l.Fidelity},
 		Models: []string{}, Points: []RatePoint{}, Ranking: []BrandStanding{}, NotMentioned: []EnginePrompt{}, Visible: []EnginePrompt{}}
@@ -75,7 +76,7 @@ func (s *Service) Engine(ctx context.Context, since *time.Time, l Line) (Engine,
 		return out, err
 	}
 	answers, err := s.scoredAnswers(ctx, `m.surface_key = $1 AND ($2 = 0 OR m.id = $2) AND a.endpoint = $3 AND a.fidelity = $4
-		AND ($5::timestamptz IS NULL OR coalesce(r.started_at, r.queued_at) >= $5)`, l.Surface, l.PairID, l.Endpoint, l.Fidelity, since)
+		AND ($5::timestamptz IS NULL OR coalesce(r.started_at, r.queued_at) >= $5)`+counted, l.Surface, l.PairID, l.Endpoint, l.Fidelity, since)
 	if err != nil {
 		return out, err
 	}

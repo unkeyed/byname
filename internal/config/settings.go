@@ -161,6 +161,9 @@ func (s *Service) PutSettings(ctx context.Context, in Settings) (SettingsView, e
 		if err != nil {
 			return err
 		}
+		if err := markBrandQuestions(ctx, tx); err != nil {
+			return err
+		}
 		out, err = getSettings(ctx, tx)
 		return err
 	})

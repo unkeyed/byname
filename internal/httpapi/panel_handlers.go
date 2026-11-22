@@ -141,6 +141,29 @@ func (s *server) estimate(w http.ResponseWriter, r *http.Request, _ core.Actor) 
 	return respond(w, http.StatusOK, v, err)
 }
 
+func (s *server) setQuestionScoring(w http.ResponseWriter, r *http.Request, _ core.Actor) error {
+	id, err := pathID(r, "question")
+	if err != nil {
+		return err
+	}
+	var b config.QuestionScoringInput
+	if err := readJSON(r, &b); err != nil {
+		return err
+	}
+	v, err := s.svc.Config.SetQuestionScoring(r.Context(), id, b)
+	return respond(w, http.StatusOK, v, err)
+}
+
+// checkNaming is a read: it stores nothing, so a viewer may call it too.
+func (s *server) checkNaming(w http.ResponseWriter, r *http.Request, _ core.Actor) error {
+	var b config.NamingCheckInput
+	if err := readJSON(r, &b); err != nil {
+		return err
+	}
+	v, err := s.svc.Config.CheckNaming(r.Context(), b)
+	return respond(w, http.StatusOK, v, err)
+}
+
 // Runs: runs:write queues a check and pauses or resumes the schedule.
 
 // runNow answers 201 with the queued run, or 200 with the run already

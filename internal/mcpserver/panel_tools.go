@@ -70,6 +70,11 @@ type surfaceModelsInput struct {
 	config.ModelsQuery
 }
 
+type questionScoringInput struct {
+	ID int64 `json:"id" jsonschema:"a question of the current set, from get_questions"`
+	config.QuestionScoringInput
+}
+
 type stepInput struct {
 	Step config.StepKey `json:"step" jsonschema:"brand, competitors, questions, surfaces, search_console or schedule"`
 }
@@ -216,6 +221,16 @@ func addConfigTools(srv *mcp.Server, svc app.Services) {
 		Description: "The estimated cost of one check: calls (questions times enabled pairs) and each pair's cost per call from its endpoint's past answers or the sampled cost, with pairs that have neither counted as unknown. GET /v1/estimate."},
 		func(ctx context.Context, _ core.Actor, _ noInput) (config.Estimate, error) {
 			return c.Estimate(ctx)
+		})
+	addTool(srv, core.ConfigWrite, &mcp.Tool{Name: "set_question_scoring", Annotations: mutates(false, true),
+		Description: "Count a question's answers in scores, leave them out, or go back to the default (null). By default a question whose text names your brand is still asked but left out of every score. The choice covers the earlier versions the question carries on. PUT /v1/questions/{id}/scoring."},
+		func(ctx context.Context, _ core.Actor, in questionScoringInput) (config.Question, error) {
+			return c.SetQuestionScoring(ctx, in.ID, in.QuestionScoringInput)
+		})
+	addTool(srv, core.ResultsRead, &mcp.Tool{Name: "check_naming", Annotations: readOnly(),
+		Description: "Check text before saving it: which brands each question names, by the rules answers are scored with (a question naming your brand is left out of scores by default), and whether each alias is a common English word that everyday text would match. Stores nothing. POST /v1/naming-check."},
+		func(ctx context.Context, _ core.Actor, in config.NamingCheckInput) (config.NamingCheck, error) {
+			return c.CheckNaming(ctx, in)
 		})
 
 	addTool(srv, core.RunsWrite, &mcp.Tool{Name: "run_now", Annotations: &mcp.ToolAnnotations{DestructiveHint: new(false), IdempotentHint: true, OpenWorldHint: new(true)},

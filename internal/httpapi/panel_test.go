@@ -276,3 +276,48 @@ func TestMCPToolsServeTheSameResults(t *testing.T) {
 		t.Fatalf("run_now with results:read: %v %+v, want a tool error", err, res)
 	}
 }
+
+// A reader can check names while typing; counting a question that names
+// the brand needs config:write.
+func TestQuestionsThatNameTheBrandOverHTTP(t *testing.T) {
+	c := newServer(t)
+	person, agent := login(t, c)
+	reader := c.withKey(t, person, core.ResultsRead)
+	agent.call("PUT", "/v1/settings", checkstest.Settings(), http.StatusOK, nil)
+	var set struct {
+		Questions []struct {
+			ID            int64 `json:"id"`
+			NamesBrand    bool  `json:"names_brand"`
+			CountInScores bool  `json:"count_in_scores"`
+		} `json:"questions"`
+	}
+	agent.call("PUT", "/v1/questions", map[string]any{"questions": []map[string]string{{"group": "Brand", "text": "Is Northwind a good host for Go?"}}}, http.StatusOK, &set)
+	if q := set.Questions[0]; !q.NamesBrand || q.CountInScores {
+		t.Fatalf("question = %+v, want it marked as naming the brand and left out of scores", q)
+	}
+
+	var check struct {
+		Questions []struct {
+			NamesBrand bool `json:"names_brand"`
+		} `json:"questions"`
+		Aliases []struct {
+			CommonWord bool `json:"common_word"`
+		} `json:"aliases"`
+	}
+	reader.call("POST", "/v1/naming-check", map[string]any{"questions": []string{"Northwind pricing"}, "aliases": []string{"Tally"}}, http.StatusOK, &check)
+	if !check.Questions[0].NamesBrand || !check.Aliases[0].CommonWord {
+		t.Fatalf("naming check = %+v", check)
+	}
+	reader.call("POST", "/v1/naming-check", map[string]any{"aliases": make([]string, 51)}, http.StatusBadRequest, nil)
+
+	path := fmt.Sprintf("/v1/questions/%d/scoring", set.Questions[0].ID)
+	reader.call("PUT", path, map[string]any{"count_in_scores": true}, http.StatusForbidden, nil)
+	var q struct {
+		CountInScores bool `json:"count_in_scores"`
+	}
+	agent.call("PUT", path, map[string]any{"count_in_scores": true}, http.StatusOK, &q)
+	if !q.CountInScores {
+		t.Fatal("count it anyway did not count it")
+	}
+	agent.call("PUT", "/v1/questions/999999/scoring", map[string]any{"count_in_scores": nil}, http.StatusNotFound, nil)
+}

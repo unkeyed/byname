@@ -94,15 +94,30 @@ func (s *Service) UpsertBrand(ctx context.Context, in BrandInput) (Brand, error)
 	if err := in.validate(); err != nil {
 		return Brand{}, err
 	}
-	b, err := scanBrand(s.db.QueryRow(ctx, `INSERT INTO brand (name, aliases, domains, kind) VALUES ($1, $2, $3, $4)
-		ON CONFLICT (lower(name)) DO UPDATE SET name = excluded.name, aliases = excluded.aliases,
-			domains = excluded.domains, kind = excluded.kind, updated_at = now()
-		WHERE brand.kind <> 'self'
-		RETURNING `+brandColumns, in.Name, in.Aliases, in.Domains, in.Kind))
+	var b Brand
+	err := s.brandChange(ctx, func(tx pgx.Tx) (err error) {
+		b, err = scanBrand(tx.QueryRow(ctx, `INSERT INTO brand (name, aliases, domains, kind) VALUES ($1, $2, $3, $4)
+			ON CONFLICT (lower(name)) DO UPDATE SET name = excluded.name, aliases = excluded.aliases,
+				domains = excluded.domains, kind = excluded.kind, updated_at = now()
+			WHERE brand.kind <> 'self'
+			RETURNING `+brandColumns, in.Name, in.Aliases, in.Domains, in.Kind))
+		return err
+	})
 	if errors.Is(err, core.ErrNotFound) {
 		return b, fmt.Errorf("%w: %q is your own brand; edit it with PUT /v1/settings", core.ErrConflict, in.Name)
 	}
 	return b, err
+}
+
+// brandChange runs a change to the brand table and marks the questions
+// again, since another brand's longer name can hide yours in a question.
+func (s *Service) brandChange(ctx context.Context, f func(pgx.Tx) error) error {
+	return pgx.BeginFunc(ctx, s.db, func(tx pgx.Tx) error {
+		if err := f(tx); err != nil {
+			return err
+		}
+		return markBrandQuestions(ctx, tx)
+	})
 }
 
 // UpdateBrand replaces a competitor or technology by id, which can rename it.
@@ -110,8 +125,12 @@ func (s *Service) UpdateBrand(ctx context.Context, id int64, in BrandInput) (Bra
 	if err := in.validate(); err != nil {
 		return Brand{}, err
 	}
-	b, err := scanBrand(s.db.QueryRow(ctx, `UPDATE brand SET name = $2, aliases = $3, domains = $4, kind = $5, updated_at = now()
-		WHERE id = $1 AND kind <> 'self' RETURNING `+brandColumns, id, in.Name, in.Aliases, in.Domains, in.Kind))
+	var b Brand
+	err := s.brandChange(ctx, func(tx pgx.Tx) (err error) {
+		b, err = scanBrand(tx.QueryRow(ctx, `UPDATE brand SET name = $2, aliases = $3, domains = $4, kind = $5, updated_at = now()
+			WHERE id = $1 AND kind <> 'self' RETURNING `+brandColumns, id, in.Name, in.Aliases, in.Domains, in.Kind))
+		return err
+	})
 	if isUniqueViolation(err, "brand_name") {
 		return b, fmt.Errorf("%w: another brand is already named %q", core.ErrConflict, in.Name)
 	}
@@ -120,9 +139,11 @@ func (s *Service) UpdateBrand(ctx context.Context, id int64, in BrandInput) (Bra
 
 // DeleteBrand removes a competitor or technology and its recorded mentions.
 func (s *Service) DeleteBrand(ctx context.Context, id int64) error {
-	tag, err := s.db.Exec(ctx, `DELETE FROM brand WHERE id = $1 AND kind <> 'self'`, id)
-	if err == nil && tag.RowsAffected() == 0 {
-		return fmt.Errorf("%w: no such competitor or technology; your own brand is edited with PUT /v1/settings", core.ErrNotFound)
-	}
-	return err
+	return s.brandChange(ctx, func(tx pgx.Tx) error {
+		tag, err := tx.Exec(ctx, `DELETE FROM brand WHERE id = $1 AND kind <> 'self'`, id)
+		if err == nil && tag.RowsAffected() == 0 {
+			return fmt.Errorf("%w: no such competitor or technology; your own brand is edited with PUT /v1/settings", core.ErrNotFound)
+		}
+		return err
+	})
 }
