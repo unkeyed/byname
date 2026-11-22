@@ -13,7 +13,7 @@ export function AlertsSlot() {
       ) : (
         <p className="flex items-start gap-2 rounded-surface border border-dashed border-line-strong px-3 py-2.5 text-sm text-muted">
           <Icon name="mail" className="mt-0.5 size-4" />
-          Alerts show in the app. An admin can add email, Slack or webhook channels in Settings &gt; Notifications.
+          Alerts tell you what changed after each check. They show in the app, and an admin can also send them by email, to Slack or to a webhook from Settings.
         </p>
       )}
     </div>
