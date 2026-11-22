@@ -23,7 +23,7 @@ func rederive(ctx context.Context, q querier) error {
 	if err != nil {
 		return err
 	}
-	if err := dropCoveredBrands(ctx, q, brands); err != nil {
+	if err := dropCoveredBrands(ctx, q, brands, mode); err != nil {
 		return err
 	}
 	return rescoreAnswers(ctx, q, brands, mode)
@@ -33,7 +33,7 @@ func rederive(ctx context.Context, q querier) error {
 // brand now covers, with their found mentions: tracking "Litware Cloud"
 // makes a found "Litware Cloud GmbH" the same brand, which brand_mention
 // now records.
-func dropCoveredBrands(ctx context.Context, q querier, tracked []panel.Brand) error {
+func dropCoveredBrands(ctx context.Context, q querier, tracked []panel.Brand, mode panel.MatchMode) error {
 	rows, err := q.Query(ctx, `SELECT id, name, coalesce(domains[1], '') FROM brand WHERE key IS NOT NULL`)
 	if err != nil {
 		return err
@@ -51,7 +51,7 @@ func dropCoveredBrands(ctx context.Context, q querier, tracked []panel.Brand) er
 	}
 	var covered []int64
 	for _, f := range all {
-		if panel.Covers(tracked, f.name, f.domain) {
+		if panel.Covers(tracked, f.name, f.domain, mode) {
 			covered = append(covered, f.id)
 		}
 	}

@@ -106,8 +106,9 @@ func (s *Service) OtherBrands(ctx context.Context, since *time.Time, sc Scope) (
 		if err := rows.Scan(&brand, &q.QuestionID, &q.Text, &q.Named); err != nil {
 			return out, err
 		}
-		b := &out.Brands[byID[brand]]
-		b.Questions = append(b.Questions, q)
+		if i, ok := byID[brand]; ok {
+			out.Brands[i].Questions = append(out.Brands[i].Questions, q)
+		}
 	}
 	if err := rows.Err(); err != nil {
 		return out, err

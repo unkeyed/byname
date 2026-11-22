@@ -153,6 +153,6 @@ Never set these in production. Each one sends Byname's outbound calls, or lets i
 | `GITHUB_API_BASE_URL` | Sends every GitHub call that site changes make to this URL instead of `https://api.github.com`, such as a fake GitHub on localhost. |
 | `BLUESKY_BASE_URL` | Sends social search on Bluesky to this URL instead of `https://api.bsky.app`, such as a fake on localhost. |
 | `RESEND_BASE_URL` | Sends alerts that go by email through Resend to this URL instead of `https://api.resend.com`. |
-| `SOURCES_ALLOW_PRIVATE_IPS` | `true` lets the fetch of pages that answers link to reach private and loopback addresses, such as a fake site on localhost. Off by default, so a link in an answer cannot make Byname fetch from your internal network. |
+| `SOURCES_ALLOW_PRIVATE_IPS` | `true` lets the fetch of pages that answers link to, and of brand logos, reach private and loopback addresses, such as a fake site on localhost. Off by default, so a link in an answer or a logo address cannot make Byname fetch from your internal network. |
 
 The tests read their own variables, which the server never reads. `TEST_DATABASE_URL` points the Go tests at a Postgres role that can create databases. `make e2e` reads `BASE_URL`, `E2E_SETUP_TOKEN`, `E2E_PUBLIC_URL`, `E2E_PASSKEY_FILE` and `E2E_ADMIN_EMAIL`. [CONTRIBUTING.md](../CONTRIBUTING.md) explains both.

@@ -61,8 +61,9 @@ type config struct {
 	// https://treg.to. Never set it in production.
 	TregBaseURL string
 	// SOURCES_ALLOW_PRIVATE_IPS, optional and for tests and local
-	// development only: lets cited-source fetching reach private and
-	// loopback addresses, such as a fake site on localhost.
+	// development only: lets cited-source fetching and logo downloads
+	// reach private and loopback addresses, such as a fake site on
+	// localhost.
 	SourcesAllowPrivate bool
 	// RESEND_BASE_URL, optional and for tests and local development only:
 	// sends email API channels to a fake Resend at this URL instead of
@@ -395,7 +396,7 @@ func run(log *slog.Logger) error {
 		Alerts: alerts,
 	})
 	brands := discovery.New(pool, settings, discovery.Options{Log: log})
-	logoLookups := logos.New(pool, settings, logos.Options{Log: log})
+	logoLookups := logos.New(pool, settings, logos.Options{Log: log, Client: sources.PublicClient(cfg.SourcesAllowPrivate)})
 	runs := checks.New(pool, settings, checks.Options{Log: log, Alerts: alerts, Finder: brands})
 	search := gsc.New(pool, gsc.Options{
 		Secrets: cfg.Secrets, Endpoints: gsc.GoogleEndpoints(cfg.GSCBaseURL), Client: cfg.GSCClient,
@@ -445,7 +446,7 @@ func run(log *slog.Logger) error {
 	}
 	var jobs sync.WaitGroup
 	if cfg.SourcesAllowPrivate {
-		log.Warn("SOURCES_ALLOW_PRIVATE_IPS is set: cited-source fetching may reach private and loopback addresses. Use it only in tests and local development")
+		log.Warn("SOURCES_ALLOW_PRIVATE_IPS is set: cited-source fetching and logo downloads may reach private and loopback addresses. Use it only in tests and local development")
 	}
 	cited := sources.New(pool, settings, sources.Options{AllowPrivate: cfg.SourcesAllowPrivate, UserAgent: "Byname/" + version, Log: log})
 	jobs.Go(func() {

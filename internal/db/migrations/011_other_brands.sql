@@ -32,8 +32,10 @@ ALTER TABLE instance_settings
 -- lookup (Context.dev for one brand). run_id is the check a find belonged
 -- to, which its per-check spend cap counts; job_run_id is the job that
 -- made it. status is ok, not_found (a lookup Context.dev had nothing for,
--- which is final), or failed (tried again later). cost_usd is NULL when
--- Treg reported no cost, never 0 for unknown.
+-- which is final), failed (tried again later, a bounded number of times)
+-- or refused (Treg declined it, which costs nothing and is not an
+-- attempt). cost_usd is NULL when Treg reported no cost, never 0 for
+-- unknown.
 CREATE TABLE brand_call (
     id           bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     purpose      text NOT NULL CHECK (purpose IN ('find', 'lookup')),
@@ -42,12 +44,12 @@ CREATE TABLE brand_call (
     run_id       bigint REFERENCES run (id) ON DELETE SET NULL,
     job_run_id   bigint REFERENCES job_run (id) ON DELETE SET NULL,
     tool         text NOT NULL,
-    status       text NOT NULL CHECK (status IN ('ok', 'not_found', 'failed')),
+    status       text NOT NULL CHECK (status IN ('ok', 'not_found', 'failed', 'refused')),
     cost_usd     numeric(12, 6),
     treg_call_id text NOT NULL DEFAULT '',
     error        text,
     called_at    timestamptz NOT NULL,
-    CHECK ((status = 'failed') = (error IS NOT NULL)),
+    CHECK ((status IN ('failed', 'refused')) = (error IS NOT NULL)),
     CHECK (purpose = 'lookup' OR status <> 'not_found')
 );
 CREATE INDEX brand_call_called ON brand_call (called_at);

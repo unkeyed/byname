@@ -128,14 +128,13 @@ func CostPerBrand(ctx context.Context, q interface {
 	return *mean, err
 }
 
-// MonthLookups is how many brands were looked up this month, which the
-// monthly limit counts: lookups that found the brand, since a miss is
-// free.
+// MonthLookups is how many lookups this month the monthly limit counts:
+// every one that found the brand or was charged, since a miss is free.
 func MonthLookups(ctx context.Context, q interface {
 	QueryRow(context.Context, string, ...any) pgx.Row
 }, start time.Time) (int, error) {
 	var n int
-	err := q.QueryRow(ctx, `SELECT count(*) FROM brand_call WHERE purpose = 'lookup' AND status = 'ok' AND called_at >= $1`, start).Scan(&n)
+	err := q.QueryRow(ctx, `SELECT count(*) FROM brand_call WHERE purpose = 'lookup' AND (status = 'ok' OR cost_usd > 0) AND called_at >= $1`, start).Scan(&n)
 	return n, err
 }
 
@@ -145,14 +144,15 @@ const lock = `hashtext('byname.logos')`
 // due selects the brands to look up, most wanted first: yours, then your
 // competitors, then the brands answers name most that you don't track. A
 // brand is due until it has a logo, Context.dev had nothing for it, or
-// maxAttempts lookups failed; a failed one waits retryAfter ($1 is that
-// moment). $2 is how many may still be looked up this month.
+// maxAttempts lookups failed; a failed or refused one waits retryAfter
+// ($1 is that moment), and a refused one is no attempt. $2 is how many may
+// still be looked up this month.
 var due = fmt.Sprintf(`SELECT b.id, b.name, coalesce(b.domains[1], '') FROM brand b
 	WHERE b.kind IN ('self', 'competitor', 'untracked')
 	AND NOT EXISTS (SELECT 1 FROM brand_logo l WHERE l.brand_id = b.id)
 	AND NOT EXISTS (SELECT 1 FROM brand_call c WHERE c.purpose = 'lookup' AND c.brand_id = b.id
-		AND (c.status <> 'failed' OR c.called_at >= $1))
-	AND (SELECT count(*) FROM brand_call c WHERE c.purpose = 'lookup' AND c.brand_id = b.id) < %d
+		AND (c.status IN ('ok', 'not_found') OR c.called_at >= $1))
+	AND (SELECT count(*) FROM brand_call c WHERE c.purpose = 'lookup' AND c.brand_id = b.id AND c.status = 'failed') < %d
 	AND (b.domains[1] IS NOT NULL OR char_length(b.name) >= 3)
 	ORDER BY b.kind = 'self' DESC, b.kind = 'competitor' DESC,
 		(SELECT count(*) FROM discovered_mention d WHERE d.brand_id = b.id) DESC, b.id
@@ -181,6 +181,11 @@ func (s *Service) Tick(ctx context.Context) error {
 			_ = conn.Conn().Close(context.WithoutCancel(ctx))
 		}
 	}()
+	if _, err := s.db.Exec(ctx, `UPDATE job_run SET status = 'failed', finished_at = $1,
+			error = 'the process stopped before these lookups finished; the logos it stored stay'
+		WHERE job = 'brand_logos' AND status = 'running'`, s.now()); err != nil {
+		return err
+	}
 	var on bool
 	var limit int
 	if err := s.db.QueryRow(ctx, `SELECT brand_logos, brand_logo_month_limit FROM instance_settings`).Scan(&on, &limit); err != nil || !on {
@@ -296,6 +301,8 @@ func (s *Service) lookUp(ctx context.Context, treg engines.Treg, job int64, b br
 	var img Image
 	var rec record
 	switch {
+	case refusal != nil:
+		status, reason = "refused", err.Error()
 	case err != nil:
 		status, reason = "failed", err.Error()
 	case resp.StatusCode >= 500:
@@ -313,7 +320,7 @@ func (s *Service) lookUp(ctx context.Context, treg engines.Treg, job int64, b br
 	}
 	return refusal, pgx.BeginFunc(ctx, s.db, func(tx pgx.Tx) error {
 		var msg *string
-		if status == "failed" {
+		if status == "failed" || status == "refused" {
 			msg = &reason
 		}
 		if _, err := tx.Exec(ctx, `INSERT INTO brand_call (purpose, brand_id, job_run_id, tool, status, cost_usd, treg_call_id, error, called_at)
@@ -339,7 +346,9 @@ func (s *Service) lookUp(ctx context.Context, treg engines.Treg, job int64, b br
 		if err != nil {
 			return err
 		}
-		_, err = tx.Exec(ctx, `UPDATE brand SET domains = ARRAY[$2::text] WHERE id = $1 AND cardinality(domains) = 0 AND $2 <> ''`, b.id, domain)
+		// Only a found brand takes Context.dev's domain: a name can match
+		// the wrong company, and a tracked brand's domains decide scores.
+		_, err = tx.Exec(ctx, `UPDATE brand SET domains = ARRAY[$2::text] WHERE id = $1 AND key IS NOT NULL AND cardinality(domains) = 0 AND $2 <> ''`, b.id, domain)
 		return err
 	})
 }

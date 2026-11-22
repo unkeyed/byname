@@ -105,9 +105,9 @@ var secondLevel = map[string]bool{"co": true, "com": true, "org": true, "net": t
 // Covers reports whether a found name or domain is one of the tracked
 // brands under another spelling: its key is a tracked name's or alias's,
 // its text names a tracked brand ("Contoso Edge Functions"), or its domain
-// is on a tracked brand's domains. A covered brand is never listed as one
-// you don't track.
-func Covers(tracked []Brand, name, domain string) bool {
+// is on a tracked brand's domains, by the match mode answers are scored
+// with. A covered brand is never listed as one you don't track.
+func Covers(tracked []Brand, name, domain string, mode MatchMode) bool {
 	key := NameKey(name)
 	host := normalizeHost(domain)
 	for _, b := range tracked {
@@ -122,5 +122,5 @@ func Covers(tracked []Brand, name, domain string) bool {
 			}
 		}
 	}
-	return len(Named(name, tracked, MatchWholeWord)) > 0
+	return len(Named(name, tracked, mode)) > 0
 }

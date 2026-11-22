@@ -115,12 +115,25 @@ func (s *Service) Tick(ctx context.Context) error {
 			_ = conn.Conn().Close(context.WithoutCancel(ctx))
 		}
 	}()
+	// With the lock held no pass runs anywhere, so a scheduled one still
+	// marked running was cut off. A pass someone asked for carries on.
+	if _, err := s.db.Exec(ctx, `UPDATE job_run SET status = 'failed', finished_at = $1,
+			error = 'the process stopped before this pass finished; the answers it read stay read'
+		WHERE job = 'other_brands' AND trigger = 'scheduled' AND status = 'running'`, s.now()); err != nil {
+		return err
+	}
 	treg, ok, err := s.ready(ctx)
-	if err != nil || !ok {
+	if err != nil {
+		return err
+	}
+	if !ok {
+		_, err := s.db.Exec(ctx, `UPDATE job_run SET status = 'failed', finished_at = $1,
+				error = 'reading answers for other brands was turned off, or the Treg token removed, before this pass ran'
+			WHERE job = 'other_brands' AND trigger = 'run_now' AND status IN ('queued', 'running')`, s.now())
 		return err
 	}
 	var job int64
-	err = s.db.QueryRow(ctx, `SELECT id FROM job_run WHERE job = 'other_brands' AND status IN ('queued', 'running') ORDER BY id LIMIT 1`).Scan(&job)
+	err = s.db.QueryRow(ctx, `SELECT id FROM job_run WHERE job = 'other_brands' AND trigger = 'run_now' AND status IN ('queued', 'running') ORDER BY id LIMIT 1`).Scan(&job)
 	switch {
 	case err == nil:
 		if err := s.pass(ctx, treg, job, `SELECT a.id, a.text `+unread+` ORDER BY a.id DESC LIMIT 20`); err != nil {
@@ -132,11 +145,13 @@ func (s *Service) Tick(ctx context.Context) error {
 	return s.retry(ctx, treg)
 }
 
-// retryable selects the answers whose reads all failed, fewer than
-// maxAttempts times, the latest over retryAfter ago ($1 is that moment).
+// retryable selects the answers no read has stored brands for, whose
+// failed reads number fewer than maxAttempts, the latest call over
+// retryAfter ago ($1 is that moment). A read Treg refused cost nothing and
+// is no attempt, so an empty balance never uses one up.
 var retryable = fmt.Sprintf(`SELECT a.id, a.text FROM answer a
 	WHERE a.status = 'ok' AND a.id IN (SELECT answer_id FROM brand_call WHERE purpose = 'find' AND answer_id IS NOT NULL
-		GROUP BY answer_id HAVING bool_and(status = 'failed') AND count(*) < %d AND max(called_at) < $1)
+		GROUP BY answer_id HAVING bool_and(status IN ('failed', 'refused')) AND count(*) FILTER (WHERE status = 'failed') < %d AND max(called_at) < $1)
 	ORDER BY a.id DESC LIMIT 20`, maxAttempts)
 
 // retry reads again the answers whose reads failed, as a scheduled

@@ -34,6 +34,7 @@ type Config interface {
 	Treg(ctx context.Context) (engines.Treg, bool, error)
 	Onboarded(ctx context.Context) (bool, error)
 	PanelBrands(ctx context.Context) ([]panel.Brand, error)
+	MatchRules(ctx context.Context) ([]panel.Brand, panel.MatchMode, error)
 	BrandChange(ctx context.Context, f func(pgx.Tx) error) error
 	Settings(ctx context.Context) (config.SettingsView, error)
 }
@@ -176,7 +177,7 @@ func (s *Service) Find(ctx context.Context, answerID, runID int64, text string) 
 // declined the call, so a pass can stop asking.
 func (s *Service) find(ctx context.Context, treg engines.Treg, r read, c call) (*engines.Refusal, error) {
 	var attempt int
-	if err := s.db.QueryRow(ctx, `SELECT count(*) + 1 FROM brand_call WHERE purpose = 'find' AND answer_id = $1`, r.answer).Scan(&attempt); err != nil {
+	if err := s.db.QueryRow(ctx, `SELECT count(*) + 1 FROM brand_call WHERE purpose = 'find' AND answer_id = $1 AND status <> 'refused'`, r.answer).Scan(&attempt); err != nil {
 		return nil, err
 	}
 	parts, _ := engines.SplitForLLM(r.text)
@@ -198,28 +199,37 @@ func (s *Service) find(ctx context.Context, treg engines.Treg, r read, c call) (
 			res.Status, res.Error = engines.StatusFailed, err.Error()
 		}
 	}
-	return refusal, pgx.BeginFunc(ctx, s.db, func(tx pgx.Tx) error {
-		status, msg := "ok", (*string)(nil)
-		if res.Status == engines.StatusFailed {
-			status, msg = "failed", &res.Error
-		}
-		if _, err := tx.Exec(ctx, `INSERT INTO brand_call (purpose, answer_id, run_id, job_run_id, tool, status, cost_usd, treg_call_id, error, called_at)
-			VALUES ('find', $1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-			r.answer, nullID(c.run), nullID(c.job), engines.BrandFinder.ID, status, res.CostUSD, res.CallID, msg, s.now()); err != nil {
-			return err
-		}
-		if status != "ok" {
-			return nil
-		}
-		return s.record(ctx, tx, r.answer, found)
-	})
+	status, msg := "ok", (*string)(nil)
+	switch {
+	case refusal != nil:
+		status, msg = "refused", &res.Error
+	case res.Status == engines.StatusFailed:
+		status, msg = "failed", &res.Error
+	}
+	// The call is recorded on its own first: it is paid whatever happens
+	// to what it found.
+	var call int64
+	if err := s.db.QueryRow(ctx, `INSERT INTO brand_call (purpose, answer_id, run_id, job_run_id, tool, status, cost_usd, treg_call_id, error, called_at)
+		VALUES ('find', $1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
+		r.answer, nullID(c.run), nullID(c.job), engines.BrandFinder.ID, status, res.CostUSD, res.CallID, msg, s.now()).Scan(&call); err != nil {
+		return refusal, err
+	}
+	if status != "ok" {
+		return refusal, nil
+	}
+	err = pgx.BeginFunc(ctx, s.db, func(tx pgx.Tx) error { return s.record(ctx, tx, r.answer, found) })
+	if err != nil && ctx.Err() == nil {
+		_, uerr := s.db.Exec(ctx, `UPDATE brand_call SET status = 'failed', error = $2 WHERE id = $1`, call, "storing the brands it found: "+err.Error())
+		return refusal, uerr
+	}
+	return refusal, err
 }
 
 // record stores the found brands of one answer that no tracked brand
 // covers, as untracked brands, and which of them the answer named.
 // Technologies are dropped.
 func (s *Service) record(ctx context.Context, tx pgx.Tx, answerID int64, found []Found) error {
-	tracked, err := s.config.PanelBrands(ctx)
+	tracked, mode, err := s.config.MatchRules(ctx)
 	if err != nil {
 		return err
 	}
@@ -227,7 +237,7 @@ func (s *Service) record(ctx context.Context, tx pgx.Tx, answerID int64, found [
 	ord := 0
 	for _, f := range found {
 		key := panel.NameKey(f.Name)
-		if f.Kind != "brand" || seen[key] || panel.Covers(tracked, f.Name, f.Domain) {
+		if f.Kind != "brand" || seen[key] || panel.Covers(tracked, f.Name, f.Domain, mode) {
 			continue
 		}
 		seen[key] = true

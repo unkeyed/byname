@@ -173,6 +173,8 @@ func TestEachBrandIsLookedUpOnceWithinTheMonthlyLimit(t *testing.T) {
 func TestMissesAreFinalAndFailuresRetryNextDay(t *testing.T) {
 	e := setup(t)
 	e.treg.SetBody(engines.BrandByDomain.ID, []byte(`{"status":"error","message":"not found","code":404}`))
+	free := int64(0)
+	e.treg.SetCost(engines.BrandByDomain.ID, &free)
 	e.answer(engines.BrandByName.ID, "missing.png")
 	if err := e.logos.Tick(ctx); err != nil {
 		t.Fatal(err)
@@ -184,8 +186,8 @@ func TestMissesAreFinalAndFailuresRetryNextDay(t *testing.T) {
 		t.Errorf("failed lookups = %d, want Fabrikam Deploy's, whose image is missing", got)
 	}
 	st, _ := e.found.Settings(ctx)
-	if st.Logos.ThisMonth != 0 {
-		t.Errorf("this month = %d, want 0: misses and failures are not new brands", st.Logos.ThisMonth)
+	if st.Logos.ThisMonth != 1 {
+		t.Errorf("this month = %d, want 1: free misses don't count toward the limit, the charged lookup whose image failed does", st.Logos.ThisMonth)
 	}
 	e.answer(engines.BrandByDomain.ID, "logo.png")
 	e.answer(engines.BrandByName.ID, "logo.png")

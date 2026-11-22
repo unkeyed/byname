@@ -16,7 +16,7 @@ Byname keeps a brand from that list only when it is not one you track:
 - It drops your own brand and every competitor and technology you track, under any spelling: "Northwind Cloud, Inc.", "Northwind Cloud's", "northwind.example" and a name that contains yours, such as "Northwind Cloud Pages", are all you.
 - It joins the spellings of one brand. "Vercel", "Vercel Inc." and "vercel.com" are one brand, as are two names on the same domain.
 
-A read that fails never fails the check. The answer simply has no other brands until Byname reads it again, an hour later at the earliest and at most three times in all. A reply that is not the list asked for counts as a failed read.
+A read that fails never fails the check. The answer simply has no other brands until Byname reads it again, an hour later at the earliest and at most three times in all. A read Treg refuses, such as for an empty balance, costs nothing and uses up no try. A reply that is not the list asked for counts as a failed read.
 
 ### Why a model, not the answer's layout
 
@@ -60,7 +60,7 @@ What changes the scores is tracking. Adding a competitor, from this list or unde
 
 Byname looks each brand up once on Context.dev, through Treg: by its domain when it has one, otherwise by its name. It keeps the logo and the brand's main colour in its database, and serves the logo itself from `GET /v1/brands/{id}/logo`, so your browser never loads anything from a third party. Until a logo is stored, and for a brand Context.dev doesn't know, a monogram takes its place: the first letter, in a colour taken from the name, in the same square, so nothing moves when the logo arrives.
 
-- A lookup that finds the brand costs 10 Context.dev credits, about $0.025. One that finds nothing is free, and that brand is not looked up again. A lookup that fails is tried again a day later, at most three times.
+- A lookup that finds the brand costs 10 Context.dev credits, about $0.025. One that finds nothing is free, and that brand is not looked up again. A lookup that fails is tried again a day later, at most three times; one Treg refuses uses up no try. Any lookup that was charged counts toward the monthly limit.
 - At most 100 new brands are looked up a calendar month by default. Change the limit under **Settings > Competitors > Other brands**, where the price and the most it can cost a month are shown. Your brand and your competitors come first, then the brands answers name most.
 - Lookups count toward the monthly spend cap, in `month.brands_usd`, and show in **Check history** as **Looking up logos**.
 

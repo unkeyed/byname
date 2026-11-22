@@ -36,7 +36,6 @@ const runSpent = `(spend_usd + coalesce((SELECT sum(cost_usd) FROM brand_call WH
 type plan struct {
 	runID    int64
 	settings config.SettingsView
-	brands   []panel.Brand
 	calls    []call
 	// monthBase is what the month's other runs, social searches and calls
 	// for other brands have spent, since the monthly cap covers them all.
@@ -137,9 +136,6 @@ func (s *Service) plan(ctx context.Context, runID, setID int64) (plan, *outcome,
 	p := plan{runID: runID}
 	var err error
 	if p.settings, err = s.config.Settings(ctx); err != nil {
-		return p, nil, err
-	}
-	if p.brands, err = s.config.PanelBrands(ctx); err != nil {
 		return p, nil, err
 	}
 	questions, err := s.config.Questions(ctx, setID)
@@ -320,10 +316,16 @@ func backoffFor(r *engines.Refusal, n int) time.Duration {
 // its id and the run's spend. The run row is locked first, so concurrent
 // answers sum the spend one after another and none is lost.
 func (s *Service) store(ctx context.Context, p plan, c call, res engines.Result, attempts int) (int64, float64, error) {
-	scored := panel.Score(res, p.brands, panel.Settings{MatchMode: p.settings.MatchMode})
+	// The brands are read for each answer, so a competitor tracked while
+	// the check runs counts in the answers stored after it.
+	brands, mode, err := s.config.MatchRules(ctx)
+	if err != nil {
+		return 0, 0, err
+	}
+	scored := panel.Score(res, brands, panel.Settings{MatchMode: mode})
 	var spent float64
 	var answerID int64
-	err := pgx.BeginFunc(ctx, s.db, func(tx pgx.Tx) error {
+	err = pgx.BeginFunc(ctx, s.db, func(tx pgx.Tx) error {
 		if _, err := tx.Exec(ctx, `SELECT 1 FROM run WHERE id = $1 FOR UPDATE`, p.runID); err != nil {
 			return err
 		}

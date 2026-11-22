@@ -74,8 +74,11 @@ func TestCoversTrackedBrandsUnderEverySpelling(t *testing.T) {
 		{"Contoso", "contoso.example", false},
 		{"Litware Cloud", "litware.example", false},
 	} {
-		if got := Covers(tracked, c.name, c.domain); got != c.want {
+		if got := Covers(tracked, c.name, c.domain, MatchWholeWord); got != c.want {
 			t.Errorf("Covers(%q, %q) = %v, want %v", c.name, c.domain, got, c.want)
 		}
+	}
+	if Covers(tracked, "NORTHWIND CLOUD PAGES", "", MatchWholeWord) || !Covers(tracked, "NORTHWIND CLOUD PAGES", "", MatchSelfAnywhere) {
+		t.Error("a name with your brand in other capitals is yours only when your brand matches anywhere, as answers are scored")
 	}
 }

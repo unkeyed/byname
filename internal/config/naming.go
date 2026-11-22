@@ -59,6 +59,12 @@ func markBrandQuestions(ctx context.Context, q querier) error {
 	return err
 }
 
+// MatchRules is the tracked brands and match mode answers are scored
+// with.
+func (s *Service) MatchRules(ctx context.Context) ([]panel.Brand, panel.MatchMode, error) {
+	return matchRules(ctx, s.db)
+}
+
 // matchRules is the brand table and match mode answers are scored with.
 func matchRules(ctx context.Context, q querier) ([]panel.Brand, panel.MatchMode, error) {
 	var mode panel.MatchMode

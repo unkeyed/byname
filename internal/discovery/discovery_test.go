@@ -178,20 +178,25 @@ func TestAFailedReadNeverFailsTheCheck(t *testing.T) {
 	if status != "completed" || answers != 2*len(checkstest.Pairs) {
 		t.Fatalf("status %s with %d answers, want a completed check with every answer", status, answers)
 	}
-	if got := e.count(t, `SELECT count(*) FROM brand_call WHERE status = 'failed' AND error LIKE '%insufficient_balance%'`); got != answers {
-		t.Errorf("failed reads = %d, want %d, each with Treg's reason", got, answers)
+	if got := e.count(t, `SELECT count(*) FROM brand_call WHERE status = 'refused' AND error LIKE '%insufficient_balance%'`); got != answers {
+		t.Errorf("refused reads = %d, want %d, each with Treg's reason", got, answers)
 	}
 	if got := e.count(t, `SELECT count(*) FROM brand WHERE key IS NOT NULL`); got != 0 {
 		t.Errorf("%d brands found from refused reads, want none", got)
 	}
-
+	e.treg.Reset()
+	if err := e.found.Tick(ctx); err != nil || len(e.treg.Calls()) != 0 {
+		t.Fatalf("a pass made %d calls right away, %v; want none before an hour has passed", len(e.treg.Calls()), err)
+	}
+	// An empty balance for hours uses up no attempt: each refused pass
+	// stops at its first refusal and leaves the answers waiting.
+	for range 4 {
+		e.now = e.now.Add(2 * time.Hour)
+		if err := e.found.Tick(ctx); err != nil {
+			t.Fatal(err)
+		}
+	}
 	e.treg.Before(nil)
-	if err := e.found.Tick(ctx); err != nil {
-		t.Fatal(err)
-	}
-	if got := e.count(t, `SELECT count(*) FROM brand_call WHERE status = 'ok'`); got != 0 {
-		t.Errorf("a pass read %d answers right away, want none before an hour has passed", got)
-	}
 	e.now = e.now.Add(2 * time.Hour)
 	if err := e.found.Tick(ctx); err != nil {
 		t.Fatal(err)
