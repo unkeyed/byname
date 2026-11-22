@@ -8,8 +8,9 @@ export type SectionTab = { path: string; label: string; short?: string };
 export type NavItem = { to: string; label: string; icon: IconName; tabs?: SectionTab[]; filters?: boolean };
 
 /**
- * The app's six places, by what a person tracks rather than how it is
- * measured. A section with tabs is a layout route, and its first tab is
+ * The app's five places, by what a person tracks rather than how it is
+ * measured. Notifications are not a place: the bell beside the account
+ * opens them. A section with tabs is a layout route, and its first tab is
  * where the bare path lands. filters marks the sections whose pages share
  * the date range and AI app filters, which follow you between them.
  */
@@ -37,7 +38,6 @@ export const nav: NavItem[] = [
     ],
   },
   { to: "/social", label: "Social", icon: "message" },
-  { to: "/alerts", label: "Alerts", icon: "bell" },
   { to: "/settings", label: "Settings", icon: "settings" },
 ];
 

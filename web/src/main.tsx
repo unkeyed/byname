@@ -15,7 +15,7 @@ import { Competitors } from "./pages/results/Competitors";
 import { Questions } from "./pages/results/Questions";
 import { Missed } from "./pages/results/Missed";
 import { Compare } from "./pages/results/Compare";
-import { Alerts } from "./pages/Alerts";
+import { Notifications } from "./pages/notifications/Notifications";
 import { Search } from "./pages/search/Search";
 import { Changes } from "./pages/changes/Changes";
 import { Social } from "./pages/social/Social";
@@ -56,7 +56,7 @@ const router = createBrowserRouter([
         ],
       },
       { path: "social", element: <Social /> },
-      { path: "alerts", element: <Alerts /> },
+      { path: "notifications", element: <Notifications /> },
       { path: "settings", element: <Settings />, children: settingsRoutes },
       { path: "*", element: <NotFound /> },
     ],

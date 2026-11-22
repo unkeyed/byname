@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useLoading } from "./ui";
 import { api, type Grouping, type GscStatus, type Line, type ResultsFilter, type Run, type Scope, type SocialMentionQuery } from "./api";
 
@@ -43,8 +43,8 @@ export const keys = {
   sources: (f: ResultsFilter) => ["results", "sources", f] as const,
   answers: (run: number) => ["results", "answers", run] as const,
   engine: (l: Line, since?: string) => ["results", "engine", l, since] as const,
-  /** Under results, so a finished check refreshes the alert count too. */
-  alerts: ["results", "alerts"] as const,
+  /** Under results, so a finished check refreshes the unread count too. */
+  notifications: ["results", "notifications"] as const,
   channels: ["channels"] as const,
   deliveries: ["channels", "deliveries"] as const,
   /**
@@ -98,7 +98,8 @@ export const useControlPages = () => useQuery({ queryKey: keys.controlPages, que
 export const useRepo = () => useQuery({ queryKey: keys.repo, queryFn: api.repo.get });
 
 export const useSocialMentions = (q: SocialMentionQuery) => useQuery({ queryKey: keys.socialMentions(q), queryFn: () => api.social.mentions(q) });
-export const useSocialDigest = (day?: string) => useQuery({ queryKey: keys.socialDigest(day), queryFn: () => api.social.digest(day) });
+/** Keeps the shown period while another loads, so the digest card never empties under the reader. */
+export const useSocialDigest = (day?: string) => useQuery({ queryKey: keys.socialDigest(day), queryFn: () => api.social.digest(day), placeholderData: keepPreviousData });
 export const useSocialSettings = () => useQuery({ queryKey: keys.socialSettings, queryFn: api.social.settings });
 export const useLeftOut = () => useQuery({ queryKey: keys.leftOut, queryFn: api.social.leftOut });
 
@@ -138,8 +139,8 @@ export const useQuestions = () =>
 export const useCan = (scope: Scope) => useMe().data?.scopes.includes(scope) ?? false;
 export const useIsAdmin = () => useMe().data?.role === "admin";
 
-/** The alerts list and unread count, checked every minute. */
-export const useAlerts = () => useQuery({ queryKey: keys.alerts, queryFn: () => api.alerts.list({ limit: 100 }), refetchInterval: 60_000 });
+/** The notifications list and unread count, checked every minute. */
+export const useNotifications = () => useQuery({ queryKey: keys.notifications, queryFn: () => api.alerts.list({ limit: 100 }), refetchInterval: 60_000 });
 
 export const isOpen = (r: Run) => r.status === "queued" || r.status === "running";
 

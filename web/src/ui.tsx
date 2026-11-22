@@ -569,20 +569,21 @@ export function EmptyState({ icon, title, children, action }: { icon?: IconName;
   );
 }
 
-/** Set by the app shell on phones, where the page header carries the menu button. */
-export const NavMenu = createContext<(() => void) | null>(null);
+/** Set by the app shell on phones, where the page header carries the menu button and, at its end, the notifications bell. */
+export const NavMenu = createContext<{ open: () => void; end: ReactNode } | null>(null);
 
 export function PageHeader({ title, children }: { title: ReactNode; children?: ReactNode }) {
-  const openNav = useContext(NavMenu);
+  const nav = useContext(NavMenu);
   return (
     <header data-load-visible className="flex h-12 shrink-0 items-center gap-3 border-b border-line px-3 md:px-5">
-      {openNav && (
-        <Button variant="ghost" size="sm" onClick={openNav} aria-label="Open menu" icon className="-ml-1">
+      {nav && (
+        <Button variant="ghost" size="sm" onClick={nav.open} aria-label="Open menu" icon className="-ml-1">
           <Icon name="menu" />
         </Button>
       )}
       <h1 className="min-w-0 flex-1 truncate text-sm font-medium">{title}</h1>
       {children && <div className="flex shrink-0 items-center gap-1.5">{children}</div>}
+      {nav?.end && <div className="-mr-1 -ml-2 flex shrink-0">{nav.end}</div>}
     </header>
   );
 }

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router";
+import { Link, useSearchParams } from "react-router";
 import type { Costs, LeftOut, SocialDigest, SocialMention, SocialNetwork, SocialSettings } from "../../api";
 import { useCan, useCosts, useIsAdmin, useLeftOut, useSocialDigest, useSocialMentions, useSocialSettings } from "../../queries";
 import { Badge, Button, buttonClass, Card, CardHeader, cx, EmptyState, ErrorNote, Icon, Pending, RelativeTime, selectClass, useLoading } from "../../ui";
@@ -129,8 +129,11 @@ function Notices({ s, leftOut }: { s: SocialSettings; leftOut: LeftOut[] | undef
   );
 }
 
+/** The latest finished period's digest, or with ?digest=<a day> the period that holds that day, which a social digest notification links to. */
 function DigestCard() {
-  const digest = useSocialDigest();
+  const [params] = useSearchParams();
+  const day = params.get("digest") ?? undefined;
+  const digest = useSocialDigest(day);
   useLoading(digest.isPending);
   if (digest.isPending) return null;
   if (digest.isError) return <ErrorNote error={digest.error} />;
@@ -139,13 +142,19 @@ function DigestCard() {
   return (
     <Card>
       <CardHeader
-        title={`Latest digest: ${d.cadence === "weekly" ? "week of " : ""}${periodLabel(d.from, d.to)}`}
+        title={`${day ? "Digest" : "Latest digest"}: ${d.cadence === "weekly" ? "week of " : ""}${periodLabel(d.from, d.to)}`}
         description={
           <>
             New mentions first seen {d.cadence === "weekly" ? "that week" : "that day"}, the most engaged first. {searchCost(d)}
           </>
         }
-      />
+      >
+        {day && (
+          <Link to="/social" className={buttonClass({ size: "sm" })}>
+            Latest digest
+          </Link>
+        )}
+      </CardHeader>
       <div className="space-y-4 border-t border-line px-4 py-3">
         <div className="flex flex-wrap items-baseline gap-x-6 gap-y-2">
           <Stat value={d.mentions} label={d.mentions === 1 ? "new mention" : "new mentions"} />

@@ -1,12 +1,13 @@
-import { useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, Navigate, NavLink, Outlet, useLocation, useNavigate } from "react-router";
 import { api, ApiError } from "./api";
-import { useAlerts, useCan, useMe, useStatus } from "./queries";
+import { useCan, useMe, useStatus } from "./queries";
 import { NotSetUp } from "./pages/onboarding/Onboarding";
 import { Toaster } from "./components/Toaster";
 import { QuestionDrawer } from "./pages/results/QuestionDrawer";
 import { EngineDrawer } from "./pages/results/EngineDrawer";
+import { Bell } from "./pages/notifications/Bell";
 import { useView } from "./view";
 import { nav } from "./nav";
 import { useTheme, type ThemeMode } from "./theme";
@@ -30,6 +31,7 @@ export function Layout() {
   const canSetUp = useCan("config:write");
   // Until setup is finished, people who can finish it go to onboarding and everyone else sees why the pages are empty. Settings stays open to all.
   const notSetUp = status.data?.onboarded === false && !location.pathname.startsWith("/settings");
+  const phoneBar = useMemo(() => (wide ? null : { open: () => setMenuOpen(true), end: <Bell /> }), [wide]);
 
   if (me.isPending || (status.isPending && !me.isError)) {
     return (
@@ -53,7 +55,7 @@ export function Layout() {
   if (notSetUp && canSetUp) return <Navigate to="/onboarding" replace />;
 
   return (
-    <NavMenu.Provider value={wide ? null : () => setMenuOpen(true)}>
+    <NavMenu.Provider value={phoneBar}>
       <Toaster>
       <div className="flex h-full">
         {wide ? (
@@ -114,7 +116,6 @@ function NavBody({ label, theme: [theme, setTheme], rail, onNavigate, close }: {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const filters = useView().filterSearch();
-  const unread = useAlerts().data?.unread ?? 0;
   const wideOnly = rail ? "hidden lg:block" : "block";
 
   const logout = async () => {
@@ -140,7 +141,6 @@ function NavBody({ label, theme: [theme, setTheme], rail, onNavigate, close }: {
             to={n.filters ? n.to + filters : n.to}
             end={n.to === "/"}
             title={rail ? n.label : undefined}
-            aria-label={n.to === "/alerts" && unread ? `${n.label}, ${unread} unread` : undefined}
             onClick={onNavigate}
             className={({ isActive }) =>
               cx(
@@ -150,20 +150,8 @@ function NavBody({ label, theme: [theme, setTheme], rail, onNavigate, close }: {
               )
             }
           >
-            <span className="relative">
-              <Icon name={n.icon} />
-              {n.to === "/alerts" && unread > 0 && (
-                <span className={cx(rail ? "lg:hidden" : "hidden", "absolute -top-1.5 -right-2 grid h-3.5 min-w-3.5 place-items-center rounded-full bg-danger px-0.5 text-[0.625rem] leading-none font-semibold text-surface tabular-nums")}>
-                  {unread > 99 ? "99+" : unread}
-                </span>
-              )}
-            </span>
+            <Icon name={n.icon} />
             <span className={cx(wideOnly, "flex-1")}>{n.label}</span>
-            {n.to === "/alerts" && unread > 0 && (
-              <span className={cx(rail ? "hidden lg:grid" : "grid", "h-4 min-w-4 place-items-center rounded-full bg-danger px-1 text-[0.625rem] leading-none font-semibold text-surface tabular-nums")}>
-                {unread > 99 ? "99+" : unread}
-              </span>
-            )}
           </NavLink>
         ))}
       </nav>
@@ -192,6 +180,7 @@ function NavBody({ label, theme: [theme, setTheme], rail, onNavigate, close }: {
           <div className={cx("flex items-center gap-2 px-1", rail && "flex-col lg:flex-row")}>
             <Avatar label={label} size={24} />
             <AccountLabel label={label} className={cx(wideOnly, "min-w-0 flex-1")} />
+            <Bell onClick={onNavigate} />
             <Button variant="ghost" size="sm" onClick={() => void logout()} aria-label="Log out" title="Log out" icon>
               <Icon name="logout" className="size-3.5" />
             </Button>

@@ -35,7 +35,7 @@ const kinds: Record<ChannelKind, { label: string; icon: IconName; blurb: string 
 };
 const kindOrder: ChannelKind[] = ["smtp", "email_api", "slack_webhook", "webhook"];
 
-/** What a new place gets: every alert about checks and models. */
+/** What a new place gets: every notification about checks and models. */
 const defaultEvents: EventKindName[] = ["check_completed", "check_refused", "check_failed", "spend_cap_reached", "pair_paused"];
 
 const tlsModes: { value: SMTPTLS; label: string }[] = [
@@ -46,12 +46,12 @@ const tlsModes: { value: SMTPTLS; label: string }[] = [
 
 const useChannels = () => useQuery({ queryKey: keys.channels, queryFn: api.channels.list });
 
-export function Notifications() {
+export function NotificationSettings() {
   return (
     <>
-      <SettingsHeader title="Alerts">
-        Alerts tell you what changed, and every one shows in the app under the bell. Choose where else they go: an email address, a Slack channel or a webhook. Each place
-        gets only the alerts you tick.
+      <SettingsHeader title="Notifications">
+        Every notification shows in the app under the bell. Choose where else they go: an email address, a Slack channel or a webhook. Each place gets only the ones you
+        tick.
       </SettingsHeader>
       <Channels />
       <DeliveryLog />
@@ -68,26 +68,26 @@ function Channels() {
   return (
     <>
       <div className="mb-3 flex items-center justify-between gap-3">
-        <h3 className="text-sm font-semibold">Where alerts go</h3>
+        <h3 className="text-sm font-semibold">Where notifications go</h3>
         <Button variant="primary" onClick={() => setEditing("new")}>
           <Icon name="plus" className="size-3.5" />
           Add a place
         </Button>
       </div>
       {channels.length === 0 ? (
-        <EmptyState icon="mail" title="Alerts show in the app only">
+        <EmptyState icon="mail" title="Notifications show in the app only">
           Add an email address, Slack or a webhook to send them where your team already looks.
         </EmptyState>
       ) : (
         <Card>
-          <ul aria-label="Where alerts go" className="divide-y divide-line">
+          <ul aria-label="Where notifications go" className="divide-y divide-line">
             {channels.map((c) => (
               <ChannelRow key={c.id} channel={c} events={events} onEdit={() => setEditing(c)} />
             ))}
           </ul>
         </Card>
       )}
-      <Dialog open={editing !== null} onClose={() => setEditing(null)} title={editing === "new" ? "Add a place to send alerts" : `Edit ${editing?.name ?? ""}`} wide>
+      <Dialog open={editing !== null} onClose={() => setEditing(null)} title={editing === "new" ? "Add a place to send notifications" : `Edit ${editing?.name ?? ""}`} wide>
         {editing !== null && <ChannelForm channel={editing === "new" ? undefined : editing} events={events} onDone={() => setEditing(null)} />}
       </Dialog>
     </>
@@ -141,7 +141,7 @@ function ChannelRow({ channel: c, events, onEdit }: { channel: NotificationChann
         <div className="text-xs text-muted [overflow-wrap:anywhere]">{channelTarget(c)}</div>
         <div className="flex flex-wrap gap-1">
           {c.events.length === 0 ? (
-            <Badge tone="warn">No alerts ticked</Badge>
+            <Badge tone="warn">Nothing ticked</Badge>
           ) : (
             c.events.map((k) => (
               <Badge key={k} tone="info">
@@ -309,7 +309,7 @@ function ChannelForm({ channel, events, onDone }: { channel?: NotificationChanne
           {(kind === "smtp" || kind === "email_api") && (
             <div className="grid gap-3 sm:grid-cols-2">
               <Field label="From">
-                <input className={inputClass} placeholder="Byname <alerts@example.com>" value={from} onChange={(e) => setFrom(e.target.value)} />
+                <input className={inputClass} placeholder="Byname <notifications@example.com>" value={from} onChange={(e) => setFrom(e.target.value)} />
               </Field>
               <Field label="To" hint="Up to 20 addresses, separated by commas.">
                 <input className={inputClass} placeholder="team@example.com" value={to} onChange={(e) => setTo(e.target.value)} />
@@ -325,7 +325,7 @@ function ChannelForm({ channel, events, onDone }: { channel?: NotificationChanne
           )}
 
           <fieldset>
-            <legend className="mb-1.5 text-xs font-medium text-muted">Alerts it gets</legend>
+            <legend className="mb-1.5 text-xs font-medium text-muted">Notifications it gets</legend>
             <div className="space-y-1.5">
               {events.map((e) => (
                 <label key={e.kind} className="flex items-start gap-2 text-sm">
@@ -341,7 +341,7 @@ function ChannelForm({ channel, events, onDone }: { channel?: NotificationChanne
           {editing && (
             <label className="flex items-center gap-2 text-sm">
               <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
-              On. Turned off, it keeps its settings and gets no alerts.
+              On. Turned off, it keeps its settings and gets no notifications.
             </label>
           )}
           <div className="flex justify-end gap-2">
@@ -365,7 +365,7 @@ function DeliveryLog() {
   const log = useQuery({ queryKey: keys.deliveries, queryFn: () => api.channels.deliveries(), refetchInterval: (q) => (q.state.data?.some((d) => d.status === "pending") ? 5000 : false) });
   return (
     <Card className="mt-10">
-      <CardHeader title="Sent alerts" description="Each alert sent to each place, newest first. A failed send is tried again, up to 5 times. Tests show on their place above." />
+      <CardHeader title="Sent notifications" description="Each notification sent to each place, newest first. A failed send is tried again, up to 5 times. Tests show on their place above." />
       {log.isPending ? (
         <Pending />
       ) : log.isError ? (
@@ -375,7 +375,7 @@ function DeliveryLog() {
       ) : log.data.length === 0 ? (
         <p className="border-t border-line px-4 py-6 text-center text-sm text-muted">Nothing sent yet.</p>
       ) : (
-        <ul aria-label="Sent alerts" className="divide-y divide-line border-t border-line">
+        <ul aria-label="Sent notifications" className="divide-y divide-line border-t border-line">
           {log.data.map((d) => (
             <li key={d.id} className="flex flex-col gap-1 px-4 py-2.5 text-sm sm:flex-row sm:items-start sm:gap-4">
               <div className="min-w-0 flex-1">
@@ -405,9 +405,10 @@ function DeliveryLog() {
 }
 
 /**
- * Picks the places alerts go, for onboarding's schedule step: each place
- * with an on switch, and Add a place. With none, alerts are in the app only.
- * Admin only, like Settings > Alerts, which manages them later.
+ * Picks the places notifications go, for onboarding's schedule step: each
+ * place with an on switch, and Add a place. With none, notifications are in
+ * the app only. Admin only, like Settings > Notifications, which manages
+ * them later.
  */
 export function ChannelPicker() {
   return (
@@ -431,9 +432,9 @@ function PickerBody() {
   return (
     <div className="space-y-2">
       {channels.length === 0 ? (
-        <p className="text-sm text-muted">No places added yet, so alerts show in the app only.</p>
+        <p className="text-sm text-muted">No places added yet, so notifications show in the app only.</p>
       ) : (
-        <ul aria-label="Where alerts go" className="space-y-1.5">
+        <ul aria-label="Where notifications go" className="space-y-1.5">
           {channels.map((c) => (
             <li key={c.id}>
               <label className="flex items-start gap-2 text-sm">
@@ -452,7 +453,7 @@ function PickerBody() {
         <Icon name="plus" className="size-3.5" />
         Add a place
       </Button>
-      <Dialog open={adding} onClose={() => setAdding(false)} title="Add a place to send alerts" wide>
+      <Dialog open={adding} onClose={() => setAdding(false)} title="Add a place to send notifications" wide>
         {adding && <ChannelForm events={events} onDone={() => setAdding(false)} />}
       </Dialog>
     </div>
