@@ -18,10 +18,7 @@ export function Team() {
   const [sent, setSent] = useState<SentInvite[]>([]);
   return (
     <>
-      <SettingsHeader title="Team">
-        Who can use Byname and what each person may do. A viewer reads results. An editor also starts checks and changes setup. An admin also manages the team,
-        API keys and apps. Invite a teammate with a one-time link.
-      </SettingsHeader>
+      <SettingsHeader title="Team" />
       <Members />
 
       <SettingsSubhead className="mt-10">Invite a teammate</SettingsSubhead>
@@ -166,6 +163,12 @@ function SignInMethods() {
   );
 }
 
+
+const roleMeaning: Record<Role, string> = {
+  viewer: "A viewer reads results.",
+  editor: "An editor also starts checks and changes setup.",
+  admin: "An admin also manages the team, API keys and apps.",
+};
 function Invite({ onSent }: { onSent: (i: SentInvite) => void }) {
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<Role>("viewer");
@@ -195,6 +198,7 @@ function Invite({ onSent }: { onSent: (i: SentInvite) => void }) {
           Create invite link
         </Button>
       </form>
+      <p className="text-xs text-muted">{roleMeaning[role]}</p>
       <ErrorNote error={invite.error} />
     </div>
   );

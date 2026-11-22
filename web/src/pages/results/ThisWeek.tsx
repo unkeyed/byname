@@ -51,7 +51,6 @@ export function ThisWeek() {
     <>
       <ViewHeader
         title="This week"
-        subtitle={`How often AI apps name ${brand}, whether that is normal, and what to do next.`}
         range={false}
         scope={false}
         action={canRun && answered.data?.length ? <RunNowButton variant="secondary" /> : undefined}

@@ -24,10 +24,7 @@ export function SocialSettings() {
   }, [linked]);
   return (
     <>
-      <SettingsHeader title="Social">
-        Byname can watch social networks for mentions, posts that name you, and send you a digest of the new ones. Leave out your team and your company&apos;s own accounts
-        so the Social page and the digest show what other people say.
-      </SettingsHeader>
+      <SettingsHeader title="Social" />
       {!canEdit && <ReadOnlyNote />}
       <div className="space-y-10">
         {settings.isPending || costs.isPending ? (

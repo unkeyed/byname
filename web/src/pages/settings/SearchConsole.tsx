@@ -19,13 +19,7 @@ export function SearchConsole() {
   const gsc = useGsc();
   return (
     <>
-      <SettingsHeader title="Search Console">
-        Search Console is Google&apos;s free report of how often your site shows up in Google results and how many people click. Connect it to see that next to your AI
-        results. Optional.
-      </SettingsHeader>
-      <p className="-mt-3 mb-6 text-sm text-muted">
-        Byname reads it once a day, read-only, for one property: your site as Search Console knows it. The numbers stay if you disconnect.
-      </p>
+      <SettingsHeader title="Search Console" />
       <GoogleReturn s={gsc.data} />
       {gsc.isPending ? <Pending /> : gsc.isError ? <ErrorNote error={gsc.error} /> : gsc.data.connected ? <Connected s={gsc.data} /> : <Connect s={gsc.data} />}
     </>

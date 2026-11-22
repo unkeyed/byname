@@ -1,6 +1,5 @@
 import { useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link } from "react-router";
 import { useReauthMutation } from "./Reauth";
 import { api, scopeInfo, scopes, type CreatedKey, type Key, type Scope } from "../../api";
 import { keys } from "../../queries";
@@ -98,15 +97,7 @@ export function ApiKeys() {
 
   return (
     <>
-      <SettingsHeader title="API keys">
-        For developers. An API key lets a script read or change Byname over its REST API. Scopes are what a key may do, such as read results or change setup, so tick
-        only what it needs. A key never does more than your role allows, and it cannot manage keys, apps or the team. Give each key an expiry unless something you
-        cannot easily update depends on it. AI agents such as Claude Code sign in as a person instead, under{" "}
-        <Link to="/settings/apps" className="text-fg underline underline-offset-2">
-          Apps
-        </Link>
-        .
-      </SettingsHeader>
+      <SettingsHeader title="API keys" />
       <div className="space-y-3">
         <CreateKeyForm onCreated={setCreated} />
         {created && <NewKey k={created} onDone={() => setCreated(null)} />}

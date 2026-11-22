@@ -3,7 +3,7 @@ import { Link } from "react-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, type Alert, type AlertList } from "../../api";
 import { keys, useIsAdmin, useNotifications, useRuns, useSurfaces } from "../../queries";
-import { Button, cx, EmptyState, ErrorNote, errorMessage, Icon, PageHeader, Pending, scrollArea, useLoading } from "../../ui";
+import { Button, buttonClass, cx, EmptyState, ErrorNote, errorMessage, Icon, PageHeader, Pending, scrollArea, useLoading } from "../../ui";
 import { useToast } from "../../components/Toaster";
 import { Segmented } from "../results/Header";
 import { NotificationCard, type CardContext } from "./cards";
@@ -77,22 +77,16 @@ export function Notifications() {
 
   return (
     <>
-      <PageHeader title="Notifications" />
+      <PageHeader title="Notifications">
+        {admin && (
+          <Link to="/settings/notifications" className={buttonClass({ size: "sm" })}>
+            <Icon name="settings" className="size-3.5" />
+            Where they go
+          </Link>
+        )}
+      </PageHeader>
       <div className={cx("relative min-h-0 flex-1", scrollArea)}>
         <div className="mx-auto max-w-2xl space-y-5 px-4 py-6 pb-16 md:px-8">
-          <p className="text-sm text-muted">
-            What Byname noticed. Each one links to the details.
-            {admin && (
-              <>
-                {" "}
-                Choose where else they go in{" "}
-                <Link to="/settings/notifications" className="text-fg underline underline-offset-2">
-                  Settings, Notifications
-                </Link>
-                .
-              </>
-            )}
-          </p>
           <div className="flex items-center justify-between gap-3">
             <Segmented
               label="Show"

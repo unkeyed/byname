@@ -40,7 +40,6 @@ export function Missed() {
     <>
       <ViewHeader
         title="Missed questions"
-        subtitle={`Questions where an AI app did not name ${brand} in the latest check, what to do about each, and the pages AI links to that name a competitor and never you.`}
         range={tab === "sources"}
       />
       <div className={cx("relative min-h-0 flex-1 px-3 py-4 md:px-5 md:py-5", scrollArea)}>

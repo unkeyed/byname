@@ -39,7 +39,6 @@ export function Questions() {
     <>
       <ViewHeader
         title="Questions"
-        subtitle={`Every question you track, which AI apps name ${brand}, and who they name instead. Open a question to read its answers, or list every answer from the latest check.`}
         range={tab === "questions"}
       />
       <div className={cx("relative min-h-0 flex-1 px-3 py-4 md:px-5 md:py-5", scrollArea)}>

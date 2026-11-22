@@ -25,7 +25,6 @@ export function Changes() {
     <>
       <ViewHeader
         title="Site changes"
-        subtitle="Did a change to your site help it in Google? Byname waits for Google to see the change, then compares the page's appearances, click rate and position before and after with pages you left alone."
         range={false}
         scope={false}
         action={

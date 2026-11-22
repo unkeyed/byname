@@ -14,11 +14,8 @@ export function SiteChanges() {
   const repo = useRepo();
   return (
     <>
-      <SettingsHeader title="Site changes">
-        Did a change to your site help it in Google? Connect your site&apos;s GitHub repo and Byname finds each change you merge, waits until Google sees the changed
-        page, then compares its clicks before and after with comparison pages: a few steady pages you promise not to edit.
-      </SettingsHeader>
-      <p className="-mt-3 mb-6 text-sm text-muted">
+      <SettingsHeader title="Site changes" />
+      <p className="mb-6 text-sm text-muted">
         No GitHub? Log changes by hand under{" "}
         <Link to="/google/site-changes" className="text-fg underline underline-offset-2">
           Google search, Site changes

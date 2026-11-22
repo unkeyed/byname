@@ -49,10 +49,7 @@ const useChannels = () => useQuery({ queryKey: keys.channels, queryFn: api.chann
 export function NotificationSettings() {
   return (
     <>
-      <SettingsHeader title="Notifications">
-        Every notification shows in the app under the bell. Choose where else they go: an email address, a Slack channel or a webhook. Each place gets only the ones you
-        tick.
-      </SettingsHeader>
+      <SettingsHeader title="Notifications" />
       <Channels />
       <DeliveryLog />
     </>

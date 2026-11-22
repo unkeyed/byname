@@ -226,7 +226,6 @@ export function Compare() {
     <>
       <ViewHeader
         title="What changed"
-        subtitle="Pick two checks to see where AI apps started naming you, stopped, or moved you up or down. Some movement between checks is normal; watch for changes that last."
         range={false}
         scope={false}
       />

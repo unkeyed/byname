@@ -90,9 +90,7 @@ export function Account() {
 
   return (
     <>
-      <SettingsHeader title="Account">
-        How you sign in to Byname, and where you are signed in now. A passkey or a connected login signs you in on its own. A password always needs a second step.
-      </SettingsHeader>
+      <SettingsHeader title="Account" />
       <div className="space-y-3 empty:hidden">
         <UrlNotice providers={providers} />
         <SingleMethodWarning a={a} />

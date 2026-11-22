@@ -131,13 +131,8 @@ export function Settings() {
   );
 }
 
-export function SettingsHeader({ title, children }: { title: string; children?: ReactNode }) {
-  return (
-    <div className="mb-6">
-      <h2 className="text-lg font-semibold">{title}</h2>
-      {children && <p className="mt-1 text-sm text-muted">{children}</p>}
-    </div>
-  );
+export function SettingsHeader({ title }: { title: string }) {
+  return <h2 className="mb-6 text-lg font-semibold">{title}</h2>;
 }
 
 export function SettingsSubhead({ children, className }: { children: ReactNode; className?: string }) {

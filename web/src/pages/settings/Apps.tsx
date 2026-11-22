@@ -19,11 +19,7 @@ export function Apps() {
 
   return (
     <>
-      <SettingsHeader title="Apps">
-        For developers. Connect an AI agent such as Claude Code or Cursor so it can read your Byname results for you. Agents connect through MCP, a standard way for
-        them to use other tools, at <code className="font-mono text-fg">/mcp</code>, and act as the person who approves them. Scopes, shown on each app, are what it
-        may do. Scripts use the REST API with an API key instead.
-      </SettingsHeader>
+      <SettingsHeader title="Apps" />
 
       <section className="space-y-4">
         <SettingsSubhead className="mb-0">Connect an MCP client</SettingsSubhead>

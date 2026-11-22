@@ -164,9 +164,7 @@ export function CheckHistory() {
 
   return (
     <>
-      <SettingsHeader title="Check history">
-        Every check with what it cost and how each AI app answered. When one app fails a lot, that is the provider having a bad day, not a drop in your results.
-      </SettingsHeader>
+      <SettingsHeader title="Check history" />
       <div className="space-y-8">
         {body}
         <Jobs />

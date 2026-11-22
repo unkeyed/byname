@@ -21,7 +21,7 @@ import { SettingsHeader, SettingsSubhead } from "./Settings";
 export function General() {
   return (
     <>
-      <SettingsHeader title="General">Your brand's name and website, how answers are matched to it, the country AI apps answer from, and how long full answers are kept.</SettingsHeader>
+      <SettingsHeader title="General" />
       <BrandForm retention />
     </>
   );
@@ -30,10 +30,7 @@ export function General() {
 export function Competitors() {
   return (
     <>
-      <SettingsHeader title="Competitors">
-        Brands people buy instead of you. Share of mentions compares you with these. Mark a brand as a technology when it is named alongside you but nobody buys it instead of you. A change
-        applies to every answer, past ones included.
-      </SettingsHeader>
+      <SettingsHeader title="Competitors" />
       <div className="space-y-6">
         <BrandTable />
         <OtherBrandsSettings />
@@ -45,10 +42,7 @@ export function Competitors() {
 export function Questions() {
   return (
     <>
-      <SettingsHeader title="Questions">
-        What a buyer who has not heard of you might ask an AI. Every check asks each one exactly as written. Saving a change makes a new version, and you say which new question carries on each old one
-        so its history continues.
-      </SettingsHeader>
+      <SettingsHeader title="Questions" />
       <QuestionEditor history />
     </>
   );
@@ -57,9 +51,7 @@ export function Questions() {
 export function WherePeopleAsk() {
   return (
     <>
-      <SettingsHeader title="AI apps">
-        Where your buyers ask AI, and for developer tools, the models they use. Byname asks each one your questions. Changing how an app is asked starts its chart line again.
-      </SettingsHeader>
+      <SettingsHeader title="AI apps" />
       <Surfaces />
     </>
   );
@@ -74,10 +66,7 @@ export function Treg() {
   const t = list.data?.find((c) => c.kind === "treg");
   return (
     <>
-      <SettingsHeader title="Treg">
-        Treg is the service that runs each question in each AI app and bills you for each answer. Settings, Schedule and limits shows what a check and a month cost. One Treg token covers every AI app. It is stored encrypted and never shown
-        again after you save it.
-      </SettingsHeader>
+      <SettingsHeader title="Treg" />
       {list.isPending ? (
         <Pending />
       ) : list.isError ? (
@@ -150,10 +139,7 @@ export function Treg() {
 export function ProviderKeys() {
   return (
     <>
-      <SettingsHeader title="Provider keys">
-        Your own keys for a scraping or model provider, for an AI app you set to use one instead of Treg. Most teams need none. Keys are stored encrypted, sent only to their provider, and never
-        shown again after you save them.
-      </SettingsHeader>
+      <SettingsHeader title="Provider keys" />
       <ProviderKeyList />
     </>
   );
@@ -163,7 +149,7 @@ export function ProviderKeys() {
 export function ScheduleAndSpending() {
   return (
     <>
-      <SettingsHeader title="Schedule and limits">When Byname checks, what that costs, and the most it may spend. Treg bills you for every answer, not Byname.</SettingsHeader>
+      <SettingsHeader title="Schedule and limits" />
       <div className="space-y-8">
         <CheckSchedule />
         <MonthSpend />

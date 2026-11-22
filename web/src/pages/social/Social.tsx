@@ -19,7 +19,6 @@ export function Social() {
     <>
       <ViewHeader
         title="Social"
-        subtitle="Mentions: posts that name you on X, Reddit, Hacker News, LinkedIn, YouTube, Threads and Bluesky. Posts by the people you left out are hidden, so this is what everyone else says."
         range={false}
         scope={false}
         action={

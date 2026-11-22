@@ -31,7 +31,6 @@ export function Search() {
     <>
       <ViewHeader
         title="Traffic"
-        subtitle="Search Console is Google's free report of how often your site appears in Google results and how many people click. Google data arrives about 3 days late."
         range={false}
         scope={false}
       />

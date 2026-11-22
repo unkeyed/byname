@@ -39,7 +39,7 @@ export function Competitors() {
     );
   return (
     <>
-      <ViewHeader title="Competitors" subtitle={`Which brands AI answers name, how ${brand} compares, and the questions where a competitor was named and ${brand} was not.`} />
+      <ViewHeader title="Competitors" />
       <div className={cx("relative min-h-0 flex-1 px-3 py-4 md:px-5 md:py-5", scrollArea)}>
         <div className="mx-auto max-w-6xl">{body}</div>
       </div>
