@@ -24,6 +24,8 @@ const jobNames: Record<string, string> = {
   source_fetch: "Reading linked pages",
   gsc_sync: "Search Console sync",
   social_fetch: "Social search",
+  other_brands: "Reading answers for other brands",
+  brand_logos: "Looking up logos",
   site_changes: "Site changes from GitHub",
   recrawl_watch: "Waiting for Google to see site changes",
   verdicts: "Site change results",

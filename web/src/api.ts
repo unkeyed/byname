@@ -467,10 +467,12 @@ export interface Estimate {
   pairs: number;
   /** Questions times active pairs. */
   calls: number;
-  /** Over the pairs with a cost per call. */
+  /** Over the pairs with a cost per call, plus reading the answers for other brands when that is on. */
   known_usd: number;
   unknown_pairs: number;
   rows: EstimateRow[];
+  /** Reading each answer for brands you don't track; null while off or with no Treg token. */
+  find_brands: { answers: number; cost_per_answer_usd: number; cost_usd: number } | null;
 }
 
 /** GET /v1/costs: every cost figure, in US dollars. Expected figures are estimates. */
@@ -511,6 +513,7 @@ export interface Costs {
     /** 0 while social is off. */
     month_usd: number;
   };
+  other_brands: OtherBrandsSettings;
   /** checks.month_usd plus social.month_usd. */
   month_estimate_usd: number;
   /** The monthly cap finishing onboarding sets when none is set. */
@@ -519,6 +522,8 @@ export interface Costs {
     start: Timestamp;
     checks_usd: number;
     social_usd: number;
+    /** Reading answers for other brands and looking up logos. */
+    brands_usd: number;
     spent_usd: number;
     missing_cost_calls: number;
     cap_usd: number | null;
@@ -742,6 +747,74 @@ export interface Mention {
   position: number | null;
 }
 
+/** A brand an answer named that you don't track. It counts in no score. */
+export interface OtherMention {
+  brand_id: number;
+  name: string;
+}
+
+/** GET /v1/other-brands: the brands answers in range named that you don't track, most named first. */
+export interface OtherBrands {
+  answered: number;
+  /** Of answered, how many were read for other brands. */
+  read: number;
+  latest_run: number;
+  /** 0 when latest_run is the first check. */
+  previous_run: number;
+  hidden: number;
+  brands: OtherBrand[];
+}
+
+export interface OtherBrand {
+  brand_id: number;
+  name: string;
+  domain: string;
+  named: number;
+  latest: number;
+  previous: number;
+  /** Null when the latest check is the first. */
+  change: number | null;
+  questions: { question_id: number; text: string; named: number }[];
+}
+
+export interface HiddenBrand {
+  brand_id: number;
+  name: string;
+  domain: string;
+  named: number;
+}
+
+export interface OtherBrandsSettings {
+  has_token: boolean;
+  onboarded: boolean;
+  find: { on: boolean; cost_per_answer_usd: number; model: string };
+  logos: { on: boolean; cost_per_brand_usd: number; month_limit: number; month_max_usd: number; this_month: number; logos: number };
+}
+
+export interface OtherBrandsSettingsInput {
+  find?: boolean;
+  logos?: boolean;
+  logo_month_limit?: number;
+}
+
+export interface BrandBackfill {
+  unread: number;
+  cost_per_answer_usd: number;
+  cost_usd: number;
+  ready: boolean;
+  latest: { job_id: number; status: RunStatus | "queued"; started_at: Timestamp; finished_at: Timestamp | null; read: number; spent_usd: number; error: string } | null;
+}
+
+/** A brand with a stored logo. Draw it from logoURL. */
+export interface BrandLogo {
+  brand_id: number;
+  domain: string;
+  color: string;
+  version: number;
+}
+
+export const logoURL = (l: BrandLogo) => `/v1/brands/${l.brand_id}/logo?v=${l.version}`;
+
 export interface AnswerSummary {
   id: number;
   run_id: number;
@@ -758,6 +831,8 @@ export interface AnswerSummary {
   cost_usd: number | null;
   citation_count: number;
   mentions: Mention[];
+  /** Brands the answer named that you don't track, in answer order. */
+  others: OtherMention[];
   answered_at: Timestamp;
 }
 
@@ -1709,6 +1784,21 @@ export const api = {
     /** 404 before a repo was ever connected. */
     putRules: (rules: PathRule[]) => request<RepoStatus>("PUT", "/v1/repo/rules", { body: { rules } }),
   },
+
+  otherBrands: {
+    list: (f: ResultsFilter) => request<OtherBrands>("GET", `/v1/other-brands${qs({ ...f })}`),
+    hidden: () => request<HiddenBrand[]>("GET", "/v1/other-brands/hidden"),
+    /** Adds it as a competitor; past answers are scored again. */
+    track: (id: number) => request<BrandEntry>("POST", `/v1/other-brands/${id}/track`),
+    hide: (id: number) => request<void>("POST", `/v1/other-brands/${id}/hide`),
+    unhide: (id: number) => request<void>("POST", `/v1/other-brands/${id}/unhide`),
+    settings: () => request<OtherBrandsSettings>("GET", "/v1/other-brands/settings"),
+    putSettings: (body: OtherBrandsSettingsInput) => request<OtherBrandsSettings>("PUT", "/v1/other-brands/settings", { body }),
+    backfill: () => request<BrandBackfill>("GET", "/v1/other-brands/backfill"),
+    /** Needs runs:write; spends money. */
+    startBackfill: () => request<BrandBackfill>("POST", "/v1/other-brands/backfill"),
+  },
+  logos: () => request<BrandLogo[]>("GET", "/v1/logos"),
 
   social: {
     mentions: (q: SocialMentionQuery = {}) =>

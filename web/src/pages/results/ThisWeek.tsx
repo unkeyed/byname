@@ -1,16 +1,18 @@
 import type { ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router";
-import { api, type Change, type Competitors, type Costs, type Gap, type Grouping, type LeftOut, type QuestionSet, type ResultsFilter, type RunSummary, type Series, type SettingsView, type SocialSettings, type Sources } from "../../api";
+import { api, type Change, type Competitors, type Costs, type Gap, type Grouping, type LeftOut, type OtherBrands, type QuestionSet, type ResultsFilter, type RunSummary, type Series, type SettingsView, type SocialSettings, type Sources } from "../../api";
+import { BrandMark } from "../../brandmark";
 import { LineChart, LineKey, Sparkline, type ChartLine } from "../../charts";
 import { money, nextCheckDay, nextCheckPhrase } from "../../checks";
 import { fidelityInfo, lineKey, palette, pct, shortDay, useLabels } from "../../lines";
-import { keys, useAnsweredRuns, useChanges, useCosts, useGsc, useLeftOut, useMe, useQuestions, useRuns, useSettings, useSocialSettings, useSurfaces } from "../../queries";
+import { keys, useAnsweredRuns, useChanges, useCosts, useGsc, useLeftOut, useMe, useOtherBrands, useQuestions, useRuns, useSettings, useSocialSettings, useSurfaces } from "../../queries";
 import { Card, CardHeader, cx, EmptyState, ErrorNote, Icon, Pending, ScrollX, useLoading, type IconName } from "../../ui";
 import { runTime, useFilter, useView, type RangeID } from "../../view";
 import { DailyChart } from "../search/DailyChart";
 import { day, figureInfo, searchState, spanFrom, useSearchDaily, type SearchState } from "../search/model";
 import { NotReady, settingsPath as searchConsoleSettings } from "../search/Search";
+import { useBrandActions } from "./AlsoNamed";
 import { useOpenEngine } from "./EngineDrawer";
 import { Segmented, ViewHeader } from "./Header";
 import { QuestionsTable } from "./QuestionsTable";
@@ -83,6 +85,8 @@ type WeekData = {
   sources: Sources | undefined;
   latest: Competitors | undefined;
   lastTwo: Competitors | undefined;
+  /** The brands the latest check named that you don't track. */
+  others: OtherBrands | undefined;
   changes: Change[];
   social: SocialSettings | undefined;
   socialNew: number;
@@ -108,6 +112,7 @@ function Week() {
   const sources = useQuery({ queryKey: keys.sources(filter), queryFn: () => api.sources(filter) });
   const latest = useQuery({ queryKey: keys.competitors({ since: latestStart }, "surface"), queryFn: () => api.metrics.competitors({ since: latestStart }, "surface") });
   const lastTwo = useQuery({ queryKey: keys.competitors({ since: prevStart }, "surface"), queryFn: () => api.metrics.competitors({ since: prevStart }, "surface"), enabled: !!prevStart });
+  const others = useOtherBrands({ since: latestStart });
   const changes = useChanges();
   const social = useSocialSettings();
   const socialNew = useQuery({ queryKey: keys.socialMentions({ since: weekAgo.slice(0, 10), limit: 1 }), queryFn: () => api.social.mentions({ since: weekAgo.slice(0, 10), limit: 1 }), enabled: !!social.data?.enabled });
@@ -115,7 +120,7 @@ function Week() {
   const questions = useQuestions();
   const costs = useCosts();
   const gsc = useGsc();
-  const pending = [summary, gaps, sources, latest, changes, social, leftOut, questions, costs, gsc].some((q) => q.isPending) || (!!prevStart && lastTwo.isPending) || (!!social.data?.enabled && socialNew.isPending);
+  const pending = [summary, gaps, sources, latest, others, changes, social, leftOut, questions, costs, gsc].some((q) => q.isPending) || (!!prevStart && lastTwo.isPending) || (!!social.data?.enabled && socialNew.isPending);
   useLoading(pending);
   if (pending || !settings.data) return null;
   if (summary.isError) return <ErrorNote error={summary.error} />;
@@ -127,6 +132,7 @@ function Week() {
     sources: sources.data,
     latest: latest.data,
     lastTwo: lastTwo.data,
+    others: others.data,
     changes: changes.data ?? [],
     social: social.data,
     socialNew: socialNew.data?.total ?? 0,
@@ -270,7 +276,8 @@ function RangeBar({ value, band }: { value: number | null; band: Band | null }) 
   );
 }
 
-type Item = { key: string; icon: IconName; text: string; to: string; action: string };
+/** A to-do. track is a brand you don't track, shown with its logo and a Track button. */
+type Item = { key: string; icon: IconName; text: string; to: string; action: string; track?: { id: number; name: string } };
 
 const quote = (s: string) => `“${s.length > 70 ? `${s.slice(0, 68).trimEnd()}…` : s}”`;
 const names = (xs: string[]) => (xs.length <= 1 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`);
@@ -304,6 +311,23 @@ const todoRules: ((d: WeekData) => Item[])[] = [
       .sort((a, b) => b.gain - a.gain)
       .slice(0, 2);
     return gains.map((g) => ({ key: `gain-${g.name}`, icon: "users" as const, text: `${g.name} was named in ${g.gain} more answers than in the check before.`, to: "/ai/competitors", action: "See competitors" }));
+  },
+  (d) => {
+    // Named in at least 3 answers and a fifth of the check: often enough that you likely compete with it.
+    const o = d.others;
+    if (!o) return [];
+    const often = Math.max(3, Math.ceil(o.answered / 5));
+    return o.brands
+      .filter((b) => b.latest >= often)
+      .slice(0, 2)
+      .map((b) => ({
+        key: `other-${b.brand_id}`,
+        icon: "users" as const,
+        text: `${b.name} was named in ${b.latest} ${b.latest === 1 ? "answer" : "answers"} and you don't track it.`,
+        to: "/ai/competitors#also-named",
+        action: "See other brands",
+        track: { id: b.brand_id, name: b.name },
+      }));
   },
   (d) => {
     const today = new Date().toISOString().slice(0, 10);
@@ -364,6 +388,8 @@ const setupRules: ((d: WeekData) => Item[])[] = [
 ];
 
 function ItemList({ title, description, items, empty }: { title: string; description: string; items: Item[]; empty?: string }) {
+  const actions = useBrandActions();
+  const canEdit = useMe().data?.scopes.includes("config:write") ?? false;
   return (
     <Card>
       <CardHeader title={title} description={description} />
@@ -373,13 +399,27 @@ function ItemList({ title, description, items, empty }: { title: string; descrip
         <ul className="divide-y divide-line border-t border-line">
           {items.map((it) => (
             <li key={it.key} className="flex items-start gap-3 px-4 py-3">
-              <Icon name={it.icon} className="mt-0.5 size-4 text-muted" />
+              {it.track ? <BrandMark id={it.track.id} name={it.track.name} size={16} /> : <Icon name={it.icon} className="mt-0.5 size-4 text-muted" />}
               <div className="min-w-0 flex-1 text-sm">
                 <p className="[overflow-wrap:anywhere]">{it.text}</p>
-                <Link to={it.to} className="inline-flex h-11 items-center gap-1 text-xs font-medium text-fg hover:underline md:h-auto md:pt-1">
-                  {it.action}
-                  <Icon name="right" className="size-3" />
-                </Link>
+                <div className="flex flex-wrap items-center gap-x-4">
+                  <Link to={it.to} className="inline-flex h-11 items-center gap-1 text-xs font-medium text-fg hover:underline md:h-auto md:pt-1">
+                    {it.action}
+                    <Icon name="right" className="size-3" />
+                  </Link>
+                  {it.track && canEdit && (
+                    <button
+                      type="button"
+                      disabled={actions.track.isPending}
+                      onClick={() => actions.track.mutate(it.track!.id)}
+                      aria-label={`Track ${it.track.name} as a competitor`}
+                      className="inline-flex h-11 items-center gap-1 text-xs font-medium text-fg hover:underline disabled:opacity-50 md:h-auto md:pt-1"
+                    >
+                      <Icon name="plus" className="size-3" />
+                      Track
+                    </button>
+                  )}
+                </div>
               </div>
             </li>
           ))}
@@ -584,9 +624,12 @@ function ShareCard({ filter }: { filter: ResultsFilter }) {
         <ul className="space-y-2 px-4 pb-4">
           {top.map((b) => (
             <li key={b.brand_id} className="grid grid-cols-[minmax(0,1fr)_3rem] items-center gap-x-3 gap-y-1 text-xs sm:grid-cols-[minmax(6rem,10rem)_minmax(0,1fr)_3rem]">
-              <span className={cx("truncate", b.kind === "self" ? "font-semibold" : "text-muted")}>
-                {b.name}
-                {b.kind === "self" && " (you)"}
+              <span className={cx("flex min-w-0 items-center gap-1.5", b.kind === "self" ? "font-semibold" : "text-muted")}>
+                <BrandMark id={b.brand_id} name={b.name} size={16} />
+                <span className="truncate">
+                  {b.name}
+                  {b.kind === "self" && " (you)"}
+                </span>
               </span>
               <span className="col-span-2 row-start-2 h-2 rounded-full bg-subtle sm:col-span-1 sm:row-start-auto">
                 <span className="block h-2 rounded-full" style={{ width: `${(b.share / max) * 100}%`, background: b.kind === "self" ? "var(--you)" : "var(--line-hover)" }} />

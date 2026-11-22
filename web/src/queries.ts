@@ -74,6 +74,12 @@ export const keys = {
   socialDigest: (day?: string) => ["social", "digest", day] as const,
   socialSettings: ["social", "settings"] as const,
   leftOut: ["social", "left-out"] as const,
+  /** Under results, so a finished check refreshes the list. */
+  otherBrands: (f: ResultsFilter) => ["results", "other-brands", f] as const,
+  hiddenBrands: ["results", "other-brands", "hidden"] as const,
+  otherBrandsSettings: ["other-brands-settings"] as const,
+  brandBackfill: ["results", "brand-backfill"] as const,
+  logos: ["logos"] as const,
 };
 
 export const useGscProperties = (enabled = true) => useQuery({ queryKey: keys.gscProperties, queryFn: api.gsc.properties, enabled });
@@ -101,6 +107,19 @@ export const useSocialMentions = (q: SocialMentionQuery) => useQuery({ queryKey:
 export const useSocialDigest = (day?: string) => useQuery({ queryKey: keys.socialDigest(day), queryFn: () => api.social.digest(day) });
 export const useSocialSettings = () => useQuery({ queryKey: keys.socialSettings, queryFn: api.social.settings });
 export const useLeftOut = () => useQuery({ queryKey: keys.leftOut, queryFn: api.social.leftOut });
+
+export const useOtherBrands = (f: ResultsFilter, enabled = true) => useQuery({ queryKey: keys.otherBrands(f), queryFn: () => api.otherBrands.list(f), enabled });
+export const useOtherBrandsSettings = () => useQuery({ queryKey: keys.otherBrandsSettings, queryFn: api.otherBrands.settings });
+/** Polls while a pass over past answers is queued or running. */
+export const useBrandBackfill = () =>
+  useQuery({
+    queryKey: keys.brandBackfill,
+    queryFn: api.otherBrands.backfill,
+    refetchInterval: (q) => (q.state.data?.latest && ["queued", "running"].includes(q.state.data.latest.status) ? 3000 : false),
+  });
+/** Every stored logo by brand id. A brand missing here draws its monogram. */
+export const useLogos = () =>
+  useQuery({ queryKey: keys.logos, queryFn: async () => new Map((await api.logos()).map((l) => [l.brand_id, l])), staleTime: 60_000 });
 
 export const useMe = () => useQuery({ queryKey: keys.me, queryFn: api.me.get, staleTime: Infinity });
 
