@@ -385,9 +385,9 @@ func TestInviteFlow(t *testing.T) {
 	person, _ := login(t, c)
 	var inv struct{ Token string }
 	person.call("POST", "/v1/invites", map[string]string{"email": "grace@example.com", "role": "admin"}, http.StatusCreated, &inv)
-	var info auth.Invitation
+	var info auth.InviteStatus
 	c.call("GET", "/auth/invites/"+inv.Token, nil, http.StatusOK, &info)
-	if info != (auth.Invitation{Email: "grace@example.com", Role: core.Admin}) {
+	if !info.Live || info.Invitation == nil || *info.Invitation != (auth.Invitation{Email: "grace@example.com", Role: core.Admin}) {
 		t.Fatalf("invite = %+v", info)
 	}
 
@@ -403,7 +403,11 @@ func TestInviteFlow(t *testing.T) {
 	gracesAgent.key = key.Key
 	gracesAgent.call("GET", "/v1/status", nil, http.StatusOK, nil)
 	c.call("POST", "/auth/signup/passkey/begin", map[string]string{"invite_token": inv.Token, "name": "Grace"}, http.StatusNotFound, nil)
-	c.call("GET", "/auth/invites/"+inv.Token, nil, http.StatusNotFound, nil)
+	var gone map[string]any
+	c.call("GET", "/auth/invites/"+inv.Token, nil, http.StatusOK, &gone)
+	if len(gone) != 1 || gone["live"] != false {
+		t.Fatalf("used invite = %v, want only live false", gone)
+	}
 
 	var users []auth.User
 	person.call("GET", "/v1/users", nil, http.StatusOK, &users)

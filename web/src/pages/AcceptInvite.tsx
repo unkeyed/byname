@@ -42,10 +42,10 @@ export function AcceptInvite() {
       </AuthShell>
     );
   }
-  if (invite.isError || used(join.error)) {
+  if (invite.isError || !invite.data.live || used(join.error)) {
     return (
       <AuthShell title="This invite no longer works">
-        {used(invite.error) || used(join.error) ? (
+        {!invite.isError ? (
           <p className="text-sm text-muted">It expired or was already used. Ask a teammate for a new link from Settings, Team.</p>
         ) : (
           <ErrorNote error={invite.error} />

@@ -254,6 +254,13 @@ type Invitation struct {
 	Role  core.Role `json:"role"`
 }
 
+// InviteStatus is what an invite link shows before anyone signs up with it.
+// Email and role are present only while it is live.
+type InviteStatus struct {
+	Live bool `json:"live"`
+	*Invitation
+}
+
 func (u *Users) Invitation(ctx context.Context, token string) (Invitation, error) {
 	var inv Invitation
 	err := u.db.QueryRow(ctx, `SELECT email, role FROM invites WHERE token_hash = $1 AND accepted_at IS NULL AND expires_at > now()`,

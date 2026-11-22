@@ -97,10 +97,8 @@ export interface User {
   created_at: Timestamp;
 }
 
-export interface Invitation {
-  email: Email;
-  role: Role;
-}
+/** An unknown, used or expired invite answers live false. */
+export type Invitation = { live: true; email: Email; role: Role } | { live: false };
 
 /** POST /v1/keys: the plaintext key is returned exactly once. */
 export interface CreatedKey extends Key {

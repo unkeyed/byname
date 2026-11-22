@@ -3793,17 +3793,15 @@ paths:
     get:
       tags: [auth]
       operationId: getInvite
-      summary: Who a live invite is for, and the role they join with.
+      summary: Whether an invite is live, and if so who it is for and the role they join with.
       security: []
       responses:
         "200":
-          description: The invite.
+          description: The invite. An unknown, used or expired one answers live false.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Invitation"
-        "404":
-          $ref: "#/components/responses/NotFound"
         "503":
           $ref: "#/components/responses/Unavailable"
   /auth/signup/passkey/begin:
@@ -4254,8 +4252,11 @@ components:
           description: Whether someone has finished setting up the brand, surfaces and questions.
     Invitation:
       type: object
-      required: [email, role]
+      required: [live]
       properties:
+        live:
+          type: boolean
+          description: False for an unknown, used or expired invite, which then has no email or role.
         email:
           type: string
         role:

@@ -253,7 +253,10 @@ func (s *server) checkSetup(w http.ResponseWriter, r *http.Request, _ core.Actor
 
 func (s *server) inviteInfo(w http.ResponseWriter, r *http.Request, _ core.Actor) error {
 	inv, err := s.users.Invitation(r.Context(), r.PathValue("token"))
-	return respond(w, http.StatusOK, inv, err)
+	if errors.Is(err, core.ErrNotFound) {
+		return respond(w, http.StatusOK, auth.InviteStatus{}, nil)
+	}
+	return respond(w, http.StatusOK, auth.InviteStatus{Live: true, Invitation: &inv}, err)
 }
 
 func (s *server) signupPasskeyBegin(w http.ResponseWriter, r *http.Request, _ core.Actor) error {
