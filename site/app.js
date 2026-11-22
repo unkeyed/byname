@@ -129,12 +129,12 @@ function stagger(block) {
 }
 
 // The hero: an answer streams in word by word, then Byname marks it up. It
-// moves to the next surface while on screen, and stops when the visitor picks
-// a surface, presses Pause, scrolls away or switches tabs.
+// moves to the next surface while on screen, stops for good when the visitor
+// picks a surface, and holds while they scroll away or switch tabs.
 const Hero = (() => {
   const root = $("[data-hero]");
   if (!root) return null;
-  const panes = $$(".pane", root), tabs = $$(".asked [role=tab]"), play = $("[data-play]");
+  const panes = $$(".pane", root), tabs = $$(".asked [role=tab]");
   const stamp = $(".stamp", root);
   let current = 0, auto = !reduce, onScreen = true, timers = [];
   const at = (ms, fn) => timers.push(setTimeout(fn, ms));
@@ -193,16 +193,8 @@ const Hero = (() => {
     if (auto && onScreen) at(t + 4200, () => show((i + 1) % panes.length, true));
   }
 
-  function setAuto(on) {
-    auto = on;
-    play.querySelector(".play-l").textContent = on ? "Pause" : "Play";
-    play.setAttribute("aria-label", on ? "Pause the example" : "Play the example");
-    if (on) show((current + 1) % panes.length, true);
-    else show(current, false);
-  }
-
   tabs.forEach((tab, k) => {
-    tab.addEventListener("click", () => { if (auto) setAuto(false); show(k, !reduce); });
+    tab.addEventListener("click", () => { auto = false; show(k, !reduce); });
     tab.addEventListener("keydown", (e) => {
       const to = { ArrowRight: k + 1, ArrowLeft: k - 1, Home: 0, End: tabs.length - 1 }[e.key];
       if (to === undefined) return;
@@ -213,8 +205,6 @@ const Hero = (() => {
     });
   });
   if (!reduce) {
-    play.hidden = false;
-    play.addEventListener("click", () => setAuto(!auto));
     const pauseFor = (away) => {
       if (onScreen === !away) return;
       onScreen = !away;

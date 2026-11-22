@@ -100,14 +100,19 @@ p { text-wrap: pretty; }
 .mk-svg path, path.draw {
   fill: none; stroke: var(--tone, var(--you)); stroke-width: var(--sw, 2.2); stroke-linecap: round; stroke-linejoin: round;
   stroke-dasharray: 1; stroke-dashoffset: 1;
-  transition: stroke-dashoffset var(--dur, .8s) cubic-bezier(.55, .05, .3, 1) var(--d, 0s);
+  /* A round cap at the dash boundary leaves a dot at the start, so the stroke stays transparent until it begins. */
+  opacity: 0;
+  transition: stroke-dashoffset var(--dur, .8s) cubic-bezier(.55, .05, .3, 1) var(--d, 0s), opacity 0s;
 }
 [data-tone="instead"], .instead { --tone: var(--instead); }
 [data-tone="ink"], .ink { --tone: var(--ink-3); }
-.mk.on .mk-svg path, .on .mk .mk-svg path, .on path.draw, path.draw.on { stroke-dashoffset: 0; }
-.no-js .mk-svg path, .no-js path.draw { stroke-dashoffset: 0; }
+.mk.on .mk-svg path, .on .mk .mk-svg path, .on path.draw, path.draw.on {
+  stroke-dashoffset: 0; opacity: 1;
+  transition: stroke-dashoffset var(--dur, .8s) cubic-bezier(.55, .05, .3, 1) var(--d, 0s), opacity 0s var(--d, 0s);
+}
+.no-js .mk-svg path, .no-js path.draw { stroke-dashoffset: 0; opacity: 1; }
 @media (prefers-reduced-motion: reduce) {
-  .mk-svg path, path.draw { transition: none; stroke-dashoffset: 0; }
+  .mk-svg path, path.draw, .mk.on .mk-svg path, .on .mk .mk-svg path, .on path.draw, path.draw.on { transition: none; stroke-dashoffset: 0; opacity: 1; }
 }
 
 /* Masthead */
