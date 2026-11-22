@@ -258,7 +258,7 @@ function AddQuestions({ groups, onAdd, names }: { groups: string[]; onAdd: (qs: 
             <label className="block">
               <span className={labelClass}>{mode === "csv" ? "CSV with group and text columns. The header row is optional." : "One question per line"}</span>
               <textarea
-                className={cx(inputClass, "h-36 py-2 font-mono text-xs leading-relaxed")}
+                className={cx(inputClass, "h-36 py-2 font-mono text-[16px] md:text-xs leading-relaxed")}
                 value={bulk}
                 onChange={(e) => setBulk(e.target.value)}
                 placeholder={

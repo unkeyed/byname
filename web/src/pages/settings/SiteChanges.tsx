@@ -293,8 +293,8 @@ function Rules({ r }: { r: RepoStatus }) {
               <li key={x.key} className="flex items-start gap-2 rounded-surface border border-line bg-surface p-2">
                 <span className="mt-1.5 w-5 shrink-0 text-center text-xs text-faint tabular-nums">{i + 1}</span>
                 <div className="grid min-w-0 flex-1 grid-cols-1 gap-2 md:grid-cols-2">
-                  <input aria-label={`Rule ${i + 1} glob`} ref={(el) => void (x.key === added && el?.focus({ preventScroll: true }))} className={cx(inputClass, "font-mono text-xs")} value={x.glob} onChange={(e) => edit(x.key, { glob: e.target.value })} placeholder="content/blog/*.mdx" autoCapitalize="none" spellCheck={false} />
-                  <input aria-label={`Rule ${i + 1} URL`} className={cx(inputClass, "font-mono text-xs")} value={x.url} onChange={(e) => edit(x.key, { url: e.target.value })} placeholder={`https://${domain}/blog/{1}`} autoCapitalize="none" spellCheck={false} />
+                  <input aria-label={`Rule ${i + 1} glob`} ref={(el) => void (x.key === added && el?.focus({ preventScroll: true }))} className={cx(inputClass, "font-mono text-[16px] md:text-xs")} value={x.glob} onChange={(e) => edit(x.key, { glob: e.target.value })} placeholder="content/blog/*.mdx" autoCapitalize="none" spellCheck={false} />
+                  <input aria-label={`Rule ${i + 1} URL`} className={cx(inputClass, "font-mono text-[16px] md:text-xs")} value={x.url} onChange={(e) => edit(x.key, { url: e.target.value })} placeholder={`https://${domain}/blog/{1}`} autoCapitalize="none" spellCheck={false} />
                 </div>
                 <div className="flex shrink-0 flex-col items-center sm:flex-row">
                   <Button size="sm" variant="ghost" icon aria-label={`Move rule ${i + 1} up`} disabled={i === 0} onClick={() => move(i, -1)}>
@@ -314,7 +314,7 @@ function Rules({ r }: { r: RepoStatus }) {
         {rows.length > 0 && (
           <div className="rounded-surface border border-line bg-header p-3">
             <Field label="Try a repo path" hint="Shows the page the rules above give it, saved or not.">
-              <input className={cx(inputClass, "font-mono text-xs")} value={path} onChange={(e) => setPath(e.target.value)} placeholder="content/blog/launch.mdx" autoCapitalize="none" spellCheck={false} />
+              <input className={cx(inputClass, "font-mono text-[16px] md:text-xs")} value={path} onChange={(e) => setPath(e.target.value)} placeholder="content/blog/launch.mdx" autoCapitalize="none" spellCheck={false} />
             </Field>
             {preview !== undefined && (
               <p className="mt-2 text-xs [overflow-wrap:anywhere]" aria-live="polite">

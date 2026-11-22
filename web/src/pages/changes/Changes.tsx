@@ -348,7 +348,7 @@ function LogForm({ zone, onDone }: { zone: Zone; onDone: () => void }) {
         </div>
         <Field label="Notes" hint="Optional, such as what you changed.">
           <textarea
-            className="block min-h-20 w-full rounded-control border border-line-strong bg-surface px-2.5 py-2 text-sm text-fg transition-colors placeholder:text-faint hover:border-line-hover focus:border-fg focus:ring-3 focus:ring-halo focus:outline-none"
+            className="block min-h-20 w-full rounded-control border border-line-strong bg-surface px-2.5 py-2 text-[16px] md:text-sm text-fg transition-colors placeholder:text-faint hover:border-line-hover focus:border-fg focus:ring-3 focus:ring-halo focus:outline-none"
             maxLength={2000}
             value={notes}
             onChange={(e) => setNotes(e.target.value)}

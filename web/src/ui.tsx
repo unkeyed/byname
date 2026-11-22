@@ -115,7 +115,7 @@ export function Logo({ className = "size-6 text-xs" }: { className?: string }) {
 }
 
 const fieldBase =
-  "h-11 md:h-8 min-w-0 rounded-control border border-line-strong bg-surface px-2.5 text-sm text-fg transition-colors placeholder:text-faint hover:border-line-hover focus-within:border-fg focus-within:ring-3 focus-within:ring-halo focus:outline-none focus-visible:outline-none disabled:opacity-60";
+  "h-11 md:h-8 min-w-0 rounded-control border border-line-strong bg-surface px-2.5 text-[16px] md:text-sm text-fg transition-colors placeholder:text-faint hover:border-line-hover focus-within:border-fg focus-within:ring-3 focus-within:ring-halo focus:outline-none focus-visible:outline-none disabled:opacity-60";
 export const inputClass = cx(fieldBase, "w-full");
 export const selectClass = cx(fieldBase, "select-chevron pr-7");
 export const labelClass = "mb-1.5 block text-xs font-medium text-muted";

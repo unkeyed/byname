@@ -146,7 +146,7 @@ export function ServiceAccountForm({ label = "Connect service account" }: { labe
         }
       >
         <textarea
-          className="block min-h-32 w-full rounded-control border border-line-strong bg-surface px-2.5 py-2 font-mono text-xs text-fg transition-colors placeholder:text-faint hover:border-line-hover focus:border-fg focus:ring-3 focus:ring-halo focus:outline-none"
+          className="block min-h-32 w-full rounded-control border border-line-strong bg-surface px-2.5 py-2 font-mono text-[16px] md:text-xs text-fg transition-colors placeholder:text-faint hover:border-line-hover focus:border-fg focus:ring-3 focus:ring-halo focus:outline-none"
           placeholder='{"type": "service_account", "client_email": "…", "private_key": "…"}'
           spellCheck={false}
           autoCapitalize="none"

@@ -133,7 +133,7 @@ export function ChangeSource({ c, className }: { c: Change; className?: string }
 
 function Facts({ c, zone }: { c: Change; zone: Zone }) {
   const rows: [string, ReactNode][] = [
-    ["Change", c.source === "manual" ? "Logged by hand" : <ChangeSource c={c} className="[overflow-wrap:anywhere]" />],
+    ["Change", c.source === "manual" ? "Logged by hand" : <ChangeSource c={c} className="inline-block min-h-11 py-3 [overflow-wrap:anywhere] md:min-h-0 md:py-0" />],
     ...(c.notes ? [["Notes", <span className="whitespace-pre-wrap [overflow-wrap:anywhere]">{c.notes}</span>] as [string, ReactNode]] : []),
     [c.source === "manual" ? "Went live" : "Merged", zone.at(c.merged_at)],
     ["Google's first crawl after", c.first_crawl_at ? zone.at(c.first_crawl_at) : <span className="text-muted">Not yet</span>],
