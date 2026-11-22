@@ -270,6 +270,10 @@ export interface Question {
   id: number;
   group: string;
   text: string;
+  /** The text names your brand, by the rules answers are scored with. */
+  names_brand: boolean;
+  /** False by default when the text names your brand. Set with questions.setScoring. */
+  count_in_scores: boolean;
 }
 
 export interface QuestionSet {
@@ -446,6 +450,39 @@ export interface Estimate {
   rows: EstimateRow[];
 }
 
+/** GET /v1/costs: what Byname costs, expected and spent, in US dollars. Treg bills you, not Byname. */
+export interface Costs {
+  per_answer: {
+    surface: SurfaceKey;
+    title: string;
+    group: "apps" | "developer_tools" | "approximations";
+    route: Route;
+    endpoint: string;
+    enabled: boolean;
+    default_on: boolean;
+    models: string[];
+    cost_per_answer_usd: number | null;
+    source: "history" | "sample" | "unknown";
+    samples: number;
+  }[];
+  checks: { check: Estimate; check_every_days: number; paused: boolean; checks_per_month: number; month_usd: number };
+  social: {
+    enabled: boolean;
+    fetches_per_month: number;
+    terms: number;
+    treg_networks: number;
+    treg_per_fetch_usd: number;
+    /** What the Treg networks cost a month at these settings, whether social is on or not. */
+    treg_month_usd: number;
+    bluesky_on: boolean;
+    bluesky_month_usd: number;
+    month_usd: number;
+  };
+  month_estimate_usd: number;
+  /** The calendar month so far in the instance's time zone. */
+  month: { start: Timestamp; checks_usd: number; social_usd: number; spent_usd: number; missing_cost_calls: number; cap_usd: number | null };
+}
+
 export type RunStatus = "queued" | "running" | "completed" | "capped" | "refused" | "failed";
 
 export interface EndpointStats {
@@ -472,6 +509,8 @@ export interface Run {
   spend_missing_calls: number;
   calls: number;
   succeeded: number;
+  /** Answers that did not fail and count in scores; mentioned and cited are out of these. */
+  scored: number;
   mentioned: number;
   cited: number;
   error: string;
@@ -502,6 +541,8 @@ export interface QuestionRef {
   id: number;
   group: string;
   text: string;
+  /** False when its answers are left out of scores, as for a question that names your brand. Its answers are still shown. */
+  counts_in_scores: boolean;
 }
 
 /** One line: a pair (or a surface) on one endpoint at one fidelity. */
@@ -1501,6 +1542,8 @@ export const api = {
     put: (body: QuestionsInput) => request<QuestionSet>("PUT", "/v1/questions", { body }),
     /** Newest first. */
     versions: () => request<QuestionSetSummary[]>("GET", "/v1/question-sets"),
+    /** true counts its answers in scores, false leaves them out, null goes back to the default. */
+    setScoring: (id: number, count: boolean | null) => request<Question>("PUT", `/v1/questions/${id}/scoring`, { body: { count_in_scores: count } }),
   },
   surfaces: {
     list: () => request<Surface[]>("GET", "/v1/surfaces"),
@@ -1533,6 +1576,7 @@ export const api = {
     finish: () => request<Onboarding>("POST", "/v1/onboarding/finish"),
   },
   estimate: () => request<Estimate>("GET", "/v1/estimate"),
+  costs: () => request<Costs>("GET", "/v1/costs"),
 
   runs: {
     /** Newest first. */
