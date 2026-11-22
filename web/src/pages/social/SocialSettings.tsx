@@ -75,7 +75,7 @@ function SearchForm({ s, costs, canEdit }: { s: Settings; costs: Costs["social"]
           <span>
             <span className="font-medium">Watch X, Reddit, Hacker News, LinkedIn, YouTube, Threads and Bluesky for mentions</span>
             <span className="mt-0.5 block text-muted">
-              Off until you turn it on.{costs && ` ${socialCost(s, costs)}`}
+              {on ? "On." : "Off until you turn it on."}{costs && ` ${socialCost(s, costs)}`}
             </span>
           </span>
         </label>
