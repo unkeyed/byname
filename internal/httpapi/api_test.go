@@ -34,6 +34,7 @@ import (
 	"github.com/unkeyed/byname/internal/notify"
 	"github.com/unkeyed/byname/internal/notify/notifytest"
 	"github.com/unkeyed/byname/internal/results"
+	"github.com/unkeyed/byname/internal/social"
 	"github.com/unkeyed/byname/internal/testdb"
 )
 
@@ -190,7 +191,8 @@ func serve(t *testing.T, srv *httptest.Server, publicURL string, mod ...func(*au
 		Client: gsc.OAuthClient{ID: "test-client", Secret: "test-secret"}, PublicURL: u, Terms: settings})
 	github := githubtest.New(t, "northwind", "site", githubToken)
 	site := changes.New(pool, search, changes.Options{Secrets: cfg.Secrets, Alerts: alerts, GitHubBaseURL: github.URL})
-	svc := app.Services{Instance: instance.New("test", settings), Config: settings, Checks: checks.New(pool, settings, checks.Options{Alerts: alerts}), Results: res, Notify: alerts, GSC: search, Changes: site}
+	mentions := social.New(pool, settings, social.Options{Alerts: alerts, BaseURLs: map[social.Network]string{social.Bluesky: fakeBluesky(t)}})
+	svc := app.Services{Instance: instance.New("test", settings), Config: settings, Checks: checks.New(pool, settings, checks.Options{Alerts: alerts}), Results: res, Notify: alerts, GSC: search, Changes: site, Social: mentions}
 	mux := NewMux(svc, authn, slog.New(slog.DiscardHandler))
 	mux.Handle("/mcp", mcpserver.Handler(svc, authn.OAuth, "test"))
 	srv.Config.Handler = mux

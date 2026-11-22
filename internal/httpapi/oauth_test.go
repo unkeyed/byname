@@ -620,6 +620,15 @@ var mcpTools = map[string]string{
 	"DELETE /v1/control-pages/{id}": "delete_control_page",
 	"GET /v1/repo":                  "repo_status",
 	"PUT /v1/repo/rules":            "update_path_rules",
+
+	// Social mentions.
+	"GET /v1/social/mentions":         "list_social_mentions",
+	"GET /v1/social/digest":           "get_social_digest",
+	"GET /v1/social/settings":         "get_social_settings",
+	"PUT /v1/social/settings":         "update_social_settings",
+	"GET /v1/social/left-out":         "list_left_out_accounts",
+	"POST /v1/social/left-out":        "leave_out_account",
+	"DELETE /v1/social/left-out/{id}": "remove_left_out_account",
 }
 
 // TestEveryAPIKeyRouteHasAnMCPTool fails when a route an API key can call

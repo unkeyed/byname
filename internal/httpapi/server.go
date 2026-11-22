@@ -138,6 +138,15 @@ var routes = []route{
 	{"POST /v1/repo/test", admin, (*server).testRepo},
 	{"DELETE /v1/repo", admin, (*server).disconnectRepo},
 
+	// Social mentions (internal/social).
+	{"GET /v1/social/mentions", needs(core.ResultsRead), (*server).listMentions},
+	{"GET /v1/social/digest", needs(core.ResultsRead), (*server).socialDigest},
+	{"GET /v1/social/settings", needs(core.ResultsRead), (*server).socialSettings},
+	{"PUT /v1/social/settings", needs(core.ConfigWrite), (*server).putSocialSettings},
+	{"GET /v1/social/left-out", needs(core.ResultsRead), (*server).listLeftOut},
+	{"POST /v1/social/left-out", needs(core.ConfigWrite), (*server).leaveOut},
+	{"DELETE /v1/social/left-out/{id}", needs(core.ConfigWrite), (*server).removeLeftOut},
+
 	{"GET /v1/keys", admin, (*server).listKeys},
 	{"POST /v1/keys", admin, (*server).createKey},
 	{"DELETE /v1/keys/{id}", admin, (*server).revokeKey},

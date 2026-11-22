@@ -186,4 +186,5 @@ func addTools(srv *mcp.Server, svc app.Services) {
 	addNotifyTools(srv, svc)
 	addSearchTools(srv, svc)
 	addChangeTools(srv, svc)
+	addSocialTools(srv, svc)
 }

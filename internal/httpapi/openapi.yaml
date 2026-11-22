@@ -73,6 +73,13 @@ tags:
       pages. results:read reads them; config:write logs changes and edits
       control pages, path rules and the read settings; a signed-in admin
       connects the repo.
+  - name: social
+    description: >-
+      Social mentions. Posts that name you on X, Reddit, Hacker News,
+      LinkedIn, YouTube, Threads and Bluesky, found through Treg (Bluesky
+      through its own public API), with the accounts you left out hidden at
+      read time. results:read reads mentions, digests, settings and the
+      left-out list; config:write changes the settings and the list.
   - name: settings
     description: Keys, apps, the team and the Treg token, for signed-in admins, and the consent page.
   - name: auth
@@ -2168,6 +2175,203 @@ paths:
           $ref: "#/components/responses/NotFound"
         "503":
           $ref: "#/components/responses/Unavailable"
+  /v1/social/mentions:
+    get:
+      tags: [social]
+      operationId: listMentions
+      summary: Stored posts that mention you, newest first, without those by left-out accounts unless asked.
+      security:
+        - apiKey: [results:read]
+        - session: [results:read]
+      parameters:
+        - name: network
+          in: query
+          schema:
+            $ref: "#/components/schemas/SocialNetwork"
+        - name: since
+          in: query
+          description: Only posts from then on, a day such as 2026-11-01 (midnight in the instance's time zone) or a time.
+          schema:
+            type: string
+        - name: include_hidden
+          in: query
+          description: Also return mentions by left-out accounts, marked hidden.
+          schema:
+            type: boolean
+        - name: limit
+          in: query
+          description: 1 to 500, default 100.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+      responses:
+        "200":
+          description: The mentions, with how many match and how many are hidden.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SocialMentionList"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /v1/social/digest:
+    get:
+      tags: [social]
+      operationId: getSocialDigest
+      summary: One day's or week's mentions grouped by network, the most engaged first, with new authors and spend.
+      description: Counts mentions first seen in the period, without the accounts left out now. Periods follow the instance's time zone and the digest cadence in the social settings.
+      security:
+        - apiKey: [results:read]
+        - session: [results:read]
+      parameters:
+        - name: day
+          in: query
+          description: Any day in the period, such as 2026-11-18. Without it, the latest period that has ended.
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: The digest.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SocialDigest"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /v1/social/settings:
+    get:
+      tags: [social]
+      operationId: getSocialSettings
+      summary: The search terms, the networks and each one's latest call, how often to fetch and when the digest goes out.
+      security:
+        - apiKey: [results:read]
+        - session: [results:read]
+      responses:
+        "200":
+          description: The social settings.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SocialSettings"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+    put:
+      tags: [social]
+      operationId: putSocialSettings
+      summary: Replace the search terms, the fetch period and the digest schedule, and turn networks on or off.
+      security:
+        - apiKey: [config:write]
+        - session: [config:write]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SocialSettingsInput"
+      responses:
+        "200":
+          description: The social settings.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SocialSettings"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /v1/social/left-out:
+    get:
+      tags: [social]
+      operationId: listLeftOut
+      summary: The accounts whose mentions are hidden, such as teammates and your own accounts, by label.
+      security:
+        - apiKey: [results:read]
+        - session: [results:read]
+      responses:
+        "200":
+          description: The left-out accounts.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LeftOut"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+    post:
+      tags: [social]
+      operationId: leaveOut
+      summary: Leave an account out, or relabel the one already left out on that network. Its past mentions are hidden too.
+      security:
+        - apiKey: [config:write]
+        - session: [config:write]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LeftOutInput"
+      responses:
+        "200":
+          description: The left-out account.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LeftOut"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /v1/social/left-out/{id}:
+    parameters:
+      - $ref: "#/components/parameters/id"
+    delete:
+      tags: [social]
+      operationId: removeLeftOut
+      summary: Take an account off the list, so its mentions show again.
+      security:
+        - apiKey: [config:write]
+        - session: [config:write]
+      responses:
+        "204":
+          description: Removed.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/Unavailable"
   /v1/keys:
     get:
       tags: [settings]
@@ -3584,7 +3788,7 @@ components:
       description: Set by a completed sign-in under /auth. Unsafe cross-site browser requests are rejected.
     EventKindName:
       type: string
-      enum: [check_completed, check_refused, check_failed, spend_cap_reached, pair_paused, goal_reached, search_moved, change_verdict, token_expiring]
+      enum: [check_completed, check_refused, check_failed, spend_cap_reached, pair_paused, goal_reached, search_moved, change_verdict, token_expiring, social_digest]
     EventKind:
       type: object
       description: One kind of event a channel can subscribe to.
@@ -5490,7 +5694,7 @@ components:
           type: integer
         job:
           type: string
-          enum: [ai_check, model_refresh, source_fetch, gsc_sync]
+          enum: [ai_check, model_refresh, source_fetch, gsc_sync, site_changes, recrawl_watch, verdicts, social_fetch]
         trigger:
           $ref: "#/components/schemas/Trigger"
         run_id:
@@ -6338,3 +6542,294 @@ components:
           format: date-time
         last_poll_error:
           type: string
+    SocialNetwork:
+      type: string
+      enum: [x, reddit, hackernews, linkedin, youtube, threads, bluesky]
+    Engagement:
+      type: object
+      description: What the network reports about a post. A count it does not give is null, never 0.
+      required: [likes, replies, reposts, score, views, total]
+      properties:
+        likes:
+          type: [integer, "null"]
+        replies:
+          type: [integer, "null"]
+        reposts:
+          type: [integer, "null"]
+        score:
+          type: [integer, "null"]
+          description: Points on Hacker News, score on Reddit.
+        views:
+          type: [integer, "null"]
+          description: Views on X and YouTube.
+        total:
+          type: integer
+          description: What ranks posts within a network, views on YouTube, elsewhere likes, replies, reposts and score added up.
+    SocialCall:
+      type: object
+      description: The search call that first found a post.
+      required: [id, route, treg_call_id, cost_usd, cost_missing]
+      properties:
+        id:
+          type: integer
+        route:
+          type: string
+          enum: [treg, direct]
+        treg_call_id:
+          type: string
+        cost_usd:
+          type: [number, "null"]
+          description: The whole call's cost, shared by every post it found. Null when Treg reported no cost; 0 for a direct call, which is free.
+        cost_missing:
+          type: boolean
+    SocialMention:
+      type: object
+      required: [id, network, post_id, url, author_handle, author_name, text, posted_at, posted_approx, engagement, term, first_seen_at, hidden, left_out_as, call]
+      properties:
+        id:
+          type: integer
+        network:
+          $ref: "#/components/schemas/SocialNetwork"
+        post_id:
+          type: string
+        url:
+          type: string
+        author_handle:
+          type: string
+          description: Lowercase, with no @ or u/. A YouTube channel's name without spaces.
+        author_name:
+          type: string
+        text:
+          type: string
+        posted_at:
+          type: string
+          format: date-time
+        posted_approx:
+          type: boolean
+          description: True when the network gave only an age, as YouTube does.
+        engagement:
+          $ref: "#/components/schemas/Engagement"
+        term:
+          type: string
+        first_seen_at:
+          type: string
+          format: date-time
+        hidden:
+          type: boolean
+          description: Its author is on the left-out list.
+        left_out_as:
+          type: string
+          description: The label that hides it, empty when shown.
+        call:
+          oneOf:
+            - $ref: "#/components/schemas/SocialCall"
+            - type: "null"
+    SocialMentionList:
+      type: object
+      required: [mentions, total, hidden]
+      properties:
+        mentions:
+          type: array
+          items:
+            $ref: "#/components/schemas/SocialMention"
+        total:
+          type: integer
+          description: Mentions that match and are shown, which can be more than returned.
+        hidden:
+          type: integer
+          description: Mentions that match but are by left-out accounts.
+    SocialDigest:
+      type: object
+      required: [cadence, from, to, starts_at, ends_at, finished, mentions, hidden, networks, new_authors, calls, spend_usd, spend_missing_calls]
+      properties:
+        cadence:
+          type: string
+          enum: [daily, weekly]
+        from:
+          type: string
+          format: date
+        to:
+          type: string
+          format: date
+        starts_at:
+          type: string
+          format: date-time
+        ends_at:
+          type: string
+          format: date-time
+        finished:
+          type: boolean
+        mentions:
+          type: integer
+        hidden:
+          type: integer
+        networks:
+          type: array
+          description: Each network with a mention, most mentions first.
+          items:
+            type: object
+            required: [network, title, mentions, top]
+            properties:
+              network:
+                $ref: "#/components/schemas/SocialNetwork"
+              title:
+                type: string
+              mentions:
+                type: integer
+              top:
+                type: array
+                maxItems: 5
+                items:
+                  $ref: "#/components/schemas/SocialMention"
+        new_authors:
+          type: array
+          description: Accounts whose first shown mention fell in the period.
+          items:
+            type: object
+            required: [network, handle, name, profile, mentions]
+            properties:
+              network:
+                $ref: "#/components/schemas/SocialNetwork"
+              handle:
+                type: string
+              name:
+                type: string
+              profile:
+                type: string
+              mentions:
+                type: integer
+        calls:
+          type: integer
+        spend_usd:
+          type: number
+        spend_missing_calls:
+          type: integer
+          description: Treg calls that reported no cost, left out of spend_usd rather than counted as $0.
+    SocialSettings:
+      type: object
+      required: [terms, default_terms, custom_terms, fetch_every_hours, digest_cadence, digest_weekday, time_zone, token_set, networks, last_fetch_at, next_fetch_at]
+      properties:
+        terms:
+          type: array
+          items:
+            type: string
+        default_terms:
+          type: array
+          description: Your brand's name and primary domain, searched when no terms are set.
+          items:
+            type: string
+        custom_terms:
+          type: boolean
+        fetch_every_hours:
+          type: integer
+          enum: [1, 3, 6, 12, 24]
+        digest_cadence:
+          type: string
+          enum: [daily, weekly]
+        digest_weekday:
+          type: integer
+          minimum: 0
+          maximum: 6
+          description: The day a weekly digest's week starts, 0 for Sunday.
+        time_zone:
+          type: string
+        token_set:
+          type: boolean
+          description: Whether a Treg token is stored. Without one only Bluesky is searched.
+        networks:
+          type: array
+          items:
+            type: object
+            required: [network, title, enabled, route, tool, cost_per_call_usd, last_call_at, last_error, unavailable]
+            properties:
+              network:
+                $ref: "#/components/schemas/SocialNetwork"
+              title:
+                type: string
+              enabled:
+                type: boolean
+              route:
+                type: string
+                enum: [treg, direct]
+              tool:
+                type: string
+              cost_per_call_usd:
+                type: number
+              last_call_at:
+                type: [string, "null"]
+                format: date-time
+              last_error:
+                type: string
+              unavailable:
+                type: boolean
+                description: The latest call found the network's public search asking for sign-in.
+        last_fetch_at:
+          type: [string, "null"]
+          format: date-time
+        next_fetch_at:
+          type: [string, "null"]
+          format: date-time
+    SocialSettingsInput:
+      type: object
+      required: [terms, fetch_every_hours, digest_cadence, digest_weekday]
+      additionalProperties: false
+      properties:
+        terms:
+          type: array
+          maxItems: 5
+          description: 1 to 5 terms, or [] to search for your brand's name and primary domain.
+          items:
+            type: string
+        fetch_every_hours:
+          type: integer
+          enum: [1, 3, 6, 12, 24]
+        digest_cadence:
+          type: string
+          enum: [daily, weekly]
+        digest_weekday:
+          type: integer
+          minimum: 0
+          maximum: 6
+        networks:
+          type: array
+          description: Networks to turn on or off; one left out keeps its setting.
+          items:
+            type: object
+            required: [network, enabled]
+            additionalProperties: false
+            properties:
+              network:
+                $ref: "#/components/schemas/SocialNetwork"
+              enabled:
+                type: boolean
+    LeftOut:
+      type: object
+      required: [id, network, handle, label, profile, mentions]
+      properties:
+        id:
+          type: integer
+        network:
+          $ref: "#/components/schemas/SocialNetwork"
+        handle:
+          type: string
+        label:
+          type: string
+          description: Who it is, such as a person's name or Our accounts.
+        profile:
+          type: string
+        mentions:
+          type: integer
+          description: Stored mentions it hides.
+    LeftOutInput:
+      type: object
+      required: [network, handle, label]
+      additionalProperties: false
+      properties:
+        network:
+          $ref: "#/components/schemas/SocialNetwork"
+        handle:
+          type: string
+          description: The handle (@name, u/name, name), a YouTube channel's name, or a link to the profile.
+        label:
+          type: string
+          maxLength: 80
