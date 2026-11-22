@@ -192,4 +192,5 @@ func addTools(srv *mcp.Server, svc app.Services) {
 	addSearchTools(srv, svc)
 	addChangeTools(srv, svc)
 	addSocialTools(srv, svc)
+	addOtherBrandsTools(srv, svc)
 }

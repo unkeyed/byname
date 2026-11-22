@@ -544,7 +544,8 @@ func (b bearer) RoundTrip(r *http.Request) (*http.Response, error) {
 
 // mcpExclusions are routes an API key can call with no MCP tool, and why.
 var mcpExclusions = map[string]string{
-	"DELETE /v1/keys/current": "revokes the calling API key; MCP clients sign in with OAuth and are disconnected under Settings > Apps",
+	"DELETE /v1/keys/current":  "revokes the calling API key; MCP clients sign in with OAuth and are disconnected under Settings > Apps",
+	"GET /v1/brands/{id}/logo": "an image file for the browser to draw; list_logos gives each brand's colour and domain",
 }
 
 // mcpTools maps each route an API key can call to the MCP tool that does
@@ -632,6 +633,17 @@ var mcpTools = map[string]string{
 	"GET /v1/social/left-out":         "list_left_out_accounts",
 	"POST /v1/social/left-out":        "leave_out_account",
 	"DELETE /v1/social/left-out/{id}": "remove_left_out_account",
+	// Other brands and logos.
+	"GET /v1/other-brands":              "list_other_brands",
+	"GET /v1/other-brands/hidden":       "list_hidden_brands",
+	"POST /v1/other-brands/{id}/track":  "track_brand",
+	"POST /v1/other-brands/{id}/hide":   "hide_brand",
+	"POST /v1/other-brands/{id}/unhide": "unhide_brand",
+	"GET /v1/other-brands/settings":     "get_other_brands_settings",
+	"PUT /v1/other-brands/settings":     "update_other_brands_settings",
+	"GET /v1/other-brands/backfill":     "get_brand_backfill",
+	"POST /v1/other-brands/backfill":    "start_brand_backfill",
+	"GET /v1/logos":                     "list_logos",
 }
 
 // TestEveryAPIKeyRouteHasAnMCPTool fails when a route an API key can call

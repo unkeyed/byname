@@ -80,6 +80,13 @@ tags:
       through its own public API), with the accounts you left out hidden at
       read time. results:read reads mentions, digests, settings and the
       left-out list; config:write changes the settings and the list.
+  - name: other-brands
+    description: >-
+      The brands AI answers name that you don't track, found by a small model
+      reading each new answer through Treg, and every brand's logo from
+      Context.dev through Treg. None of it counts in any score. results:read
+      reads them; config:write tracks, hides and unhides a brand and changes
+      the settings; runs:write starts reading past answers.
   - name: settings
     description: Keys, apps, the team and the Treg token, for signed-in admins, and the consent page.
   - name: auth
@@ -2469,6 +2476,264 @@ paths:
       responses:
         "204":
           description: Removed.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /v1/other-brands:
+    get:
+      tags: [other-brands]
+      operationId: listOtherBrands
+      summary: The brands AI answers named that you don't track, most named first, over the checks in range on the AI apps in scope. They count in no score.
+      security:
+        - apiKey: [results:read]
+        - session: [results:read]
+      parameters:
+        - $ref: "#/components/parameters/since"
+        - $ref: "#/components/parameters/surface"
+        - $ref: "#/components/parameters/model"
+      responses:
+        "200":
+          description: The brands, with how many answers in range were read for them.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OtherBrands"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /v1/other-brands/hidden:
+    get:
+      tags: [other-brands]
+      operationId: listHiddenBrands
+      summary: The brands someone marked as not a competitor, by name.
+      security:
+        - apiKey: [results:read]
+        - session: [results:read]
+      responses:
+        "200":
+          description: The hidden brands.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/HiddenBrand"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /v1/other-brands/{id}/track:
+    parameters:
+      - $ref: "#/components/parameters/id"
+    post:
+      tags: [other-brands]
+      operationId: trackBrand
+      summary: Track a brand AI answers named as a competitor, with every spelling answers used as an alias. It counts from then on, and every past answer is scored again, locally and for free.
+      security:
+        - apiKey: [config:write]
+        - session: [config:write]
+      responses:
+        "200":
+          description: The new competitor.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Brand"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /v1/other-brands/{id}/hide:
+    parameters:
+      - $ref: "#/components/parameters/id"
+    post:
+      tags: [other-brands]
+      operationId: hideBrand
+      summary: Mark a brand AI answers named as not a competitor, so it leaves the list. Its mentions are kept.
+      security:
+        - apiKey: [config:write]
+        - session: [config:write]
+      responses:
+        "204":
+          description: Hidden.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /v1/other-brands/{id}/unhide:
+    parameters:
+      - $ref: "#/components/parameters/id"
+    post:
+      tags: [other-brands]
+      operationId: unhideBrand
+      summary: Put a hidden brand back on the list of brands you don't track.
+      security:
+        - apiKey: [config:write]
+        - session: [config:write]
+      responses:
+        "204":
+          description: Back on the list.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /v1/other-brands/settings:
+    get:
+      tags: [other-brands]
+      operationId: getOtherBrandsSettings
+      summary: Whether new answers are read for other brands and logos looked up, what each costs, and the monthly limit on new logo lookups.
+      security:
+        - apiKey: [results:read]
+        - session: [results:read]
+      responses:
+        "200":
+          description: The settings.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OtherBrandsSettings"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+    put:
+      tags: [other-brands]
+      operationId: putOtherBrandsSettings
+      summary: Turn reading answers for other brands or logo lookups on or off, or set the monthly limit on new lookups. A field left out keeps its setting.
+      security:
+        - apiKey: [config:write]
+        - session: [config:write]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OtherBrandsSettingsInput"
+      responses:
+        "200":
+          description: The settings.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OtherBrandsSettings"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /v1/other-brands/backfill:
+    get:
+      tags: [other-brands]
+      operationId: getBrandBackfill
+      summary: How many past answers were never read for other brands, what reading them costs, and the latest pass someone started.
+      security:
+        - apiKey: [results:read]
+        - session: [results:read]
+      responses:
+        "200":
+          description: The unread answers and the latest pass.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BrandBackfill"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+    post:
+      tags: [other-brands]
+      operationId: startBrandBackfill
+      summary: Read every past answer never read for other brands, as one job in Check history that starts within a minute, within the monthly spend cap. A pass already queued or running is returned instead.
+      security:
+        - apiKey: [runs:write]
+        - session: [runs:write]
+      responses:
+        "202":
+          description: The pass is queued.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BrandBackfill"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /v1/logos:
+    get:
+      tags: [other-brands]
+      operationId: listLogos
+      summary: Every brand with a logo, with its colour and domain. Draw a logo from /v1/brands/{id}/logo?v={version}.
+      security:
+        - apiKey: [results:read]
+        - session: [results:read]
+      responses:
+        "200":
+          description: The brands with a logo.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Logo"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /v1/brands/{id}/logo:
+    parameters:
+      - $ref: "#/components/parameters/id"
+    get:
+      tags: [other-brands]
+      operationId: getBrandLogo
+      summary: A brand's logo image, as Context.dev gave it. Served by Byname, so the browser never calls a third party.
+      security:
+        - apiKey: [results:read]
+        - session: [results:read]
+      responses:
+        "200":
+          description: The image.
+          content:
+            image/*:
+              schema:
+                type: string
+                format: binary
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
@@ -5164,7 +5429,7 @@ components:
           type: string
     Estimate:
       type: object
-      required: [questions, pairs, calls, known_usd, unknown_pairs, rows]
+      required: [questions, pairs, calls, known_usd, unknown_pairs, rows, find_brands]
       properties:
         questions:
           type: integer
@@ -5175,9 +5440,21 @@ components:
           description: Questions times enabled pairs.
         known_usd:
           type: number
-          description: The sum over pairs with a cost per call.
+          description: The sum over pairs with a cost per call, plus reading the answers for other brands when that is on.
         unknown_pairs:
           type: integer
+        find_brands:
+          type: ["object", "null"]
+          description: Reading each answer for the brands it names that you don't track. Null while it is off or no Treg token is stored.
+          required: [answers, cost_per_answer_usd, cost_usd]
+          properties:
+            answers:
+              type: integer
+            cost_per_answer_usd:
+              type: number
+              description: The mean of past reads, or the sampled price before any.
+            cost_usd:
+              type: number
         rows:
           type: array
           items:
@@ -5213,7 +5490,7 @@ components:
                 type: [number, "null"]
     Costs:
       type: object
-      required: [per_answer, checks, social, month_estimate_usd, default_month_cap_usd, month]
+      required: [per_answer, checks, social, other_brands, month_estimate_usd, default_month_cap_usd, month]
       properties:
         per_answer:
           type: array
@@ -5296,15 +5573,17 @@ components:
             month_usd:
               type: number
               description: treg_month_usd while social is on, 0 while it is off.
+        other_brands:
+          $ref: "#/components/schemas/OtherBrandsSettings"
         month_estimate_usd:
           type: number
-          description: checks.month_usd plus social.month_usd.
+          description: checks.month_usd plus social.month_usd. Reading answers for other brands is in each check's estimate; logo lookups are capped by other_brands.logos.month_max_usd.
         default_month_cap_usd:
           type: number
           description: The monthly spend cap finishing onboarding sets when none is set. Three times month_estimate_usd, rounded up to a whole dollar, and at least 5.
         month:
           type: object
-          required: [start, checks_usd, social_usd, spent_usd, missing_cost_calls, cap_usd]
+          required: [start, checks_usd, social_usd, brands_usd, spent_usd, missing_cost_calls, cap_usd]
           description: The calendar month so far, in the instance's time zone.
           properties:
             start:
@@ -5314,9 +5593,12 @@ components:
               type: number
             social_usd:
               type: number
+            brands_usd:
+              type: number
+              description: Finding other brands, reading answers in checks or later and looking up logos.
             spent_usd:
               type: number
-              description: checks_usd plus social_usd, what the monthly spend cap counts.
+              description: checks_usd plus social_usd plus brands_usd, what the monthly spend cap counts.
             missing_cost_calls:
               type: integer
               description: Answered calls this month that reported no cost, so spent_usd is a floor.
@@ -5480,7 +5762,7 @@ components:
     AnswerSummary:
       type: object
       description: One answer as the answers list shows it.
-      required: [id, run_id, question, pair, endpoint, fidelity, reported_model, status, error, attempts, mentioned, cited, position, cost_usd, citation_count, mentions, answered_at]
+      required: [id, run_id, question, pair, endpoint, fidelity, reported_model, status, error, attempts, mentioned, cited, position, cost_usd, citation_count, mentions, others, answered_at]
       properties:
         id:
           type: integer
@@ -5524,6 +5806,17 @@ components:
           items:
             $ref: "#/components/schemas/Mention"
           description: Every brand named, in order of first mention.
+        others:
+          type: array
+          description: The brands the answer named that you don't track, in answer order. They count in no score.
+          items:
+            type: object
+            required: [brand_id, name]
+            properties:
+              brand_id:
+                type: integer
+              name:
+                type: string
         answered_at:
           type: string
           format: date-time
@@ -6053,7 +6346,7 @@ components:
           type: integer
         job:
           type: string
-          enum: [ai_check, model_refresh, source_fetch, gsc_sync, site_changes, recrawl_watch, verdicts, social_fetch]
+          enum: [ai_check, model_refresh, source_fetch, gsc_sync, site_changes, recrawl_watch, verdicts, social_fetch, other_brands, brand_logos]
         trigger:
           $ref: "#/components/schemas/Trigger"
         run_id:
@@ -6073,7 +6366,7 @@ components:
           type: string
         spend_usd:
           type: [number, "null"]
-          description: The run's spend, for an AI check. Null for any other job.
+          description: What the job spent. An AI check's answers and its reads for other brands, or the calls an other_brands or brand_logos job made. Null for a job that spends nothing.
     SearchTotals:
       type: object
       required: [clicks, impressions, ctr, position]
@@ -7168,6 +7461,176 @@ components:
                 $ref: "#/components/schemas/SocialNetwork"
               enabled:
                 type: boolean
+    OtherBrands:
+      type: object
+      required: [answered, read, latest_run, previous_run, hidden, brands]
+      properties:
+        answered:
+          type: integer
+          description: Answers in range that did not fail, the N in "named in M of N answers".
+        read:
+          type: integer
+          description: Of those, answers read for other brands. An unread answer names none here yet.
+        latest_run:
+          type: integer
+          description: The newest check in range, 0 when none.
+        previous_run:
+          type: integer
+          description: The check before latest_run on these AI apps, 0 when latest_run is the first.
+        hidden:
+          type: integer
+          description: Brands marked as not a competitor.
+        brands:
+          type: array
+          items:
+            type: object
+            required: [brand_id, name, domain, named, latest, previous, change, questions]
+            properties:
+              brand_id:
+                type: integer
+              name:
+                type: string
+              domain:
+                type: string
+              named:
+                type: integer
+                description: Answers in range that named it.
+              latest:
+                type: integer
+              previous:
+                type: integer
+              change:
+                type: [integer, "null"]
+                description: latest minus previous, null when the latest check is the first.
+              questions:
+                type: array
+                description: The questions whose answers named it most, at most 3.
+                items:
+                  type: object
+                  required: [question_id, text, named]
+                  properties:
+                    question_id:
+                      type: integer
+                    text:
+                      type: string
+                    named:
+                      type: integer
+    HiddenBrand:
+      type: object
+      required: [brand_id, name, domain, named]
+      properties:
+        brand_id:
+          type: integer
+        name:
+          type: string
+        domain:
+          type: string
+        named:
+          type: integer
+          description: Answers that named it, over all time.
+    OtherBrandsSettings:
+      type: object
+      required: [has_token, onboarded, find, logos]
+      properties:
+        has_token:
+          type: boolean
+          description: A Treg token is stored. Both need one.
+        onboarded:
+          type: boolean
+        find:
+          type: object
+          required: [on, cost_per_answer_usd, model]
+          properties:
+            on:
+              type: boolean
+            cost_per_answer_usd:
+              type: number
+              description: The mean of past reads, or the sampled price before any.
+            model:
+              type: string
+        logos:
+          type: object
+          required: [on, cost_per_brand_usd, month_limit, month_max_usd, this_month, logos]
+          properties:
+            on:
+              type: boolean
+            cost_per_brand_usd:
+              type: number
+              description: The mean of past lookups, or Context.dev's price before any. A brand Context.dev has nothing for costs nothing.
+            month_limit:
+              type: integer
+            month_max_usd:
+              type: number
+              description: month_limit times cost_per_brand_usd.
+            this_month:
+              type: integer
+            logos:
+              type: integer
+              description: Brands with a logo.
+    OtherBrandsSettingsInput:
+      type: object
+      additionalProperties: false
+      properties:
+        find:
+          type: boolean
+        logos:
+          type: boolean
+        logo_month_limit:
+          type: integer
+          minimum: 0
+          maximum: 1000
+    BrandBackfill:
+      type: object
+      required: [unread, cost_per_answer_usd, cost_usd, ready, latest]
+      properties:
+        unread:
+          type: integer
+          description: Answers of finished checks never read for other brands.
+        cost_per_answer_usd:
+          type: number
+        cost_usd:
+          type: number
+          description: unread times cost_per_answer_usd.
+        ready:
+          type: boolean
+          description: Reading is on, a Treg token is stored and onboarding is finished, so a pass can start.
+        latest:
+          oneOf:
+            - type: "null"
+            - type: object
+              required: [job_id, status, started_at, finished_at, read, spent_usd, error]
+              properties:
+                job_id:
+                  type: integer
+                status:
+                  type: string
+                  enum: [queued, running, completed, capped, refused, failed]
+                started_at:
+                  type: string
+                  format: date-time
+                finished_at:
+                  type: [string, "null"]
+                  format: date-time
+                read:
+                  type: integer
+                spent_usd:
+                  type: number
+                error:
+                  type: string
+    Logo:
+      type: object
+      required: [brand_id, domain, color, version]
+      properties:
+        brand_id:
+          type: integer
+        domain:
+          type: string
+        color:
+          type: string
+          description: The brand's main colour as #rrggbb, or empty.
+        version:
+          type: integer
+          description: Changes when the logo does. Add it to the logo URL as ?v= to cache it.
     LeftOut:
       type: object
       required: [id, network, handle, label, profile, mentions]
