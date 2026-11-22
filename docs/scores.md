@@ -22,7 +22,7 @@ So Byname still asks a question that names your brand and shows its answers on *
 
 A question names your brand by the same rules answers are scored with, above. Byname works it out again whenever you change the questions, your brand's name or aliases, the match mode, or a competitor's name, and on every start.
 
-To count one anyway, an Editor or Admin calls `PUT /v1/questions/{id}/scoring` with `{"count_in_scores": true}`, or the `set_question_scoring` tool. `false` leaves any question out, and `null` goes back to the default. The choice covers the earlier versions of the question, so charts don't jump where the question set changed, and it carries on into later versions. Only a question of the current set takes it.
+In onboarding's **Questions** step and under **Settings > Questions**, the app warns while you type a question that names your brand, and its row shows **Left out of scores** with **Count it anyway**. The choice is set when the questions are saved. Through the API, an Editor or Admin calls `PUT /v1/questions/{id}/scoring` with `{"count_in_scores": true}`, or the `set_question_scoring` tool. `false` leaves any question out, and `null` goes back to the default. The choice covers the earlier versions of the question, so charts don't jump where the question set changed, and it carries on into later versions. Only a question of the current set takes it.
 
 Each question in `GET /v1/questions` has `names_brand` and `count_in_scores`. Each question in a results response has `counts_in_scores`. A check in `GET /v1/runs` has `succeeded`, every answer that did not fail, and `scored`, the ones that count. Its `mentioned` and `cited` are out of `scored`.
 

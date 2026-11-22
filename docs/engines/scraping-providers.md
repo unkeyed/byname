@@ -1,6 +1,6 @@
 # Scraping providers
 
-Every pinned endpoint belongs to one of three scraping providers: DataForSEO, cloro or SerpApi. If you already have an account with one, a surface can call the same endpoint at that provider with your key instead of through Treg. The answer is the same one Treg would return, so an app surface stays an App answer.
+Every pinned endpoint belongs to one of three scraping providers: DataForSEO, cloro or SerpApi. If you already have an account with one, a surface can call the same endpoint at that provider with your key instead of through Treg. The answer is the same one Treg would return, so an app surface stays a Real app answer.
 
 ## Which surfaces each provider serves
 

@@ -2,7 +2,7 @@
 
 Byname asks your questions where your buyers ask them: the ChatGPT app, a Google results page, Claude Code in a developer's terminal. You pick these surfaces, not engines or providers, and each surface is pinned to the endpoint that comes closest to what a person sees there. This page lists every surface, what its fidelity label means, and what Byname cannot reach yet.
 
-You choose surfaces in onboarding and under **Settings > Where people ask**. `internal/engines/registry.go` is the one list of surfaces, and this page follows it.
+You choose surfaces in onboarding's **AI apps** step and under **Settings > Where people ask**. Each row shows what one answer costs. In onboarding one button, **Test and continue**, saves your picks, asks each surface and model one short test question, and moves on once every test passes. `internal/engines/registry.go` is the one list of surfaces, and this page follows it.
 
 ## Fidelity labels
 
@@ -10,15 +10,15 @@ Every surface, chart and answer carries one of three labels. Answers with differ
 
 | Label | Stored as | What it means |
 |---|---|---|
-| App answer | `app` | Read from the real app or search page by a scraping provider. The most faithful option, used wherever one exists. |
-| Same model and search | `model_match` | For a developer tool that runs in a terminal: an API call with the model your team uses and web search turned on. It does not include the tool's own system prompt or agent loop. |
-| Approximation | `approximation` | The closest option when there is no app answer, such as the Claude API standing in for the Claude app. Never called the app. |
+| Real app answer | `app` | Read from the real app or search page by a scraping provider. The most faithful option, used wherever one exists. |
+| Same model, not the full tool | `model_match` | For a developer tool that runs in a terminal: an API call with the model your team uses and web search turned on. It does not include the tool's own system prompt or agent loop. |
+| Stand-in (not the real app) | `approximation` | The closest option when there is no app answer, such as the Claude API standing in for the Claude app. Never called the app. |
 
 Fidelity is decided per surface and model pair, in `PairFidelity`:
 
-- An app surface is an App answer when its app is read, through Treg or a scraping provider's own key. On a direct model key or a gateway it becomes an Approximation, because a model API stands in for the app.
-- A developer tool is Same model and search while the route accepts the model, search was forced (or turned on, where it cannot be forced) and the pair's test call actually searched. Otherwise it is an Approximation. Until the test call runs, a pair shows the label it is expected to get.
-- A stand-in surface, the Claude app or the Perplexity app, is always an Approximation.
+- An app surface is a Real app answer when its app is read, through Treg or a scraping provider's own key. On a direct model key or a gateway it becomes a Stand-in, because a model API stands in for the app.
+- A developer tool is **Same model, not the full tool** while the route accepts the model, search was forced (or turned on, where it cannot be forced) and the pair's test call actually searched. Otherwise it is a Stand-in. Until the test call runs, a pair shows the label it is expected to get.
+- A stand-in surface, the Claude app or the Perplexity app, is always a Stand-in.
 
 ## Surfaces and their pinned endpoints
 
@@ -26,18 +26,18 @@ Each surface calls one pinned Treg endpoint, never a routed one that picks a pro
 
 | Surface | Key | Pinned Treg endpoint | Fidelity | Sample cost |
 |---|---|---|---|---|
-| ChatGPT app | `chatgpt_app` | `dataforseo.x.ai-optimization-chat-gpt-llm-scraper-live-advanced` | App answer | $0.004 |
-| Gemini app | `gemini_app` | `cloro.ai-search.gemini.scrape` | App answer | $0.0024 |
-| Google AI Mode | `google_ai_mode` | `cloro.google.serp.ai_mode` | App answer | $0.0024 |
-| Google AI Overview | `google_ai_overview` | `cloro.google.serp.organic` | App answer | $0.0028 |
-| Microsoft Copilot | `copilot` | `serpapi.x.bing-copilot` | App answer | $0.015 |
-| Bing AI Mode | `bing_ai_mode` | `cloro.bing.serp.ai_mode` | App answer | $0.0024 |
-| Brave AI answers | `brave` | `serpapi.x.brave-ai-mode` | App answer | $0.015 |
-| Claude Code | `claude_code` | `dataforseo.x.ai-optimization-claude-llm-responses-live` | Same model and search | $0.055 |
-| Gemini CLI | `gemini_cli` | `dataforseo.x.ai-optimization-gemini-llm-responses-live` | Same model and search | $0.060 |
-| Codex CLI | `codex_cli` | `dataforseo.x.ai-optimization-chat-gpt-llm-responses-live` | Same model and search | $0.073 |
-| Claude app | `claude_app` | `dataforseo.x.ai-optimization-claude-llm-responses-live` | Approximation | $0.055 |
-| Perplexity app | `perplexity_app` | `dataforseo.x.ai-optimization-perplexity-llm-responses-live` | Approximation | $0.0061 |
+| ChatGPT app | `chatgpt_app` | `dataforseo.x.ai-optimization-chat-gpt-llm-scraper-live-advanced` | Real app answer | $0.004 |
+| Gemini app | `gemini_app` | `cloro.ai-search.gemini.scrape` | Real app answer | $0.0024 |
+| Google AI Mode | `google_ai_mode` | `cloro.google.serp.ai_mode` | Real app answer | $0.0024 |
+| Google AI Overview | `google_ai_overview` | `cloro.google.serp.organic` | Real app answer | $0.0028 |
+| Microsoft Copilot | `copilot` | `serpapi.x.bing-copilot` | Real app answer | $0.015 |
+| Bing AI Mode | `bing_ai_mode` | `cloro.bing.serp.ai_mode` | Real app answer | $0.0024 |
+| Brave AI answers | `brave` | `serpapi.x.brave-ai-mode` | Real app answer | $0.015 |
+| Claude Code | `claude_code` | `dataforseo.x.ai-optimization-claude-llm-responses-live` | Same model, not the full tool | $0.055 |
+| Gemini CLI | `gemini_cli` | `dataforseo.x.ai-optimization-gemini-llm-responses-live` | Same model, not the full tool | $0.060 |
+| Codex CLI | `codex_cli` | `dataforseo.x.ai-optimization-chat-gpt-llm-responses-live` | Same model, not the full tool | $0.073 |
+| Claude app | `claude_app` | `dataforseo.x.ai-optimization-claude-llm-responses-live` | Stand-in (not the real app) | $0.055 |
+| Perplexity app | `perplexity_app` | `dataforseo.x.ai-optimization-perplexity-llm-responses-live` | Stand-in (not the real app) | $0.0061 |
 
 The ChatGPT app, the Gemini app and Google AI Mode are ticked by default in onboarding. They are what most buyers use, and each answer costs well under a cent. No developer tool is ticked: they cost about ten times more an answer and matter only when developers are your buyers. Token-billed endpoints, the developer tools and stand-ins, cost a different amount on every answer, so the review step labels the cost per check as an estimate. `GET /v1/costs` gives the cost of one answer on every surface. See [Treg](treg.md#cost).
 
@@ -49,7 +49,7 @@ How web search is turned on depends on the endpoint:
 
 | Endpoint | Search |
 |---|---|
-| Claude and ChatGPT LLM responses | `web_search` on, and `force_web_search` on the models that accept it. Some models refuse forced search, and their pair becomes an Approximation. |
+| Claude and ChatGPT LLM responses | `web_search` on, and `force_web_search` on the models that accept it. Some models refuse forced search, and their pair becomes a Stand-in. |
 | Gemini LLM responses | `web_search` on. It cannot be forced. |
 | Perplexity LLM responses | The `sonar` models search on every call. |
 | App scrapes | The app decides for itself. |
@@ -72,10 +72,10 @@ Every surface works through [Treg](treg.md) with one token. You can move any sur
 
 | Route | Calls | Fidelity on an app surface | Page |
 |---|---|---|---|
-| Treg | The pinned endpoint through Treg | App answer | [Treg](treg.md) |
-| Scraping provider | The same pinned endpoint at DataForSEO, cloro or SerpApi, with your key | App answer | [Scraping providers](scraping-providers.md) |
-| Model provider | OpenAI, Anthropic, Google Gemini or Perplexity directly, with your key | Approximation | [Model providers](model-providers.md) |
-| Gateway | An OpenAI-compatible gateway at its base URL | Approximation | [Gateways](gateways.md) |
+| Treg | The pinned endpoint through Treg | Real app answer | [Treg](treg.md) |
+| Scraping provider | The same pinned endpoint at DataForSEO, cloro or SerpApi, with your key | Real app answer | [Scraping providers](scraping-providers.md) |
+| Model provider | OpenAI, Anthropic, Google Gemini or Perplexity directly, with your key | Stand-in (not the real app) | [Model providers](model-providers.md) |
+| Gateway | An OpenAI-compatible gateway at its base URL | Stand-in (not the real app) | [Gateways](gateways.md) |
 
 Moving a surface to another route resets each pair's test, and the stored endpoint changes, so the surface starts a new series.
 

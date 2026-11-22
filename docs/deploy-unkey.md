@@ -134,7 +134,7 @@ Check three URLs:
 
 Open `PUBLIC_URL/setup/SETUP_TOKEN`. Enter your name and email and register a passkey. You are the first user and an Admin, and the link stops working. The deployment logs print the same link. Add a second passkey under **Settings > Account**, so losing one device does not lock you out.
 
-The next stop is onboarding, which opens on its own: your brand and domain, competitors, questions, where people ask with a Treg token or your own keys, Search Console, and the schedule with spend caps. Nothing runs until you finish it.
+The next stop is onboarding, which opens on its own: your brand and domain, competitors, questions, the AI apps to ask with a Treg token or your own keys, Search Console, social mentions, and the schedule with spend caps. Nothing runs until you finish it.
 
 ## Deploy the prebuilt image instead
 

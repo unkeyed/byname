@@ -13,7 +13,7 @@ Byname is an open source app you run yourself that shows how your brand shows up
 
 ## Why Byname
 
-- **What a person sees, or labeled as not.** You pick surfaces, not engines. Each one is pinned to the endpoint closest to the real app, and every answer is labeled App answer, Same model and search, or Approximation. Labels are charted apart and never averaged.
+- **What a person sees, or labeled as not.** You pick surfaces, not engines. Each one is pinned to the endpoint closest to the real app, and every answer is labeled **Real app answer**, **Same model, not the full tool**, or **Stand-in (not the real app)**. Labels are charted apart and never averaged.
 - **Every answer kept.** The raw response, the cost of every call, every brand mention with its position, and every citation. A call that reported no cost is flagged, never stored as $0.
 - **Your keys, your limits.** One Treg token runs every surface, or bring your own provider keys and gateways, surface by surface. A spend cap per check and an optional monthly cap bound the bill.
 - **Built for agents.** Claude Code, Cursor and other MCP clients sign in as you in the browser, with the scopes you pick. Scripts use scoped API keys that can expire.
@@ -43,7 +43,7 @@ docker compose up -d --build --wait
 docker compose logs app | grep -A2 'Open this link'
 ```
 
-Open the link Byname prints and register a passkey. Onboarding then asks for your brand, competitors, questions, where people ask, Search Console and the schedule. Keep `.env`: the `ENCRYPTION_KEY` in it protects the provider keys and secrets Byname stores. To run it on your own server, see [Self-host Byname](docs/self-hosting.md).
+Open the link Byname prints and register a passkey. Onboarding then asks for your brand, competitors, questions, the AI apps to ask, Search Console, social mentions and the schedule. Keep `.env`: the `ENCRYPTION_KEY` in it protects the provider keys and secrets Byname stores. To run it on your own server, see [Self-host Byname](docs/self-hosting.md).
 
 ## Connect your engines
 
@@ -51,7 +51,7 @@ Open **Settings > Where people ask**, tick the surfaces your buyers use, and pas
 
 [Surfaces and fidelity](docs/engines/surfaces.md) · [Treg](docs/engines/treg.md) · [Scraping providers](docs/engines/scraping-providers.md) · [Model providers](docs/engines/model-providers.md) · [Gateways](docs/engines/gateways.md)
 
-Not using Treg? Any surface can call DataForSEO, cloro or SerpApi with your key and stay an App answer, or call OpenAI, Anthropic, Gemini, Perplexity or an OpenAI-compatible gateway directly, which makes an app surface an Approximation.
+Not using Treg? Any surface can call DataForSEO, cloro or SerpApi with your key and stay a Real app answer, or call OpenAI, Anthropic, Gemini, Perplexity or an OpenAI-compatible gateway directly, which makes an app surface a Stand-in.
 
 ## Connect Search Console
 

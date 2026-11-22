@@ -1,6 +1,6 @@
 # Notifications
 
-Byname tells people when something moves: a check finished with gains and losses, a check stopped, a spend cap was reached, a model was paused, a search goal was reached, search clicks moved, a site change got its verdict, or the GitHub token for site changes is about to expire. Every event shows in the app under **Alerts**. To also get it by email, in Slack or at your own endpoint, an Admin adds notification channels under **Settings > Notifications**, or in onboarding's **Schedule, limits and alerts** step. With no channel, alerts stay in the app.
+Byname tells people when something moves: a check finished with gains and losses, a check stopped, a spend cap was reached, a model was paused, a search goal was reached, search clicks moved, a site change got its verdict, or the GitHub token for site changes is about to expire. Every event shows in the app under **Alerts**. To also get it by email, in Slack or at your own endpoint, an Admin adds notification channels under **Settings > Notifications**, or in onboarding's **Schedule and spend caps** step. With no channel, alerts stay in the app.
 
 ## Channels
 

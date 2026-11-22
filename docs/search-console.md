@@ -2,7 +2,7 @@
 
 Byname puts your Google Search Console numbers on the same timeline as your AI answers: daily clicks, impressions, CTR and position, brand against non-brand clicks, top pages and queries, and progress toward search goals. It reads Search Console straight from Google's API with read-only access. No third party sits in between, and Treg is not involved.
 
-You connect it in onboarding's fifth step, **Search Console**, or later under **Settings > Search Console**. Both offer the same Google sign-in, service account form and property picker. Only an Admin can connect it, and connecting needs a sign-in within the last 15 minutes. In onboarding, someone who is not an Admin sees a note to skip the step. The step offers **Skip** until a property is picked, and **Continue** after. There are two ways in:
+You connect it in onboarding's fifth step, **Search Console**, or later under **Settings > Search Console**. Both offer the same Google sign-in, service account form and property picker. Without a Google OAuth client, onboarding shows only the service account form, with the three steps to follow. Only an Admin can connect it, and connecting needs a sign-in within the last 15 minutes. In onboarding, someone who is not an Admin sees a note to skip the step. The step offers **Skip** until a property is picked, and **Continue** after. There are two ways in:
 
 | Method | You need | Best when |
 |---|---|---|
@@ -73,7 +73,7 @@ Pick a domain property when you have one. It counts traffic to every subdomain, 
 
 A query is brand when it contains one of your branded terms, ignoring case. By default the terms are your brand's name and aliases, lowercased, and they follow the name and aliases until someone changes them.
 
-You can change them in three places: the **Branded search terms** field in onboarding's first step, **Brand and domain**, the same field under **Settings > General**, and **Branded terms** on the brand card of the **Search** page. Agents use `PUT /v1/settings/branded-terms` or the `update_branded_terms` tool. **Use name and aliases**, or saving an empty list, goes back to the default.
+You can change them in three places: **Google searches for your name** in onboarding's first step, **Brand and domain**, the same field under **Settings > General**, and **Branded terms** on the brand card of the **Search** page. Agents use `PUT /v1/settings/branded-terms` or the `update_branded_terms` tool. **Use name and aliases**, or saving an empty list, goes back to the default.
 
 Google hides rare queries, which come back with no query text. Byname counts those clicks as anonymized, never as non-brand, so non-brand clicks are a floor, not an estimate.
 

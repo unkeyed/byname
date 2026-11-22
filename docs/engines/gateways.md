@@ -2,7 +2,7 @@
 
 Any surface can call an OpenAI-compatible gateway, such as OpenRouter, Vercel AI Gateway or Cloudflare AI Gateway. Byname sends a chat completion to the gateway's base URL with the model you pick. None of these is a tested integration yet, so run each pair's test call and read its result before you rely on it.
 
-A gateway calls a model API, not the app, so an app surface on this route is an Approximation. A developer tool stays Same model and search only if the test call shows the model searched.
+A gateway calls a model API, not the app, so an app surface on this route is a Stand-in. A developer tool stays **Same model, not the full tool** only if the test call shows the model searched.
 
 ## How the gateway route works
 

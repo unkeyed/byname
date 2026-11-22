@@ -4,7 +4,7 @@ The **Social** page shows the public posts that name you on X, Reddit, Hacker Ne
 
 Six networks are searched through Treg with your Treg token. Bluesky is searched through its own public API, which needs no key and costs nothing. Without a Treg token, Byname searches Bluesky only.
 
-Social is off until someone turns it on under **Settings > Social**, because the Treg searches cost money. Saving the Treg token starts nothing, and nothing is searched before onboarding is finished, even with social on. An instance upgraded from a version before the switch, which had already searched, keeps social on.
+Social is off until someone turns it on, in onboarding's optional **Social mentions** step or under **Settings > Social**, because the Treg searches cost money. The onboarding step shows what a month costs at the default settings, and, once switched on, the **People to leave out** form with **Our accounts** as the first label. Saving the Treg token starts nothing, and nothing is searched before onboarding is finished, even with social on. An instance upgraded from a version before the switch, which had already searched, keeps social on.
 
 `internal/social` holds all of it, and this page follows that package.
 

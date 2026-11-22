@@ -1,6 +1,6 @@
 # Model providers
 
-A surface can call a model provider's API directly with your own key: OpenAI, Anthropic, Google Gemini or Perplexity. A model API is not the app, so an app surface on this route is an Approximation. A developer tool stays Same model and search while the provider accepts the model and its test call searched.
+A surface can call a model provider's API directly with your own key: OpenAI, Anthropic, Google Gemini or Perplexity. A model API is not the app, so an app surface on this route is a Stand-in. A developer tool stays **Same model, not the full tool** while the provider accepts the model and its test call searched.
 
 ## Which surfaces each provider stands in for
 
