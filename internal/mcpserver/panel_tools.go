@@ -208,9 +208,9 @@ func addConfigTools(srv *mcp.Server, svc app.Services) {
 			return c.SaveStep(ctx, in.Step)
 		})
 	addTool(srv, core.ConfigWrite, &mcp.Tool{Name: "finish_onboarding", Annotations: mutates(false, true),
-		Description: "Finish onboarding once the required steps are saved and every enabled pair has passed test_pair. Sets the first scheduled check; queue one now with run_now. POST /v1/onboarding/finish."},
+		Description: "Finish onboarding once the required steps are saved and every enabled pair has passed test_pair. Sets the first scheduled check, and with no monthly spend cap set, a cap of three times the monthly estimate (at least $5); queue a check now with run_now. POST /v1/onboarding/finish."},
 		func(ctx context.Context, _ core.Actor, _ noInput) (config.Onboarding, error) {
-			return c.FinishOnboarding(ctx)
+			return svc.Instance.FinishOnboarding(ctx)
 		})
 	addTool(srv, core.ConfigWrite, &mcp.Tool{Name: "test_pair", Annotations: &mcp.ToolAnnotations{DestructiveHint: new(false), IdempotentHint: true, OpenWorldHint: new(true)},
 		Description: "Make one short paid call for a surface and model pair through its route. Reports the status, the reported cost, whether it searched and cited, and sets the pair's fidelity from what it showed. POST /v1/pairs/{id}/test."},

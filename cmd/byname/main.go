@@ -410,7 +410,7 @@ func run(log *slog.Logger) error {
 	}
 	authn := &auth.Authenticator{Keys: auth.NewKeyStore(pool, cfg.Unkey), Users: users, OAuth: auth.NewOAuthServer(pool, cfg.Auth.PublicURL)}
 
-	services := app.Services{Instance: instance.New(version, settings), Config: settings, Checks: runs, Results: res, Notify: alerts, GSC: search, Changes: site, Social: mentions}
+	services := app.Services{Instance: instance.New(version, pool, settings, mentions), Config: settings, Checks: runs, Results: res, Notify: alerts, GSC: search, Changes: site, Social: mentions}
 	mux := httpapi.NewMux(services, authn, log)
 	mux.Handle("/mcp", mcpserver.Handler(services, authn.OAuth, version))
 	mux.Handle("/", web.Handler())

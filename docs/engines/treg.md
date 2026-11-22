@@ -23,4 +23,18 @@ A provider error that Treg passes through is different. It is stored as a failed
 
 ## Cost
 
-A check costs questions times enabled pairs times each endpoint's cost per call. The review step and `GET /v1/estimate` estimate it from each endpoint's past answers, or from the sample cost in [Where people ask](surfaces.md#surfaces-and-their-pinned-endpoints) before the first check. The per-check spend cap stops queueing new calls once a check passes it. The optional monthly cap stops a check from starting once the month's checks have spent that much.
+A check costs questions times enabled pairs times each endpoint's cost per call. The review step and `GET /v1/estimate` estimate it from each endpoint's past answers, or from the sample cost in [Where people ask](surfaces.md#surfaces-and-their-pinned-endpoints) before the first check. The per-check spend cap stops queueing new calls once a check passes it. The monthly cap stops a check from starting, and social searches from calling Treg, once the month's checks and social searches have spent that much.
+
+Treg bills you, not Byname. `GET /v1/costs`, or the `get_costs` tool, gathers every cost figure in one place, in US dollars:
+
+- `per_answer`: what one answer costs on each surface on its current route, from past answers or the sample cost, with the models turned on. Every model on a surface costs the same per answer.
+- `checks`: one check, the same estimate as `GET /v1/estimate`, how many checks the schedule runs in an average month (0 while paused), and what they cost. **Run now** adds to it.
+- `social`: social searches at their settings, one call per network and term each fetch. `treg_month_usd` is what the Treg networks would cost, `bluesky_month_usd` is always 0, and `month_usd` is 0 while social is off.
+- `month_estimate_usd`: checks and social searches in an average month.
+- `month`: what the calendar month has spent so far in the instance's time zone, checks and social apart, how many calls reported no cost, and the monthly cap.
+
+At the default schedule, every 3 days, the three consumer apps ticked by default and 10 questions cost about $0.09 a check, or about $0.90 a month. Social searches for two terms on all seven networks every 6 hours add about $1.60 a month.
+
+### The default monthly cap
+
+When onboarding finishes and no monthly cap is set, Byname sets one: three times the monthly estimate of checks and social searches, rounded up to a whole dollar, and at least $5. A normal month stays well under it, and a mistake, such as a question list ten times longer than meant, stops at it. Change it or remove it under **Settings > Limits**, or with `PUT /v1/settings`.

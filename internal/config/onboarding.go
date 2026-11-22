@@ -145,10 +145,17 @@ func (s *Service) SaveStep(ctx context.Context, key StepKey) (Onboarding, error)
 // FinishOnboarding ends onboarding once every required step is saved, the
 // instance is ready to check and every active pair has passed its test.
 // It sets the first scheduled check; "Start first check" then queues one
-// with Run now. Finishing again changes nothing.
-func (s *Service) FinishOnboarding(ctx context.Context) (Onboarding, error) {
+// with Run now. With no monthly spend cap set, it sets DefaultMonthCap of
+// the checks' monthly estimate plus socialMonthUSD, what social searches
+// cost a month at their current settings. Finishing again changes nothing.
+func (s *Service) FinishOnboarding(ctx context.Context, socialMonthUSD float64) (Onboarding, error) {
+	costs, err := s.CheckCosts(ctx)
+	if err != nil {
+		return Onboarding{}, err
+	}
+	monthCap := DefaultMonthCap(costs.MonthUSD + socialMonthUSD)
 	var out Onboarding
-	err := pgx.BeginFunc(ctx, s.db, func(tx pgx.Tx) error {
+	err = pgx.BeginFunc(ctx, s.db, func(tx pgx.Tx) error {
 		cur, err := getSettings(ctx, tx)
 		if err != nil {
 			return err
@@ -165,7 +172,8 @@ func (s *Service) FinishOnboarding(ctx context.Context) (Onboarding, error) {
 			return fmt.Errorf("%w: onboarding needs %s", core.ErrInvalid, strings.Join(state.Missing, "; "))
 		}
 		next := NextCheck(s.now(), cur.LastCheckAt, cur.Schedule())
-		if _, err := tx.Exec(ctx, `UPDATE instance_settings SET onboarded_at = $1, next_check_at = $2, updated_at = now()`, s.now(), next); err != nil {
+		if _, err := tx.Exec(ctx, `UPDATE instance_settings SET onboarded_at = $1, next_check_at = $2,
+				spend_cap_month_usd = coalesce(spend_cap_month_usd, $3), updated_at = now()`, s.now(), next, monthCap); err != nil {
 			return err
 		}
 		out, err = s.onboarding(ctx, tx)

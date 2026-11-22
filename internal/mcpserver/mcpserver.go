@@ -180,6 +180,11 @@ func addTools(srv *mcp.Server, svc app.Services) {
 		func(ctx context.Context, _ core.Actor, _ noInput) (instance.Status, error) {
 			return svc.Instance.Status(ctx)
 		})
+	addTool(srv, core.ResultsRead, &mcp.Tool{Name: "get_costs", Annotations: readOnly(),
+		Description: "What Byname costs, in US dollars: the estimated cost of one answer on each surface, of one check, of a month of checks at the schedule and of social searches at their settings (Treg networks, and Bluesky, which is free), and what this month has spent against the monthly spend cap. GET /v1/costs."},
+		func(ctx context.Context, _ core.Actor, _ noInput) (instance.Costs, error) {
+			return svc.Instance.Costs(ctx)
+		})
 	addConfigTools(srv, svc)
 	addResultTools(srv, svc)
 	addPageTools(srv, svc)

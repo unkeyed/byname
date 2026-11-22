@@ -577,8 +577,10 @@ paths:
         Needs every required step saved, the instance ready to check, and a
         passing test for every enabled pair; 400 lists what is missing.
         Until it succeeds nothing runs on schedule and Run now refuses.
-        Finishing again changes nothing. Queue the first check with POST
-        /v1/runs.
+        With no monthly spend cap set, it sets one of three times the
+        monthly estimate of checks and social searches (GET /v1/costs),
+        rounded up to a whole dollar and at least $5. Finishing again
+        changes nothing. Queue the first check with POST /v1/runs.
       security:
         - apiKey: [config:write]
         - session: [config:write]
@@ -694,6 +696,35 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /v1/costs:
+    get:
+      tags: [config]
+      operationId: getCosts
+      summary: What Byname costs, expected and spent, in US dollars.
+      description: >-
+        The estimated cost of one answer on each surface on its current
+        route, of one check (the same estimate as GET /v1/estimate), of a
+        month of checks at the schedule, and of a month of social searches
+        at their settings, split into the Treg networks and Bluesky, which
+        is free. Then what the calendar month has spent in the instance's
+        time zone, which the monthly spend cap counts. Expected figures are
+        estimates. Treg bills you, not Byname.
+      security:
+        - apiKey: [results:read]
+        - session: [results:read]
+      responses:
+        "200":
+          description: The cost facts.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Costs"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "503":
           $ref: "#/components/responses/Unavailable"
   /v1/naming-check:
@@ -5111,6 +5142,115 @@ components:
                 description: Past answers averaged, for history.
               cost_usd:
                 type: [number, "null"]
+    Costs:
+      type: object
+      required: [per_answer, checks, social, month_estimate_usd, month]
+      properties:
+        per_answer:
+          type: array
+          description: One answer on each surface, on its current route, in onboarding order.
+          items:
+            type: object
+            required: [surface, title, group, route, endpoint, enabled, default_on, models, cost_per_answer_usd, source, samples]
+            properties:
+              surface:
+                $ref: "#/components/schemas/SurfaceKey"
+              title:
+                type: string
+              group:
+                type: string
+                enum: [apps, developer_tools, approximations]
+              route:
+                $ref: "#/components/schemas/Route"
+              endpoint:
+                type: string
+              enabled:
+                type: boolean
+              default_on:
+                type: boolean
+                description: Ticked by default in onboarding.
+              models:
+                type: array
+                description: The models turned on, each charged this per answer. Empty on an app surface.
+                items:
+                  type: string
+              cost_per_answer_usd:
+                type: [number, "null"]
+                description: Null when no past answer reported a cost and the route has no sampled price.
+              source:
+                type: string
+                enum: [history, sample, unknown]
+                description: history is the mean reported cost of the endpoint's past answers, sample the registry's sampled price.
+              samples:
+                type: integer
+        checks:
+          type: object
+          required: [check, check_every_days, paused, checks_per_month, month_usd]
+          properties:
+            check:
+              $ref: "#/components/schemas/Estimate"
+            check_every_days:
+              type: integer
+            paused:
+              type: boolean
+              description: Scheduled checks are paused, so none runs on its own.
+            checks_per_month:
+              type: number
+              description: Scheduled checks in an average month, 0 while paused. Check now adds to it.
+            month_usd:
+              type: number
+              description: One check's known cost times checks_per_month.
+        social:
+          type: object
+          required: [enabled, fetches_per_month, terms, treg_networks, treg_per_fetch_usd, treg_month_usd, bluesky_on, bluesky_month_usd, month_usd]
+          description: Social searches at their current settings, counting one call per network and term each fetch. A first fetch pages back further and costs more.
+          properties:
+            enabled:
+              type: boolean
+            fetches_per_month:
+              type: number
+            terms:
+              type: integer
+            treg_networks:
+              type: integer
+              description: Networks on that are searched through Treg. 0 without a Treg token.
+            treg_per_fetch_usd:
+              type: number
+            treg_month_usd:
+              type: number
+              description: What the Treg networks cost a month at these settings, whether social is on or not.
+            bluesky_on:
+              type: boolean
+            bluesky_month_usd:
+              type: number
+              description: Always 0. Bluesky's own API is free.
+            month_usd:
+              type: number
+              description: treg_month_usd while social is on, 0 while it is off.
+        month_estimate_usd:
+          type: number
+          description: checks.month_usd plus social.month_usd.
+        month:
+          type: object
+          required: [start, checks_usd, social_usd, spent_usd, missing_cost_calls, cap_usd]
+          description: The calendar month so far, in the instance's time zone.
+          properties:
+            start:
+              type: string
+              format: date-time
+            checks_usd:
+              type: number
+            social_usd:
+              type: number
+            spent_usd:
+              type: number
+              description: checks_usd plus social_usd, what the monthly spend cap counts.
+            missing_cost_calls:
+              type: integer
+              description: Answered calls this month that reported no cost, so spent_usd is a floor.
+            cap_usd:
+              type: [number, "null"]
+              description: The monthly spend cap. Null for none.
     QueuedRun:
       type: object
       description: A queued or running check, as Run now reports it. GET /v1/runs/{id} has its progress and spend.

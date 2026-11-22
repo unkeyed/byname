@@ -88,6 +88,6 @@ func Seed(t testing.TB, cfg *config.Service, treg *tregtest.Server, mod func(*co
 	for _, step := range []config.StepKey{config.StepBrand, config.StepCompetitors, config.StepQuestions, config.StepSurfaces, config.StepSearchConsole, config.StepSchedule} {
 		must(cfg.SaveStep(ctx, step))
 	}
-	must(cfg.FinishOnboarding(ctx))
+	must(cfg.FinishOnboarding(ctx, 0))
 	treg.Reset()
 }

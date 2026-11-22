@@ -117,7 +117,7 @@ Keys live in Postgres by default, or in Unkey when `UNKEY_ROOT_KEY` and `UNKEY_A
 
 ## MCP tools
 
-Byname's MCP server has 72 tools. Every REST route an API key can call has one with the same scope, except `DELETE /v1/keys/current`, since MCP clients sign in with OAuth instead of a key. A test keeps the two in step. Read tools are marked read-only, and `delete_brand`, `delete_goal`, `delete_change`, `delete_control_page` and `remove_left_out_account` are marked destructive, so a client can ask before it runs them.
+Byname's MCP server has 73 tools. Every REST route an API key can call has one with the same scope, except `DELETE /v1/keys/current`, since MCP clients sign in with OAuth instead of a key. A test keeps the two in step. Read tools are marked read-only, and `delete_brand`, `delete_goal`, `delete_change`, `delete_control_page` and `remove_left_out_account` are marked destructive, so a client can ask before it runs them.
 
 | Tool | Scope | REST | What it does |
 |---|---|---|---|
@@ -141,6 +141,7 @@ Byname's MCP server has 72 tools. Every REST route an API key can call has one w
 | `leave_out_account` | `config:write` | `POST /v1/social/left-out` | Leave an account out of social mentions, or relabel one already left out; its past mentions are hidden too. |
 | `remove_left_out_account` | `config:write` | `DELETE /v1/social/left-out/{id}` | Take an account off the left-out list, so its mentions show again. |
 | `status` | `results:read` | `GET /v1/status` | Byname's version and whether onboarding is done. |
+| `get_costs` | `results:read` | `GET /v1/costs` | What Byname costs, in US dollars: one answer on each surface, one check, a month of checks and of social searches, and what this month has spent against the monthly cap. See [Treg](engines/treg.md#cost). |
 | `list_alerts` | `results:read` | `GET /v1/alerts` | Alerts newest first: finished checks with what was gained and lost, refused or failed checks, spend caps reached, paused models, search goals reached, search moves, change verdicts, an expiring GitHub token and social digests, each with whether the person this connection acts for has read it, and the unread count. |
 | `mark_alerts_read` | `results:read` | `POST /v1/alerts/read` | Mark alerts read for the person this connection acts for, by id or all at once. |
 | `prompts` | `results:read` | `GET /v1/prompts` | Every question of the latest run in range: the pairs that named you there, your best position, the competitors named instead, and per run whether some pair named you, only cited you, did not, or every call failed. |
@@ -161,7 +162,7 @@ Byname's MCP server has 72 tools. Every REST route an API key can call has one w
 | `list_surface_models` | `results:read` | `GET /v1/surfaces/{key}/models` | A surface's live model list on its current route, or on another route given in route, read for free. |
 | `get_onboarding` | `results:read` | `GET /v1/onboarding` | How far onboarding has come: each step and whether it is saved, when it was finished, and what still blocks finishing. |
 | `save_onboarding_step` | `config:write` | `PUT /v1/onboarding/steps/{step}` | Mark an onboarding step saved, after saving its data with the matching tool, or to skip an optional step (competitors, search_console). |
-| `finish_onboarding` | `config:write` | `POST /v1/onboarding/finish` | Finish onboarding once the required steps are saved and every enabled pair has passed test_pair. |
+| `finish_onboarding` | `config:write` | `POST /v1/onboarding/finish` | Finish onboarding once the required steps are saved and every enabled pair has passed test_pair. With no monthly cap set, it sets one of three times the monthly estimate, at least $5. |
 | `test_pair` | `config:write` | `POST /v1/pairs/{id}/test` | Make one short paid call for a surface and model pair through its route. |
 | `estimate_cost` | `results:read` | `GET /v1/estimate` | The estimated cost of one check: calls (questions times enabled pairs) and each pair's cost per call from its endpoint's past answers or the sampled cost, with pairs that have neither counted as unknown. |
 | `set_question_scoring` | `config:write` | `PUT /v1/questions/{id}/scoring` | Count a question's answers in scores, leave them out, or go back to the default, which leaves out a question whose text names your brand. See [How answers are scored](scores.md). |

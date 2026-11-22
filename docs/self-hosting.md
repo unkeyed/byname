@@ -109,6 +109,8 @@ The scheduler runs inside the container, so you need no cron service. Every minu
 
 **Run now** queues a check in the background and never runs it inside the request, so a long check survives a request timeout.
 
+Nothing that costs money runs before onboarding is finished: no AI check and no social search, even with the Treg token saved. Model lists, Search Console, GitHub and cited pages cost nothing, so those jobs run as soon as they are set up. Social searches also wait until someone turns them on under **Settings > Social**. See [Social](social.md).
+
 ## Upgrade
 
 Pull or build the new image and restart the container. Byname applies new migrations when it starts and has no command to undo them, so back up the database before you upgrade.

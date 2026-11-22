@@ -84,7 +84,7 @@ func onboard(t *testing.T, svc *config.Service) {
 	t.Helper()
 	configure(t, svc)
 	testAll(t, svc)
-	if _, err := svc.FinishOnboarding(ctx); err != nil {
+	if _, err := svc.FinishOnboarding(ctx, 0); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -100,7 +100,7 @@ func TestNothingRunsBeforeOnboardingIsFinished(t *testing.T) {
 	if done, err := svc.Onboarded(ctx); err != nil || done {
 		t.Fatalf("onboarded = %v %v on a fresh instance", done, err)
 	}
-	_, err = svc.FinishOnboarding(ctx)
+	_, err = svc.FinishOnboarding(ctx, 0)
 	is(t, err, core.ErrInvalid)
 	_, err = svc.SaveStep(ctx, config.StepReview)
 	is(t, err, core.ErrNotFound)
@@ -116,13 +116,13 @@ func TestNothingRunsBeforeOnboardingIsFinished(t *testing.T) {
 	if len(state.Missing) != 1 || !strings.Contains(state.Missing[0], "Claude Code on claude-sonnet-5-5") || !strings.Contains(state.Missing[0], "ChatGPT app") {
 		t.Fatalf("missing = %q, want only the untested pairs", state.Missing)
 	}
-	_, err = svc.FinishOnboarding(ctx)
+	_, err = svc.FinishOnboarding(ctx, 0)
 	if !errors.Is(err, core.ErrInvalid) || !strings.Contains(err.Error(), "passing test") {
 		t.Fatalf("finish before testing: %v, want a refusal naming the tests", err)
 	}
 
 	testAll(t, svc)
-	state, err = svc.FinishOnboarding(ctx)
+	state, err = svc.FinishOnboarding(ctx, 0)
 	if err != nil || state.FinishedAt == nil || !state.Steps[6].Saved || len(state.Missing) != 0 {
 		t.Fatalf("finish: %+v %v", state, err)
 	}
@@ -134,7 +134,7 @@ func TestNothingRunsBeforeOnboardingIsFinished(t *testing.T) {
 	if err := svc.Ready(ctx); err != nil {
 		t.Fatalf("ready after finishing: %v", err)
 	}
-	again, err := svc.FinishOnboarding(ctx)
+	again, err := svc.FinishOnboarding(ctx, 0)
 	if err != nil || !again.FinishedAt.Equal(*state.FinishedAt) {
 		t.Fatalf("finishing twice: %+v %v, want the first finish kept", again, err)
 	}
@@ -248,5 +248,55 @@ func TestEstimate(t *testing.T) {
 	}
 	if !near(est.KnownUSD, 2*0.03+2*0.004) {
 		t.Errorf("known = %v after history", est.KnownUSD)
+	}
+}
+
+func TestDefaultMonthCap(t *testing.T) {
+	for _, c := range []struct{ month, want float64 }{
+		{0, 5}, {1.2, 5}, {1.67, 6}, {4.0 / 3, 5}, {10.0 / 3, 10}, {12.34, 38},
+	} {
+		if got := config.DefaultMonthCap(c.month); got != c.want {
+			t.Errorf("DefaultMonthCap(%v) = %v, want %v", c.month, got, c.want)
+		}
+	}
+}
+
+// Finishing onboarding sets a monthly cap of three times the monthly
+// estimate, social searches included, when none is set, and keeps one that
+// is.
+func TestFinishingSetsADefaultMonthlyCap(t *testing.T) {
+	now := time.Date(2026, 11, 21, 12, 0, 0, 0, time.UTC)
+	svc, _ := newService(t, now)
+	configure(t, svc)
+	testAll(t, svc)
+	costs, err := svc.CheckCosts(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	perCheck := 2*0.055 + 2*0.004
+	if costs.ChecksPerMonth != 365.25/12/3 || math.Abs(costs.MonthUSD-perCheck*costs.ChecksPerMonth) > 1e-9 {
+		t.Fatalf("check costs = %+v, want %v a check about ten times a month", costs, perCheck)
+	}
+	if _, err := svc.FinishOnboarding(ctx, 2); err != nil {
+		t.Fatal(err)
+	}
+	s, _ := svc.Settings(ctx)
+	if want := math.Ceil(3 * (costs.MonthUSD + 2)); s.SpendCapMonthUSD == nil || *s.SpendCapMonthUSD != want {
+		t.Fatalf("monthly cap = %v, want %v: three times checks plus social, rounded up", s.SpendCapMonthUSD, want)
+	}
+
+	other, _ := newService(t, now)
+	in := settings()
+	in.SpendCapMonthUSD = new(50.0)
+	if _, err := other.PutSettings(ctx, in); err != nil {
+		t.Fatal(err)
+	}
+	configure(t, other)
+	testAll(t, other)
+	if _, err := other.FinishOnboarding(ctx, 0); err != nil {
+		t.Fatal(err)
+	}
+	if s, _ := other.Settings(ctx); *s.SpendCapMonthUSD != 50 {
+		t.Fatalf("monthly cap = %v, want the $50 already set kept", *s.SpendCapMonthUSD)
 	}
 }

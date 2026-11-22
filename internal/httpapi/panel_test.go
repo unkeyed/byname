@@ -277,6 +277,85 @@ func TestMCPToolsServeTheSameResults(t *testing.T) {
 	}
 }
 
+// GET /v1/costs prices an answer on every surface, a check, a month of
+// checks and of social searches, and what the month has spent against the
+// cap that finishing onboarding set.
+func TestCostsOverHTTP(t *testing.T) {
+	c := newServer(t)
+	person, agent := login(t, c)
+	reader := c.withKey(t, person, core.ResultsRead)
+	configure(t, person, agent)
+
+	type costs struct {
+		PerAnswer []struct {
+			Surface          string   `json:"surface"`
+			DefaultOn        bool     `json:"default_on"`
+			Enabled          bool     `json:"enabled"`
+			Models           []string `json:"models"`
+			CostPerAnswerUSD *float64 `json:"cost_per_answer_usd"`
+			Source           string   `json:"source"`
+		} `json:"per_answer"`
+		Checks struct {
+			Check struct {
+				KnownUSD float64 `json:"known_usd"`
+				Calls    int     `json:"calls"`
+			} `json:"check"`
+			ChecksPerMonth float64 `json:"checks_per_month"`
+			MonthUSD       float64 `json:"month_usd"`
+		} `json:"checks"`
+		Social struct {
+			Enabled         bool    `json:"enabled"`
+			TregNetworks    int     `json:"treg_networks"`
+			TregMonthUSD    float64 `json:"treg_month_usd"`
+			BlueskyOn       bool    `json:"bluesky_on"`
+			BlueskyMonthUSD float64 `json:"bluesky_month_usd"`
+			MonthUSD        float64 `json:"month_usd"`
+		} `json:"social"`
+		MonthEstimateUSD float64 `json:"month_estimate_usd"`
+		Month            struct {
+			ChecksUSD float64  `json:"checks_usd"`
+			SpentUSD  float64  `json:"spent_usd"`
+			CapUSD    *float64 `json:"cap_usd"`
+		} `json:"month"`
+	}
+	var got costs
+	reader.call("GET", "/v1/costs", nil, http.StatusOK, &got)
+	if len(got.PerAnswer) != 12 {
+		t.Fatalf("per answer = %d surfaces, want all 12", len(got.PerAnswer))
+	}
+	for _, a := range got.PerAnswer {
+		wantOn := a.Surface == "chatgpt_app" || a.Surface == "gemini_app" || a.Surface == "google_ai_mode"
+		if a.DefaultOn != wantOn || a.CostPerAnswerUSD == nil {
+			t.Errorf("%s: %+v, want a price and default_on %v: only the three consumer apps are ticked", a.Surface, a, wantOn)
+		}
+		if a.Surface == "claude_code" && (!a.Enabled || len(a.Models) != 1 || *a.CostPerAnswerUSD != 0.055 || a.Source != "sample") {
+			t.Errorf("claude code: %+v, want its sampled $0.055 an answer on its one model", a)
+		}
+	}
+	if got.Checks.Check.Calls != 4 || got.Checks.ChecksPerMonth != 365.25/12/3 || got.Checks.MonthUSD != got.Checks.Check.KnownUSD*got.Checks.ChecksPerMonth {
+		t.Errorf("checks = %+v, want one check of 4 calls about ten times a month", got.Checks)
+	}
+	if s := got.Social; s.Enabled || s.MonthUSD != 0 || s.TregNetworks != 6 || s.TregMonthUSD <= 0 || !s.BlueskyOn || s.BlueskyMonthUSD != 0 {
+		t.Errorf("social = %+v, want off and costing nothing, with what the six Treg networks would cost", s)
+	}
+	if got.MonthEstimateUSD != got.Checks.MonthUSD || got.Month.CapUSD == nil || *got.Month.CapUSD != 5 || got.Month.SpentUSD != 0 {
+		t.Fatalf("month = %+v, estimate %v, want nothing spent and the $5 minimum cap set by finishing onboarding", got.Month, got.MonthEstimateUSD)
+	}
+
+	agent.call("POST", "/v1/runs", nil, http.StatusCreated, nil)
+	if err := c.svc.Checks.Work(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	var runs []struct {
+		SpendUSD float64 `json:"spend_usd"`
+	}
+	reader.call("GET", "/v1/runs", nil, http.StatusOK, &runs)
+	reader.call("GET", "/v1/costs", nil, http.StatusOK, &got)
+	if got.Month.ChecksUSD != runs[0].SpendUSD || got.Month.SpentUSD != runs[0].SpendUSD || got.Month.ChecksUSD == 0 {
+		t.Fatalf("month = %+v after a check that spent %v", got.Month, runs[0].SpendUSD)
+	}
+}
+
 // A reader can check names while typing; counting a question that names
 // the brand needs config:write.
 func TestQuestionsThatNameTheBrandOverHTTP(t *testing.T) {

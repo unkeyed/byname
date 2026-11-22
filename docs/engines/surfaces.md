@@ -39,7 +39,7 @@ Each surface calls one pinned Treg endpoint, never a routed one that picks a pro
 | Claude app | `claude_app` | `dataforseo.x.ai-optimization-claude-llm-responses-live` | Approximation | $0.055 |
 | Perplexity app | `perplexity_app` | `dataforseo.x.ai-optimization-perplexity-llm-responses-live` | Approximation | $0.0061 |
 
-The ChatGPT app, the Gemini app, Google AI Mode and Claude Code are ticked by default in onboarding. Token-billed endpoints, the developer tools and stand-ins, cost a different amount on every answer, so the review step labels the cost per check as an estimate.
+The ChatGPT app, the Gemini app and Google AI Mode are ticked by default in onboarding. They are what most buyers use, and each answer costs well under a cent. No developer tool is ticked: they cost about ten times more an answer and matter only when developers are your buyers. Token-billed endpoints, the developer tools and stand-ins, cost a different amount on every answer, so the review step labels the cost per check as an estimate. `GET /v1/costs` gives the cost of one answer on every surface. See [Treg](treg.md#cost).
 
 ## Models
 

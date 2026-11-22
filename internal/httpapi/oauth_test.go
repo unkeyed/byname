@@ -573,6 +573,7 @@ var mcpTools = map[string]string{
 	"GET /v1/estimate":                "estimate_cost",
 	"PUT /v1/questions/{id}/scoring":  "set_question_scoring",
 	"POST /v1/naming-check":           "check_naming",
+	"GET /v1/costs":                   "get_costs",
 
 	"POST /v1/runs":          "run_now",
 	"POST /v1/checks/pause":  "pause_checks",

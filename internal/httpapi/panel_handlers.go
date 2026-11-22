@@ -123,7 +123,7 @@ func (s *server) saveOnboardingStep(w http.ResponseWriter, r *http.Request, _ co
 }
 
 func (s *server) finishOnboarding(w http.ResponseWriter, r *http.Request, _ core.Actor) error {
-	v, err := s.svc.Config.FinishOnboarding(r.Context())
+	v, err := s.svc.Instance.FinishOnboarding(r.Context())
 	return respond(w, http.StatusOK, v, err)
 }
 
@@ -151,6 +151,11 @@ func (s *server) setQuestionScoring(w http.ResponseWriter, r *http.Request, _ co
 		return err
 	}
 	v, err := s.svc.Config.SetQuestionScoring(r.Context(), id, b)
+	return respond(w, http.StatusOK, v, err)
+}
+
+func (s *server) costs(w http.ResponseWriter, r *http.Request, _ core.Actor) error {
+	v, err := s.svc.Instance.Costs(r.Context())
 	return respond(w, http.StatusOK, v, err)
 }
 

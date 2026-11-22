@@ -3,6 +3,8 @@ package config
 import (
 	"context"
 	"errors"
+	"math"
+	"slices"
 
 	"github.com/unkeyed/byname/internal/core"
 	"github.com/unkeyed/byname/internal/engines"
@@ -49,6 +51,51 @@ type EstimateRow struct {
 	CostUSD        *float64         `json:"cost_usd"`
 }
 
+// callCost is one endpoint's cost per call and where it comes from.
+type callCost struct {
+	usd     *float64
+	source  CostSource
+	samples int
+}
+
+// callCosts is the mean reported cost of each endpoint's past answers.
+type callCosts map[string]meanCost
+
+type meanCost struct {
+	usd float64
+	n   int
+}
+
+func (s *Service) callCosts(ctx context.Context) (callCosts, error) {
+	out := callCosts{}
+	rows, err := s.db.Query(ctx, `SELECT endpoint, avg(cost_usd)::float8, count(*) FROM answer WHERE cost_usd IS NOT NULL GROUP BY endpoint`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var e string
+		var m meanCost
+		if err := rows.Scan(&e, &m.usd, &m.n); err != nil {
+			return nil, err
+		}
+		out[e] = m
+	}
+	return out, rows.Err()
+}
+
+// of prices one call to endpoint on route rs: the mean of its past
+// answers, or else the route's sampled cost, or unknown.
+func (c callCosts) of(rs engines.RouteSpec, endpoint string) callCost {
+	if m, ok := c[endpoint]; ok {
+		return callCost{usd: &m.usd, source: CostFromHistory, samples: m.n}
+	}
+	if sample := rs.SampleCostUSD(); sample != nil {
+		return callCost{usd: sample, source: CostFromSample}
+	}
+	return callCost{source: CostUnknown}
+}
+
 func (s *Service) Estimate(ctx context.Context) (Estimate, error) {
 	out := Estimate{Rows: []EstimateRow{}}
 	set, err := s.CurrentQuestions(ctx)
@@ -64,24 +111,8 @@ func (s *Service) Estimate(ctx context.Context) (Estimate, error) {
 	if err != nil {
 		return out, err
 	}
-	type mean struct {
-		usd float64
-		n   int
-	}
-	history := map[string]mean{}
-	rows, err := s.db.Query(ctx, `SELECT endpoint, avg(cost_usd)::float8, count(*) FROM answer WHERE cost_usd IS NOT NULL GROUP BY endpoint`)
+	costs, err := s.callCosts(ctx)
 	if err != nil {
-		return out, err
-	}
-	for rows.Next() {
-		var e string
-		var m mean
-		if err := rows.Scan(&e, &m.usd, &m.n); err != nil {
-			return out, err
-		}
-		history[e] = m
-	}
-	if err := rows.Err(); err != nil {
 		return out, err
 	}
 	for _, p := range pairs {
@@ -92,13 +123,10 @@ func (s *Service) Estimate(ctx context.Context) (Estimate, error) {
 		}
 		row := EstimateRow{
 			PairID: p.ID, Surface: p.Surface, Title: rs.Spec.Title, Model: p.Model, Fidelity: p.Fidelity,
-			Route: st.route, Endpoint: rs.EndpointID(st.baseURL), Calls: out.Questions, Source: CostUnknown,
+			Route: st.route, Endpoint: rs.EndpointID(st.baseURL), Calls: out.Questions,
 		}
-		if m, ok := history[row.Endpoint]; ok {
-			row.CostPerCallUSD, row.Source, row.Samples = &m.usd, CostFromHistory, m.n
-		} else if sample := rs.SampleCostUSD(); sample != nil {
-			row.CostPerCallUSD, row.Source = sample, CostFromSample
-		}
+		c := costs.of(rs, row.Endpoint)
+		row.CostPerCallUSD, row.Source, row.Samples = c.usd, c.source, c.samples
 		if row.CostPerCallUSD != nil {
 			cost := *row.CostPerCallUSD * float64(row.Calls)
 			row.CostUSD = &cost
@@ -111,4 +139,88 @@ func (s *Service) Estimate(ctx context.Context) (Estimate, error) {
 	out.Pairs = len(out.Rows)
 	out.Calls = out.Questions * out.Pairs
 	return out, nil
+}
+
+// AnswerCost is what one answer costs on a surface on its current route,
+// priced the way Estimate prices a pair. The price is the endpoint's, so
+// every model on the surface costs the same per answer.
+type AnswerCost struct {
+	Surface          engines.Surface `json:"surface"`
+	Title            string          `json:"title"`
+	Group            SurfaceGroup    `json:"group"`
+	Route            engines.Route   `json:"route"`
+	Endpoint         string          `json:"endpoint"`
+	Enabled          bool            `json:"enabled"`
+	DefaultOn        bool            `json:"default_on" jsonschema:"ticked by default in onboarding"`
+	Models           []string        `json:"models" jsonschema:"the models turned on, each charged this per answer; empty on an app surface"`
+	CostPerAnswerUSD *float64        `json:"cost_per_answer_usd" jsonschema:"null when no past answer reported a cost and the route has no sampled price"`
+	Source           CostSource      `json:"source" jsonschema:"history (the mean of past answers), sample (the registry's sampled price) or unknown"`
+	Samples          int             `json:"samples" jsonschema:"past answers averaged, for history"`
+}
+
+// AnswerCosts prices one answer on every surface, on or off, in the
+// order onboarding shows them.
+func (s *Service) AnswerCosts(ctx context.Context) ([]AnswerCost, error) {
+	surfaces, err := s.Surfaces(ctx)
+	if err != nil {
+		return nil, err
+	}
+	costs, err := s.callCosts(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := []AnswerCost{}
+	for _, sf := range surfaces {
+		rs, err := engines.RouteOf(sf.Key, sf.Route)
+		if err != nil {
+			continue
+		}
+		c := costs.of(rs, sf.Endpoint)
+		row := AnswerCost{Surface: sf.Key, Title: sf.Title, Group: sf.Group, Route: sf.Route, Endpoint: sf.Endpoint, Enabled: sf.Enabled,
+			DefaultOn: sf.DefaultOn, Models: []string{}, CostPerAnswerUSD: c.usd, Source: c.source, Samples: c.samples}
+		for _, p := range sf.Pairs {
+			if p.Enabled && p.Model != "" && !slices.Contains(row.Models, p.Model) {
+				row.Models = append(row.Models, p.Model)
+			}
+		}
+		out = append(out, row)
+	}
+	return out, nil
+}
+
+// daysPerMonth is the average calendar month.
+const daysPerMonth = 365.25 / 12
+
+// CheckCosts is what checks cost in a month at the current schedule.
+type CheckCosts struct {
+	Check          Estimate `json:"check" jsonschema:"the estimated cost of one check, as GET /v1/estimate gives it"`
+	CheckEveryDays int      `json:"check_every_days"`
+	Paused         bool     `json:"paused" jsonschema:"scheduled checks are paused, so none runs on its own"`
+	ChecksPerMonth float64  `json:"checks_per_month" jsonschema:"scheduled checks in an average month; 0 while paused. Check now adds to it"`
+	MonthUSD       float64  `json:"month_usd" jsonschema:"one check's known cost times checks_per_month"`
+}
+
+func (s *Service) CheckCosts(ctx context.Context) (CheckCosts, error) {
+	est, err := s.Estimate(ctx)
+	if err != nil {
+		return CheckCosts{}, err
+	}
+	st, err := s.Settings(ctx)
+	if err != nil {
+		return CheckCosts{}, err
+	}
+	out := CheckCosts{Check: est, CheckEveryDays: st.CheckEveryDays, Paused: st.ChecksPaused}
+	if !st.ChecksPaused {
+		out.ChecksPerMonth = daysPerMonth / float64(st.CheckEveryDays)
+	}
+	out.MonthUSD = est.KnownUSD * out.ChecksPerMonth
+	return out, nil
+}
+
+// DefaultMonthCap is the monthly spend cap onboarding sets when none is
+// set: three times the monthly estimate, rounded up to a whole dollar, and
+// at least $5, so a normal month never reaches it and a runaway one stops.
+func DefaultMonthCap(monthUSD float64) float64 {
+	cents := math.Round(3 * monthUSD * 100)
+	return max(5, math.Ceil(cents/100))
 }

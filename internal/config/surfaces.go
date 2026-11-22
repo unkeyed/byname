@@ -49,7 +49,10 @@ var surfaceGroups = map[engines.Fidelity]SurfaceGroup{
 	engines.FidelityApproximation: GroupApproximations,
 }
 
-var defaultOn = []engines.Surface{engines.ChatGPTApp, engines.GeminiApp, engines.GoogleAIMode, engines.ClaudeCode}
+// defaultOn is what onboarding ticks: the apps most buyers use, which
+// cost well under a cent an answer. Developer tools cost ten times more and
+// matter only when developers are the buyers, so none is ticked.
+var defaultOn = []engines.Surface{engines.ChatGPTApp, engines.GeminiApp, engines.GoogleAIMode}
 
 // RouteOption is one way a surface can be asked, with the label its pairs
 // get there before a test, so the change shows before it is saved.
