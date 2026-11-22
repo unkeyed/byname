@@ -94,8 +94,11 @@ func TestNothingRunsBeforeOnboardingIsFinished(t *testing.T) {
 	svc, _ := newService(t, now)
 
 	state, err := svc.Onboarding(ctx)
-	if err != nil || state.FinishedAt != nil || len(state.Steps) != 7 || state.Steps[0].Saved || len(state.Missing) == 0 {
-		t.Fatalf("fresh: %+v %v, want seven unsaved steps and a list of what is missing", state, err)
+	if err != nil || state.FinishedAt != nil || len(state.Steps) != 8 || state.Steps[0].Saved || len(state.Missing) == 0 {
+		t.Fatalf("fresh: %+v %v, want eight unsaved steps and a list of what is missing", state, err)
+	}
+	if !strings.Contains(strings.Join(state.Missing, "; "), "save the AI apps step") {
+		t.Fatalf("missing = %q, want each unsaved required step named as written", state.Missing)
 	}
 	if done, err := svc.Onboarded(ctx); err != nil || done {
 		t.Fatalf("onboarded = %v %v on a fresh instance", done, err)
@@ -113,6 +116,9 @@ func TestNothingRunsBeforeOnboardingIsFinished(t *testing.T) {
 		t.Fatalf("ready = %v, want onboarding named as missing, so Run now refuses", err)
 	}
 	state, _ = svc.Onboarding(ctx)
+	if next := state.FirstScheduledCheck; next == nil || next.LocalDate != "2026-11-22" || next.LocalTime != "06:00" || next.DaysAway != 1 || next.ThenEveryDays != 3 {
+		t.Fatalf("first scheduled check = %+v, want tomorrow 06:00 Berlin, then every 3 days, before finishing", next)
+	}
 	if len(state.Missing) != 1 || !strings.Contains(state.Missing[0], "Claude Code on claude-sonnet-5-5") || !strings.Contains(state.Missing[0], "ChatGPT app") {
 		t.Fatalf("missing = %q, want only the untested pairs", state.Missing)
 	}
@@ -123,7 +129,7 @@ func TestNothingRunsBeforeOnboardingIsFinished(t *testing.T) {
 
 	testAll(t, svc)
 	state, err = svc.FinishOnboarding(ctx, 0)
-	if err != nil || state.FinishedAt == nil || !state.Steps[6].Saved || len(state.Missing) != 0 {
+	if err != nil || state.FinishedAt == nil || !state.Steps[len(state.Steps)-1].Saved || len(state.Missing) != 0 || state.FirstScheduledCheck != nil {
 		t.Fatalf("finish: %+v %v", state, err)
 	}
 	s, _ := svc.Settings(ctx)

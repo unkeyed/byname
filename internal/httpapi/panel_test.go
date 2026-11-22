@@ -311,8 +311,9 @@ func TestCostsOverHTTP(t *testing.T) {
 			BlueskyMonthUSD float64 `json:"bluesky_month_usd"`
 			MonthUSD        float64 `json:"month_usd"`
 		} `json:"social"`
-		MonthEstimateUSD float64 `json:"month_estimate_usd"`
-		Month            struct {
+		MonthEstimateUSD   float64 `json:"month_estimate_usd"`
+		DefaultMonthCapUSD float64 `json:"default_month_cap_usd"`
+		Month              struct {
 			ChecksUSD float64  `json:"checks_usd"`
 			SpentUSD  float64  `json:"spent_usd"`
 			CapUSD    *float64 `json:"cap_usd"`
@@ -338,7 +339,7 @@ func TestCostsOverHTTP(t *testing.T) {
 	if s := got.Social; s.Enabled || s.MonthUSD != 0 || s.TregNetworks != 6 || s.TregMonthUSD <= 0 || !s.BlueskyOn || s.BlueskyMonthUSD != 0 {
 		t.Errorf("social = %+v, want off and costing nothing, with what the six Treg networks would cost", s)
 	}
-	if got.MonthEstimateUSD != got.Checks.MonthUSD || got.Month.CapUSD == nil || *got.Month.CapUSD != 5 || got.Month.SpentUSD != 0 {
+	if got.MonthEstimateUSD != got.Checks.MonthUSD || got.Month.CapUSD == nil || *got.Month.CapUSD != 5 || got.Month.SpentUSD != 0 || got.DefaultMonthCapUSD != 5 {
 		t.Fatalf("month = %+v, estimate %v, want nothing spent and the $5 minimum cap set by finishing onboarding", got.Month, got.MonthEstimateUSD)
 	}
 

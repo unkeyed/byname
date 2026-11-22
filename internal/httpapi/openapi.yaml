@@ -4537,7 +4537,7 @@ components:
       enum: [treg, openai, anthropic, perplexity, google, dataforseo, cloro, serpapi, gateway]
     StepKey:
       type: string
-      enum: [brand, competitors, questions, surfaces, search_console, schedule, review]
+      enum: [brand, competitors, questions, surfaces, search_console, social, schedule, review]
     AnswerStatus:
       type: string
       enum: [ok, no_answer, failed]
@@ -5092,7 +5092,7 @@ components:
           description: Surfaces whose route calls with this key.
     Onboarding:
       type: object
-      required: [steps, finished_at, missing]
+      required: [steps, finished_at, missing, first_scheduled_check]
       properties:
         steps:
           type: array
@@ -5116,6 +5116,29 @@ components:
           items:
             type: string
           description: What still blocks finishing, in plain words. Empty once finished.
+        first_scheduled_check:
+          description: The scheduled check finishing now would set, in the instance's time zone, so the review can say when the second check runs. Null once finished.
+          oneOf:
+            - type: "null"
+            - type: object
+              required: [at, local_date, local_time, days_away, then_every_days]
+              properties:
+                at:
+                  type: string
+                  format: date-time
+                local_date:
+                  type: string
+                  format: date
+                  description: The day in time_zone.
+                local_time:
+                  type: string
+                  description: HH:MM in time_zone.
+                days_away:
+                  type: integer
+                  minimum: 0
+                  description: Calendar days from today in time_zone. 0 is today, 1 tomorrow.
+                then_every_days:
+                  type: integer
     PairTest:
       type: object
       required: [pair, status, error, cost_usd, cost_reported, searched, cited, citations, reported_model]
@@ -5190,7 +5213,7 @@ components:
                 type: [number, "null"]
     Costs:
       type: object
-      required: [per_answer, checks, social, month_estimate_usd, month]
+      required: [per_answer, checks, social, month_estimate_usd, default_month_cap_usd, month]
       properties:
         per_answer:
           type: array
@@ -5276,6 +5299,9 @@ components:
         month_estimate_usd:
           type: number
           description: checks.month_usd plus social.month_usd.
+        default_month_cap_usd:
+          type: number
+          description: The monthly spend cap finishing onboarding sets when none is set. Three times month_estimate_usd, rounded up to a whole dollar, and at least 5.
         month:
           type: object
           required: [start, checks_usd, social_usd, spent_usd, missing_cost_calls, cap_usd]

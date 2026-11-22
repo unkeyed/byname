@@ -76,7 +76,7 @@ type questionScoringInput struct {
 }
 
 type stepInput struct {
-	Step config.StepKey `json:"step" jsonschema:"brand, competitors, questions, surfaces, search_console or schedule"`
+	Step config.StepKey `json:"step" jsonschema:"brand, competitors, questions, surfaces, search_console, social or schedule"`
 }
 
 type updateSurfaceInput struct {
@@ -203,7 +203,7 @@ func addConfigTools(srv *mcp.Server, svc app.Services) {
 			return c.Onboarding(ctx)
 		})
 	addTool(srv, core.ConfigWrite, &mcp.Tool{Name: "save_onboarding_step", Annotations: mutates(false, true),
-		Description: "Mark an onboarding step saved, after saving its data with the matching tool, or to skip an optional step (competitors, search_console). PUT /v1/onboarding/steps/{step}."},
+		Description: "Mark an onboarding step saved, after saving its data with the matching tool, or to skip an optional step (competitors, search_console, social). PUT /v1/onboarding/steps/{step}."},
 		func(ctx context.Context, _ core.Actor, in stepInput) (config.Onboarding, error) {
 			return c.SaveStep(ctx, in.Step)
 		})

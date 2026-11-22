@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/jackc/pgx/v5"
 
@@ -24,6 +25,7 @@ const (
 	StepQuestions     StepKey = "questions"
 	StepSurfaces      StepKey = "surfaces"
 	StepSearchConsole StepKey = "search_console"
+	StepSocial        StepKey = "social"
 	StepSchedule      StepKey = "schedule"
 	StepReview        StepKey = "review"
 )
@@ -40,9 +42,10 @@ var steps = []stepSpec{
 	{StepBrand, "Brand and domain", true},
 	{StepCompetitors, "Competitors", false},
 	{StepQuestions, "Questions", true},
-	{StepSurfaces, "Where people ask", true},
+	{StepSurfaces, "AI apps", true},
 	{StepSearchConsole, "Search Console", false},
-	{StepSchedule, "Schedule, limits and alerts", true},
+	{StepSocial, "Social mentions", false},
+	{StepSchedule, "Schedule and spend caps", true},
 	{StepReview, "Review", true},
 }
 
@@ -59,6 +62,9 @@ type Onboarding struct {
 	Steps      []Step     `json:"steps"`
 	FinishedAt *time.Time `json:"finished_at"`
 	Missing    []string   `json:"missing"`
+	// FirstScheduledCheck is the scheduled check finishing now would set,
+	// so the review can say when the second check runs.
+	FirstScheduledCheck *UpcomingCheck `json:"first_scheduled_check" jsonschema:"the scheduled check finishing now would set, in the instance's time zone; null once finished"`
 }
 
 // Onboarded reports whether onboarding is finished.
@@ -86,13 +92,19 @@ func (s *Service) onboarding(ctx context.Context, q querier) (Onboarding, error)
 	if out.FinishedAt != nil {
 		return out, nil
 	}
+	cur, err := s.settingsView(ctx, q)
+	if err != nil {
+		return out, err
+	}
+	now := s.now()
+	out.FirstScheduledCheck = upcoming(NextCheck(now, cur.LastCheckAt, cur.Schedule()), now, cur.Schedule())
 	missing, err := s.readiness(ctx)
 	if err != nil {
 		return out, err
 	}
 	for _, st := range out.Steps {
 		if st.Required && !st.Saved && st.Key != StepReview {
-			missing = append(missing, fmt.Sprintf("save the %s step", strings.ToLower(st.Title)))
+			missing = append(missing, fmt.Sprintf("save the %s step", sentenceCase(st.Title)))
 		}
 	}
 	untested, err := s.untestedPairs(ctx, q)
@@ -104,6 +116,15 @@ func (s *Service) onboarding(ctx context.Context, q querier) (Onboarding, error)
 	}
 	out.Missing = append(out.Missing, missing...)
 	return out, nil
+}
+
+// sentenceCase lowercases a title's first letter to sit inside a sentence,
+// and leaves an acronym such as "AI" alone.
+func sentenceCase(title string) string {
+	if len(title) > 1 && unicode.IsUpper(rune(title[1])) {
+		return title
+	}
+	return strings.ToLower(title[:1]) + title[1:]
 }
 
 // untestedPairs names each active pair whose last test did not pass.

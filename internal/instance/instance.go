@@ -62,8 +62,11 @@ type Costs struct {
 	Checks    config.CheckCosts   `json:"checks"`
 	Social    social.CostEstimate `json:"social"`
 	// MonthEstimateUSD is checks plus social searches in an average month.
-	MonthEstimateUSD float64   `json:"month_estimate_usd" jsonschema:"checks.month_usd plus social.month_usd"`
-	Month            MonthCost `json:"month"`
+	MonthEstimateUSD float64 `json:"month_estimate_usd" jsonschema:"checks.month_usd plus social.month_usd"`
+	// DefaultMonthCapUSD is what finishing onboarding sets as the monthly
+	// cap when none is set, from month_estimate_usd.
+	DefaultMonthCapUSD float64   `json:"default_month_cap_usd" jsonschema:"the monthly spend cap finishing onboarding sets when none is set: three times month_estimate_usd, rounded up to a whole dollar, at least 5"`
+	Month              MonthCost `json:"month"`
 }
 
 // MonthCost is what the calendar month so far has spent, in the
@@ -92,6 +95,7 @@ func (s *Service) Costs(ctx context.Context) (Costs, error) {
 		return out, err
 	}
 	out.MonthEstimateUSD = out.Checks.MonthUSD + out.Social.MonthUSD
+	out.DefaultMonthCapUSD = config.DefaultMonthCap(out.MonthEstimateUSD)
 	st, err := s.config.Settings(ctx)
 	if err != nil {
 		return out, err
