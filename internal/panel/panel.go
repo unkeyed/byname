@@ -22,14 +22,23 @@ type (
 )
 
 // BrandKind decides how a brand counts. Technologies are recorded but never
-// get a position and never count toward share of voice.
+// get a position and never count toward share of voice. Untracked and
+// hidden brands are ones AI answers named that nobody tracks; they are
+// never scored, so Score never sees them.
 type BrandKind string
 
 const (
 	KindSelf       BrandKind = "self"
 	KindCompetitor BrandKind = "competitor"
 	KindTechnology BrandKind = "technology"
+	// KindUntracked is a brand found in answers that you don't track.
+	KindUntracked BrandKind = "untracked"
+	// KindHidden is a found brand someone said is not a competitor.
+	KindHidden BrandKind = "hidden"
 )
+
+// TrackedKinds are the kinds answers are scored against.
+var TrackedKinds = []BrandKind{KindSelf, KindCompetitor, KindTechnology}
 
 type Brand struct {
 	ID      BrandID

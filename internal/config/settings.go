@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"slices"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -180,6 +181,9 @@ func (s *Service) PutSettings(ctx context.Context, in Settings) (SettingsView, e
 		if err != nil {
 			return err
 		}
+		if err := freeName(ctx, tx, in.Brand.Name); err != nil {
+			return err
+		}
 		_, err = tx.Exec(ctx, `INSERT INTO brand (name, aliases, domains, kind) VALUES ($1, $2, $3, 'self')
 			ON CONFLICT (kind) WHERE kind = 'self'
 			DO UPDATE SET name = excluded.name, aliases = excluded.aliases, domains = excluded.domains, updated_at = now()`,
@@ -204,7 +208,14 @@ func (s *Service) PutSettings(ctx context.Context, in Settings) (SettingsView, e
 		if err != nil {
 			return err
 		}
-		if err := markBrandQuestions(ctx, tx); err != nil {
+		rules := old.MatchMode != in.MatchMode || old.Brand.Name != in.Brand.Name ||
+			!slices.Equal(old.Brand.Aliases, in.Brand.Aliases) || !slices.Equal(old.Brand.Domains, in.Brand.Domains)
+		if rules {
+			err = rederive(ctx, tx)
+		} else {
+			err = markBrandQuestions(ctx, tx)
+		}
+		if err != nil {
 			return err
 		}
 		out, err = s.settingsView(ctx, tx)

@@ -65,7 +65,7 @@ func matchRules(ctx context.Context, q querier) ([]panel.Brand, panel.MatchMode,
 	if err := q.QueryRow(ctx, `SELECT match_mode FROM instance_settings`).Scan(&mode); err != nil {
 		return nil, mode, err
 	}
-	rows, err := q.Query(ctx, `SELECT id, name, aliases, domains, kind FROM brand ORDER BY kind <> 'self', lower(name)`)
+	rows, err := q.Query(ctx, `SELECT id, name, aliases, domains, kind FROM tracked_brand ORDER BY kind <> 'self', lower(name)`)
 	if err != nil {
 		return nil, mode, err
 	}
