@@ -76,7 +76,7 @@ There is no key to copy. The first time, your browser opens, you pick the scopes
 | [AI apps](docs/engines/surfaces.md) | Every AI app Byname asks, the accuracy labels, models, routes and known gaps |
 | [Search Console](docs/search-console.md) | The Google OAuth client, service accounts, the sync, branded terms and goals |
 | [Agents](docs/agents.md) | MCP over OAuth, the REST API, API keys and scopes |
-| [Alerts](docs/notifications.md) | Where alerts go (email, Slack and webhooks), each alert, and webhook signatures |
+| [Notifications](docs/notifications.md) | The bell, where notifications go (email, Slack and webhooks), each kind, and webhook signatures |
 | [Site changes](docs/changes.md) | Site changes from GitHub, when Google sees them, and results against comparison pages |
 | [How answers are scored](docs/scores.md) | Named you, questions that name your brand, and aliases that are everyday words |
 | [Social](docs/social.md) | Posts that name you on seven social networks, the people you leave out, and the digest |

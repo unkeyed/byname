@@ -17,7 +17,7 @@ Saving the token makes one free call, a read of the Claude Code model list, to p
 
 ## When Treg refuses a call
 
-Treg can decline a call on its own behalf, for example `402 insufficient_balance` when the balance is empty or `429 org_rate_limit`. Nothing reached the provider and nothing was charged, so Byname does not count it against the endpoint's success rate. The check stops, and Byname raises a **Check refused** alert with Treg's reason. Top up or wait, then use **Check now**.
+Treg can decline a call on its own behalf, for example `402 insufficient_balance` when the balance is empty or `429 org_rate_limit`. Nothing reached the provider and nothing was charged, so Byname does not count it against the endpoint's success rate. The check stops, and Byname raises a **Check refused** notification with Treg's reason. Top up or wait, then use **Check now**.
 
 A provider error that Treg passes through is different. It is stored as a failed answer and counts against that endpoint's success rate on **Settings > Check history**.
 

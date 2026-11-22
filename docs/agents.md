@@ -12,13 +12,13 @@ Every API key and every MCP connection carries one or more of three scopes. Each
 
 | Scope | Allows |
 |---|---|
-| `results:read` | Read checks, answers, raw responses, questions, brands, Search Console data, goals, site changes, comparison pages, the repo connection, social mentions and digests, the left-out list, alerts and settings. Never a secret. |
+| `results:read` | Read checks, answers, raw responses, questions, brands, Search Console data, goals, site changes, comparison pages, the repo connection, social mentions and digests, the left-out list, notifications and settings. Never a secret. |
 | `runs:write` | Queue a check, and pause and resume scheduled checks. |
 | `config:write` | Edit the brand, competitors, questions and question sets, AI apps and models, the schedule and limits, goals, branded search terms, site changes logged by hand, comparison pages, path rules, when change results fall and what counts as a move, the social search settings, and the people left out of social mentions. |
 
 A key or connection never carries a scope its creator's role lacks. An Admin or Editor can grant all three. A Viewer can grant only `results:read`. If the creator's role later loses a scope, so do their keys and connections. [Sign-in](sign-in.md#roles-and-what-they-allow) describes the roles.
 
-Some things no key or MCP connection can do, whatever its scopes. The Treg token, provider keys, Search Console connections, the GitHub repo connection for site changes, where alerts go, API keys, connected apps and teammates are managed only by a signed-in Admin in the UI. A key that tries gets `403`.
+Some things no key or MCP connection can do, whatever its scopes. The Treg token, provider keys, Search Console connections, the GitHub repo connection for site changes, where notifications go, API keys, connected apps and teammates are managed only by a signed-in Admin in the UI. A key that tries gets `403`.
 
 ## Connect an MCP client
 
@@ -142,8 +142,8 @@ Byname's MCP server has 73 tools. Every REST route an API key can call has one w
 | `remove_left_out_account` | `config:write` | `DELETE /v1/social/left-out/{id}` | Take an account off the left-out list, so its mentions show again. |
 | `status` | `results:read` | `GET /v1/status` | Byname's version and whether onboarding is done. |
 | `get_costs` | `results:read` | `GET /v1/costs` | What Byname costs, in US dollars: one answer in each AI app, one check, a month of checks and of social searches, and what this month has spent against the monthly cap. See [Treg](engines/treg.md#cost). |
-| `list_alerts` | `results:read` | `GET /v1/alerts` | Alerts newest first: finished checks with the answers that started or stopped naming you, refused or failed checks, spend caps reached, paused models, Google search goals reached, Google clicks that moved, change results, an expiring GitHub token and social digests, each with whether the person this connection acts for has read it, and the unread count. |
-| `mark_alerts_read` | `results:read` | `POST /v1/alerts/read` | Mark alerts read for the person this connection acts for, by id or all at once. |
+| `list_alerts` | `results:read` | `GET /v1/alerts` | Notifications newest first, the ones the app shows under the bell: finished checks with the answers that started or stopped naming you, refused or failed checks, spend caps reached, paused models, Google search goals reached, Google clicks that moved, change results, an expiring GitHub token and social digests, each with whether the person this connection acts for has read it, and the unread count. |
+| `mark_alerts_read` | `results:read` | `POST /v1/alerts/read` | Mark notifications read for the person this connection acts for, by id or all at once. |
 | `prompts` | `results:read` | `GET /v1/prompts` | Every question of the latest check in range: the AI apps and models that named you there, your best position, the competitors named instead, and per check whether some AI app named you, only linked to your site, did not, or every call failed. |
 | `cited_sources` | `results:read` | `GET /v1/sources` | The domains and pages answers linked to most over the checks in range, whether each page's HTML names you and which brands it names. |
 | `engine_view` | `results:read` | `GET /v1/metrics/engine` | One chart line (an AI app, or one of its models, on one endpoint and accuracy label, as mention_rates reports it): how often it named you, the questions it named you on and your average position on its latest check, how often it named you per check, its brand ranking, and the questions it named you on or not, with who it named instead. |

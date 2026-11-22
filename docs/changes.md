@@ -25,7 +25,7 @@ Each poll lists the pull requests merged into the default branch, newest update 
 
 For each merged pull request, Byname maps every changed file through the path rules and stores one change per page. A page whose files include an added file is a new page. Otherwise, a page with a removed file is removed, and any other page is an edit. A pull request read twice updates its changes in place, so no change is stored twice.
 
-GitHub sends the token's expiry in the `GitHub-Authentication-Token-Expiration` header on every call made with a fine-grained token. Byname records it on each poll and each **Test**, and **Settings > Site changes** shows it. A token without an expiry shows **Never**. Within 14 days of the expiry, Settings and **Google search > Site changes** warn, and Byname raises a **Token expiring** alert, which only Admins see. See [Alerts](notifications.md).
+GitHub sends the token's expiry in the `GitHub-Authentication-Token-Expiration` header on every call made with a fine-grained token. Byname records it on each poll and each **Test**, and **Settings > Site changes** shows it. A token without an expiry shows **Never**. Within 14 days of the expiry, Settings and **Google search > Site changes** warn, and Byname raises a **Token expiring** notification, which only Admins see. See [Notifications](notifications.md).
 
 When a poll fails, Settings and **Google search > Site changes** show why. A `401` from GitHub means the token expired or was revoked. A `404` means the repository does not exist or the token cannot read it.
 
@@ -80,7 +80,7 @@ Results are experimental. The method is new and has few real results behind it y
 Each change gets two results, counted in days from the day Google saw it:
 
 1. The first result, after 17 days by default. It is provisional, and the page marks it so.
-2. The final result, after 31 days by default. It settles whether the change helped and raises a **Change result** alert.
+2. The final result, after 31 days by default. It settles whether the change helped and raises a **Change result** notification.
 
 The `verdicts` job works out each result on or after its day, as days in the instance's time zone, and stores each one once. It also stores each change's before numbers, the page's totals over the final result's length ending the day before the merge, once Search Console has finalized those days.
 
@@ -157,7 +157,7 @@ A comparison page counts in a result while its hold date is on or after the resu
 
 ## What Site changes shows
 
-**Google search > Site changes** lists every change, the latest merge first, with its page, its pull request or manual log, the merge day, **Google saw it**, the **First result** and **Final result**, and its status. Opening a change shows its before numbers, both results against the comparison pages, and its timeline of the merge, each inspection, the day Google saw it, and the result days. An alert about a change links to `/google/site-changes?chg=<id>`, which opens that change. **Google search > Traffic** marks each merged pull request and each change logged by hand on its daily chart.
+**Google search > Site changes** lists every change, the latest merge first, with its page, its pull request or manual log, the merge day, **Google saw it**, the **First result** and **Final result**, and its status. Opening a change shows its before numbers, both results against the comparison pages, and its timeline of the merge, each inspection, the day Google saw it, and the result days. A notification about a change links to `/google/site-changes?chg=<id>`, which opens that change. **Google search > Traffic** marks each merged pull request and each change logged by hand on its daily chart.
 
 Google data arrives about three days late, and one page's appearances swing with demand as much as with rank. Read a result as evidence about one page, not as proof.
 
