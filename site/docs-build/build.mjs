@@ -23,7 +23,7 @@ const origin = "https://byname.dev";
 const sections = [
   { title: "Get started", pages: ["self-hosting", "deploy-unkey", "configuration", "sign-in"] },
   { title: "Where people ask", pages: ["engines/surfaces", "engines/treg", "engines/scraping-providers", "engines/model-providers", "engines/gateways"] },
-  { title: "Connect", pages: ["search-console", "agents", "notifications", "changes"] },
+  { title: "Connect", pages: ["search-console", "agents", "notifications", "changes", "social"] },
 ];
 const navLabels = {
   "self-hosting": "Self-host",

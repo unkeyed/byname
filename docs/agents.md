@@ -12,9 +12,9 @@ Every API key and every MCP connection carries one or more of three scopes. Each
 
 | Scope | Allows |
 |---|---|
-| `results:read` | Read runs, answers, raw responses, questions, brands, Search Console data, goals, site changes, control pages, the repo connection and settings. Never a secret. |
+| `results:read` | Read runs, answers, raw responses, questions, brands, Search Console data, goals, site changes, control pages, the repo connection, social mentions and digests, the left-out list and settings. Never a secret. |
 | `runs:write` | Queue a check, and pause and resume scheduled checks. |
-| `config:write` | Edit the brand, competitors, questions and question sets, surfaces and models, the schedule and limits, goals, branded search terms, site changes logged by hand, control pages, path rules, and when change reads fall and what counts as a move. |
+| `config:write` | Edit the brand, competitors, questions and question sets, surfaces and models, the schedule and limits, goals, branded search terms, site changes logged by hand, control pages, path rules, when change reads fall and what counts as a move, the social search settings, and the people left out of social mentions. |
 
 A key or connection never carries a scope its creator's role lacks. An Admin or Editor can grant all three. A Viewer can grant only `results:read`. If the creator's role later loses a scope, so do their keys and connections. [Sign-in](sign-in.md#roles-and-what-they-allow) describes the roles.
 
@@ -117,7 +117,7 @@ Keys live in Postgres by default, or in Unkey when `UNKEY_ROOT_KEY` and `UNKEY_A
 
 ## MCP tools
 
-Byname's MCP server has 63 tools. Every REST route an API key can call has one with the same scope, except `DELETE /v1/keys/current`, since MCP clients sign in with OAuth instead of a key. A test keeps the two in step. Read tools are marked read-only, and `delete_brand`, `delete_goal`, `delete_change` and `delete_control_page` are marked destructive, so a client can ask before it runs them.
+Byname's MCP server has 70 tools. Every REST route an API key can call has one with the same scope, except `DELETE /v1/keys/current`, since MCP clients sign in with OAuth instead of a key. A test keeps the two in step. Read tools are marked read-only, and `delete_brand`, `delete_goal`, `delete_change`, `delete_control_page` and `remove_left_out_account` are marked destructive, so a client can ask before it runs them.
 
 | Tool | Scope | REST | What it does |
 |---|---|---|---|
@@ -133,8 +133,15 @@ Byname's MCP server has 63 tools. Every REST route an API key can call has one w
 | `upsert_control_page` | `config:write` | `POST /v1/control-pages` | Add a control page, or change the hold date and note of the one with the same URL. |
 | `delete_control_page` | `config:write` | `DELETE /v1/control-pages/{id}` | Remove a control page. |
 | `update_path_rules` | `config:write` | `PUT /v1/repo/rules` | Replace the rules that map a pull request's changed files to page URLs. |
+| `list_social_mentions` | `results:read` | `GET /v1/social/mentions` | Posts that mention the brand on X, Reddit, Hacker News, LinkedIn, YouTube, Threads and Bluesky, newest first, each with its author, text, engagement and link, without those by left-out accounts unless include_hidden is set, with how many match and how many are hidden. |
+| `get_social_digest` | `results:read` | `GET /v1/social/digest` | One day's or week's social mentions grouped by network with the most engaged first, the authors new in it, and what the searches cost, without left-out accounts; the latest period that has ended unless day names one. |
+| `get_social_settings` | `results:read` | `GET /v1/social/settings` | The social search terms, each network with whether it is on, its route (Treg or direct) and its latest call, how often searches run and when the digest goes out. |
+| `list_left_out_accounts` | `results:read` | `GET /v1/social/left-out` | The accounts whose mentions are hidden, such as teammates and the company's own accounts, each with its label and how many stored mentions it hides. |
+| `update_social_settings` | `config:write` | `PUT /v1/social/settings` | Replace the social search terms, the fetch period and the digest schedule, and turn networks on or off (read them with get_social_settings first). |
+| `leave_out_account` | `config:write` | `POST /v1/social/left-out` | Leave an account out of social mentions, or relabel one already left out; its past mentions are hidden too. |
+| `remove_left_out_account` | `config:write` | `DELETE /v1/social/left-out/{id}` | Take an account off the left-out list, so its mentions show again. |
 | `status` | `results:read` | `GET /v1/status` | Byname's version and whether onboarding is done. |
-| `list_alerts` | `results:read` | `GET /v1/alerts` | Alerts newest first: finished checks with what was gained and lost, refused or failed checks, spend caps reached, paused models, search goals reached, search moves, change verdicts and an expiring GitHub token, each with whether the person this connection acts for has read it, and the unread count. |
+| `list_alerts` | `results:read` | `GET /v1/alerts` | Alerts newest first: finished checks with what was gained and lost, refused or failed checks, spend caps reached, paused models, search goals reached, search moves, change verdicts, an expiring GitHub token and social digests, each with whether the person this connection acts for has read it, and the unread count. |
 | `mark_alerts_read` | `results:read` | `POST /v1/alerts/read` | Mark alerts read for the person this connection acts for, by id or all at once. |
 | `prompts` | `results:read` | `GET /v1/prompts` | Every question of the latest run in range: the pairs that named you there, your best position, the competitors named instead, and per run whether some pair named you, only cited you, did not, or every call failed. |
 | `cited_sources` | `results:read` | `GET /v1/sources` | The domains and pages answers cited most over the runs in range, whether each page's HTML names you and which brands it names. |

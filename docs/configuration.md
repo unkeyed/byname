@@ -151,6 +151,7 @@ Never set these in production. Each one sends Byname's outbound calls, or lets i
 | `SERPAPI_BASE_URL` | Sends calls with your own SerpApi key to this URL instead of `https://serpapi.com`. |
 | `GSC_GOOGLE_BASE_URL` | Sends every Google call the Search Console connection makes, sign-in included, to this URL. |
 | `GITHUB_API_BASE_URL` | Sends every GitHub call that site changes make to this URL instead of `https://api.github.com`, such as a fake GitHub on localhost. |
+| `BLUESKY_BASE_URL` | Sends social search on Bluesky to this URL instead of `https://api.bsky.app`, such as a fake on localhost. |
 | `RESEND_BASE_URL` | Sends email API notification channels to this URL instead of `https://api.resend.com`. |
 | `SOURCES_ALLOW_PRIVATE_IPS` | `true` lets cited-source fetching reach private and loopback addresses, such as a fake site on localhost. Off by default, so a cited link cannot make Byname fetch from your internal network. |
 

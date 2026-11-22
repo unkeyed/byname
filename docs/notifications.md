@@ -30,8 +30,9 @@ Webhook and Slack URLs must use `https`, or `http` to `localhost` for a receiver
 | Search moved | `search_moved` | After a Search Console sync, 28-day clicks or 28-day non-brand clicks differ from the 28 days before by at least 25% of the earlier number and by at least 20 clicks. Both 28-day windows must have data for every day. | Anyone with `results:read` |
 | Change verdict | `change_verdict` | A site change got its final read against the control pages, 31 days after Google's first crawl by default. The interim read raises nothing. See [Changes](changes.md). | Anyone with `results:read` |
 | Token expiring | `token_expiring` | The hourly GitHub poll, or **Test** under **Settings > Site changes**, finds that the token expires within 14 days. | Admins only |
+| Social digest | `social_digest` | A day or week of social searches ended. It carries the new mentions per network with the most engaged posts, the new voices and what the searches cost, without the accounts left out. See [Social](social.md). | Anyone with `results:read` |
 
-Each event has a natural key, its kind and what it happened to, such as one run. Raising the same event twice stores and sends it once. For the four events that do not come from a check, the key decides how often each one fires:
+Each event has a natural key, its kind and what it happened to, such as one run. Raising the same event twice stores and sends it once. For the five events that do not come from a check, the key decides how often each one fires:
 
 | Event | Fires once per |
 |---|---|
@@ -39,6 +40,7 @@ Each event has a natural key, its kind and what it happened to, such as one run.
 | `search_moved` | Metric and the last day of the 28-day window. While the move holds, the next day's sync raises it again. |
 | `change_verdict` | Change. |
 | `token_expiring` | Repository and token expiry date. A new token with a new expiry date warns again. |
+| `social_digest` | Day or week, such as `week/2026-11-16`. A period in which nothing was searched raises none. |
 
 ## Delivery and retries
 

@@ -78,6 +78,7 @@ There is no key to copy. The first time, your browser opens, you pick the scopes
 | [Agents](docs/agents.md) | MCP over OAuth, the REST API, API keys and scopes |
 | [Notifications](docs/notifications.md) | Email, Slack and webhook channels, events and webhook signatures |
 | [Changes](docs/changes.md) | Site changes from GitHub, recrawls and verdicts against control pages |
+| [Social](docs/social.md) | Posts that name you on seven social networks, the people you leave out, and the digest |
 
 ## Contributing
 
