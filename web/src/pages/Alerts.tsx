@@ -53,13 +53,14 @@ export function Alerts() {
       <div className="relative min-h-0 flex-1 overflow-auto">
         <div className="mx-auto max-w-3xl space-y-3 px-4 py-6 pb-16 md:px-8">
           <p className="text-sm text-muted">
-            Byname raises an alert when a check finishes, stops or reaches its spend cap, and when a model leaves its list.
+            Alerts tell you what changed. One arrives when a check finishes, stops or reaches its spend cap, when an AI app stops offering a model, when your Google
+            clicks move or reach a goal, when a site change gets its final result, and with the social digest of new mentions.
             {me.data?.role === "admin" ? (
               <>
                 {" "}
-                Send them by email, to Slack or to a webhook under{" "}
-                <Link to="/settings/notifications" className="text-fg underline underline-offset-2">
-                  Settings, Notifications
+                To also get them by email, in Slack or at a webhook, choose where alerts go in{" "}
+                <Link to="/settings/alerts" className="text-fg underline underline-offset-2">
+                  Settings, Alerts
                 </Link>
                 .
               </>
