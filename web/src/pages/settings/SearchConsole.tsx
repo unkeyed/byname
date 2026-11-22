@@ -20,9 +20,12 @@ export function SearchConsole() {
   return (
     <>
       <SettingsHeader title="Search Console">
-        Byname reads clicks, impressions and position for one property, read-only, once a day. Connect with a Google account that can see the property,
-        or with a service account if this instance has no Google OAuth client. The numbers stay when you disconnect.
+        Search Console is Google&apos;s free report of how often your site shows up in Google results and how many people click. Connect it to see that next to your AI
+        results. Optional.
       </SettingsHeader>
+      <p className="-mt-3 mb-6 text-sm text-muted">
+        Byname reads it once a day, read-only, for one property: your site as Search Console knows it. The numbers stay if you disconnect.
+      </p>
       <GoogleReturn s={gsc.data} />
       {gsc.isPending ? <Pending /> : gsc.isError ? <ErrorNote error={gsc.error} /> : gsc.data.connected ? <Connected s={gsc.data} /> : <Connect s={gsc.data} />}
     </>
@@ -71,16 +74,39 @@ function Connect({ s }: { s: GscStatus }) {
           {s.first_day && s.latest_final_day ? `, ${dayRange(s.first_day, s.latest_final_day)}` : ""}. Connect again to keep them current.
         </p>
       )}
-      <section>
-        <SettingsSubhead>Sign in with Google</SettingsSubhead>
-        <p className="mb-3 text-sm text-muted">Byname asks for read-only access to Search Console and nothing else. Use an account that can see the property.</p>
-        <GoogleButton available={s.oauth_available} primary />
-      </section>
-      <section>
-        <SettingsSubhead>Or use a service account</SettingsSubhead>
-        <ServiceAccountForm />
-      </section>
+      {s.oauth_available ? (
+        <>
+          <section>
+            <SettingsSubhead>Sign in with Google</SettingsSubhead>
+            <p className="mb-3 text-sm text-muted">Byname asks for read-only access to Search Console and nothing else. Use an account that can see the property.</p>
+            <GoogleButton available primary />
+          </section>
+          <section>
+            <SettingsSubhead>Or use a service account</SettingsSubhead>
+            <ServiceAccountForm />
+          </section>
+        </>
+      ) : (
+        <section>
+          <SettingsSubhead>Connect with a service account</SettingsSubhead>
+          <p className="mb-3 text-sm text-muted">
+            A service account is a Google account for software, made in Google Cloud. Google sign-in isn&apos;t set up on this server, so this is the way to connect.
+          </p>
+          <ServiceAccountForm />
+          <NoGoogleSignIn />
+        </section>
+      )}
     </div>
+  );
+}
+
+/** How a server admin adds Google sign-in, shown instead of a button that cannot work. */
+function NoGoogleSignIn() {
+  return (
+    <p className="mt-4 text-xs text-muted">
+      To offer Google sign-in instead, set <code className="font-mono">GSC_GOOGLE_CLIENT_ID</code> and <code className="font-mono">GSC_GOOGLE_CLIENT_SECRET</code> on the
+      server and restart Byname.
+    </p>
   );
 }
 
@@ -179,7 +205,7 @@ function Connected({ s }: { s: GscStatus }) {
   useGscProperties();
   const disconnect = useMutation({ mutationFn: api.gsc.disconnect, onSuccess: () => qc.invalidateQueries({ queryKey: keys.search }) });
   const rows: [string, ReactNode][] = [
-    ["Method", methodInfo[s.method]],
+    ["Connected with", methodInfo[s.method]],
     ...(s.account ? [["Account", <span className="font-mono text-xs [overflow-wrap:anywhere]">{s.account}</span>] as [string, ReactNode]] : []),
     [
       "Property",
@@ -209,7 +235,7 @@ function Connected({ s }: { s: GscStatus }) {
     ],
     ...(s.last_sync_error ? [["Last error", <span className="text-danger [overflow-wrap:anywhere]">{s.last_sync_error}</span>] as [string, ReactNode]] : []),
     ["Stored", s.first_day && s.latest_final_day ? `${dayRange(s.first_day, s.latest_final_day)}, final` : <span className="text-muted">Nothing yet</span>],
-    ["Partial days", s.partial_days.length ? `${dayList(s.partial_days)}. Google still revises these; the next sync overwrites them.` : <span className="text-muted">None</span>],
+    ["Still updating", s.partial_days.length ? `${dayList(s.partial_days)}. Google still revises these days, and the next sync replaces them.` : <span className="text-muted">None</span>],
   ];
 
   return (
@@ -242,10 +268,10 @@ function Connected({ s }: { s: GscStatus }) {
       <section>
         <SettingsSubhead>Change the connection</SettingsSubhead>
         <p className="mb-3 text-sm text-muted">
-          Connect again to replace the credential. The property stays picked, so use an account that can read it.
+          Connect again to change how Byname signs in to Google. The property stays picked, so use an account that can read it.
         </p>
-        <GoogleButton available={s.oauth_available} label={s.method === "oauth" ? "Sign in with Google again" : "Switch to Google sign-in"} />
-        <details className="mt-4 text-sm">
+        {s.oauth_available && <GoogleButton available label={s.method === "oauth" ? "Sign in with Google again" : "Switch to Google sign-in"} />}
+        <details className={cx("text-sm", s.oauth_available && "mt-4")}>
           <summary className="cursor-pointer py-3.5 font-medium text-muted hover:text-fg md:py-0">{s.method === "service_account" ? "Replace the service account key" : "Switch to a service account"}</summary>
           <div className="mt-3">
             <ServiceAccountForm label={s.method === "service_account" ? "Replace key" : "Switch to this service account"} />
@@ -256,7 +282,7 @@ function Connected({ s }: { s: GscStatus }) {
       <section>
         <SettingsSubhead>Disconnect</SettingsSubhead>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-sm text-muted">Deletes the stored credential and stops syncing. The numbers already synced stay on the Search page.</p>
+          <p className="text-sm text-muted">Deletes the stored sign-in and stops syncing. The numbers already synced stay under Google search, Traffic.</p>
           <ConfirmButton label="Disconnect Search Console" confirmLabel="Disconnect?" onConfirm={() => disconnect.mutate()} disabled={disconnect.isPending} className="self-start sm:self-auto">
             <Icon name="x" className="size-3.5" />
             Disconnect
