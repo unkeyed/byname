@@ -1,31 +1,32 @@
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, type Fidelity, type Pair, type PairTest, type Route, type RouteOption, type SearchControl, type Surface, type SurfaceGroup, type SurfaceInput, type SurfaceKey } from "../api";
+import { api, type Costs, type Fidelity, type Pair, type PairTest, type Route, type RouteOption, type SearchControl, type Surface, type SurfaceGroup, type SurfaceInput, type SurfaceKey } from "../api";
 import { fidelityInfo, usd } from "../lines";
 import { keys, useCan, useIsAdmin, useSurfaces } from "../queries";
 import { Badge, Button, Card, cx, ErrorNote, errorMessage, Icon, inputClass, labelClass, Pending, RelativeTime, Spinner, SteadyLabel, type Tone } from "../ui";
-import { CredentialForm, testTone, useCredentials } from "./Credentials";
-import { Disclosure, FieldNote, NoteSlot } from "./forms";
+import { about, refreshCosts, useCosts } from "./costs";
+import { CredentialForm, useCredentials } from "./Credentials";
+import { Disclosure, FieldNote, NoteSlot, type Footer } from "./forms";
 
 export const groupInfo: Record<SurfaceGroup, { title: string; detail: string }> = {
-  apps: { title: "Consumer apps and search", detail: "The answer a person sees in the app or on the results page, read by a scraping provider." },
-  developer_tools: { title: "Developer tools", detail: "Tools that run in a terminal, matched by the same model with the same web search." },
-  approximations: { title: "Approximations", detail: "Apps with no faithful source yet. The closest API stands in, always labeled and charted apart." },
+  apps: { title: "AI apps and AI search", detail: "Byname reads the answer a person sees in the app, word for word." },
+  developer_tools: { title: "Developer tools", detail: "Only if developers are your buyers. Byname asks the model the tool uses, with the same web search." },
+  approximations: { title: "Stand-ins", detail: "Byname can't read these apps' own answers yet, so the closest model stands in. Their answers are labeled and charted apart." },
 };
 
 export const routeInfo: Record<Route, { title: string; detail: string }> = {
-  treg: { title: "Treg", detail: "The default. One Treg token runs every surface." },
-  scraper: { title: "Your own scraping key", detail: "The same scraping provider, called with your key. App surfaces stay App answers." },
-  provider: { title: "Your own provider key", detail: "The model provider's API, called with your key. On an app surface this makes an Approximation." },
-  gateway: { title: "OpenAI-compatible gateway", detail: "Such as OpenRouter or Vercel AI Gateway. On an app surface this makes an Approximation. Not yet a tested integration." },
+  treg: { title: "Treg", detail: "The default. One Treg token runs every AI app." },
+  scraper: { title: "Your own scraping key", detail: "The same scraping service, called with your key. AI apps keep the Real app answer label." },
+  provider: { title: "Your own provider key", detail: "The model provider's API, called with your key. On an AI app this makes a Stand-in." },
+  gateway: { title: "OpenAI-compatible gateway", detail: "Such as OpenRouter or Vercel AI Gateway. On an AI app this makes a Stand-in. Not yet a tested integration." },
 };
 
 export const searchInfo: Record<SearchControl, string> = {
-  by_app: "The app decides whether to search.",
-  forceable: "Web search is forced on every call.",
-  enable_only: "Web search is turned on. This route cannot force it, so some answers may not search.",
-  always: "Searches on every call.",
-  by_model: "Web search is forced where the model allows it. A model that refuses it is an Approximation.",
+  by_app: "The app decides whether to search the web.",
+  forceable: "Searches the web on every answer.",
+  enable_only: "Web search is on, but this route can't force it, so some answers may not search.",
+  always: "Searches the web on every answer.",
+  by_model: "Searches the web where the model allows it. A model that refuses counts as a Stand-in.",
 };
 
 export const fidelityTone = (f: Fidelity): Tone => (f === "approximation" ? "warn" : f === "app" ? "success" : "info");
@@ -54,10 +55,17 @@ const same = (a: Draft, b: Draft) => a.enabled === b.enabled && a.route === b.ro
 const optionFor = (s: Surface, route: Route): RouteOption =>
   s.routes.find((r) => r.route === route) ?? { route: s.route, credential: s.credential, provider: "", fidelity: s.fidelity, takes_model: s.takes_model, search: s.search };
 
-function draftProblem(s: Surface, d: Draft): string | null {
+/** What stops a ticked surface from saving. The row says it short, so the note fits its one reserved line on a phone; the status line under Test and continue names the surface. */
+type Problem = "no_base_url" | "no_model";
+const problemText: Record<Problem, { row: string; named: (title: string) => string }> = {
+  no_base_url: { row: "Give the gateway's base URL.", named: (t) => `Give the gateway's base URL for ${t}, under Advanced.` },
+  no_model: { row: "Pick at least one model.", named: (t) => `Pick at least one model for ${t}.` },
+};
+
+function draftProblem(s: Surface, d: Draft): Problem | null {
   if (!d.enabled) return null;
-  if (d.route === "gateway" && !/^https?:\/\/\S+$/.test(d.base_url.trim())) return "Give the gateway's base URL, such as https://openrouter.ai/api/v1.";
-  if (optionFor(s, d.route).takes_model && d.models.length === 0) return `Pick at least one model for ${s.title}.`;
+  if (d.route === "gateway" && !/^https?:\/\/\S+$/.test(d.base_url.trim())) return "no_base_url";
+  if (optionFor(s, d.route).takes_model && d.models.length === 0) return "no_model";
   return null;
 }
 
@@ -77,26 +85,60 @@ function toInput(s: Surface, d: Draft): SurfaceInput {
 
 const testable = (s: Surface) => (s.enabled ? s.pairs.filter((p) => p.enabled) : []);
 
-/** Whether onboarding may move on: every enabled pair saved and its last test passed. */
-export interface Readiness {
-  ok: boolean;
-  reason?: string;
-}
+/**
+ * Where onboarding's one action is: saving the picks, testing each AI app,
+ * and moving on are one press of Test and continue, which walks these.
+ */
+type Run = { phase: "idle" } | { phase: "saving" } | { phase: "testing"; done: number; total: number } | { phase: "blocked"; message: string };
 
 /**
- * Where people ask: onboarding step 4 and Settings > Where people ask. Ticks,
- * models and routes are drafts until Save; tests run against what is saved.
+ * The AI apps Byname asks: onboarding step 4 and Settings > Where people
+ * ask. Ticks, models and routes are drafts until saved; tests run against
+ * what is saved. With onContinue (onboarding), one Test and continue saves,
+ * tests and moves on; without it, Settings shows Save and Test all.
  */
-export function WherePeopleAsk({ prefillDefaults, footer }: { prefillDefaults?: boolean; footer?: (ready: Readiness) => ReactNode }) {
+export function WherePeopleAsk({ prefillDefaults, onContinue, footer }: { prefillDefaults?: boolean; onContinue?: () => void; footer?: Footer }) {
   const surfaces = useSurfaces();
+  const costs = useCosts();
   if (surfaces.isPending) return <Pending />;
   if (surfaces.isError) return <ErrorNote error={surfaces.error} />;
-  return <Body surfaces={surfaces.data ?? []} prefillDefaults={prefillDefaults} footer={footer} />;
+  return <Body surfaces={surfaces.data ?? []} costs={costs.data} prefillDefaults={prefillDefaults} onContinue={onContinue} footer={footer} />;
 }
 
-function Body({ surfaces, prefillDefaults, footer }: { surfaces: Surface[]; prefillDefaults?: boolean; footer?: (ready: Readiness) => ReactNode }) {
+/** "about $0.004 an answer", from GET /v1/costs. */
+function answerCost(costs: Costs | undefined, key: SurfaceKey): number | null {
+  return costs?.per_answer.find((a) => a.surface === key)?.cost_per_answer_usd ?? null;
+}
+
+/** How many times an AI app's answer a developer tool's answer costs, on average. */
+function devToolRatio(costs: Costs | undefined): number | null {
+  const mean = (g: SurfaceGroup) => {
+    const list = (costs?.per_answer ?? []).filter((a) => a.group === g && a.cost_per_answer_usd != null).map((a) => a.cost_per_answer_usd!);
+    return list.length ? list.reduce((x, y) => x + y, 0) / list.length : null;
+  };
+  const apps = mean("apps");
+  const dev = mean("developer_tools");
+  return apps && dev && dev / apps >= 2 ? Math.round(dev / apps) : null;
+}
+
+function Body({
+  surfaces,
+  costs,
+  prefillDefaults,
+  onContinue,
+  footer,
+}: {
+  surfaces: Surface[];
+  costs: Costs | undefined;
+  prefillDefaults?: boolean;
+  onContinue?: () => void;
+  footer?: Footer;
+}) {
   const qc = useQueryClient();
   const canEdit = useCan("config:write");
+  const admin = useIsAdmin();
+  const creds = useCredentials();
+  const onboarding = !!onContinue;
   const [drafts, setDrafts] = useState<Record<SurfaceKey, Draft>>(() =>
     prefillDefaults && !surfaces.some((s) => s.enabled) ? Object.fromEntries(surfaces.filter((s) => s.default_on).map((s) => [s.key, { ...fromServer(s), enabled: true }])) : {},
   );
@@ -107,20 +149,21 @@ function Body({ surfaces, prefillDefaults, footer }: { surfaces: Surface[]; pref
   const [testErrors, setTestErrors] = useState<Record<number, unknown>>({});
   const [testing, setTesting] = useState<Set<number>>(new Set());
   const [tried, setTried] = useState(false);
+  const [run, setRun] = useState<Run>({ phase: "idle" });
 
   const draftOf = (s: Surface) => drafts[s.key] ?? fromServer(s);
   const dirty = surfaces.filter((s) => drafts[s.key] && !same(drafts[s.key], fromServer(s)));
   const setDraft = (s: Surface, patch: Partial<Draft>) => {
     setDrafts((all) => ({ ...all, [s.key]: { ...(all[s.key] ?? fromServer(s)), ...patch } }));
     setSaveErrors(({ [s.key]: _, ...rest }) => rest);
+    if (run.phase === "blocked") setRun({ phase: "idle" });
   };
   const putSurface = (next: Surface) => qc.setQueryData<Surface[]>(keys.surfaces, (list) => list?.map((x) => (x.key === next.key ? next : x)));
   const putPair = (pair: Pair) =>
     qc.setQueryData<Surface[]>(keys.surfaces, (list) => list?.map((x) => (x.key === pair.surface ? { ...x, pairs: x.pairs.map((p) => (p.id === pair.id ? pair : p)) } : x)));
 
-  const saveAll = async () => {
-    setTried(true);
-    if (dirty.some((s) => draftProblem(s, drafts[s.key]))) return;
+  /** Saves every changed surface; returns the ones that failed. */
+  const saveAll = async (): Promise<Record<SurfaceKey, unknown>> => {
     setSaving(true);
     const errors: Record<SurfaceKey, unknown> = {};
     for (const s of dirty) {
@@ -134,20 +177,29 @@ function Body({ surfaces, prefillDefaults, footer }: { surfaces: Surface[]; pref
     setSaveErrors(errors);
     setSaving(false);
     setTried(false);
-    void qc.invalidateQueries({ queryKey: keys.surfaces });
     void qc.invalidateQueries({ queryKey: keys.estimate });
     void qc.invalidateQueries({ queryKey: keys.credentials });
+    void refreshCosts(qc);
+    return errors;
+  };
+  const save = async () => {
+    setTried(true);
+    if (dirty.some((s) => draftProblem(s, drafts[s.key]))) return;
+    await saveAll();
+    void qc.invalidateQueries({ queryKey: keys.surfaces });
   };
 
-  const runTest = async (pair: Pair) => {
+  const runTest = async (pair: Pair): Promise<boolean> => {
     setTesting((t) => new Set(t).add(pair.id));
     setTestErrors(({ [pair.id]: _, ...rest }) => rest);
     try {
       const result = await api.pairs.test(pair.id);
       setTests((t) => ({ ...t, [pair.id]: result }));
       putPair(result.pair);
+      return result.status === "ok";
     } catch (err) {
       setTestErrors((e) => ({ ...e, [pair.id]: err }));
+      return false;
     } finally {
       setTesting((t) => {
         const next = new Set(t);
@@ -159,28 +211,67 @@ function Body({ surfaces, prefillDefaults, footer }: { surfaces: Surface[]; pref
   const allPairs = surfaces.flatMap(testable);
   const testAll = () => Promise.all(allPairs.filter((p) => !testing.has(p.id)).map(runTest)).then(() => qc.invalidateQueries({ queryKey: keys.estimate }));
 
-  const enabledCount = surfaces.filter((s) => draftOf(s).enabled).length;
-  const needsTreg = surfaces.some((s) => draftOf(s).enabled && draftOf(s).route === "treg");
+  const ticked = surfaces.filter((s) => draftOf(s).enabled);
+  const needsTreg = ticked.some((s) => draftOf(s).route === "treg");
+  const tregMissing = admin && needsTreg && creds.data !== undefined && !creds.data.find((c) => c.kind === "treg")?.set;
   const failing = allPairs.filter((p) => p.test_status !== "ok");
-  const ready: Readiness =
-    dirty.length > 0
-      ? { ok: false, reason: "Save your changes first." }
-      : !surfaces.some((s) => s.enabled)
-        ? { ok: false, reason: "Tick at least one surface and save." }
-        : failing.length > 0
-          ? { ok: false, reason: `Test every surface and model. ${failing.length} of ${allPairs.length} ${allPairs.length === 1 ? "has" : "have"} not passed yet.` }
-          : { ok: true };
+  // One test answer per ticked AI app and per model picked on it.
+  const testCost = ticked.reduce((sum, s) => sum + (answerCost(costs, s.key) ?? 0) * Math.max(1, draftOf(s).models.length), 0);
+
+  const testAndContinue = async () => {
+    setTried(true);
+    const stuck = ticked.find((s) => draftProblem(s, draftOf(s)));
+    if (stuck) return setRun({ phase: "blocked", message: problemText[draftProblem(stuck, draftOf(stuck))!].named(stuck.title) });
+    if (ticked.length === 0) return setRun({ phase: "blocked", message: "Tick at least one AI app." });
+    if (tregMissing) return setRun({ phase: "blocked", message: "Paste your Treg token above first." });
+    setRun({ phase: "saving" });
+    const errors = await saveAll();
+    const failed = Object.keys(errors);
+    if (failed.length) return setRun({ phase: "blocked", message: `Couldn't save ${failed.map((k) => surfaces.find((s) => s.key === k)?.title ?? k).join(", ")}. The reason is under each one.` });
+    const fresh = await qc.fetchQuery({ queryKey: keys.surfaces, queryFn: api.surfaces.list, staleTime: 0 });
+    const pending = fresh.flatMap(testable).filter((p) => p.test_status !== "ok");
+    let done = 0;
+    setRun({ phase: "testing", done, total: pending.length });
+    const results = await Promise.all(
+      pending.map(async (p) => {
+        const ok = await runTest(p);
+        setRun({ phase: "testing", done: ++done, total: pending.length });
+        return ok;
+      }),
+    );
+    void qc.invalidateQueries({ queryKey: keys.estimate });
+    void refreshCosts(qc);
+    const bad = results.filter((ok) => !ok).length;
+    if (bad) return setRun({ phase: "blocked", message: `${bad} of ${pending.length} ${pending.length === 1 ? "test" : "tests"} didn't pass. The reason is under each AI app. Fix it, or untick that app, and press Test and continue again.` });
+    setRun({ phase: "idle" });
+    onContinue?.();
+  };
 
   const groups = (Object.keys(groupInfo) as SurfaceGroup[]).map((g) => ({ g, list: surfaces.filter((s) => s.group === g) })).filter((x) => x.list.length > 0);
+  const ratio = devToolRatio(costs);
+  const busy = run.phase === "saving" || run.phase === "testing";
+  const label = run.phase === "saving" ? "Saving…" : run.phase === "testing" ? "Testing…" : "Test and continue";
+  const status =
+    run.phase === "blocked" ? (
+      <FieldNote tone="error">{run.message}</FieldNote>
+    ) : run.phase === "testing" ? (
+      <FieldNote tone="info">
+        Asked {run.done} of {run.total}. Each AI app answers one short test question.
+      </FieldNote>
+    ) : dirty.length === 0 && ticked.length > 0 && failing.length === 0 && allPairs.length > 0 ? (
+      <FieldNote tone="info">Every AI app here passed its test.</FieldNote>
+    ) : (
+      <FieldNote tone="info">Byname asks each AI app one short test question. It takes up to a minute{testCost > 0 && <> and costs {about(testCost)}</>}.</FieldNote>
+    );
 
   return (
     <div className="space-y-6">
       <TregToken needed={needsTreg} onNoTreg={() => setAdvanced(Object.fromEntries(surfaces.map((s) => [s.key, true])))} canEdit={canEdit} />
 
-      {canEdit && dirty.length === 0 && allPairs.length > 0 && (
+      {!onboarding && canEdit && dirty.length === 0 && allPairs.length > 0 && (
         <div className="flex flex-wrap items-center gap-2">
           <p className="mr-auto text-xs text-muted" aria-live="polite">
-            {allPairs.length - failing.length} of {allPairs.length} surface and model {allPairs.length === 1 ? "pair" : "pairs"} passed a test.
+            {allPairs.length - failing.length} of {allPairs.length} AI app and model {allPairs.length === 1 ? "test" : "tests"} passed.
           </p>
           <Button onClick={() => void testAll()} disabled={testing.size > 0}>
             {testing.size > 0 ? <Spinner className="size-3 border" /> : <Icon name="check" className="size-3.5" />}
@@ -194,7 +285,10 @@ function Body({ surfaces, prefillDefaults, footer }: { surfaces: Surface[]; pref
           <h3 id={`group-${g}`} className="text-sm font-semibold">
             {groupInfo[g].title}
           </h3>
-          <p className="mb-2 text-xs text-muted">{groupInfo[g].detail}</p>
+          <p className="mb-2 text-xs text-muted">
+            {groupInfo[g].detail}
+            {g === "developer_tools" && ratio && ` Each answer costs about ${ratio} times more than an AI app's.`}
+          </p>
           <Card>
             <ul className="divide-y divide-line">
               {list.map((s) => (
@@ -203,6 +297,8 @@ function Body({ surfaces, prefillDefaults, footer }: { surfaces: Surface[]; pref
                   s={s}
                   draft={draftOf(s)}
                   dirty={dirty.includes(s)}
+                  onboarding={onboarding}
+                  cost={answerCost(costs, s.key)}
                   canEdit={canEdit}
                   onChange={(patch) => setDraft(s, patch)}
                   advancedOpen={advanced[s.key] ?? false}
@@ -212,7 +308,7 @@ function Body({ surfaces, prefillDefaults, footer }: { surfaces: Surface[]; pref
                   tests={tests}
                   testErrors={testErrors}
                   testing={testing}
-                  onTest={runTest}
+                  onTest={(p) => void runTest(p)}
                 />
               ))}
             </ul>
@@ -220,28 +316,39 @@ function Body({ surfaces, prefillDefaults, footer }: { surfaces: Surface[]; pref
         </section>
       ))}
 
-      {canEdit && (dirty.length > 0 || allPairs.length === 0 || footer) && (
-        <div className="bottom-0 z-10 border-t border-line bg-bg py-3 md:sticky">
-          {(dirty.length > 0 || allPairs.length === 0) && (
-            <div className="flex flex-wrap items-center gap-2">
-              <p className="mr-auto text-xs text-muted" aria-live="polite">
-                {dirty.length > 0
-                  ? `${dirty.length} unsaved ${dirty.length === 1 ? "change" : "changes"}. ${enabledCount} ${enabledCount === 1 ? "surface" : "surfaces"} ticked.`
-                  : "Tick the surfaces your buyers use, then save."}
-              </p>
-              {dirty.length > 0 && (
-                <>
-                  <Button variant="ghost" onClick={() => setDrafts({})} disabled={saving}>
-                    Discard
-                  </Button>
-                  <Button variant="primary" onClick={() => void saveAll()} disabled={saving}>
-                    <SteadyLabel labels={["Save changes", "Saving…"]} current={saving ? "Saving…" : "Save changes"} />
-                  </Button>
-                </>
-              )}
-            </div>
+      {canEdit && onboarding && footer && (
+        <div className="space-y-1">
+          {footer(
+            <Button variant="primary" onClick={() => void testAndContinue()} disabled={busy}>
+              <SteadyLabel labels={["Test and continue", "Saving…", "Testing…"]} current={label} />
+            </Button>,
           )}
-          {footer?.(ready)}
+          {/* Two lines kept on phones, where the longest status wraps, so a shorter one never shortens the page under a scrolled-down reader. */}
+          <div className="flex min-h-9 justify-end md:min-h-5" aria-live="polite">
+            {status}
+          </div>
+        </div>
+      )}
+
+      {canEdit && !onboarding && (dirty.length > 0 || allPairs.length === 0) && (
+        <div className="bottom-0 z-10 border-t border-line bg-bg py-3 md:sticky">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="mr-auto text-xs text-muted" aria-live="polite">
+              {dirty.length > 0
+                ? `${dirty.length} unsaved ${dirty.length === 1 ? "change" : "changes"}. ${ticked.length} ${ticked.length === 1 ? "AI app" : "AI apps"} ticked.`
+                : "Tick the AI apps your buyers use, then save."}
+            </p>
+            {dirty.length > 0 && (
+              <>
+                <Button variant="ghost" onClick={() => setDrafts({})} disabled={saving}>
+                  Discard
+                </Button>
+                <Button variant="primary" onClick={() => void save()} disabled={saving}>
+                  <SteadyLabel labels={["Save changes", "Saving…"]} current={saving ? "Saving…" : "Save changes"} />
+                </Button>
+              </>
+            )}
+          </div>
         </div>
       )}
     </div>
@@ -253,43 +360,56 @@ function TregToken({ needed, onNoTreg, canEdit }: { needed: boolean; onNoTreg: (
   const creds = useCredentials();
   const [replacing, setReplacing] = useState(false);
   const treg = creds.data?.find((c) => c.kind === "treg");
+  const tested = treg?.set ? treg.last_test_status : "";
   return (
     <Card className="p-4">
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        <h3 className="text-sm font-semibold">Treg token</h3>
-        {treg && (treg.set ? <Badge tone="success">Set</Badge> : needed ? <Badge tone="warn">Required</Badge> : <Badge>Not needed</Badge>)}
-        {treg?.last_test_status && (
-          <Badge tone={testTone(treg.last_test_status)} title={treg.last_test_status}>
-            {treg.last_test_status === "ok" ? "Test passed" : "Test failed"}
-          </Badge>
-        )}
+      <div className="mb-2 flex flex-wrap items-center gap-2">
+        <h3 className="text-sm font-semibold">Connect Treg (pays for the AI answers)</h3>
+        {treg && (treg.set ? <Badge tone="success">Saved</Badge> : needed ? <Badge tone="warn">Required</Badge> : <Badge>Not needed</Badge>)}
         {canEdit && (
           <button type="button" onClick={onNoTreg} className="ml-auto inline-flex h-11 items-center text-xs text-muted underline underline-offset-2 hover:text-fg md:h-auto">
-            Don&apos;t use Treg?
+            Use your own keys instead
           </button>
         )}
       </div>
-      <p className="mb-3 text-xs text-muted">
-        One token runs every surface below. It is stored encrypted and only ever sent to Treg.{" "}
-        {needed ? "Required while any ticked surface goes through Treg." : "Not needed: every ticked surface uses its own key or a gateway."}
+      <p className="mb-3 text-sm text-muted">
+        Byname asks ChatGPT, Gemini, Google and the others through Treg, a service that runs each question and bills you per answer, usually under half a cent. One Treg
+        token covers every AI app below. Treg bills you, not Byname.{" "}
+        <a href="https://treg.to" target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center gap-1 font-medium text-fg underline underline-offset-2 md:min-h-0">
+          Get a token at treg.to
+          <Icon name="external" className="size-3" />
+        </a>
       </p>
+      {!needed && <p className="mb-3 text-xs text-muted">Not needed now: every ticked AI app uses your own key or a gateway.</p>}
       {admin ? (
         creds.isPending ? (
           <Pending />
         ) : creds.isError ? (
           <ErrorNote error={creds.error} />
         ) : treg?.set && !replacing ? (
-          <div className="flex flex-wrap items-center gap-2 text-sm">
-            <span className="text-muted">
-              Saved {treg.updated_at && <RelativeTime iso={treg.updated_at} />}
-              {treg.org && <> for org {treg.org}</>}. It is never shown again.
-            </span>
-            <Button size="sm" onClick={() => setReplacing(true)}>
-              Replace
-            </Button>
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center gap-2 text-sm">
+              <span className="text-muted">
+                Saved {treg.updated_at && <RelativeTime iso={treg.updated_at} />}
+                {treg.org && <> for the Treg organization {treg.org}</>}. Byname keeps it encrypted, sends it only to Treg and never shows it again.
+              </span>
+              <Button size="sm" onClick={() => setReplacing(true)}>
+                Replace
+              </Button>
+            </div>
+            {tested === "ok" ? (
+              <FieldNote tone="info">
+                <span className="text-success">Treg accepted the token.</span>
+              </FieldNote>
+            ) : tested && !tested.startsWith("untested") ? (
+              <div>
+                <FieldNote tone="error">Treg didn&apos;t accept this token. Copy it again from treg.to and replace it.</FieldNote>
+                <p className="mt-0.5 pl-4 text-xs text-muted [overflow-wrap:anywhere]">Treg said: {tested}</p>
+              </div>
+            ) : null}
           </div>
         ) : (
-          <CredentialForm kind="treg" title="Treg" set={!!treg?.set} org={treg?.org} compact hint={treg?.hint} onDone={() => setReplacing(false)} />
+          <CredentialForm kind="treg" title="Treg" set={!!treg?.set} org={treg?.org} compact onDone={() => setReplacing(false)} onCancel={treg?.set ? () => setReplacing(false) : undefined} />
         )
       ) : (
         <p className="text-xs text-muted">An admin pastes the Treg token, here or under Settings &gt; Credentials.</p>
@@ -302,6 +422,8 @@ function SurfaceRow({
   s,
   draft,
   dirty,
+  onboarding,
+  cost,
   canEdit,
   onChange,
   advancedOpen,
@@ -316,11 +438,13 @@ function SurfaceRow({
   s: Surface;
   draft: Draft;
   dirty: boolean;
+  onboarding: boolean;
+  cost: number | null;
   canEdit: boolean;
   onChange: (patch: Partial<Draft>) => void;
   advancedOpen: boolean;
   onAdvanced: (open: boolean) => void;
-  problem: string | null;
+  problem: Problem | null;
   saveError: unknown;
   tests: Record<number, PairTest>;
   testErrors: Record<number, unknown>;
@@ -343,7 +467,12 @@ function SurfaceRow({
             </label>
             <FidelityBadge fidelity={opt.fidelity} />
             {draft.route !== "treg" && <Badge tone="outline">{opt.provider || routeInfo[draft.route].title}</Badge>}
-            {dirty && <Badge tone="info">Unsaved</Badge>}
+            {dirty && !onboarding && <Badge tone="info">Unsaved</Badge>}
+            {cost != null && (
+              <span className="basis-full text-xs whitespace-nowrap text-muted tabular-nums sm:ml-auto sm:basis-auto">
+                {about(cost)} an answer{opt.takes_model && " per model"}
+              </span>
+            )}
           </div>
           <p className="mt-0.5 text-xs text-muted">{fidelityInfo[opt.fidelity].detail}</p>
         </div>
@@ -354,27 +483,27 @@ function SurfaceRow({
           {opt.takes_model ? (
             <ModelChips s={s} draft={draft} opt={opt} canEdit={canEdit} onChange={(models) => onChange({ models })} />
           ) : (
-            <p className="text-xs text-muted">The app picks the model. Byname stores the model name when the answer reports one.</p>
+            <p className="text-xs text-muted">The app picks its own model, the way it does for a person.</p>
           )}
-          <p className="text-xs text-muted">{searchInfo[opt.search]}</p>
+          {opt.search !== "forceable" && <p className="text-xs text-muted">{searchInfo[opt.search]}</p>}
 
           {pairs.length > 0 && (
             <ul className="divide-y divide-line rounded-surface border border-line">
               {pairs.map((p) => (
-                <PairRow key={p.id} p={p} result={tests[p.id]} error={testErrors[p.id]} testing={testing.has(p.id)} canEdit={canEdit} onTest={() => onTest(p)} />
+                <PairRow key={p.id} p={p} result={tests[p.id]} error={testErrors[p.id]} testing={testing.has(p.id)} canTest={canEdit && !onboarding} onTest={() => onTest(p)} />
               ))}
             </ul>
           )}
-          {dirty && s.enabled && <p className="text-xs text-muted">Save to test the new setup.</p>}
+          {dirty && s.enabled && !onboarding && <p className="text-xs text-muted">Save to test the new setup.</p>}
 
-          <Disclosure summary="Advanced: own key or gateway" open={advancedOpen} onToggle={onAdvanced}>
+          <Disclosure summary="Advanced: your own key or a gateway" open={advancedOpen} onToggle={onAdvanced}>
             <RoutePicker s={s} draft={draft} canEdit={canEdit} onChange={onChange} />
           </Disclosure>
         </div>
       )}
       {dirty && (
         <div className="sm:pl-7">
-          <NoteSlot>{problem ? <FieldNote tone="error">{problem}</FieldNote> : saveError != null && <FieldNote tone="error">{errorMessage(saveError)}</FieldNote>}</NoteSlot>
+          <NoteSlot>{problem ? <FieldNote tone="error">{problemText[problem].row}</FieldNote> : saveError != null && <FieldNote tone="error">{errorMessage(saveError)}</FieldNote>}</NoteSlot>
         </div>
       )}
       {!dirty && saveError != null && (
@@ -412,20 +541,20 @@ function ModelChips({ s, draft, opt, canEdit, onChange }: { s: Surface; draft: D
   return (
     <fieldset>
       <legend className={labelClass}>
-        Models <span className="font-normal text-faint">· pick one or more, each becomes its own series</span>
+        Models <span className="font-normal text-faint">· pick the ones your buyers use. Each model is charted on its own line.</span>
       </legend>
       {!ready ? (
         <p className="text-xs text-muted">Give the gateway&apos;s base URL under Advanced to list its models.</p>
       ) : keyMissing && cred ? (
         <p className="text-xs text-muted">
-          Models load once the {cred.title} {cred.kind === "treg" ? "token" : "key"} is set{cred.kind === "treg" ? " above" : " under Advanced"}.
+          Models load once the {cred.title} {cred.kind === "treg" ? "token" : "key"} is saved{cred.kind === "treg" ? " above" : " under Advanced"}.
         </p>
       ) : models.isPending ? (
         <Spinner className="size-3.5" />
       ) : models.isError ? (
         <div className="space-y-1">
           <ErrorNote error={models.error} />
-          {opt.route === "treg" && <p className="text-xs text-muted">Models load once the Treg token is set.</p>}
+          {opt.route === "treg" && <p className="text-xs text-muted">Models load once the Treg token is saved.</p>}
         </div>
       ) : (
         <div className="flex flex-wrap gap-1.5">
@@ -438,7 +567,7 @@ function ModelChips({ s, draft, opt, canEdit, onChange }: { s: Surface; draft: D
                 aria-pressed={on}
                 disabled={!canEdit}
                 onClick={() => toggle(m.name)}
-                title={m.off ? "Not on the route's current list" : !listsSearch ? "The test call shows whether it searches" : m.web_search ? "Supports web search" : "No web search on this model"}
+                title={m.off ? "Not on the route's current list" : !listsSearch ? "The test call shows whether it searches" : m.web_search ? "Searches the web" : "Can't search the web"}
                 className={cx(
                   "inline-flex h-11 items-center gap-1 rounded-full border px-3 font-mono md:h-7 md:px-2.5 text-xs transition-colors disabled:cursor-default",
                   on ? "border-fg bg-fg text-bg" : "border-line-strong text-muted hover:border-line-hover hover:text-fg",
@@ -447,7 +576,7 @@ function ModelChips({ s, draft, opt, canEdit, onChange }: { s: Surface; draft: D
               >
                 {on && <Icon name="check" className="size-3" />}
                 {m.name}
-                {listsSearch && !m.web_search && <span className="font-sans opacity-70">· no search</span>}
+                {listsSearch && !m.web_search && <span className="font-sans opacity-70">· no web search</span>}
               </button>
             );
           })}
@@ -455,15 +584,15 @@ function ModelChips({ s, draft, opt, canEdit, onChange }: { s: Surface; draft: D
         </div>
       )}
       {opt.search === "forceable" && draft.models.length > 0 && (
-        <ul className="mt-2 space-y-1" aria-label="Forced web search per model">
+        <ul className="mt-2 space-y-1" aria-label="Web search per model">
           {draft.models.map((m) => (
             <li key={m.model}>
-              <label className="flex flex-wrap items-center gap-x-2 text-xs">
+              <label className="flex min-h-11 flex-wrap items-center gap-x-2 text-xs md:min-h-0">
                 <input type="checkbox" checked={m.force} disabled={!canEdit} onChange={(e) => setForce(m.model, e.target.checked)} />
                 <span>
-                  Force web search on <span className="font-mono">{m.model}</span>
+                  Search the web on every answer from <span className="font-mono">{m.model}</span>
                 </span>
-                {!m.force && <span className="text-warn">Without it the answer may not search, so this pair is an Approximation.</span>}
+                {!m.force && <span className="text-warn">Without it some answers won&apos;t search, so it counts as a Stand-in.</span>}
               </label>
             </li>
           ))}
@@ -479,7 +608,7 @@ const statusBadge: Record<PairTest["status"], { label: string; tone: Tone }> = {
   failed: { label: "Failed", tone: "danger" },
 };
 
-function PairRow({ p, result, error, testing, canEdit, onTest }: { p: Pair; result?: PairTest; error: unknown; testing: boolean; canEdit: boolean; onTest: () => void }) {
+function PairRow({ p, result, error, testing, canTest, onTest }: { p: Pair; result?: PairTest; error: unknown; testing: boolean; canTest: boolean; onTest: () => void }) {
   const tested = p.test_status !== "";
   const failed = result ? result.status !== "ok" : tested && p.test_status !== "ok";
   return (
@@ -487,21 +616,22 @@ function PairRow({ p, result, error, testing, canEdit, onTest }: { p: Pair; resu
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
         <span className={cx("min-w-0 text-sm [overflow-wrap:anywhere]", p.model ? "font-mono text-xs" : "text-muted")}>{p.model || "The app picks the model"}</span>
         <FidelityBadge fidelity={p.fidelity} expected={!tested} />
-        {p.force_web_search && <Badge tone="outline">search forced</Badge>}
         {p.paused_reason && (
           <Badge tone="warn" title={p.paused_reason}>
             Paused
           </Badge>
         )}
         <span className="ml-auto flex items-center gap-2">
-          {result ? (
+          {testing ? (
+            <Badge>Testing…</Badge>
+          ) : result ? (
             <Badge tone={statusBadge[result.status].tone}>{statusBadge[result.status].label}</Badge>
           ) : tested ? (
             <Badge tone={p.test_status === "ok" ? "success" : "danger"}>{p.test_status === "ok" ? "Passed" : "Failed"}</Badge>
           ) : (
             <Badge>Not tested</Badge>
           )}
-          {canEdit && (
+          {canTest && (
             <Button size="sm" variant="ghost" onClick={onTest} disabled={testing}>
               {testing ? <Spinner className="size-3 border" /> : null}
               <SteadyLabel labels={["Test", "Test again", "Testing…"]} current={testing ? "Testing…" : tested ? "Test again" : "Test"} />
@@ -518,7 +648,7 @@ function PairRow({ p, result, error, testing, canEdit, onTest }: { p: Pair; resu
           <p className="text-xs text-muted [overflow-wrap:anywhere]">
             {p.test_status === "ok" ? (
               <>
-                {p.test_searched === true ? "Searched. " : p.test_searched === false ? "Did not search. " : ""}
+                {p.test_searched === true ? "Searched the web. " : p.test_searched === false ? "Didn't search the web. " : ""}
                 {fidelityInfo[p.fidelity].label} confirmed
               </>
             ) : (
@@ -533,11 +663,11 @@ function PairRow({ p, result, error, testing, canEdit, onTest }: { p: Pair; resu
           </p>
         )
       )}
-      {!tested && !result && error == null && <p className="text-xs text-faint">The label is what this route should give. A test confirms it, or lowers it to Approximation.</p>}
+      {!tested && !result && error == null && <p className="text-xs text-faint">The label is what this should give. A test confirms it, or lowers it to Stand-in.</p>}
       {p.paused_reason && <p className="text-xs text-warn">{p.paused_reason}</p>}
       {failed && p.force_web_search && (
         <p className="text-xs text-muted">
-          If the model refused forced web search, untick “Force web search” for it above, save, and test again. The pair then counts as an Approximation.
+          If the model refused web search, untick “Search the web on every answer” for it above and test again. It then counts as a Stand-in.
         </p>
       )}
     </li>
@@ -547,9 +677,9 @@ function PairRow({ p, result, error, testing, canEdit, onTest }: { p: Pair; resu
 function TestDetails({ r }: { r: PairTest }) {
   const facts = [
     r.cost_reported && r.cost_usd != null ? `Cost ${usd(r.cost_usd)}` : "Cost not reported (billed by tokens)",
-    r.searched ? "searched" : "did not search",
-    r.cited ? `cited ${r.citations} ${r.citations === 1 ? "link" : "links"}` : "cited nothing",
-    r.reported_model ? `reported model ${r.reported_model}` : "no model reported",
+    r.searched ? "searched the web" : "didn't search the web",
+    r.cited ? `linked to ${r.citations} ${r.citations === 1 ? "page" : "pages"}` : "linked to nothing",
+    r.reported_model ? `answered with ${r.reported_model}` : "no model reported",
   ];
   return (
     <div className="space-y-0.5 text-xs text-muted">
@@ -574,7 +704,7 @@ function RoutePicker({ s, draft, canEdit, onChange }: { s: Surface; draft: Draft
   return (
     <>
       <fieldset>
-        <legend className={labelClass}>How {s.title} is asked</legend>
+        <legend className={labelClass}>How Byname asks {s.title}</legend>
         <div className="space-y-1.5">
           {s.routes.map((r) => (
             <label key={r.route} className="flex cursor-pointer items-start gap-2 text-sm has-disabled:cursor-default">
@@ -618,12 +748,12 @@ function RoutePicker({ s, draft, canEdit, onChange }: { s: Surface; draft: Draft
       <div className="rounded-control bg-subtle px-3 py-2 text-xs">
         {changed ? (
           <p className="flex flex-wrap items-center gap-1.5">
-            Fidelity once saved: <FidelityBadge fidelity={current.fidelity} /> <Icon name="right" className="size-3" /> <FidelityBadge fidelity={opt.fidelity} />
-            <span className="basis-full text-muted">Saving resets this surface&apos;s tests, and its answers start a new series.</span>
+            Once saved: <FidelityBadge fidelity={current.fidelity} /> <Icon name="right" className="size-3" /> <FidelityBadge fidelity={opt.fidelity} />
+            <span className="basis-full text-muted">Saving clears this app&apos;s tests, and its answers start a new line on the charts.</span>
           </p>
         ) : (
           <p className="flex flex-wrap items-center gap-1.5">
-            Fidelity on this route: <FidelityBadge fidelity={opt.fidelity} />
+            On this route: <FidelityBadge fidelity={opt.fidelity} />
           </p>
         )}
       </div>
@@ -633,7 +763,7 @@ function RoutePicker({ s, draft, canEdit, onChange }: { s: Surface; draft: Draft
       ) : admin ? (
         cred?.set ? (
           <p className="text-xs text-muted">
-            The {cred.title} key is set. Replace or test it under Settings &gt; Credentials.
+            The {cred.title} key is saved. Replace or test it under Settings &gt; Credentials.
           </p>
         ) : (
           <CredentialForm kind={opt.credential} title={cred?.title ?? opt.provider} hint={cred?.hint} set={false} compact />

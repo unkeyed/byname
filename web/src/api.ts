@@ -427,7 +427,7 @@ export interface Credential {
   used_by: SurfaceKey[];
 }
 
-export type StepKey = "brand" | "competitors" | "questions" | "surfaces" | "search_console" | "schedule" | "review";
+export type StepKey = "brand" | "competitors" | "questions" | "surfaces" | "search_console" | "social" | "schedule" | "review";
 
 export interface OnboardingStep {
   key: StepKey;

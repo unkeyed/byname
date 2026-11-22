@@ -11,6 +11,7 @@ import { BrandTable } from "../../config/BrandTable";
 import { QuestionEditor } from "../../config/QuestionEditor";
 import { RunSettingsForm } from "../../config/RunSettings";
 import { SearchConsoleStep } from "../../config/SearchConsoleStep";
+import { SocialStep } from "../../config/SocialStep";
 import { WherePeopleAsk } from "../../config/WherePeopleAsk";
 import { ReauthProvider } from "../settings/Reauth";
 import { Review } from "./Review";
@@ -25,7 +26,7 @@ export interface StepNav {
 }
 
 /** The buttons under a step: Back, Skip for optional steps, and the step's own primary action. */
-export function StepFooter({ nav, skip, children, note }: { nav: StepNav; skip?: boolean; children?: ReactNode; note?: ReactNode }) {
+export function StepFooter({ nav, skip, children }: { nav: StepNav; skip?: boolean; children?: ReactNode }) {
   return (
     <div className="space-y-2 border-t border-line pt-4">
       <div className="flex flex-wrap items-center gap-2">
@@ -36,7 +37,6 @@ export function StepFooter({ nav, skip, children, note }: { nav: StepNav; skip?:
           </Link>
         )}
         <span className="ml-auto" />
-        {note && <span className="text-xs text-muted">{note}</span>}
         {skip && (
           <Button variant="ghost" onClick={nav.done} disabled={nav.pending}>
             Skip
@@ -53,11 +53,12 @@ const continueLabel = "Save and continue";
 
 const views: Record<StepKey, { intro: string; render: (nav: StepNav) => ReactNode }> = {
   brand: {
-    intro: "Who you are, so answers that name you or link to you count. Everything here can be changed later in Settings.",
+    intro: "Who you are, so Byname can tell when an AI answer names you or links to your site. You can change all of this later in Settings.",
     render: (nav) => <BrandForm onSaved={nav.done} submitLabel={continueLabel} footer={(submit) => <StepFooter nav={nav}>{submit}</StepFooter>} />,
   },
   competitors: {
-    intro: "The brands you compete with, and technologies answers name alongside you. Optional: you can start with none and add brands the first check's answers name.",
+    intro:
+      "The brands buyers pick instead of you. Add the ones you lose deals to, so you see how often AI names them next to you, or instead of you. Byname tracks only the brands you list here, and you can add more any time.",
     render: (nav) => (
       <div className="space-y-5">
         <BrandTable />
@@ -70,28 +71,17 @@ const views: Record<StepKey, { intro: string; render: (nav: StepNav) => ReactNod
     ),
   },
   questions: {
-    intro: "What your buyers ask an AI. Each check asks every question on every surface and model you pick, so calls and cost scale with the number of questions.",
+    intro: "What a buyer might ask an AI before they've heard of you. Each check asks every question in every AI app you pick, so more questions cost more.",
     render: (nav) => <QuestionEditor onSaved={nav.done} submitLabel={continueLabel} footer={(submit) => <StepFooter nav={nav}>{submit}</StepFooter>} />,
   },
   surfaces: {
-    intro: "The places your buyers ask. Each surface is asked the way that comes closest to what a person sees, and every answer carries a fidelity label saying how close.",
-    render: (nav) => (
-      <WherePeopleAsk
-        prefillDefaults={!nav.step.saved}
-        footer={(ready) => (
-          <div className="mt-3">
-            <StepFooter nav={nav} note={!ready.ok && ready.reason}>
-              <Button variant="primary" onClick={nav.done} disabled={!ready.ok || nav.pending}>
-                Continue
-              </Button>
-            </StepFooter>
-          </div>
-        )}
-      />
-    ),
+    intro:
+      "Pick where your buyers ask AI. Byname asks each one your questions and records exactly what a person would see. A label on each app says how close Byname gets to the real thing.",
+    render: (nav) => <WherePeopleAsk prefillDefaults={!nav.step.saved} onContinue={nav.done} footer={(primary) => <StepFooter nav={nav}>{primary}</StepFooter>} />,
   },
   search_console: {
-    intro: "Google Search Console data next to your AI results. Optional, and it can be connected later.",
+    intro:
+      "Search Console is Google's free report of how often your site shows up in Google results and how many people click. Connect it to see that next to your AI results. It's optional, and you can connect it later.",
     render: (nav) => (
       <SearchConsoleStep
         onPicked={nav.done}
@@ -107,14 +97,18 @@ const views: Record<StepKey, { intro: string; render: (nav: StepNav) => ReactNod
       />
     ),
   },
+  social: {
+    intro: "Public posts on social networks that name you, gathered in one digest.",
+    render: (nav) => <SocialStep onSaved={nav.done} footer={(primary) => <StepFooter nav={nav}>{primary}</StepFooter>} />,
+  },
   schedule: {
-    intro: "How often Byname checks, and what a check may spend. Nothing runs until you start the first check on the next step.",
+    intro: "How often Byname checks, and the most a check or a month may spend. Nothing runs until you start the first check on the last step.",
     render: (nav) => (
       <RunSettingsForm schedule limits tuningCollapsed extra={<AlertsSlot />} onSaved={nav.done} submitLabel={continueLabel} footer={(submit) => <StepFooter nav={nav}>{submit}</StepFooter>} />
     ),
   },
   review: {
-    intro: "Check everything once more. Starting the first check also sets the schedule going.",
+    intro: "Look everything over, see what it will cost, and start the first check.",
     render: (nav) => <Review nav={nav} />,
   },
 };
@@ -124,7 +118,7 @@ export function NotSetUp() {
   return (
     <div className="mx-auto mt-16 max-w-md px-4">
       <EmptyState icon="settings" title="Byname is not set up yet">
-        An admin or editor finishes setup: your brand, questions and where people ask. Results show here after the first check.
+        An admin or editor finishes setup: your brand, your questions and the AI apps to ask. Results show here after the first check.
       </EmptyState>
     </div>
   );

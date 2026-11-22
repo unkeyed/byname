@@ -1,18 +1,14 @@
 import type { ReactNode } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router";
-import { api, type EstimateRow, type StepKey, type Surface } from "../../api";
+import { api, type EstimateRow, type StepKey, type Surface, type UpcomingCheck } from "../../api";
 import { fidelityInfo, usd } from "../../lines";
-import { keys, useBrands, useOnboarding, useQuestions, useSettings, useSurfaces } from "../../queries";
-import { Badge, Button, buttonClass, Card, CardHeader, ErrorNote, Icon, Pending, RelativeTime, ScrollX } from "../../ui";
+import { keys, useBrands, useGsc, useOnboarding, useQuestions, useSettings, useSocialSettings, useSurfaces } from "../../queries";
+import { Badge, Button, buttonClass, Card, CardHeader, ErrorNote, Icon, Pending, RelativeTime, ScrollX, SteadyLabel, useLoading } from "../../ui";
+import { About, about, refreshCosts, useCosts } from "../../config/costs";
+import { Disclosure } from "../../config/forms";
 import { FidelityBadge, routeInfo } from "../../config/WherePeopleAsk";
 import type { StepNav } from "./Onboarding";
-
-const sourceLabel: Record<EstimateRow["source"], string> = {
-  history: "Mean",
-  sample: "Nov 21 sample",
-  unknown: "until the first check",
-};
 
 function Section({ title, step, children }: { title: string; step: StepKey; children: ReactNode }) {
   return (
@@ -31,7 +27,18 @@ function Section({ title, step, children }: { title: string; step: StepKey; chil
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
-/** Onboarding step 7: everything set, the pairs a check asks, and what a check should cost. */
+/** "tomorrow at 06:00", "today at 18:00" or "on Tuesday, Nov 24 at 06:00", in the instance's time zone. */
+export function whenLocal(c: UpcomingCheck): string {
+  const day =
+    c.days_away === 0
+      ? "today"
+      : c.days_away === 1
+        ? "tomorrow"
+        : `on ${new Date(`${c.local_date}T12:00:00Z`).toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric", timeZone: "UTC" })}`;
+  return `${day} at ${c.local_time}`;
+}
+
+/** Onboarding's last step: everything set, what it costs a check and a month, when results come, and Start first check. */
 export function Review({ nav }: { nav: StepNav }) {
   const qc = useQueryClient();
   const navigate = useNavigate();
@@ -40,7 +47,10 @@ export function Review({ nav }: { nav: StepNav }) {
   const brands = useBrands();
   const questions = useQuestions();
   const surfaces = useSurfaces();
-  const estimate = useQuery({ queryKey: keys.estimate, queryFn: api.estimate });
+  const social = useSocialSettings();
+  const costs = useCosts();
+  const gsc = useGsc();
+  useLoading(gsc.isPending);
   const start = useMutation({
     mutationFn: async () => {
       await api.onboarding.finish();
@@ -52,29 +62,73 @@ export function Review({ nav }: { nav: StepNav }) {
         qc.invalidateQueries({ queryKey: keys.onboarding }),
         qc.invalidateQueries({ queryKey: keys.settings }),
         qc.invalidateQueries({ queryKey: keys.runs }),
+        refreshCosts(qc),
       ]);
       void navigate("/");
     },
     onError: () => qc.invalidateQueries({ queryKey: keys.onboarding }),
   });
 
-  if (settings.isPending || brands.isPending || questions.isPending || surfaces.isPending) return <Pending />;
-  const error = settings.error ?? brands.error ?? questions.error ?? surfaces.error;
-  if (error || !settings.data || !brands.data || questions.data === undefined || !surfaces.data) return <ErrorNote error={error} />;
+  if (settings.isPending || brands.isPending || questions.isPending || surfaces.isPending || social.isPending || costs.isPending) return <Pending />;
+  const error = settings.error ?? brands.error ?? questions.error ?? surfaces.error ?? social.error ?? costs.error;
+  if (error || !settings.data || !brands.data || questions.data === undefined || !surfaces.data || !social.data || !costs.data) return <ErrorNote error={error} />;
 
   const s = settings.data;
+  const c = costs.data;
   const others = brands.data.filter((b) => b.kind !== "self");
   const competitors = others.filter((b) => b.kind === "competitor");
   const technologies = others.filter((b) => b.kind === "technology");
   const set = questions.data;
   const groups = new Set(set?.questions.map((q) => q.group));
+  const leftOut = set?.questions.filter((q) => !q.count_in_scores).length ?? 0;
   const enabled = surfaces.data.filter((x) => x.enabled);
   const pairs = new Map(surfaces.data.flatMap((x) => x.pairs.map((p) => [p.id, p] as const)));
   const byKey = new Map(surfaces.data.map((x) => [x.key, x]));
   const missing = onboarding.data?.missing ?? [];
+  const next = onboarding.data?.first_scheduled_check ?? null;
+  const est = c.checks.check;
+  const socialMonth = c.social.month_usd;
+  const cap = s.spend_cap_month_usd ?? c.default_month_cap_usd;
+  const gscProperty = gsc.data?.connected ? gsc.data.property : "";
 
   return (
     <div className="space-y-6">
+      <Card>
+        <CardHeader title="What it costs" description="Treg bills you for each answer, not Byname. These are estimates." />
+        <div className="space-y-3 border-t border-line px-4 py-3 text-sm">
+          <p className="text-base font-semibold tabular-nums">
+            {About(est.known_usd)} a check, {about(c.checks.month_usd)} a month
+          </p>
+          <p className="text-muted">
+            Each check asks {plural(est.questions, "question")} in {plural(est.pairs, "AI app")}
+            {est.pairs !== enabled.length && " and model"}, {plural(est.calls, "answer")} in all. At every {s.check_every_days === 1 ? "day" : `${s.check_every_days} days`} that is{" "}
+            {about(c.checks.month_usd)} a month
+            {socialMonth > 0 ? <>, plus {about(socialMonth)} a month for social mentions.</> : "."}
+            {est.unknown_pairs > 0 && ` ${plural(est.unknown_pairs, "AI app")} ${est.unknown_pairs === 1 ? "has" : "have"} no price yet, so the first check will tell.`}
+          </p>
+          <p className="text-muted">
+            {s.spend_cap_month_usd == null ? (
+              <>
+                Finishing sets a monthly spend cap of <span className="font-medium text-fg">{usd(cap)}</span>, so a mistake can&apos;t run up a bill. You can change it any time in
+                Settings.
+              </>
+            ) : (
+              <>
+                Your monthly spend cap is <span className="font-medium text-fg">{usd(cap)}</span>.
+              </>
+            )}{" "}
+            A single check stops at {usd(s.spend_cap_run_usd)}.
+          </p>
+        </div>
+        {est.rows.length > 0 && (
+          <div className="border-t border-line p-3">
+            <Disclosure summary="Cost per AI app">
+              <PairsTable rows={est.rows} pairs={pairs} surfaces={byKey} />
+            </Disclosure>
+          </div>
+        )}
+      </Card>
+
       <Card>
         <div className="divide-y divide-line">
           <Section title="Brand and domain" step="brand">
@@ -84,55 +138,27 @@ export function Review({ nav }: { nav: StepNav }) {
             {s.match_mode === "whole_word" ? "Whole word, case-sensitive" : "Also anywhere, ignoring case"} · {s.market} · {s.language} · {s.time_zone.replaceAll("_", " ")}
           </Section>
           <Section title="Competitors" step="competitors">
-            {others.length === 0 ? "None yet" : `${plural(competitors.length, "competitor")}, ${plural(technologies.length, "technology", "technologies")}: ${others.map((b) => b.name).join(", ")}`}
+            {others.length === 0
+              ? "None yet. You can add them later in Settings."
+              : `${plural(competitors.length, "competitor")}${technologies.length ? `, ${plural(technologies.length, "technology", "technologies")}` : ""}: ${others.map((b) => b.name).join(", ")}`}
           </Section>
           <Section title="Questions" step="questions">
-            {set ? `${plural(set.questions.length, "question")} in ${plural(groups.size, "group")}, version ${set.version}` : "None yet"}
+            {set ? `${plural(set.questions.length, "question")} in ${plural(groups.size, "group")}` : "None yet"}
+            {leftOut > 0 && `. ${leftOut} ${leftOut === 1 ? "names" : "name"} ${s.brand.name || "you"} and ${leftOut === 1 ? "is" : "are"} left out of scores.`}
           </Section>
-          <Section title="Where people ask" step="surfaces">
-            {enabled.length === 0 ? "No surface ticked" : enabled.map((x) => (x.pairs.some((p) => p.model) ? `${x.title} (${x.pairs.filter((p) => p.enabled).map((p) => p.model).join(", ")})` : x.title)).join(", ")}
+          <Section title="AI apps" step="surfaces">
+            {enabled.length === 0 ? "None ticked" : enabled.map((x) => (x.pairs.some((p) => p.model) ? `${x.title} (${x.pairs.filter((p) => p.enabled).map((p) => p.model).join(", ")})` : x.title)).join(", ")}
           </Section>
           <Section title="Search Console" step="search_console">
-            Not connected. Connect it later in Settings &gt; Search Console.
+            {gscProperty ? `Connected: ${gscProperty}` : "Not connected. You can connect it later in Settings."}
           </Section>
-          <Section title="Schedule and limits" step="schedule">
-            Every {plural(s.check_every_days, "day")} at {s.check_time} · {usd(s.spend_cap_run_usd)} cap per check
-            {s.spend_cap_month_usd != null ? ` · ${usd(s.spend_cap_month_usd)} a month` : " · no monthly cap"} · {s.concurrency} at once, {plural(s.retries, "retry", "retries")},{" "}
-            {s.timeout_s} s timeout
+          <Section title="Social mentions" step="social">
+            {social.data.enabled ? `On, from when setup is finished. ${About(socialMonth)} a month.` : "Off. You can turn it on later in Settings."}
+          </Section>
+          <Section title="Schedule and spend caps" step="schedule">
+            Every {plural(s.check_every_days, "day")} at {s.check_time} · {usd(s.spend_cap_run_usd)} cap per check · {usd(cap)} a month
           </Section>
         </div>
-      </Card>
-
-      <Card>
-        {estimate.isPending ? (
-          <Pending />
-        ) : estimate.isError ? (
-          <div className="p-4">
-            <ErrorNote error={estimate.error} />
-          </div>
-        ) : (
-          <>
-            <CardHeader
-              title={`${estimate.data.calls.toLocaleString()} calls per check`}
-              description={`${plural(estimate.data.questions, "question")} × ${plural(estimate.data.pairs, "surface and model pair")}. Each pair is its own series.`}
-            >
-              <div className="md:text-right">
-                <div className="text-base font-semibold tabular-nums">
-                  {estimate.data.unknown_pairs > 0 && estimate.data.known_usd > 0 && "at least "}
-                  {estimate.data.known_usd > 0 || estimate.data.unknown_pairs === 0 ? usd(estimate.data.known_usd) : "Unknown"}
-                </div>
-                <div className="text-xs text-muted">estimated per check</div>
-              </div>
-            </CardHeader>
-            <p className="border-t border-line px-4 py-2 text-xs text-muted">
-              An estimate from the mean cost of past answers on each endpoint, or the costs sampled on Nov 21, 2026 where there is no history yet. API calls are billed by
-              tokens, so real costs move with every answer.
-              {estimate.data.unknown_pairs > 0 && ` ${plural(estimate.data.unknown_pairs, "pair")} with neither ${estimate.data.unknown_pairs === 1 ? "is" : "are"} unknown until the first check.`}{" "}
-              The spend cap of {usd(s.spend_cap_run_usd)} stops a check that runs over.
-            </p>
-            {estimate.data.rows.length > 0 && <PairsTable rows={estimate.data.rows} pairs={pairs} surfaces={byKey} />}
-          </>
-        )}
       </Card>
 
       {missing.length > 0 && (
@@ -147,7 +173,15 @@ export function Review({ nav }: { nav: StepNav }) {
       )}
 
       <div className="space-y-2 border-t border-line pt-4">
-        <ErrorNote error={start.error} />
+        <p className="text-sm text-muted">
+          Your first results appear in a few minutes.
+          {next && (
+            <>
+              {" "}
+              The second check runs {whenLocal(next)}, so you can see what moves, then every {next.then_every_days === 1 ? "day" : `${next.then_every_days} days`}.
+            </>
+          )}
+        </p>
         <div className="flex flex-wrap items-center gap-2">
           {nav.back && (
             <Link to={nav.back} className={buttonClass({ variant: "ghost" })}>
@@ -157,9 +191,10 @@ export function Review({ nav }: { nav: StepNav }) {
           )}
           <span className="ml-auto" />
           <Button variant="primary" onClick={() => start.mutate()} disabled={start.isPending || missing.length > 0}>
-            {start.isPending ? "Starting…" : "Start first check"}
+            <SteadyLabel labels={["Start first check", "Starting…"]} current={start.isPending ? "Starting…" : "Start first check"} />
           </Button>
         </div>
+        <ErrorNote error={start.error} />
       </div>
     </div>
   );
@@ -169,16 +204,16 @@ function PairsTable({ rows, pairs, surfaces }: { rows: EstimateRow[]; pairs: Map
   const th = "px-3 py-2 text-left text-xs font-medium whitespace-nowrap text-muted";
   const td = "px-3 py-2 align-top";
   return (
-    <ScrollX label="Surface and model pairs">
-      <table className="w-full min-w-[40rem] border-t border-line text-sm">
+    <ScrollX label="Cost per AI app">
+      <table className="w-full min-w-[40rem] text-sm">
         <thead className="bg-header">
           <tr>
-            <th className={th}>Surface</th>
+            <th className={th}>AI app</th>
             <th className={th}>Model</th>
-            <th className={th}>Route</th>
-            <th className={th}>Fidelity</th>
-            <th className={th}>Last test</th>
-            <th className={`${th} text-right`}>Cost per call</th>
+            <th className={th}>Asked through</th>
+            <th className={th}>Accuracy</th>
+            <th className={th}>Test</th>
+            <th className={`${th} text-right`}>Per answer</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-line">
@@ -205,18 +240,10 @@ function PairsTable({ rows, pairs, surfaces }: { rows: EstimateRow[]; pairs: Map
                       Passed{p.last_tested_at && <RelativeTime iso={p.last_tested_at} className="block text-muted" />}
                     </span>
                   ) : (
-                    <span className="text-danger" title={p.test_status}>
-                      Failed
-                    </span>
+                    <span className="text-danger">Failed</span>
                   )}
                 </td>
-                <td className={`${td} text-right`}>
-                  <span className="tabular-nums">{r.cost_per_call_usd != null ? usd(r.cost_per_call_usd) : <span className="text-muted">Unknown</span>}</span>
-                  <span className="block text-xs text-muted">
-                    {sourceLabel[r.source]}
-                    {r.source === "history" && r.samples > 0 && ` of ${plural(r.samples, "answer")}`}
-                  </span>
-                </td>
+                <td className={`${td} text-right tabular-nums`}>{r.cost_per_call_usd != null ? about(r.cost_per_call_usd) : <span className="text-muted">Unknown</span>}</td>
               </tr>
             );
           })}
