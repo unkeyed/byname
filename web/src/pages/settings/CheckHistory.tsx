@@ -24,6 +24,9 @@ const jobNames: Record<string, string> = {
   source_fetch: "Reading linked pages",
   gsc_sync: "Search Console sync",
   social_fetch: "Social search",
+  site_changes: "Site changes from GitHub",
+  recrawl_watch: "Waiting for Google to see site changes",
+  verdicts: "Site change results",
 };
 
 /** A job's status in the same words and tones as a check's; only a job can be skipped. */
@@ -53,7 +56,7 @@ function MissingCost({ run }: { run: Run }) {
   );
 }
 
-const grid = "xl:grid xl:grid-cols-[7rem_9.5rem_minmax(0,1fr)_5.5rem_8.5rem_1rem] xl:items-center xl:gap-x-3";
+const grid = "xl:grid xl:grid-cols-[10rem_8.5rem_minmax(0,1fr)_5rem_8.5rem_1rem] xl:items-center xl:gap-x-3";
 
 function CheckRow({ run: r, title }: { run: Run; title: (endpoint: string) => string }) {
   return (
@@ -183,7 +186,7 @@ function Jobs() {
           {jobs.data.map((j) => {
             const st = jobStatus(j.status);
             return (
-              <li key={j.id} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 px-4 py-2 md:grid-cols-[10rem_9.5rem_minmax(0,1fr)_5rem]">
+              <li key={j.id} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 px-4 py-2 md:grid-cols-[15rem_8.5rem_minmax(0,1fr)_6rem]">
                 <span className="font-medium">{jobNames[j.job] ?? j.job}</span>
                 <span className="justify-self-end md:justify-self-start">
                   <Badge tone={st.tone}>{st.label}</Badge>
