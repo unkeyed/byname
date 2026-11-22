@@ -97,7 +97,7 @@ function ShareOfMentions({ data }: { data: Data }) {
             </tr>
           </thead>
           <tbody className="divide-y divide-line">
-            {data.brands.map((b) => (
+            {steady(data.brands).map((b) => (
               <tr key={b.brand_id} className={b.kind === "self" ? "font-semibold" : undefined}>
                 <td className="py-1.5 text-muted tabular-nums">{b.rank ? `#${b.rank}` : "–"}</td>
                 <td className="py-1.5">
@@ -118,6 +118,12 @@ function ShareOfMentions({ data }: { data: Data }) {
     </Card>
   );
 }
+
+/**
+ * You first, then by name, so changing the date range never reorders the
+ * rows under the reader; the rank is its own column.
+ */
+const steady = (brands: BrandStanding[]) => [...brands].sort((a, b) => Number(b.kind === "self") - Number(a.kind === "self") || a.name.localeCompare(b.name));
 
 /** A rate's step on the sequential ramp in index.css; 0 stays off the ramp so "never named" reads as empty. */
 const heatStep = (rate: number) => Math.min(12, Math.max(0, Math.round(rate * 12)));

@@ -108,7 +108,9 @@ export const useSocialDigest = (day?: string) => useQuery({ queryKey: keys.socia
 export const useSocialSettings = () => useQuery({ queryKey: keys.socialSettings, queryFn: api.social.settings });
 export const useLeftOut = () => useQuery({ queryKey: keys.leftOut, queryFn: api.social.leftOut });
 
-export const useOtherBrands = (f: ResultsFilter, enabled = true) => useQuery({ queryKey: keys.otherBrands(f), queryFn: () => api.otherBrands.list(f), enabled });
+/** Keeps the previous range's list while a new range loads, so the page never collapses and regrows. */
+export const useOtherBrands = (f: ResultsFilter, enabled = true) =>
+  useQuery({ queryKey: keys.otherBrands(f), queryFn: () => api.otherBrands.list(f), enabled, placeholderData: (prev) => prev });
 export const useOtherBrandsSettings = () => useQuery({ queryKey: keys.otherBrandsSettings, queryFn: api.otherBrands.settings });
 /** Polls while a pass over past answers is queued or running. */
 export const useBrandBackfill = () =>

@@ -425,6 +425,11 @@ function ItemList({ title, description, items, empty }: { title: string; descrip
           ))}
         </ul>
       )}
+      {items.some((it) => it.track) && (
+        <div className="min-h-5 px-4 pb-2">
+          <ErrorNote error={actions.track.error} />
+        </div>
+      )}
     </Card>
   );
 }

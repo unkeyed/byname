@@ -6,7 +6,7 @@ import { BrandMark } from "../../brandmark";
 import { money } from "../../checks";
 import { usd } from "../../lines";
 import { keys, useBrandBackfill, useCan, useOtherBrands, useOtherBrandsSettings } from "../../queries";
-import { Button, Card, CardHeader, Dialog, DialogBody, EmptyState, ErrorNote, Pending, Spinner } from "../../ui";
+import { Button, Card, CardHeader, cx, Dialog, DialogBody, EmptyState, ErrorNote, Pending, Spinner } from "../../ui";
 import { useView } from "../../view";
 
 /** Where the settings for finding other brands live. */
@@ -48,7 +48,7 @@ export function AlsoNamed({ filter }: { filter: ResultsFilter }) {
   const on = !!s?.find.on && !!s.has_token;
   const rows = all ? d.brands : d.brands.slice(0, shown);
   return (
-    <Card>
+    <Card className={cx(list.isPlaceholderData && "opacity-60")}>
       <span id="also-named" className="block scroll-mt-4" />
       <CardHeader
         title="Also named in answers"
@@ -64,7 +64,7 @@ export function AlsoNamed({ filter }: { filter: ResultsFilter }) {
           </Button>
         )}
       </CardHeader>
-      {hiddenOpen && <HiddenList canEdit={canEdit} actions={actions} />}
+      {hiddenOpen && d.hidden > 0 && <HiddenList canEdit={canEdit} actions={actions} />}
       {d.brands.length === 0 ? (
         <div className="px-4 pb-4">
           <Empty d={d} on={on} />
@@ -116,8 +116,9 @@ function Row({ b, d, canEdit, actions }: { b: OtherBrand; d: OtherBrands; canEdi
             <ul className="mt-1 space-y-0.5 text-xs text-muted">
               {b.questions.map((q) => (
                 <li key={q.question_id}>
-                  <button type="button" onClick={() => view.set({ q: q.question_id, qa: null }, { push: true })} className="block min-h-11 py-2.5 text-left hover:text-fg hover:underline md:min-h-0 md:py-0">
-                    “{q.text}” <span className="ml-1 text-faint tabular-nums">({answers(q.named)})</span>
+                  <button type="button" onClick={() => view.set({ q: q.question_id, qa: null }, { push: true })} className="group flex min-h-11 w-full items-center gap-2 text-left md:min-h-6">
+                    <span className="w-20 shrink-0 text-faint tabular-nums">{answers(q.named)}</span>
+                    <span className="min-w-0 flex-1 group-hover:text-fg group-hover:underline">“{q.text}”</span>
                   </button>
                 </li>
               ))}
@@ -158,7 +159,7 @@ function Empty({ d, on }: { d: OtherBrands; on: boolean }) {
   if (d.read === 0)
     return (
       <EmptyState icon="users" title="Not read yet">
-        Byname reads each answer for the brands it names right after a check stores it. The answers in this range came before that, so read them below to fill this list.
+        Byname reads each answer for the brands it names right after a check stores it. The answers in this range have not been read yet: they came before reading was on, or their reads failed and are tried again later.
       </EmptyState>
     );
   return (
