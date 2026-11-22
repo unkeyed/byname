@@ -48,7 +48,7 @@ func TestQuestionNamingTheBrandIsLeftOutOfScores(t *testing.T) {
 	summary := func() results.RunSummary {
 		t.Helper()
 		s, err := e.results.Summary(ctx, nil, results.Scope{})
-		if err != nil || len(s) != 1 {
+		if err != nil || len(s) == 0 || s[0].RunID != run {
 			t.Fatalf("summary = %+v %v", s, err)
 		}
 		return s[0]
@@ -90,6 +90,18 @@ func TestQuestionNamingTheBrandIsLeftOutOfScores(t *testing.T) {
 	i := slices.IndexFunc(table.Rows, func(r results.QuestionRow) bool { return r.Question.ID == q.ID })
 	if i < 0 || table.Rows[i].Question.CountsInScores || table.Rows[i].Named == 0 {
 		t.Fatalf("questions table = %+v, want the question shown with its answers naming you and marked as left out", table.Rows)
+	}
+
+	c, err := e.results.Compare(ctx, run, e.check(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	total := 0
+	for _, n := range c.Counts {
+		total += n
+	}
+	if len(c.Pairs) != 18 || total != 12 {
+		t.Fatalf("compare lists %d pairs and counts %d, want all 18 listed and the 12 that count counted", len(c.Pairs), total)
 	}
 
 	if q, err = e.config.SetQuestionScoring(ctx, q.ID, config.QuestionScoringInput{CountInScores: new(true)}); err != nil || !q.CountInScores || !q.NamesBrand {
