@@ -1342,38 +1342,149 @@ export interface ResultsFilter {
 
 export type Grouping = "pair" | "surface";
 
-/** internal/notify's registry of event kinds. */
-export type EventKindName =
-  | "check_completed"
-  | "check_refused"
-  | "check_failed"
-  | "spend_cap_reached"
-  | "pair_paused"
-  | "goal_reached"
-  | "search_moved"
-  | "change_verdict"
-  | "token_expiring"
-  | "social_digest";
+/** How one question moved across its AI apps between two checks. */
+export interface QuestionChange {
+  question_id: number;
+  question: string;
+  gained: number;
+  lost: number;
+  moved: number;
+}
+
+/** A finished check against the previous one, the counts GET /v1/compare returns. previous_run_id is 0 for the first check. */
+export interface CheckCompletedPayload {
+  run_id: number;
+  previous_run_id: number;
+  gained: number;
+  lost: number;
+  moved: number;
+  unchanged: number;
+  not_comparable: number;
+  net: number;
+  /** named of answered is the headline: answers that named you, of those that did not fail. */
+  named: number;
+  answered: number;
+  spend_usd: number;
+  /** The questions that changed most, at most three. */
+  top: QuestionChange[];
+}
+
+export interface CheckRefusedPayload {
+  run_id: number;
+  /** Treg's error code, such as insufficient_balance. */
+  code: string;
+  message: string;
+}
+
+export interface CheckFailedPayload {
+  run_id: number;
+  message: string;
+}
+
+export interface SpendCapReachedPayload {
+  run_id: number;
+  spend_usd: number;
+  message: string;
+}
+
+export interface PairPausedPayload {
+  pair_id: number;
+  surface: SurfaceKey;
+  model: string;
+  reason: string;
+}
+
+export interface GoalReachedPayload {
+  goal_id: number;
+  metric: GoalMetric;
+  window_days: number;
+  target: number;
+  value: number;
+  due_on: Day;
+}
+
+export interface SearchMovedPayload {
+  metric: GoalMetric;
+  window_days: number;
+  before: number;
+  after: number;
+}
+
+export interface ChangeVerdictPayload {
+  change_id: number;
+  url: string;
+  verdict: ChangeOutcome;
+  /** The result in one line. */
+  detail: string;
+}
+
+export interface TokenExpiringPayload {
+  provider: string;
+  repo: string;
+  expires_at: Timestamp;
+}
+
+export interface SocialDigestPost {
+  /** The author as the network writes them, such as @dana or u/dana. */
+  author: string;
+  /** The start of the post. */
+  text: string;
+  url: string;
+  engagement: number;
+}
+
+export interface SocialDigestPayload {
+  cadence: "daily" | "weekly";
+  from: Day;
+  to: Day;
+  mentions: number;
+  /** Posts by left-out accounts, not counted in mentions. */
+  hidden: number;
+  networks: { network: SocialNetwork; title: string; mentions: number; top: SocialDigestPost[] }[];
+  /** At most ten of the new_authors_count accounts whose first mention fell in the period. */
+  new_authors: string[];
+  new_authors_count: number;
+  spend_usd: number;
+  spend_missing_calls: number;
+}
+
+/** Each event kind in internal/notify's registry and the payload it carries. */
+export interface EventPayloads {
+  check_completed: CheckCompletedPayload;
+  check_refused: CheckRefusedPayload;
+  check_failed: CheckFailedPayload;
+  spend_cap_reached: SpendCapReachedPayload;
+  pair_paused: PairPausedPayload;
+  goal_reached: GoalReachedPayload;
+  search_moved: SearchMovedPayload;
+  change_verdict: ChangeVerdictPayload;
+  token_expiring: TokenExpiringPayload;
+  social_digest: SocialDigestPayload;
+}
+
+export type EventKindName = keyof EventPayloads;
 
 export interface EventKind {
   kind: EventKindName;
   title: string;
   description: string;
-  /** Who sees its alerts in the app: anyone who reads results, or admins only. */
+  /** Who sees its notifications in the app: anyone who reads results, or admins only. */
   audience: "results:read" | "admin";
 }
 
-/** One event as the app shows it. path is the page it links to. */
-export interface Alert {
-  id: number;
-  kind: EventKindName;
-  title: string;
-  lines: string[];
-  path: string;
-  payload: unknown;
-  created_at: Timestamp;
-  read: boolean;
-}
+/** One event as the app shows it, which the API calls an alert. path is the page it links to; lines are the text email and Slack send. */
+export type Alert = {
+  [K in EventKindName]: {
+    id: number;
+    kind: K;
+    title: string;
+    lines: string[];
+    path: string;
+    payload: EventPayloads[K];
+    created_at: Timestamp;
+    read: boolean;
+  };
+}[EventKindName];
 
 export interface AlertList {
   alerts: Alert[];
