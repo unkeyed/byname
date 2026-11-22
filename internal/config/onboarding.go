@@ -156,7 +156,7 @@ func (s *Service) FinishOnboarding(ctx context.Context, socialMonthUSD float64) 
 	monthCap := DefaultMonthCap(costs.MonthUSD + socialMonthUSD)
 	var out Onboarding
 	err = pgx.BeginFunc(ctx, s.db, func(tx pgx.Tx) error {
-		cur, err := getSettings(ctx, tx)
+		cur, err := s.settingsView(ctx, tx)
 		if err != nil {
 			return err
 		}

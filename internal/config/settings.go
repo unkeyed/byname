@@ -47,9 +47,13 @@ type SettingsView struct {
 	// NextCheckAt stays null until onboarding is finished, so nothing runs
 	// on schedule before setup is done.
 	NextCheckAt *time.Time `json:"next_check_at"`
-	LastCheckAt *time.Time `json:"last_check_at"`
-	UpdatedAt   time.Time  `json:"updated_at"`
-	OnboardedAt *time.Time `json:"onboarded_at" jsonschema:"when onboarding was finished, null before"`
+	// LastCheckAt is when the schedule last fired; LastCheck is the latest
+	// check whatever started it.
+	LastCheckAt *time.Time     `json:"last_check_at"`
+	LastCheck   *LastCheck     `json:"last_check" jsonschema:"the latest check, whether the schedule, Run now or Start first check started it; null before the first"`
+	NextCheck   *UpcomingCheck `json:"next_check" jsonschema:"the next scheduled check in the instance's time zone; null while paused or before onboarding is finished"`
+	UpdatedAt   time.Time      `json:"updated_at"`
+	OnboardedAt *time.Time     `json:"onboarded_at" jsonschema:"when onboarding was finished, null before"`
 	// BrandedTerms decide brand against non-brand search queries; set with
 	// PUT /v1/settings/branded-terms.
 	BrandedTerms        []string `json:"branded_terms" jsonschema:"lowercased; a Search Console query containing one is brand"`
@@ -61,10 +65,30 @@ const settingsColumns = `match_mode, market, language, time_zone, check_every_da
 	timeout_s, raw_retention_days, checks_paused, next_check_at, last_check_at, updated_at, onboarded_at`
 
 func (s *Service) Settings(ctx context.Context) (SettingsView, error) {
-	return getSettings(ctx, s.db)
+	return s.settingsView(ctx, s.db)
 }
 
-func getSettings(ctx context.Context, q querier) (SettingsView, error) {
+// LastCheck is the latest check, whatever started it.
+type LastCheck struct {
+	RunID      int64      `json:"run_id"`
+	Trigger    string     `json:"trigger" jsonschema:"scheduled, or run_now for Run now and Start first check"`
+	Status     string     `json:"status" jsonschema:"queued, running, completed, capped, refused or failed"`
+	QueuedAt   time.Time  `json:"queued_at"`
+	StartedAt  *time.Time `json:"started_at"`
+	FinishedAt *time.Time `json:"finished_at"`
+}
+
+// UpcomingCheck is the next scheduled check in the instance's own time
+// zone, so the app can say "tomorrow at 06:00, then every 3 days".
+type UpcomingCheck struct {
+	At            time.Time `json:"at"`
+	LocalDate     string    `json:"local_date" jsonschema:"YYYY-MM-DD in time_zone"`
+	LocalTime     string    `json:"local_time" jsonschema:"HH:MM in time_zone"`
+	DaysAway      int       `json:"days_away" jsonschema:"calendar days from today in time_zone: 0 is today, 1 tomorrow"`
+	ThenEveryDays int       `json:"then_every_days"`
+}
+
+func (s *Service) settingsView(ctx context.Context, q querier) (SettingsView, error) {
 	var v SettingsView
 	err := q.QueryRow(ctx, `SELECT `+settingsColumns+` FROM instance_settings`).Scan(
 		&v.MatchMode, &v.Market, &v.Language, &v.TimeZone, &v.CheckEveryDays, &v.CheckTime,
@@ -78,8 +102,27 @@ func getSettings(ctx context.Context, q querier) (SettingsView, error) {
 	if err != nil && err != pgx.ErrNoRows {
 		return v, err
 	}
+	var last LastCheck
+	err = q.QueryRow(ctx, `SELECT id, trigger, status, queued_at, started_at, finished_at FROM run ORDER BY id DESC LIMIT 1`).
+		Scan(&last.RunID, &last.Trigger, &last.Status, &last.QueuedAt, &last.StartedAt, &last.FinishedAt)
+	switch {
+	case err == nil:
+		v.LastCheck = &last
+	case err != pgx.ErrNoRows:
+		return v, err
+	}
+	if v.NextCheckAt != nil && !v.ChecksPaused {
+		v.NextCheck = upcoming(*v.NextCheckAt, s.now(), v.Schedule())
+	}
 	v.BrandedTerms, v.BrandedTermsDefault, err = brandedTerms(ctx, q)
 	return v, err
+}
+
+func upcoming(at, now time.Time, sch Schedule) *UpcomingCheck {
+	local, today := at.In(sch.Location), now.In(sch.Location)
+	day := func(t time.Time) time.Time { return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.UTC) }
+	return &UpcomingCheck{At: at, LocalDate: local.Format(time.DateOnly), LocalTime: local.Format("15:04"),
+		DaysAway: int(day(local).Sub(day(today)).Hours() / 24), ThenEveryDays: sch.Days}
 }
 
 var (
@@ -133,7 +176,7 @@ func (s *Service) PutSettings(ctx context.Context, in Settings) (SettingsView, e
 	}
 	var out SettingsView
 	err := pgx.BeginFunc(ctx, s.db, func(tx pgx.Tx) error {
-		old, err := getSettings(ctx, tx)
+		old, err := s.settingsView(ctx, tx)
 		if err != nil {
 			return err
 		}
@@ -164,7 +207,7 @@ func (s *Service) PutSettings(ctx context.Context, in Settings) (SettingsView, e
 		if err := markBrandQuestions(ctx, tx); err != nil {
 			return err
 		}
-		out, err = getSettings(ctx, tx)
+		out, err = s.settingsView(ctx, tx)
 		return err
 	})
 	return out, err
@@ -176,7 +219,7 @@ func (s *Service) PutSettings(ctx context.Context, in Settings) (SettingsView, e
 func (s *Service) SetPaused(ctx context.Context, paused bool) (SettingsView, error) {
 	var out SettingsView
 	err := pgx.BeginFunc(ctx, s.db, func(tx pgx.Tx) error {
-		cur, err := getSettings(ctx, tx)
+		cur, err := s.settingsView(ctx, tx)
 		if err != nil {
 			return err
 		}
@@ -188,7 +231,7 @@ func (s *Service) SetPaused(ctx context.Context, paused bool) (SettingsView, err
 		if _, err := tx.Exec(ctx, `UPDATE instance_settings SET checks_paused = $1, next_check_at = $2, updated_at = now()`, paused, next); err != nil {
 			return err
 		}
-		out, err = getSettings(ctx, tx)
+		out, err = s.settingsView(ctx, tx)
 		return err
 	})
 	return out, err

@@ -148,6 +148,18 @@ func TestRunNowRunsOnTheSchedulerWithoutMovingTheSchedule(t *testing.T) {
 	if !s.NextCheckAt.Equal(next) || s.LastCheckAt != nil {
 		t.Fatalf("next %v last %v, want the schedule untouched by run now", s.NextCheckAt, s.LastCheckAt)
 	}
+	if l := s.LastCheck; l == nil || l.RunID != run.ID || l.Trigger != "run_now" || l.Status != "completed" {
+		t.Fatalf("last check = %+v, want the run now check reported though the schedule did not start it", l)
+	}
+	if n := s.NextCheck; n == nil || n.LocalDate != "2026-11-23" || n.LocalTime != "09:00" || n.DaysAway != 2 || n.ThenEveryDays != 3 {
+		t.Fatalf("next check = %+v, want 2026-11-23 at 09:00, two days away, then every 3 days", n)
+	}
+	if _, err := p.cfg.SetPaused(context.Background(), true); err != nil {
+		t.Fatal(err)
+	}
+	if s, _ := p.cfg.Settings(context.Background()); s.NextCheck != nil {
+		t.Fatalf("next check = %+v while paused, want none", s.NextCheck)
+	}
 }
 
 func TestStartResumesARunLeftRunning(t *testing.T) {

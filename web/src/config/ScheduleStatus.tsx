@@ -49,7 +49,7 @@ export function ScheduleStatus() {
         <dd>{s?.checks_paused ? <span className="text-muted">Paused</span> : <When iso={s?.next_check_at ?? null} none="Not scheduled yet" />}</dd>
         <dt className="text-muted">Last check</dt>
         <dd>
-          <When iso={s?.last_check_at ?? null} none="None yet" />
+          <When iso={s?.last_check ? (s.last_check.started_at ?? s.last_check.queued_at) : null} none="None yet" />
         </dd>
       </dl>
       {(settings.error || toggle.error) && (

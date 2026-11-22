@@ -4633,7 +4633,7 @@ components:
       allOf:
         - $ref: "#/components/schemas/Settings"
         - type: object
-          required: [checks_paused, next_check_at, last_check_at, updated_at, onboarded_at, branded_terms, branded_terms_default]
+          required: [checks_paused, next_check_at, last_check_at, last_check, next_check, updated_at, onboarded_at, branded_terms, branded_terms_default]
           properties:
             checks_paused:
               type: boolean
@@ -4645,7 +4645,52 @@ components:
             last_check_at:
               type: [string, "null"]
               format: date-time
-              description: When the schedule last fired, even when that check was skipped. Null before the first.
+              description: When the schedule last fired, even when that check was skipped. Null before the first. Run now does not move it; last_check is the latest check whatever started it.
+            last_check:
+              description: The latest check, whether the schedule, Run now or Start first check started it. Null before the first.
+              oneOf:
+                - type: "null"
+                - type: object
+                  required: [run_id, trigger, status, queued_at, started_at, finished_at]
+                  properties:
+                    run_id:
+                      type: integer
+                    trigger:
+                      $ref: "#/components/schemas/Trigger"
+                    status:
+                      $ref: "#/components/schemas/RunStatus"
+                    queued_at:
+                      type: string
+                      format: date-time
+                    started_at:
+                      type: [string, "null"]
+                      format: date-time
+                    finished_at:
+                      type: [string, "null"]
+                      format: date-time
+            next_check:
+              description: The next scheduled check in the instance's time zone, so the app can say "tomorrow at 06:00, then every 3 days". Null while paused or before onboarding is finished.
+              oneOf:
+                - type: "null"
+                - type: object
+                  required: [at, local_date, local_time, days_away, then_every_days]
+                  properties:
+                    at:
+                      type: string
+                      format: date-time
+                    local_date:
+                      type: string
+                      format: date
+                      description: The day in time_zone.
+                    local_time:
+                      type: string
+                      description: HH:MM in time_zone.
+                    days_away:
+                      type: integer
+                      minimum: 0
+                      description: Calendar days from today in time_zone. 0 is today, 1 tomorrow.
+                    then_every_days:
+                      type: integer
             updated_at:
               type: string
               format: date-time

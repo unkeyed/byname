@@ -232,6 +232,17 @@ export interface SettingsView extends Settings {
   next_check_at: Timestamp | null;
   /** Set when a scheduled check is claimed, even one that was skipped. */
   last_check_at: Timestamp | null;
+  /** The latest check, whatever started it. */
+  last_check: {
+    run_id: number;
+    trigger: "scheduled" | "run_now";
+    status: string;
+    queued_at: Timestamp;
+    started_at: Timestamp | null;
+    finished_at: Timestamp | null;
+  } | null;
+  /** The next scheduled check in the instance's time zone; null while paused or before onboarding is finished. */
+  next_check: { at: Timestamp; local_date: string; local_time: string; days_away: number; then_every_days: number } | null;
   updated_at: Timestamp;
   /** Lowercased; a Search Console query containing one is brand. */
   branded_terms: string[];

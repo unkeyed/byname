@@ -107,7 +107,7 @@ The scheduler runs inside the container, so you need no cron service. Every minu
 - Deletes raw provider responses past the retention set under **Settings > General**, once a day.
 - Fetches pages that answers newly cited, to see whether they name you.
 
-**Run now** queues a check in the background and never runs it inside the request, so a long check survives a request timeout.
+**Run now** queues a check in the background and never runs it inside the request, so a long check survives a request timeout. It does not move the schedule. **Settings > Schedule** shows the latest check whatever started it, the schedule, **Run now** or **Start first check**, and `GET /v1/settings` has it as `last_check`. Its `next_check` gives the next scheduled check as a day and time in the instance's time zone, how many days away it is, and how often checks run after it.
 
 Nothing that costs money runs before onboarding is finished: no AI check and no social search, even with the Treg token saved. Model lists, Search Console, GitHub and cited pages cost nothing, so those jobs run as soon as they are set up. Social searches also wait until someone turns them on under **Settings > Social**. See [Social](social.md).
 
