@@ -205,10 +205,10 @@ function SearchForm({ s, costs, canEdit }: { s: Settings; costs: Costs["social"]
           )}
         </div>
         <p className="mt-2 text-xs text-muted">
-          The digest lists the new mentions. It shows in Alerts when each {cadence === "weekly" ? "week" : "day"} ends in {s.time_zone}, and goes wherever alerts go that get
+          The digest lists the new mentions. It shows under the bell when each {cadence === "weekly" ? "week" : "day"} ends in {s.time_zone}, and goes wherever notifications go that get
           the Social digest, chosen in{" "}
-          <Link to="/settings/alerts" className="text-fg underline underline-offset-2">
-            Settings, Alerts
+          <Link to="/settings/notifications" className="text-fg underline underline-offset-2">
+            Settings, Notifications
           </Link>
           .
         </p>

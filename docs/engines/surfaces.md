@@ -54,7 +54,7 @@ How web search is turned on depends on the endpoint:
 | Perplexity LLM responses | The `sonar` models search on every call. |
 | App scrapes | The app decides for itself. |
 
-Model lists are read for free and refreshed once a day, and an hour after a failed refresh. If a model you picked leaves its list, Byname stops asking it, shows a notice and raises a **Model paused** alert. It never switches to another model on its own. Every answer stores the exact model name the endpoint reported, such as a dated snapshot name, so a change shows on the charts. Picking a dated name pins the version.
+Model lists are read for free and refreshed once a day, and an hour after a failed refresh. If a model you picked leaves its list, Byname stops asking it, shows a notice and raises a **Model paused** notification. It never switches to another model on its own. Every answer stores the exact model name the endpoint reported, such as a dated snapshot name, so a change shows on the charts. Picking a dated name pins the version.
 
 ## What every answer stores
 

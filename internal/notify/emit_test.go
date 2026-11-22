@@ -89,21 +89,32 @@ func TestRunsAndPausesRaiseTheirEvents(t *testing.T) {
 	}
 }
 
-// Alerts read as plain sentences in the app's words and link to the page
-// that shows the event.
-func TestAlertsReadAsSentences(t *testing.T) {
+// Notifications read as plain sentences in the app's words and link to the
+// page that shows the event. The digest says counts, at most three new
+// people by name and the five posts people engaged with most, and never the
+// cost.
+func TestNotificationsReadAsSentences(t *testing.T) {
 	ctx := context.Background()
 	alerts := notify.New(testdb.New(t), nil, notify.Options{Secrets: secretbox.ForTest()})
-	digest := notify.SocialDigestPayload{Cadence: "weekly", From: "2026-11-16", To: "2026-11-22", Mentions: 12, Hidden: 2,
+	digest := notify.SocialDigestPayload{Cadence: "weekly", From: "2026-11-09", To: "2026-11-15", Mentions: 12, Hidden: 10,
 		Networks: []notify.SocialNetworkDigest{
-			{Network: "x", Title: "X", Mentions: 5, Top: []notify.SocialPost{{Author: "@dana", Text: "Northwind sorted our invoices", URL: "https://x.example/1", Engagement: 40}}},
-			{Network: "reddit", Title: "Reddit", Mentions: 4},
-			{Network: "hackernews", Title: "Hacker News", Mentions: 3},
+			{Network: "x", Title: "X", Mentions: 5, Top: []notify.SocialPost{
+				{Author: "@dana", Text: "Northwind sorted our invoices", URL: "https://x.example/1", Engagement: 40},
+				{Author: "@lee", Text: "Trying Northwind", URL: "https://x.example/2", Engagement: 3},
+				{Author: "@kim", Text: "Northwind or Ledgerly?", URL: "https://x.example/3", Engagement: 1},
+			}},
+			{Network: "reddit", Title: "Reddit", Mentions: 4, Top: []notify.SocialPost{
+				{Author: "u/ledgerfan", Text: "Northwind is the one", URL: "https://reddit.example/1", Engagement: 120},
+				{Author: "u/sam", Text: "We moved to Northwind", URL: "https://reddit.example/2", Engagement: 2},
+			}},
+			{Network: "hackernews", Title: "Hacker News", Mentions: 3, Top: []notify.SocialPost{
+				{Author: "pg", Text: "Show HN: an invoice tool", URL: "https://news.example/1", Engagement: 0},
+			}},
 			{Network: "linkedin", Title: "LinkedIn"},
 		},
-		NewAuthors: []string{"@dana", "u/ledgerfan"}, NewAuthorsCount: 3, SpendUSD: 0.0406}
+		NewAuthors: []string{"@dana", "u/ledgerfan", "@lee", "@kim"}, NewAuthorsCount: 9, SpendUSD: 0.0138}
 	for _, e := range []notify.Event{
-		{Subject: "week/2026-11-16", Payload: digest},
+		{Subject: "week/2026-11-09", Payload: digest},
 		{Subject: "change/7/final", Payload: notify.ChangeVerdictPayload{ChangeID: 7, URL: "https://northwind.example/pricing", Verdict: "improved"}},
 		{Subject: "search/non_brand_clicks", Payload: notify.SearchMovedPayload{Metric: "non_brand_clicks", WindowDays: 28, Before: 120, After: 80}},
 	} {
@@ -113,29 +124,32 @@ func TestAlertsReadAsSentences(t *testing.T) {
 	}
 	list, err := alerts.Alerts(ctx, reader, notify.AlertQuery{})
 	if err != nil || len(list.Alerts) != 3 {
-		t.Fatalf("alerts = %+v, %v", list, err)
+		t.Fatalf("notifications = %+v, %v", list, err)
 	}
 	moved, change, social := list.Alerts[0], list.Alerts[1], list.Alerts[2]
 
-	if social.Title != "Social digest: 12 new posts named you in the week of Nov 16" || social.Path != "/social" {
+	if social.Title != "12 new posts named you, Nov 9 to 15" || social.Path != "/social?digest=2026-11-09" {
 		t.Errorf("digest title %q, path %q", social.Title, social.Path)
 	}
 	want := []string{
 		"5 were on X, 4 on Reddit and 3 on Hacker News.",
-		"3 people who had not mentioned you before posted about you: @dana, u/ledgerfan and 1 other.",
-		"2 more posts came from accounts you left out, so they are not counted.",
+		"9 people posted about you for the first time, among them @dana, u/ledgerfan and @lee.",
+		"10 posts from accounts you left out are not counted.",
 		"The posts people engaged with most:",
-		"@dana on X, with 40 likes, replies and reposts: “Northwind sorted our invoices” https://x.example/1",
-		"Searching for posts cost $0.04.",
+		"u/ledgerfan on Reddit, 120 upvotes and comments: “Northwind is the one” https://reddit.example/1",
+		"@dana on X, 40 likes, replies and reposts: “Northwind sorted our invoices” https://x.example/1",
+		"@lee on X, 3 likes, replies and reposts: “Trying Northwind” https://x.example/2",
+		"u/sam on Reddit, 2 upvotes and comments: “We moved to Northwind” https://reddit.example/2",
+		"@kim on X, 1 like, reply or repost: “Northwind or Ledgerly?” https://x.example/3",
 	}
 	if strings.Join(social.Lines, "\n") != strings.Join(want, "\n") {
 		t.Errorf("digest lines:\n%s\nwant:\n%s", strings.Join(social.Lines, "\n"), strings.Join(want, "\n"))
 	}
 
 	if change.Title != "Change result: helped" || change.Path != "/google/site-changes?chg=7" {
-		t.Errorf("change alert %q at %q", change.Title, change.Path)
+		t.Errorf("change notification %q at %q", change.Title, change.Path)
 	}
 	if moved.Title != "Clicks from searches without your name fell over the last 28 days" || moved.Path != "/google/traffic" {
-		t.Errorf("search alert %q at %q", moved.Title, moved.Path)
+		t.Errorf("search notification %q at %q", moved.Title, moved.Path)
 	}
 }

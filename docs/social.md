@@ -1,6 +1,6 @@
 # Social
 
-The **Social** page shows the public posts that name you on X, Reddit, Hacker News, LinkedIn, YouTube, Threads and Bluesky. You name the people and accounts to leave out, such as your team and your company's own accounts, so the page and the digest show what everyone else says. A digest of each day or week shows under **Alerts** and goes wherever you send alerts.
+The **Social** page shows the public posts that name you on X, Reddit, Hacker News, LinkedIn, YouTube, Threads and Bluesky. You name the people and accounts to leave out, such as your team and your company's own accounts, so the page and the digest show what everyone else says. A digest of each day or week shows under the bell and goes wherever you send notifications.
 
 Six networks are searched through Treg with your Treg token. Bluesky is searched through its own public API, which needs no key and costs nothing. Without a Treg token, Byname searches Bluesky only.
 
@@ -12,14 +12,14 @@ Social is off until someone turns it on, in onboarding's optional **Social menti
 
 Treg has no single search across social networks, so Byname pins one search per network, the same way it pins one endpoint per AI app.
 
-| Network | Searched through | Endpoint | Price per 1,000 searches | What a mention is |
+| Network | Searched through | Endpoint | Price per call | What a mention is |
 |---|---|---|---|---|
-| X | Treg | `anyapi.x.search.posts` | $0.75 | A post. Retweets are left out. |
-| Reddit | Treg | `crawl4ai.reddit.search.posts` | $0.90 | A post, title and text. |
-| Hacker News | Treg | `crawl4ai.hackernews.search.stories` | $0.15 | A story. Comments are not searched. |
-| LinkedIn | Treg | `anyapi.linkedin.search.posts` | $2.00 | A post. |
-| YouTube | Treg | `crawl4ai.youtube.search.videos` | $0.90 | A video whose title or description names you. The channel is the author. |
-| Threads | Treg | `tikhub.x.threads-web-search-recent` | $2.00 | A post. |
+| X | Treg | `anyapi.x.search.posts` | $0.00075 | A post. Retweets are left out. |
+| Reddit | Treg | `crawl4ai.reddit.search.posts` | $0.0009 | A post, title and text. |
+| Hacker News | Treg | `crawl4ai.hackernews.search.stories` | $0.00015 | A story. Comments are not searched. |
+| LinkedIn | Treg | `anyapi.linkedin.search.posts` | $0.002 | A post. |
+| YouTube | Treg | `crawl4ai.youtube.search.videos` | $0.0009 | A video whose title or description names you. The channel is the author. |
+| Threads | Treg | `tikhub.x.threads-web-search-recent` | $0.002 | A post. |
 | Bluesky | Bluesky's public API | `app.bsky.feed.searchPosts` on `https://api.bsky.app` | Free | A post. |
 
 The prices are the Treg catalog's, checked on November 22, 2026. Every Treg call sends `X-Treg-Route-Max-Cost`, a ceiling a few times the listed price, so Treg refuses a dearer fallback source instead of charging for it. What a call cost is read from Treg's `X-Treg-Cost-Micro` header. A Treg call without that header is recorded as a missing cost, never as $0. A Bluesky call is recorded as a known $0, which is not a missing cost.
@@ -64,20 +64,25 @@ Bluesky can start asking for sign-in at any time. When it answers `401` or `403`
 
 ## The digest
 
-When a day or week ends, Byname raises the **Social digest** alert, once per period. It covers the posts first seen in the period, without the accounts left out at that moment. It reads as a few sentences, then the top posts, for example:
+When a day or week ends, Byname raises the **Social digest** notification, once per period. It covers the posts first seen in the period, without the accounts left out at that moment. In the app it is a card with the count, each network's share, how many people posted about you for the first time and the top three posts. By email or in Slack it reads as a few sentences, then the top five posts, for example:
 
-> Social digest: 12 new posts named you in the week of Nov 16
+> 12 new posts named you, Nov 16 to 22
 >
 > 5 were on X, 4 on Reddit and 3 on Hacker News.
-> 3 people who had not mentioned you before posted about you: @dana, u/ledgerfan and 1 other.
-> 2 more posts came from accounts you left out, so they are not counted.
+> 9 people posted about you for the first time, among them @dana, u/ledgerfan and @lee.
+> 10 posts from accounts you left out are not counted.
 > The posts people engaged with most:
-> @dana on X, with 40 likes, replies and reposts: “Northwind sorted our invoices” https://x.com/dana/status/1
-> Searching for posts cost $0.04.
+> u/ledgerfan on Reddit, 120 upvotes and comments: “Northwind is the one” https://reddit.com/r/invoicing/1
+> @dana on X, 40 likes, replies and reposts: “Northwind sorted our invoices” https://x.com/dana/status/1
+>
+> See all posts on Social: https://byname.example.com/social?digest=2026-11-16
+> Every notification: https://byname.example.com/notifications
+
+The digest leaves out what the searches cost. **Settings > Schedule and limits** shows spend.
 
 The event's payload carries the same facts as numbers: the new mentions and how many more came from left-out accounts, the count per network with each network's most engaged posts, the new people, the accounts whose first mention fell in the period, and what the period's searches cost, with how many Treg calls reported no cost.
 
-A period in which nothing was searched raises no digest. The digest goes wherever **Settings > Alerts** sends **Social digest**, and shows in the app to anyone with `results:read`. See [Alerts](notifications.md). The top of the **Social** page shows the latest period that has ended.
+A period in which nothing was searched raises no digest. The digest goes wherever **Settings > Notifications** sends **Social digest**, and shows under the bell to anyone with `results:read`. See [Notifications](notifications.md). The top of the **Social** page shows the latest period that has ended, or the period a digest links to, with **Latest digest** to go back.
 
 The digest is data only. Byname does not write a summary of it with a model.
 

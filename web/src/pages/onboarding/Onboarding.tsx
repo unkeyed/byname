@@ -5,7 +5,7 @@ import { api, ApiError, type OnboardingStep, type StepKey } from "../../api";
 import { keys, useCan, useMe, useOnboarding } from "../../queries";
 import { useTheme } from "../../theme";
 import { Button, buttonClass, cx, Dialog, EmptyState, ErrorNote, Icon, LoadBoundary, Logo, scrollArea, Spinner, useWide } from "../../ui";
-import { AlertsSlot } from "../../config/AlertsSlot";
+import { NotificationsSlot } from "../../config/NotificationsSlot";
 import { BrandForm } from "../../config/BrandForm";
 import { BrandTable } from "../../config/BrandTable";
 import { QuestionEditor } from "../../config/QuestionEditor";
@@ -104,7 +104,7 @@ const views: Record<StepKey, { intro: string; render: (nav: StepNav) => ReactNod
   schedule: {
     intro: "How often Byname checks, and the most a check or a month may spend. Nothing runs until you start the first check on the last step.",
     render: (nav) => (
-      <RunSettingsForm schedule limits tuningCollapsed extra={<AlertsSlot />} onSaved={nav.done} submitLabel={continueLabel} footer={(submit) => <StepFooter nav={nav}>{submit}</StepFooter>} />
+      <RunSettingsForm schedule limits tuningCollapsed extra={<NotificationsSlot />} onSaved={nav.done} submitLabel={continueLabel} footer={(submit) => <StepFooter nav={nav}>{submit}</StepFooter>} />
     ),
   },
   review: {

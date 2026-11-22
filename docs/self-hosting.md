@@ -15,7 +15,7 @@ You need Docker with Compose v2.
    docker compose up -d --build --wait
    ```
 
-   `ENCRYPTION_KEY` encrypts the provider keys, Search Console credential, the secrets of the places alerts go and two-factor seeds that Byname stores, so a database backup alone does not reveal them. Keep `.env` with your other secrets. Compose builds the image, starts Postgres 17 and Byname, and returns when both pass their health checks.
+   `ENCRYPTION_KEY` encrypts the provider keys, Search Console credential, the secrets of the places notifications go and two-factor seeds that Byname stores, so a database backup alone does not reveal them. Keep `.env` with your other secrets. Compose builds the image, starts Postgres 17 and Byname, and returns when both pass their health checks.
 
 2. Check that Byname is up:
 
@@ -65,7 +65,7 @@ services:
       UNKEY_API_ID: api_123
 ```
 
-[Configuration](configuration.md) lists every variable. Provider keys, the Treg token and where alerts go are not variables. You enter them in the app, which stores them encrypted.
+[Configuration](configuration.md) lists every variable. Provider keys, the Treg token and where notifications go are not variables. You enter them in the app, which stores them encrypted.
 
 Compose publishes Byname and Postgres on `127.0.0.1` only. To reach Byname from other machines, put an HTTPS proxy in front of it and set `PUBLIC_URL` to the proxy's URL.
 
@@ -101,7 +101,7 @@ The container contract is short:
 The scheduler runs inside the container, so you need no cron service. Every minute it does each of these that is due:
 
 - Starts the AI check when its time comes. You set how many days apart checks run and the time of day under **Settings > Schedule and limits**, with **Pause** and **Check now**. A check missed while no process was running starts on the next start. A check missed while paused does not.
-- Syncs Search Console once a day, and retries an hour after a failed sync. After a sync that succeeds, it raises **Goal reached** and **Google clicks moved** alerts and runs the site changes jobs `recrawl_watch` and `verdicts`. See [Site changes](changes.md#recrawl-watch).
+- Syncs Search Console once a day, and retries an hour after a failed sync. After a sync that succeeds, it raises **Goal reached** and **Google clicks moved** notifications and runs the site changes jobs `recrawl_watch` and `verdicts`. See [Site changes](changes.md#recrawl-watch).
 - Polls the connected GitHub repository for merged pull requests once an hour, as the `site_changes` job.
 - Refreshes each AI app's model list once a day.
 - Deletes raw provider responses past the retention set under **Settings > General**, once a day.
@@ -132,7 +132,7 @@ All state is in Postgres: settings, questions, every answer with its raw respons
 docker compose exec -T db pg_dump -U byname byname > byname-backup.sql
 ```
 
-A backup holds the stored secrets only in encrypted form. Keep `ENCRYPTION_KEY` somewhere other than next to the backup, and keep it: without it, a restored database cannot read its provider keys or the secrets of the places alerts go.
+A backup holds the stored secrets only in encrypted form. Keep `ENCRYPTION_KEY` somewhere other than next to the backup, and keep it: without it, a restored database cannot read its provider keys or the secrets of the places notifications go.
 
 Raw responses are the largest part of the database. To keep it small, set **Raw response retention** under **Settings > General** to a number of days. Answers, the brands they name and their links stay. Only the raw provider body goes.
 

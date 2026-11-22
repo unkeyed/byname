@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/unkeyed/byname/internal/engines"
-	"github.com/unkeyed/byname/internal/money"
 )
 
 // Kind is one kind of event. The registry below is the only list of them.
@@ -27,7 +26,7 @@ const (
 	SocialDigest    Kind = "social_digest"
 )
 
-// Audience is who may read an event's alerts in the app.
+// Audience is who may read an event's notifications in the app.
 type Audience string
 
 const (
@@ -39,19 +38,28 @@ const (
 
 // Payload is what one kind of event carries. Each kind has its own payload
 // type, and its message is what every channel sends: a title, a few short
-// lines and the page it links to.
+// lines, and the page it links to with the words for that link.
 type Payload interface {
 	Kind() Kind
 	message() Message
 }
 
 // Message is an event as people read it. Path is the page it links to,
-// relative to PUBLIC_URL.
+// relative to PUBLIC_URL, and Action is that link's words, such as "See
+// what changed".
 type Message struct {
-	Title string   `json:"title"`
-	Lines []string `json:"lines"`
-	Path  string   `json:"path"`
+	Title  string
+	Lines  []string
+	Path   string
+	Action string
 }
+
+// NotificationsPath and SettingsPath are the app's notifications page and
+// the settings page that chooses where notifications go.
+const (
+	NotificationsPath = "/notifications"
+	SettingsPath      = "/settings/notifications"
+)
 
 // Event is something that happened. Subject names what it happened to, such
 // as "run/12"; with the payload's kind it is the event's natural key, so
@@ -61,8 +69,8 @@ type Event struct {
 	Payload Payload
 }
 
-// KindInfo describes one kind of event, as Settings > Alerts lists them to
-// choose which alerts go where.
+// KindInfo describes one kind of event, as Settings > Notifications lists
+// them to choose which notifications go where.
 type KindInfo struct {
 	Kind        Kind     `json:"kind"`
 	Title       string   `json:"title"`
@@ -139,12 +147,12 @@ type CheckCompletedPayload struct {
 func (CheckCompletedPayload) Kind() Kind { return CheckCompleted }
 
 func (p CheckCompletedPayload) message() Message {
-	m := Message{Path: "/settings/checks", Lines: []string{fmt.Sprintf("AI apps named you in %d of %d answers.", p.Named, p.Answered)}}
+	m := Message{Path: "/", Action: "Open This week", Lines: []string{fmt.Sprintf("AI apps named you in %d of %d answers.", p.Named, p.Answered)}}
 	if p.PreviousRunID == 0 {
 		m.Title = fmt.Sprintf("Check #%d finished, the first to compare against", p.RunID)
 		return m
 	}
-	m.Path = fmt.Sprintf("/ai/what-changed?before=%d&after=%d", p.PreviousRunID, p.RunID)
+	m.Path, m.Action = fmt.Sprintf("/ai/what-changed?before=%d&after=%d", p.PreviousRunID, p.RunID), "See what changed"
 	changes := changeParts(p.Gained, p.Lost, p.Moved, "answer", "answers")
 	if len(changes) == 0 {
 		m.Title = fmt.Sprintf("Check #%d: no change", p.RunID)
@@ -198,7 +206,7 @@ type CheckRefusedPayload struct {
 func (CheckRefusedPayload) Kind() Kind { return CheckRefused }
 
 func (p CheckRefusedPayload) message() Message {
-	return Message{Title: fmt.Sprintf("Check #%d stopped: Treg refused a request", p.RunID), Lines: []string{p.Message, "Treg is the service that runs each question and bills you per answer. Fix what it reports, such as an empty balance, then press Check now."}, Path: "/settings/checks"}
+	return Message{Title: fmt.Sprintf("Check #%d stopped: Treg refused a request", p.RunID), Lines: []string{p.Message, "Treg is the service that runs each question and bills you per answer. Fix what it reports, such as an empty balance, then press Check now."}, Path: "/settings/checks", Action: "Open check history"}
 }
 
 type CheckFailedPayload struct {
@@ -209,7 +217,7 @@ type CheckFailedPayload struct {
 func (CheckFailedPayload) Kind() Kind { return CheckFailed }
 
 func (p CheckFailedPayload) message() Message {
-	return Message{Title: fmt.Sprintf("Check #%d failed", p.RunID), Lines: []string{p.Message}, Path: "/settings/checks"}
+	return Message{Title: fmt.Sprintf("Check #%d failed", p.RunID), Lines: []string{p.Message}, Path: "/settings/checks", Action: "Open check history"}
 }
 
 type SpendCapReachedPayload struct {
@@ -221,7 +229,7 @@ type SpendCapReachedPayload struct {
 func (SpendCapReachedPayload) Kind() Kind { return SpendCapReached }
 
 func (p SpendCapReachedPayload) message() Message {
-	return Message{Title: fmt.Sprintf("Check #%d reached its spend cap", p.RunID), Lines: []string{p.Message}, Path: "/settings/checks"}
+	return Message{Title: fmt.Sprintf("Check #%d reached its spend cap", p.RunID), Lines: []string{p.Message}, Path: "/settings/schedule", Action: "Open schedule and limits"}
 }
 
 type PairPausedPayload struct {
@@ -238,7 +246,7 @@ func (p PairPausedPayload) message() Message {
 	if spec, ok := engines.Lookup(p.Surface); ok {
 		title = spec.Title
 	}
-	return Message{Title: fmt.Sprintf("Paused %s on %s", p.Model, title), Lines: []string{p.Reason}, Path: "/settings/ai-apps"}
+	return Message{Title: fmt.Sprintf("Paused %s on %s", p.Model, title), Lines: []string{p.Reason}, Path: "/settings/ai-apps", Action: "Open AI apps settings"}
 }
 
 // metricLabels names Search Console metrics in messages.
@@ -266,9 +274,10 @@ func (GoalReachedPayload) Kind() Kind { return GoalReached }
 
 func (p GoalReachedPayload) message() Message {
 	return Message{
-		Title: fmt.Sprintf("Goal reached: %s", metricLabel(p.Metric)),
-		Lines: []string{fmt.Sprintf("%s reached %g over the last %d days, against a target of %g by %s.", metricLabel(p.Metric), p.Value, p.WindowDays, p.Target, p.DueOn)},
-		Path:  "/google/traffic",
+		Title:  fmt.Sprintf("Goal reached: %s", metricLabel(p.Metric)),
+		Lines:  []string{fmt.Sprintf("%s reached %g over the last %d days, against a target of %g by %s.", metricLabel(p.Metric), p.Value, p.WindowDays, p.Target, p.DueOn)},
+		Path:   "/google/traffic",
+		Action: "Open Google traffic",
 	}
 }
 
@@ -289,9 +298,10 @@ func (p SearchMovedPayload) message() Message {
 		way = "fell"
 	}
 	return Message{
-		Title: fmt.Sprintf("%s %s over the last %d days", metricLabel(p.Metric), way, p.WindowDays),
-		Lines: []string{fmt.Sprintf("%g, against %g in the %d days before.", p.After, p.Before, p.WindowDays)},
-		Path:  "/google/traffic",
+		Title:  fmt.Sprintf("%s %s over the last %d days", metricLabel(p.Metric), way, p.WindowDays),
+		Lines:  []string{fmt.Sprintf("%g, against %g in the %d days before.", p.After, p.Before, p.WindowDays)},
+		Path:   "/google/traffic",
+		Action: "Open Google traffic",
 	}
 }
 
@@ -315,7 +325,7 @@ func (p ChangeVerdictPayload) message() Message {
 	if !ok {
 		label = strings.ReplaceAll(p.Verdict, "_", " ")
 	}
-	return Message{Title: "Change result: " + label, Lines: lines, Path: fmt.Sprintf("/google/site-changes?chg=%d", p.ChangeID)}
+	return Message{Title: "Change result: " + label, Lines: lines, Path: fmt.Sprintf("/google/site-changes?chg=%d", p.ChangeID), Action: "Open the change"}
 }
 
 // verdictLabels says each final result (internal/changes' Outcome) in plain words.
@@ -333,9 +343,10 @@ func (TokenExpiringPayload) Kind() Kind { return TokenExpiring }
 
 func (p TokenExpiringPayload) message() Message {
 	return Message{
-		Title: fmt.Sprintf("The %s token for %s expires %s", p.Provider, p.Repo, p.ExpiresAt.UTC().Format(time.DateOnly)),
-		Lines: []string{"Paste a new token under Settings > Site changes before it expires, or site changes stop updating."},
-		Path:  "/settings/site-changes",
+		Title:  fmt.Sprintf("The %s token for %s expires %s", p.Provider, p.Repo, p.ExpiresAt.UTC().Format(time.DateOnly)),
+		Lines:  []string{"Paste a new token under Settings > Site changes before it expires, or site changes stop updating."},
+		Path:   "/settings/site-changes",
+		Action: "Open site change settings",
 	}
 }
 
@@ -376,16 +387,58 @@ type SocialDigestPayload struct {
 func (SocialDigestPayload) Kind() Kind { return SocialDigest }
 
 func (p SocialDigestPayload) message() Message {
-	when := "in the week of " + shortDay(p.From)
+	m := Message{Path: "/social?digest=" + p.From, Action: "See all posts on Social"}
+	when := ", " + periodRange(p.From, p.To)
 	if p.Cadence == "daily" {
-		when = "on " + shortDay(p.From)
+		when = " on " + shortDay(p.From)
 	}
-	m := Message{Path: "/social"}
 	if p.Mentions == 0 {
-		m.Title = "Social digest: no new posts named you " + when
+		m.Title = "No new posts named you" + when
 	} else {
-		m.Title = fmt.Sprintf("Social digest: %s named you %s", count(p.Mentions, "new post", "new posts"), when)
+		m.Title = count(p.Mentions, "new post", "new posts") + " named you" + when
 	}
+	if where := p.where(); where != "" {
+		m.Lines = append(m.Lines, where)
+	}
+	if p.NewAuthorsCount > 0 {
+		who := count(p.NewAuthorsCount, "person", "people") + " posted about you for the first time"
+		names := p.NewAuthors[:min(digestNames, len(p.NewAuthors))]
+		switch {
+		case len(names) == 0:
+		case p.NewAuthorsCount > len(names):
+			who += ", among them " + sentenceList(names)
+		default:
+			who += ": " + sentenceList(names)
+		}
+		m.Lines = append(m.Lines, who+".")
+	}
+	if p.Hidden == 1 {
+		m.Lines = append(m.Lines, "1 post from an account you left out is not counted.")
+	} else if p.Hidden > 1 {
+		m.Lines = append(m.Lines, fmt.Sprintf("%d posts from accounts you left out are not counted.", p.Hidden))
+	}
+	if top := p.top(digestPosts); len(top) > 0 {
+		m.Lines = append(m.Lines, "The posts people engaged with most:")
+		for _, t := range top {
+			by := fmt.Sprintf("%s on %s", t.Author, t.network.Title)
+			if t.Engagement > 0 {
+				by += ", " + count(t.Engagement, engagementNoun(t.network.Network, true), engagementNoun(t.network.Network, false))
+			}
+			m.Lines = append(m.Lines, fmt.Sprintf("%s: “%s” %s", by, t.Text, t.URL))
+		}
+	}
+	return m
+}
+
+const (
+	// digestNames is how many new people a digest names; the rest are a count.
+	digestNames = 3
+	// digestPosts is how many posts a digest quotes.
+	digestPosts = 5
+)
+
+// where says, in one sentence, how the period's posts split across networks.
+func (p SocialDigestPayload) where() string {
 	var active []SocialNetworkDigest
 	for _, n := range p.Networks {
 		if n.Mentions > 0 {
@@ -394,9 +447,9 @@ func (p SocialDigestPayload) message() Message {
 	}
 	switch {
 	case len(active) == 1 && p.Mentions == 1:
-		m.Lines = append(m.Lines, fmt.Sprintf("It was on %s.", active[0].Title))
+		return fmt.Sprintf("It was on %s.", active[0].Title)
 	case len(active) == 1:
-		m.Lines = append(m.Lines, fmt.Sprintf("All %d were on %s.", p.Mentions, active[0].Title))
+		return fmt.Sprintf("All %d were on %s.", p.Mentions, active[0].Title)
 	case len(active) > 1:
 		where := make([]string, len(active))
 		for i, n := range active {
@@ -408,44 +461,40 @@ func (p SocialDigestPayload) message() Message {
 			}
 			where[i] = fmt.Sprintf("%d%son %s", n.Mentions, verb, n.Title)
 		}
-		m.Lines = append(m.Lines, sentenceList(where)+".")
+		return sentenceList(where) + "."
 	}
-	if p.NewAuthorsCount > 0 {
-		who := count(p.NewAuthorsCount, "person who had not mentioned you before", "people who had not mentioned you before") + " posted about you"
-		names := slices.Clone(p.NewAuthors)
-		if more := p.NewAuthorsCount - len(names); more > 0 && len(names) > 0 {
-			names = append(names, count(more, "other", "others"))
-		}
-		if len(names) > 0 {
-			who += ": " + sentenceList(names)
-		}
-		m.Lines = append(m.Lines, who+".")
-	}
-	if p.Hidden == 1 {
-		m.Lines = append(m.Lines, "1 more post came from an account you left out, so it is not counted.")
-	} else if p.Hidden > 1 {
-		m.Lines = append(m.Lines, fmt.Sprintf("%d more posts came from accounts you left out, so they are not counted.", p.Hidden))
-	}
-	var top []string
-	for _, n := range p.Networks {
-		for _, post := range n.Top {
-			by := fmt.Sprintf("%s on %s", post.Author, n.Title)
-			if post.Engagement > 0 {
-				by += ", with " + count(post.Engagement, engagementNoun(n.Network, true), engagementNoun(n.Network, false))
-			}
-			top = append(top, fmt.Sprintf("%s: “%s” %s", by, post.Text, post.URL))
+	return ""
+}
+
+type rankedPost struct {
+	SocialPost
+	network SocialNetworkDigest
+}
+
+// top is the period's most engaged posts across every network, at most n.
+func (p SocialDigestPayload) top(n int) []rankedPost {
+	var all []rankedPost
+	for _, net := range p.Networks {
+		for _, post := range net.Top {
+			all = append(all, rankedPost{post, net})
 		}
 	}
-	if len(top) > 0 {
-		m.Lines = append(m.Lines, "The posts people engaged with most:")
-		m.Lines = append(m.Lines, top...)
+	slices.SortStableFunc(all, func(a, b rankedPost) int { return b.Engagement - a.Engagement })
+	return all[:min(n, len(all))]
+}
+
+// periodRange says a period's days as "Nov 9 to 15", or "Nov 28 to Dec 4"
+// across a month's end.
+func periodRange(from, to string) string {
+	f, err1 := time.Parse(time.DateOnly, from)
+	t, err2 := time.Parse(time.DateOnly, to)
+	if err1 != nil || err2 != nil {
+		return from + " to " + to
 	}
-	spend := "Searching for posts cost " + money.Format(p.SpendUSD) + "."
-	if p.SpendMissingCalls > 0 {
-		spend = fmt.Sprintf("Searching for posts cost %s, plus %s that did not report a cost.", money.Format(p.SpendUSD), count(p.SpendMissingCalls, "search", "searches"))
+	if f.Month() == t.Month() {
+		return fmt.Sprintf("%s to %d", f.Format("Jan 2"), t.Day())
 	}
-	m.Lines = append(m.Lines, spend)
-	return m
+	return f.Format("Jan 2") + " to " + t.Format("Jan 2")
 }
 
 // engagementNouns says what a post's engagement count adds up on each
@@ -476,15 +525,17 @@ func shortDay(day string) string {
 	return t.Format("Jan 2")
 }
 
-// testPayload is what Send test delivers. It is never stored as an alert.
+// testPayload is what Send test delivers. It is never stored as a
+// notification.
 type testPayload struct{}
 
 func (testPayload) Kind() Kind { return "test" }
 
 func (testPayload) message() Message {
 	return Message{
-		Title: "Test alert from Byname",
-		Lines: []string{"Alerts reach this place. The alerts you chose for it will arrive here."},
-		Path:  "/settings/alerts",
+		Title:  "Test notification from Byname",
+		Lines:  []string{"Notifications reach this place. The ones you chose for it will arrive here."},
+		Path:   SettingsPath,
+		Action: "Open notification settings",
 	}
 }

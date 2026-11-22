@@ -1343,21 +1343,21 @@ paths:
     get:
       tags: [results]
       operationId: listAlerts
-      summary: Alerts the caller may see, newest first, with whether its person has read each.
-      description: Alerts show in the app whether or not any notification channel is set up. An alert of an admin-only kind, such as token_expiring, is listed only for a signed-in admin.
+      summary: Notifications the caller may see, newest first, with whether its person has read each. The API calls each one an alert.
+      description: Notifications show in the app, under the bell, whether or not any notification channel is set up. A notification of an admin-only kind, such as token_expiring, is listed only for a signed-in admin.
       security:
         - apiKey: [results:read]
         - session: [results:read]
       parameters:
         - name: unread
           in: query
-          description: true for only the alerts the caller's person has not read.
+          description: true for only the notifications the caller's person has not read.
           schema:
             type: boolean
         - $ref: "#/components/parameters/limit"
       responses:
         "200":
-          description: Alerts.
+          description: Notifications.
           content:
             application/json:
               schema:
@@ -1374,8 +1374,8 @@ paths:
     post:
       tags: [results]
       operationId: markAlertsRead
-      summary: Mark alerts read for the caller's person.
-      description: Marking an alert read twice is fine. An API key marks them for the person who created it.
+      summary: Mark notifications read for the caller's person.
+      description: Marking a notification read twice is fine. An API key marks them for the person who created it.
       security:
         - apiKey: [results:read]
         - session: [results:read]
@@ -1391,13 +1391,13 @@ paths:
                   type: array
                   items:
                     type: integer
-                  description: The alerts to mark read.
+                  description: The notifications to mark read.
                 all:
                   type: boolean
-                  description: Mark every alert the caller may see read.
+                  description: Mark every notification the caller may see read.
       responses:
         "200":
-          description: How many unread alerts are left.
+          description: How many unread notifications are left.
           content:
             application/json:
               schema:
@@ -3081,7 +3081,7 @@ paths:
     get:
       tags: [settings]
       operationId: listDeliveries
-      summary: The delivery log, newest first. One row per alert and channel, with its attempts and last error.
+      summary: The delivery log, newest first. One row per notification and channel, with its attempts and last error.
       security:
         - session: [admin]
       parameters:
@@ -3889,160 +3889,6 @@ components:
       in: cookie
       name: byname_session
       description: Set by a completed sign-in under /auth. Unsafe cross-site browser requests are rejected.
-    EventKindName:
-      type: string
-      enum: [check_completed, check_refused, check_failed, spend_cap_reached, pair_paused, goal_reached, search_moved, change_verdict, token_expiring, social_digest]
-    EventKind:
-      type: object
-      description: One kind of event a channel can subscribe to.
-      required: [kind, title, description, audience]
-      properties:
-        kind:
-          $ref: "#/components/schemas/EventKindName"
-        title:
-          type: string
-        description:
-          type: string
-        audience:
-          type: string
-          enum: ["results:read", admin]
-          description: results:read when anyone who reads results sees it in the app, admin when only admins do.
-    Alert:
-      type: object
-      description: One event as the app shows it.
-      required: [id, kind, title, lines, path, payload, created_at, read]
-      properties:
-        id:
-          type: integer
-        kind:
-          $ref: "#/components/schemas/EventKindName"
-        title:
-          type: string
-        lines:
-          type: array
-          items:
-            type: string
-        path:
-          type: string
-          description: The page it links to, relative to the app's address, such as /ai/what-changed?before=11&after=12.
-        payload:
-          type: object
-          description: The event's data. Its shape depends on kind; check_completed carries the same counts GET /v1/compare returns.
-        created_at:
-          type: string
-          format: date-time
-        read:
-          type: boolean
-          description: Whether the caller's person has read it.
-    AlertList:
-      type: object
-      required: [alerts, unread]
-      properties:
-        alerts:
-          type: array
-          items:
-            $ref: "#/components/schemas/Alert"
-        unread:
-          type: integer
-          description: Unread alerts the caller may see, in all.
-    ChannelKind:
-      type: string
-      enum: [smtp, email_api, slack_webhook, webhook]
-      description: email_api is Resend's HTTP API, the one email API Byname speaks.
-    NotificationChannel:
-      type: object
-      description: A notification channel. No response ever carries its secrets.
-      required: [id, name, kind, settings, events, enabled, last_test_at, last_test_status, created_at, updated_at]
-      properties:
-        id:
-          type: integer
-        name:
-          type: string
-        kind:
-          $ref: "#/components/schemas/ChannelKind"
-        settings:
-          type: object
-          description: "What the channel shows in the clear. smtp: host, port, tls (starttls, tls or none), username, from, to. email_api: from, to. slack_webhook: nothing. webhook: url."
-        events:
-          type: array
-          items:
-            $ref: "#/components/schemas/EventKindName"
-        enabled:
-          type: boolean
-        last_test_at:
-          type: [string, "null"]
-          format: date-time
-        last_test_status:
-          type: string
-          description: ok, or why the last test failed. Empty until tested.
-        created_at:
-          type: string
-          format: date-time
-        updated_at:
-          type: string
-          format: date-time
-    ChannelInput:
-      type: object
-      required: [name, kind, settings, events]
-      additionalProperties: false
-      properties:
-        name:
-          type: string
-          minLength: 1
-          maxLength: 80
-        kind:
-          $ref: "#/components/schemas/ChannelKind"
-        settings:
-          type: object
-          description: See NotificationChannel.settings.
-        secrets:
-          type: object
-          description: "smtp: password. email_api: api_key. slack_webhook: webhook_url. webhook: none, Byname makes its signing secret. On an edit, only the secrets to change."
-        events:
-          type: array
-          items:
-            $ref: "#/components/schemas/EventKindName"
-        enabled:
-          type: boolean
-          description: Defaults to true on create, and to the current state on an edit.
-    Delivery:
-      type: object
-      description: One alert's delivery to one channel.
-      required: [id, alert_id, kind, title, channel_id, channel_name, channel_kind, status, attempts, error, sent_at, next_attempt_at, created_at]
-      properties:
-        id:
-          type: integer
-        alert_id:
-          type: integer
-        kind:
-          $ref: "#/components/schemas/EventKindName"
-        title:
-          type: string
-        channel_id:
-          type: integer
-        channel_name:
-          type: string
-        channel_kind:
-          $ref: "#/components/schemas/ChannelKind"
-        status:
-          type: string
-          enum: [pending, sent, failed]
-          description: failed after 5 attempts with backoff.
-        attempts:
-          type: integer
-        error:
-          type: string
-          description: Why the last attempt failed.
-        sent_at:
-          type: [string, "null"]
-          format: date-time
-        next_attempt_at:
-          type: [string, "null"]
-          format: date-time
-          description: When a pending delivery is tried again.
-        created_at:
-          type: string
-          format: date-time
   parameters:
     id:
       name: id
@@ -4201,6 +4047,380 @@ components:
           schema:
             $ref: "#/components/schemas/Error"
   schemas:
+    EventKindName:
+      type: string
+      enum: [check_completed, check_refused, check_failed, spend_cap_reached, pair_paused, goal_reached, search_moved, change_verdict, token_expiring, social_digest]
+    EventKind:
+      type: object
+      description: One kind of event a channel can subscribe to.
+      required: [kind, title, description, audience]
+      properties:
+        kind:
+          $ref: "#/components/schemas/EventKindName"
+        title:
+          type: string
+        description:
+          type: string
+        audience:
+          type: string
+          enum: ["results:read", admin]
+          description: results:read when anyone who reads results sees it in the app, admin when only admins do.
+    CheckCompletedPayload:
+      type: object
+      description: check_completed. A finished check against the previous one with answers.
+      required: [run_id, previous_run_id, gained, lost, moved, unchanged, not_comparable, net, named, answered, spend_usd, top]
+      properties:
+        run_id:
+          type: integer
+        previous_run_id:
+          type: integer
+          description: 0 for the first check with answers.
+        gained:
+          type: integer
+        lost:
+          type: integer
+        moved:
+          type: integer
+        unchanged:
+          type: integer
+        not_comparable:
+          type: integer
+        net:
+          type: integer
+        named:
+          type: integer
+          description: Answers that named you, of answered.
+        answered:
+          type: integer
+          description: Answers that did not fail and count in scores.
+        spend_usd:
+          type: number
+        top:
+          type: array
+          description: The questions that changed most, at most three.
+          items:
+            type: object
+            required: [question_id, question, gained, lost, moved]
+            properties:
+              question_id:
+                type: integer
+              question:
+                type: string
+              gained:
+                type: integer
+              lost:
+                type: integer
+              moved:
+                type: integer
+    CheckRefusedPayload:
+      type: object
+      description: check_refused. Treg refused a request and the check stopped.
+      required: [run_id, code, message]
+      properties:
+        run_id:
+          type: integer
+        code:
+          type: string
+          description: Treg's error code, such as insufficient_balance.
+        message:
+          type: string
+    CheckFailedPayload:
+      type: object
+      description: check_failed.
+      required: [run_id, message]
+      properties:
+        run_id:
+          type: integer
+        message:
+          type: string
+    SpendCapReachedPayload:
+      type: object
+      description: spend_cap_reached.
+      required: [run_id, spend_usd, message]
+      properties:
+        run_id:
+          type: integer
+        spend_usd:
+          type: number
+        message:
+          type: string
+    PairPausedPayload:
+      type: object
+      description: pair_paused. An AI app stopped offering a model you picked.
+      required: [pair_id, surface, model, reason]
+      properties:
+        pair_id:
+          type: integer
+        surface:
+          type: string
+        model:
+          type: string
+        reason:
+          type: string
+    GoalReachedPayload:
+      type: object
+      description: goal_reached.
+      required: [goal_id, metric, window_days, target, value, due_on]
+      properties:
+        goal_id:
+          type: integer
+        metric:
+          type: string
+          enum: [clicks, impressions, non_brand_clicks]
+        window_days:
+          type: integer
+        target:
+          type: number
+        value:
+          type: number
+        due_on:
+          type: string
+          format: date
+    SearchMovedPayload:
+      type: object
+      description: search_moved. A 28-day Search Console metric against the 28 days before.
+      required: [metric, window_days, before, after]
+      properties:
+        metric:
+          type: string
+          enum: [clicks, impressions, non_brand_clicks]
+        window_days:
+          type: integer
+        before:
+          type: number
+        after:
+          type: number
+    ChangeVerdictPayload:
+      type: object
+      description: change_verdict. A site change's final result against the comparison pages.
+      required: [change_id, url, verdict, detail]
+      properties:
+        change_id:
+          type: integer
+        url:
+          type: string
+        verdict:
+          type: string
+          enum: [improved, worsened, no_change, insufficient_data]
+        detail:
+          type: string
+          description: The result in one line.
+    TokenExpiringPayload:
+      type: object
+      description: token_expiring. The GitHub token for site changes nears its expiry.
+      required: [provider, repo, expires_at]
+      properties:
+        provider:
+          type: string
+        repo:
+          type: string
+        expires_at:
+          type: string
+          format: date-time
+    SocialDigestPayload:
+      type: object
+      description: social_digest. One finished period's posts that name you, without the accounts left out when it was sent.
+      required: [cadence, from, to, mentions, hidden, networks, new_authors, new_authors_count, spend_usd, spend_missing_calls]
+      properties:
+        cadence:
+          type: string
+          enum: [daily, weekly]
+        from:
+          type: string
+          format: date
+        to:
+          type: string
+          format: date
+        mentions:
+          type: integer
+        hidden:
+          type: integer
+          description: Posts by left-out accounts, not counted in mentions.
+        networks:
+          type: array
+          items:
+            type: object
+            required: [network, title, mentions, top]
+            properties:
+              network:
+                type: string
+              title:
+                type: string
+              mentions:
+                type: integer
+              top:
+                type: array
+                description: The most engaged posts, at most three.
+                items:
+                  type: object
+                  required: [author, text, url, engagement]
+                  properties:
+                    author:
+                      type: string
+                    text:
+                      type: string
+                      description: The start of the post.
+                    url:
+                      type: string
+                    engagement:
+                      type: integer
+        new_authors:
+          type: array
+          description: At most ten of the accounts whose first mention fell in the period.
+          items:
+            type: string
+        new_authors_count:
+          type: integer
+        spend_usd:
+          type: number
+        spend_missing_calls:
+          type: integer
+    Alert:
+      type: object
+      description: One notification, an event as the app shows it. lines are the text email and Slack send.
+      required: [id, kind, title, lines, path, payload, created_at, read]
+      properties:
+        id:
+          type: integer
+        kind:
+          $ref: "#/components/schemas/EventKindName"
+        title:
+          type: string
+        lines:
+          type: array
+          items:
+            type: string
+        path:
+          type: string
+          description: The page it links to, relative to the app's address, such as /ai/what-changed?before=11&after=12.
+        payload:
+          description: The event's data, whose shape depends on kind. check_completed carries the same counts GET /v1/compare returns.
+          oneOf:
+            - $ref: "#/components/schemas/CheckCompletedPayload"
+            - $ref: "#/components/schemas/CheckRefusedPayload"
+            - $ref: "#/components/schemas/CheckFailedPayload"
+            - $ref: "#/components/schemas/SpendCapReachedPayload"
+            - $ref: "#/components/schemas/PairPausedPayload"
+            - $ref: "#/components/schemas/GoalReachedPayload"
+            - $ref: "#/components/schemas/SearchMovedPayload"
+            - $ref: "#/components/schemas/ChangeVerdictPayload"
+            - $ref: "#/components/schemas/TokenExpiringPayload"
+            - $ref: "#/components/schemas/SocialDigestPayload"
+        created_at:
+          type: string
+          format: date-time
+        read:
+          type: boolean
+          description: Whether the caller's person has read it.
+    AlertList:
+      type: object
+      required: [alerts, unread]
+      properties:
+        alerts:
+          type: array
+          items:
+            $ref: "#/components/schemas/Alert"
+        unread:
+          type: integer
+          description: Unread notifications the caller may see, in all.
+    ChannelKind:
+      type: string
+      enum: [smtp, email_api, slack_webhook, webhook]
+      description: email_api is Resend's HTTP API, the one email API Byname speaks.
+    NotificationChannel:
+      type: object
+      description: A notification channel. No response ever carries its secrets.
+      required: [id, name, kind, settings, events, enabled, last_test_at, last_test_status, created_at, updated_at]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        kind:
+          $ref: "#/components/schemas/ChannelKind"
+        settings:
+          type: object
+          description: "What the channel shows in the clear. smtp: host, port, tls (starttls, tls or none), username, from, to. email_api: from, to. slack_webhook: nothing. webhook: url."
+        events:
+          type: array
+          items:
+            $ref: "#/components/schemas/EventKindName"
+        enabled:
+          type: boolean
+        last_test_at:
+          type: [string, "null"]
+          format: date-time
+        last_test_status:
+          type: string
+          description: ok, or why the last test failed. Empty until tested.
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    ChannelInput:
+      type: object
+      required: [name, kind, settings, events]
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 80
+        kind:
+          $ref: "#/components/schemas/ChannelKind"
+        settings:
+          type: object
+          description: See NotificationChannel.settings.
+        secrets:
+          type: object
+          description: "smtp: password. email_api: api_key. slack_webhook: webhook_url. webhook: none, Byname makes its signing secret. On an edit, only the secrets to change."
+        events:
+          type: array
+          items:
+            $ref: "#/components/schemas/EventKindName"
+        enabled:
+          type: boolean
+          description: Defaults to true on create, and to the current state on an edit.
+    Delivery:
+      type: object
+      description: One notification's delivery to one channel.
+      required: [id, alert_id, kind, title, channel_id, channel_name, channel_kind, status, attempts, error, sent_at, next_attempt_at, created_at]
+      properties:
+        id:
+          type: integer
+        alert_id:
+          type: integer
+        kind:
+          $ref: "#/components/schemas/EventKindName"
+        title:
+          type: string
+        channel_id:
+          type: integer
+        channel_name:
+          type: string
+        channel_kind:
+          $ref: "#/components/schemas/ChannelKind"
+        status:
+          type: string
+          enum: [pending, sent, failed]
+          description: failed after 5 attempts with backoff.
+        attempts:
+          type: integer
+        error:
+          type: string
+          description: Why the last attempt failed.
+        sent_at:
+          type: [string, "null"]
+          format: date-time
+        next_attempt_at:
+          type: [string, "null"]
+          format: date-time
+          description: When a pending delivery is tried again.
+        created_at:
+          type: string
+          format: date-time
     Error:
       type: object
       required: [error]

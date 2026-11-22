@@ -213,7 +213,7 @@ func (s *Service) Run(ctx context.Context) {
 	defer t.Stop()
 	for {
 		if _, err := s.DeliverDue(ctx); err != nil && ctx.Err() == nil {
-			s.log.Error("sending alerts failed", "err", err)
+			s.log.Error("sending notifications failed", "err", err)
 		}
 		select {
 		case <-ctx.Done():
@@ -265,7 +265,7 @@ func (s *Service) deliver(ctx context.Context, id, alertID, channelID int64) err
 		return err
 	}
 	if !ch.Enabled {
-		return errors.New("alerts here were turned off before this was sent")
+		return errors.New("notifications here were turned off before this was sent")
 	}
 	info, ok := lookup(k)
 	if !ok {
@@ -301,7 +301,10 @@ func (s *Service) envelope(id string, p Payload, channel string, created time.Ti
 	if m.Lines == nil {
 		m.Lines = []string{}
 	}
-	return envelope{ID: id, Kind: p.Kind(), Message: m, URL: s.link(m.Path), Settings: s.link("/settings/alerts"), Channel: channel, CreatedAt: created}
+	if m.Action == "" {
+		m.Action = "Open in Byname"
+	}
+	return envelope{ID: id, Kind: p.Kind(), Message: m, URL: s.link(m.Path), All: s.link(NotificationsPath), Settings: s.link(SettingsPath), Channel: channel, CreatedAt: created}
 }
 
 func (s *Service) link(path string) string {
@@ -322,11 +325,11 @@ type Alert struct {
 
 type AlertList struct {
 	Alerts []Alert `json:"alerts" jsonschema:"newest first"`
-	Unread int     `json:"unread" jsonschema:"unread alerts the caller may see, in all"`
+	Unread int     `json:"unread" jsonschema:"unread notifications the caller may see, in all"`
 }
 
 type AlertQuery struct {
-	Unread bool `json:"unread,omitempty" jsonschema:"only alerts the caller's person has not read"`
+	Unread bool `json:"unread,omitempty" jsonschema:"only notifications the caller's person has not read"`
 	Limit  int  `json:"limit,omitempty" jsonschema:"at most this many, 1 to 200, default 50"`
 }
 
@@ -372,7 +375,7 @@ func (s *Service) Alerts(ctx context.Context, a core.Actor, q AlertQuery) (Alert
 		info, _ := lookup(al.Kind)
 		p, err := info.decode(al.Payload)
 		if err != nil {
-			return out, fmt.Errorf("alert %d: %w", al.ID, err)
+			return out, fmt.Errorf("notification %d: %w", al.ID, err)
 		}
 		m := p.message()
 		al.Title, al.Lines, al.Path = m.Title, m.Lines, m.Path
@@ -393,12 +396,12 @@ func (s *Service) unread(ctx context.Context, kinds []Kind, userID int64) (int, 
 }
 
 type ReadInput struct {
-	IDs []int64 `json:"ids,omitempty" jsonschema:"the alerts to mark read"`
-	All bool    `json:"all,omitempty" jsonschema:"mark every alert the caller may see read"`
+	IDs []int64 `json:"ids,omitempty" jsonschema:"the notifications to mark read"`
+	All bool    `json:"all,omitempty" jsonschema:"mark every notification the caller may see read"`
 }
 
 type ReadResult struct {
-	Unread int `json:"unread" jsonschema:"unread alerts left"`
+	Unread int `json:"unread" jsonschema:"unread notifications left"`
 }
 
 // MarkRead marks alerts read for the caller's person. Marking one twice is

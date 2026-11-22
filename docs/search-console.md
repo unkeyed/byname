@@ -64,7 +64,7 @@ Pick a domain property when you have one. It counts traffic to every subdomain, 
 - Each sync pulls web search data per day four ways: site totals, by query, by page, and by query and page. It pages through 25,000 rows a request and commits 30 days at a time, so a long backfill that stops resumes where it left off.
 - Google marks recent days as not yet final. Byname stores them as partial, using Google's `firstIncompleteDate`, and overwrites them on the next sync. A final day is never replaced by a partial one. Search Console data lags about three days.
 - Two replicas never sync at once. The sync takes a Postgres advisory lock.
-- After a sync that succeeds, Byname checks goals and 28-day clicks, and raises **Goal reached** and **Google clicks moved** alerts. [Alerts](notifications.md#events) says when each fires.
+- After a sync that succeeds, Byname checks goals and 28-day clicks, and raises **Goal reached** and **Google clicks moved** notifications. [Notifications](notifications.md#events) says when each fires.
 - After a sync that succeeds, Byname also asks URL Inspection about pages with site changes and works out the change results that are due. See [Site changes](changes.md#recrawl-watch).
 
 **Settings > Search Console** shows the property, the last sync and its error. **Change the connection** deletes the stored credential and stops syncing. The numbers already synced stay on **Google search > Traffic**.

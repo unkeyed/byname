@@ -265,12 +265,12 @@ func TestEmailChannels(t *testing.T) {
 			m := mail[0]
 			if m.User != "alerts" || m.TLS != (mode != notifytest.Plain) || m.From != "alerts@northwind.example" || len(m.To) != 2 ||
 				m.Subject != "Check #9 reached its spend cap" || !strings.Contains(m.Body, "the spend cap for one check is $5.00") ||
-				!strings.Contains(m.Body, "https://byname.example/settings/checks") {
+				!strings.Contains(m.Body, "Open schedule and limits: https://byname.example/settings/schedule\nEvery notification: https://byname.example/notifications\n") {
 				t.Fatalf("mail = %+v", m)
 			}
 			emails := resend.Emails()
 			if len(emails) != 1 || emails[0].Subject != m.Subject || emails[0].To[0] != "ops@northwind.example" || emails[0].IdempotencyKey == "" ||
-				!strings.Contains(emails[0].Text, "https://byname.example/settings/checks") {
+				!strings.Contains(emails[0].Text, "https://byname.example/settings/schedule") {
 				t.Fatalf("Resend got %+v", emails)
 			}
 		})
@@ -300,10 +300,14 @@ func TestSlackGetsBlockKit(t *testing.T) {
 			Text struct {
 				Text string `json:"text"`
 			} `json:"text"`
+			Elements []struct {
+				Text string `json:"text"`
+			} `json:"elements"`
 		} `json:"blocks"`
 	}
 	if err := json.Unmarshal(reqs[0].Body, &msg); err != nil || msg.Text != "Paused claude-sonnet-5-5 on Claude Code" || len(msg.Blocks) != 2 ||
-		msg.Blocks[0].Type != "section" || !strings.Contains(msg.Blocks[0].Text.Text, "&lt;today&gt;") {
+		msg.Blocks[0].Type != "section" || !strings.Contains(msg.Blocks[0].Text.Text, "&lt;today&gt;") ||
+		len(msg.Blocks[1].Elements) != 1 || msg.Blocks[1].Elements[0].Text != "<https://byname.example/settings/ai-apps|Open AI apps settings> · <https://byname.example/notifications|Every notification>" {
 		t.Fatalf("Slack body = %s, %v", reqs[0].Body, err)
 	}
 }

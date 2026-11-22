@@ -28,7 +28,7 @@ import (
 	"github.com/unkeyed/byname/internal/core"
 )
 
-// ChannelKind is one way to send alerts. The channelKinds table below is
+// ChannelKind is one way to send notifications. The channelKinds table below is
 // the only list of them.
 type ChannelKind string
 
@@ -113,10 +113,13 @@ func strict(raw json.RawMessage, v any) error {
 type envelope struct {
 	// ID is unique per alert and channel, so a retried send can be
 	// recognised: "alert-12/channel-3", or "test-..." for Send test.
-	ID        string
-	Kind      Kind
-	Message   Message
+	ID      string
+	Kind    Kind
+	Message Message
+	// URL is the page the message links to, All the notifications page and
+	// Settings the page that chooses where they go.
 	URL       string
+	All       string
 	Settings  string
 	Channel   string
 	Payload   json.RawMessage
@@ -129,7 +132,7 @@ func (e envelope) text() string {
 	for _, l := range e.Message.Lines {
 		b.WriteString(l + "\n")
 	}
-	fmt.Fprintf(&b, "\n%s\n\n-- \nByname sent this to “%s”. Choose which alerts go there at %s\n", e.URL, e.Channel, e.Settings)
+	fmt.Fprintf(&b, "\n%s: %s\nEvery notification: %s\n\n-- \nByname sent this to “%s”. Choose which notifications go there at %s\n", e.Message.Action, e.URL, e.All, e.Channel, e.Settings)
 	return b.String()
 }
 
@@ -327,7 +330,7 @@ func (c *slackChannel) send(ctx context.Context, s *Service, e envelope) error {
 		"text": e.Message.Title,
 		"blocks": []any{
 			map[string]any{"type": "section", "text": map[string]string{"type": "mrkdwn", "text": text}},
-			map[string]any{"type": "context", "elements": []any{map[string]string{"type": "mrkdwn", "text": "<" + e.URL + "|Open in Byname>"}}},
+			map[string]any{"type": "context", "elements": []any{map[string]string{"type": "mrkdwn", "text": "<" + e.URL + "|" + slackEscape.Replace(e.Message.Action) + "> · <" + e.All + "|Every notification>"}}},
 		},
 	})
 	if err != nil {
@@ -460,7 +463,7 @@ func (s *Service) post(ctx context.Context, target string, body []byte, headers 
 func address(field, raw string) (string, error) {
 	a, err := mail.ParseAddress(strings.TrimSpace(raw))
 	if err != nil {
-		return "", fmt.Errorf("%s must be an email address, such as Byname <alerts@example.com>", field)
+		return "", fmt.Errorf("%s must be an email address, such as Byname <notifications@example.com>", field)
 	}
 	switch {
 	case a.Name == "":

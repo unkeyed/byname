@@ -1,8 +1,8 @@
-# Alerts
+# Notifications
 
-Byname tells people when something moves: a check finished and some answers started or stopped naming you, a check stopped, a spend cap was reached, a model was paused, a Google search goal was reached, Google clicks moved, a site change got its final result, a day or week of social posts ended, or the GitHub token for site changes is about to expire. Every alert shows in the app under **Alerts**. To also get alerts by email, in Slack or at your own endpoint, an Admin adds where alerts go under **Settings > Alerts**, or in onboarding's **Schedule and spend caps** step. With nowhere added, alerts stay in the app.
+Byname tells people when something moves: a check finished and some answers started or stopped naming you, a check stopped, a spend cap was reached, a model was paused, a Google search goal was reached, Google clicks moved, a site change got its final result, a day or week of social posts ended, or the GitHub token for site changes is about to expire. Every notification shows in the app behind the bell, beside your name at the bottom of the sidebar or at the top right on a phone. The bell shows how many you have not read. Each notification is a short card that says what happened and links to the page with the details, and opening it marks it read. To also get notifications by email, in Slack or at your own endpoint, an Admin adds where they go under **Settings > Notifications**, or in onboarding's **Schedule and spend caps** step. With nowhere added, notifications stay in the app. The API calls a notification an alert, as in `GET /v1/alerts`.
 
-## Where alerts go
+## Where notifications go
 
 | Where | Stored as | Settings | Secret |
 |---|---|---|---|
@@ -11,13 +11,13 @@ Byname tells people when something moves: a check finished and some answers star
 | Slack | `slack_webhook` | None | The Slack incoming webhook URL |
 | Webhook | `webhook` | The URL to post to | A signing secret that Byname makes |
 
-For each place, you pick which alerts go there. Byname encrypts each place's secret with `ENCRYPTION_KEY` and never returns it, except the webhook signing secret, which it shows once when you add the webhook. Adding or editing a place needs a sign-in within the last 15 minutes. **Send test** sends a test alert there at once. The API calls each place a notification channel, as in `GET /v1/notification-channels`.
+For each place, you pick which notifications go there. Byname encrypts each place's secret with `ENCRYPTION_KEY` and never returns it, except the webhook signing secret, which it shows once when you add the webhook. Adding or editing a place needs a sign-in within the last 15 minutes. **Send test** sends a test notification there at once. The API calls each place a notification channel, as in `GET /v1/notification-channels`.
 
-Webhook and Slack URLs must use `https`, or `http` to `localhost` for a receiver on the same machine. Email uses plain text, with the alert's title as the subject and a link to the page in Byname, built from `PUBLIC_URL`. Email, Slack and the webhook carry the same title and lines.
+Webhook and Slack URLs must use `https`, or `http` to `localhost` for a receiver on the same machine. Email uses plain text, with the notification's title as the subject. It ends with a link to the page in Byname, such as **See what changed**, and a link to the notifications page, both built from `PUBLIC_URL`. Slack shows the same two links. Email, Slack and the webhook carry the same title and lines.
 
 ## Events
 
-`internal/notify/events.go` is the one list of events. **Settings > Alerts** lists them in this order.
+`internal/notify/events.go` is the one list of events. **Settings > Notifications** lists them in this order.
 
 | Event | Kind | Raised when | Seen in the app by |
 |---|---|---|---|
@@ -30,7 +30,7 @@ Webhook and Slack URLs must use `https`, or `http` to `localhost` for a receiver
 | Google clicks moved | `search_moved` | After a Search Console sync, clicks over the last 28 days, or clicks from searches without your name, differ from the 28 days before by at least 25% of the earlier number and by at least 20 clicks. Both 28-day windows must have data for every day. | Anyone with `results:read` |
 | Change result | `change_verdict` | A site change got its final result against your comparison pages, 31 days after Google first saw the change by default. The first result raises nothing. Its link opens the change on **Google search > Site changes**. See [Site changes](changes.md). | Anyone with `results:read` |
 | Token expiring | `token_expiring` | The hourly GitHub poll, or **Test** under **Settings > Site changes**, finds that the token expires within 14 days. | Admins only |
-| Social digest | `social_digest` | A day or week of social searches ended. It says in sentences how many new posts named you and on which networks, who mentioned you for the first time, and what the searches cost, then lists the posts people engaged with most, without the accounts left out. See [Social](social.md). | Anyone with `results:read` |
+| Social digest | `social_digest` | A day or week of social searches ended. It says how many new posts named you and on which networks, how many people posted about you for the first time with at most three names, and how many posts from left-out accounts are not counted, then quotes the five posts people engaged with most. It never says what the searches cost: see **Settings > Schedule and limits** for spend. Its link opens the **Social** page at that period. See [Social](social.md). | Anyone with `results:read` |
 
 Each event has a natural key, its kind and what it happened to, such as one check. Raising the same event twice stores and sends it once. For the five events that do not come from a check, the key decides how often each one fires:
 
@@ -44,7 +44,7 @@ Each event has a natural key, its kind and what it happened to, such as one chec
 
 ## Delivery and retries
 
-Byname sends from a background job, never inside a request. A delivery that fails is tried again after 30 seconds, 2 minutes, 8 minutes and 32 minutes, five attempts in all. Any `2xx` answer counts as delivered. Each attempt is logged with its status and error, and **Settings > Alerts** shows the log. The log never records a place's URL, because a Slack webhook URL is a secret.
+Byname sends from a background job, never inside a request. A delivery that fails is tried again after 30 seconds, 2 minutes, 8 minutes and 32 minutes, five attempts in all. Any `2xx` answer counts as delivered. Each attempt is logged with its status and error, and **Settings > Notifications** shows the log. The log never records a place's URL, because a Slack webhook URL is a secret.
 
 ## Receive a webhook
 
