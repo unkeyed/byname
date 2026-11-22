@@ -60,7 +60,7 @@ export function Compare() {
   const list = runs.data ?? [];
   const after = Number(view.get("after")) || list[0]?.id || 0;
   const before = Number(view.get("before")) || list.find((r) => r.id < after)?.id || 0;
-  const cmp = useQuery({ queryKey: keys.compare(before, after), queryFn: () => api.compare(before, after), enabled: before > 0 && after > 0 && before < after, placeholderData: (p) => p });
+  const cmp = useQuery({ queryKey: keys.compare(before, after), queryFn: () => api.compare(before, after), enabled: before > 0 && after > 0 && before < after });
   const show = view.get("show") || "changed";
 
   let body;

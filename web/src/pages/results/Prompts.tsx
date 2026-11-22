@@ -112,7 +112,7 @@ function PromptList({ filter }: { filter: ResultsFilter }) {
   const wide = useWide();
   const surfaces = useSurfaces();
   const labels = useLabels(surfaces.data);
-  const prompts = useQuery({ queryKey: keys.prompts(filter), queryFn: () => api.prompts(filter), placeholderData: (p) => p });
+  const prompts = useQuery({ queryKey: keys.prompts(filter), queryFn: () => api.prompts(filter) });
   if (prompts.isPending) return <Pending />;
   if (prompts.isError) return <ErrorNote error={prompts.error} />;
   const { rows, runs, latest_run_id } = prompts.data;

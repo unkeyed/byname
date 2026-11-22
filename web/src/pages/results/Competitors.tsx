@@ -13,7 +13,7 @@ export function Competitors() {
   const settings = useSettings();
   const runs = useAnsweredRuns();
   const { filter, by, ready } = useFilter();
-  const comp = useQuery({ queryKey: keys.competitors(filter, by), queryFn: () => api.metrics.competitors(filter, by), enabled: ready, placeholderData: (p) => p });
+  const comp = useQuery({ queryKey: keys.competitors(filter, by), queryFn: () => api.metrics.competitors(filter, by), enabled: ready });
   const brand = settings.data?.brand.name || "you";
   useLoading(settings.isPending);
 

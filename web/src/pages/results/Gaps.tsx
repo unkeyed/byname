@@ -87,7 +87,7 @@ function PromptGaps({ filter }: { filter: ResultsFilter }) {
   const view = useView();
   const me = useMe();
   const canWrite = me.data?.scopes.includes("config:write") ?? false;
-  const gaps = useQuery({ queryKey: keys.gaps(0, filter), queryFn: () => api.gaps(undefined, filter), placeholderData: (p) => p });
+  const gaps = useQuery({ queryKey: keys.gaps(0, filter), queryFn: () => api.gaps(undefined, filter) });
   if (gaps.isPending) return <Pending />;
   if (gaps.isError) return <ErrorNote error={gaps.error} />;
   const list = gaps.data.gaps;
@@ -216,7 +216,7 @@ const firstPages = 25;
 function CitedSources({ filter }: { filter: ResultsFilter }) {
   const view = useView();
   const [all, setAll] = useState(false);
-  const sources = useQuery({ queryKey: keys.sources(filter), queryFn: () => api.sources(filter), placeholderData: (p) => p });
+  const sources = useQuery({ queryKey: keys.sources(filter), queryFn: () => api.sources(filter) });
   if (sources.isPending) return <Pending />;
   if (sources.isError) return <ErrorNote error={sources.error} />;
   const s = sources.data;

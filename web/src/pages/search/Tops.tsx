@@ -20,7 +20,7 @@ function pagePath(url: string): string {
 
 export function TopPages({ status }: { status: GscStatus }) {
   const [limit, setLimit] = useState(shortLimit);
-  const q = useQuery({ queryKey: keys.searchPages(limit, dataVersion(status)), queryFn: () => api.search.pages(limit), placeholderData: (p) => p });
+  const q = useQuery({ queryKey: keys.searchPages(limit, dataVersion(status)), queryFn: () => api.search.pages(limit) });
   return (
     <TopCard
       title="Top pages"
@@ -46,7 +46,7 @@ export function TopPages({ status }: { status: GscStatus }) {
 
 export function TopQueries({ status, nonBrand }: { status: GscStatus; nonBrand: boolean }) {
   const [limit, setLimit] = useState(shortLimit);
-  const q = useQuery({ queryKey: keys.searchQueries(limit, nonBrand, dataVersion(status)), queryFn: () => api.search.queries(limit, nonBrand), placeholderData: (p) => p });
+  const q = useQuery({ queryKey: keys.searchQueries(limit, nonBrand, dataVersion(status)), queryFn: () => api.search.queries(limit, nonBrand) });
   return (
     <TopCard
       title={nonBrand ? "Top non-brand queries" : "Top queries"}
@@ -132,19 +132,18 @@ function TopCard({
             </tbody>
           </table>
         </ScrollX>
-        {(rows.length >= limit || limit > shortLimit) && (
-          <div className="px-4 pt-2">
-            <Button size="sm" variant="ghost" onClick={() => setLimit(limit > shortLimit ? shortLimit : longLimit)}>
-              <Icon name={limit > shortLimit ? "up" : "down"} className="size-3.5" />
-              {limit > shortLimit ? "Show fewer" : `Show up to ${longLimit}`}
-            </Button>
-          </div>
-        )}
       </div>
     );
   return (
     <Card className="min-w-0">
-      <CardHeader title={title} description={[range ? `Latest 28 days, ${range}, by clicks.` : "Latest 28 days, by clicks.", note].filter(Boolean).join(" ")} />
+      <CardHeader title={title} description={[range ? `Latest 28 days, ${range}, by clicks.` : "Latest 28 days, by clicks.", note].filter(Boolean).join(" ")}>
+        {rows && (rows.length >= limit || limit > shortLimit) && (
+          <Button size="sm" variant="ghost" onClick={() => setLimit(limit > shortLimit ? shortLimit : longLimit)}>
+            <Icon name={limit > shortLimit ? "up" : "down"} className="size-3.5" />
+            {limit > shortLimit ? "Show fewer" : `Show up to ${longLimit}`}
+          </Button>
+        )}
+      </CardHeader>
       {body}
     </Card>
   );

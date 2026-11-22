@@ -268,7 +268,7 @@ function RatesCard({ filter, by }: { filter: ResultsFilter; by: Grouping }) {
   const labels = useLabels(surfaces.data);
   const color = palette(surfaces.data);
   const metric = view.get("metric") === "citation" ? "citation" : "mention";
-  const rates = useQuery({ queryKey: keys.rates(filter, by), queryFn: () => api.metrics.rates(filter, by), placeholderData: (prev) => prev });
+  const rates = useQuery({ queryKey: keys.rates(filter, by), queryFn: () => api.metrics.rates(filter, by) });
 
   let body;
   if (rates.isPending) body = <Pending />;
@@ -298,7 +298,7 @@ function RatesCard({ filter, by }: { filter: ResultsFilter; by: Grouping }) {
       ) : (
         <div className={cx("grid grid-cols-[minmax(0,1fr)] gap-4 px-4 pb-4 lg:grid-cols-[minmax(0,1fr)_16rem]", rates.isPlaceholderData && "opacity-60")}>
           <LineChart xs={xs} lines={lines} format={(v) => pct(v)} label={`${metric === "mention" ? "Mention" : "Citation"} rate per check, one line per ${by === "surface" ? "surface" : "surface and model"}`} />
-          <ul aria-label="Lines, with each line's latest value. Open one for its detail." className="-mx-1.5 space-y-0.5 self-start text-xs">
+          <ul aria-label="Lines, with each line's latest value. Open one for its detail." className="-mx-1.5 space-y-0.5 self-start text-xs lg:max-h-60 lg:overflow-y-auto">
             {lines.map((l) => (
               <li key={l.key}>
                 <button type="button" onClick={() => openEngine(l.series)} title={`${l.models.length ? `${l.models.join(", ")}. ` : ""}Open ${l.label}`} className="flex w-full items-start gap-2 rounded-control px-1.5 py-1.5 text-left hover:bg-subtle md:py-1">

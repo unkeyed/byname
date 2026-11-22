@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
 import type { GscStatus } from "../api";
-import { useGsc, useIsAdmin } from "../queries";
+import { useGsc, useGscProperties, useIsAdmin } from "../queries";
 import { Button, Card, ErrorNote, Pending } from "../ui";
 import { GoogleButton, GoogleReturn, PropertyPicker, ServiceAccountForm } from "../pages/settings/SearchConsole";
 
@@ -32,6 +32,7 @@ export function SearchConsoleStep({ onPicked, footer }: { onPicked: () => void; 
 
 function Connection({ s, onPicked }: { s: GscStatus; onPicked: () => void }) {
   const [picking, setPicking] = useState(false);
+  useGscProperties(s.connected);
   if (!s.connected)
     return (
       <Card className="space-y-5 p-4">

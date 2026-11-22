@@ -1,8 +1,9 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { MutationCache, QueryCache, QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { keepPreviousData, MutationCache, QueryCache, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createBrowserRouter, RouterProvider } from "react-router";
 import { ApiError } from "./api";
+import { keys } from "./queries";
 import { Layout, nav, NotFound } from "./Layout";
 import { Login } from "./pages/Login";
 import { AcceptInvite } from "./pages/AcceptInvite";
@@ -73,6 +74,8 @@ const queryClient = new QueryClient({
     },
   },
 });
+
+for (const prefix of [keys.results, keys.search]) queryClient.setQueryDefaults(prefix, { placeholderData: keepPreviousData });
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

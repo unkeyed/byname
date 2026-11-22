@@ -1,8 +1,8 @@
 import { useState, type FormEvent, type ReactNode } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "react-router";
 import { api, type GscProperty, type GscStatus } from "../../api";
-import { keys, useGsc } from "../../queries";
+import { keys, useGsc, useGscProperties } from "../../queries";
 import { Badge, Button, Card, ConfirmButton, ErrorNote, Field, Icon, Pending, RelativeTime, Spinner, cx } from "../../ui";
 import { dayList, dayRange } from "../search/model";
 import { useReauthMutation } from "./Reauth";
@@ -176,6 +176,7 @@ function clientEmail(key: string): string {
 function Connected({ s }: { s: GscStatus }) {
   const qc = useQueryClient();
   const [picking, setPicking] = useState(false);
+  useGscProperties();
   const disconnect = useMutation({ mutationFn: api.gsc.disconnect, onSuccess: () => qc.invalidateQueries({ queryKey: keys.search }) });
   const rows: [string, ReactNode][] = [
     ["Method", methodInfo[s.method]],
@@ -271,7 +272,7 @@ function Connected({ s }: { s: GscStatus }) {
 
 export function PropertyPicker({ s, onDone, onCancel, submitLabel }: { s: GscStatus; onDone: () => void; onCancel?: () => void; submitLabel?: string }) {
   const qc = useQueryClient();
-  const props = useQuery({ queryKey: keys.gscProperties, queryFn: api.gsc.properties });
+  const props = useGscProperties();
   const [chosen, setChosen] = useState<string | null>(null);
   const [backfill, setBackfill] = useState(s.property ? s.backfill : true);
   const save = useMutation({

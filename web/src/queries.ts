@@ -73,6 +73,8 @@ export const keys = {
   leftOut: ["social", "left-out"] as const,
 };
 
+export const useGscProperties = (enabled = true) => useQuery({ queryKey: keys.gscProperties, queryFn: api.gsc.properties, enabled });
+
 /** Changes whenever a sync or a disconnect changes what the read API returns. */
 export const dataVersion = (s: GscStatus) => [s.data_property, s.last_sync_at, s.latest_final_day, s.partial_days.join()].join("|");
 

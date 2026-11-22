@@ -112,7 +112,7 @@ export const useSearchSummary = (s: GscStatus | undefined) =>
   useQuery({ queryKey: keys.searchSummary(s ? dataVersion(s) : ""), queryFn: api.search.summary, enabled: !!s?.first_day });
 
 export const useSearchDaily = (s: GscStatus | undefined, from: Day | undefined) =>
-  useQuery({ queryKey: keys.searchDaily(from, s ? dataVersion(s) : ""), queryFn: () => api.search.daily(from), enabled: !!s?.first_day, placeholderData: (p) => p });
+  useQuery({ queryKey: keys.searchDaily(from, s ? dataVersion(s) : ""), queryFn: () => api.search.daily(from), enabled: !!s?.first_day });
 
 export const useSearchBrand = (s: GscStatus | undefined, from: Day | undefined) =>
-  useQuery({ queryKey: keys.searchBrand(from, s ? dataVersion(s) : ""), queryFn: () => api.search.brand(from), enabled: !!s?.first_day, placeholderData: (p) => p });
+  useQuery({ queryKey: keys.searchBrand(from, s ? dataVersion(s) : ""), queryFn: () => api.search.brand(from), enabled: !!s?.first_day });
