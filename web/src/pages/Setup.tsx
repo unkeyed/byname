@@ -62,11 +62,11 @@ export function Setup() {
           <Field label="Your account's email">
             <input className={inputClass} type="email" autoComplete="email" required autoFocus value={email} onChange={(e) => setEmail(e.target.value)} />
           </Field>
-          <ErrorNote error={create.error} />
           <Button type="submit" variant="primary" className="w-full" disabled={create.isPending}>
             <Icon name="key" className="size-3.5" />
             {create.isPending ? "Waiting for your passkey…" : "Register a new passkey"}
           </Button>
+          <ErrorNote error={create.error} />
         </form>
         <p className="mt-3 text-xs text-muted">Once you are in, remove the passkey you lost under Settings &gt; Account.</p>
       </AuthShell>
@@ -81,11 +81,11 @@ export function Setup() {
         <Field label="Email">
           <input className={inputClass} type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
         </Field>
-        <ErrorNote error={create.error} />
         <Button type="submit" variant="primary" className="w-full" disabled={create.isPending}>
           <Icon name="key" className="size-3.5" />
           {create.isPending ? "Waiting for your passkey…" : "Create account with a passkey"}
         </Button>
+        <ErrorNote error={create.error} />
       </form>
       {providers.length > 0 && (
         <>

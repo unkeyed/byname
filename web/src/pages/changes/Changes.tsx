@@ -355,13 +355,13 @@ function LogForm({ zone, onDone }: { zone: Zone; onDone: () => void }) {
             onChange={(e) => setNotes(e.target.value)}
           />
         </Field>
-        <ErrorNote error={log.error} />
         <div className="flex justify-end gap-2">
           <Button onClick={onDone}>Cancel</Button>
           <Button type="submit" variant="primary" disabled={!valid || log.isPending}>
             Log change
           </Button>
         </div>
+        <ErrorNote error={log.error} />
       </form>
     </DialogBody>
   );

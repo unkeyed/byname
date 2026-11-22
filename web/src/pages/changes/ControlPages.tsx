@@ -140,13 +140,13 @@ function ControlForm({ page, onDone }: { page: ControlPage | null; onDone: () =>
         <Field label="Note" hint="Optional, such as why this page.">
           <input className={inputClass} maxLength={500} value={note} onChange={(e) => setNote(e.target.value)} />
         </Field>
-        <ErrorNote error={save.error} />
         <div className="flex justify-end gap-2">
           <Button onClick={onDone}>Cancel</Button>
           <Button type="submit" variant="primary" disabled={!valid || save.isPending}>
             {page ? "Save" : "Add control page"}
           </Button>
         </div>
+        <ErrorNote error={save.error} />
       </form>
     </DialogBody>
   );

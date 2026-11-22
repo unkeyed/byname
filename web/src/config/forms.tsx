@@ -110,6 +110,11 @@ export function FieldNote({ tone, children }: { tone: "error" | "warn" | "info";
   );
 }
 
+/** A field's note line, kept while empty, so a note shown on submit never pushes the form down under the pointer. */
+export function NoteSlot({ children }: { children?: ReactNode }) {
+  return <div className="min-h-5">{children}</div>;
+}
+
 /** Shown to people who can read setup but not change it. */
 export function ReadOnlyNote({ children = "You can see these settings. An admin or editor can change them." }: { children?: ReactNode }) {
   return <p className="mb-4 rounded-control bg-subtle px-3 py-2 text-xs text-muted">{children}</p>;

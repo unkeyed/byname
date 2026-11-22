@@ -154,7 +154,6 @@ function TermsForm({ onDone }: { onDone: () => void }) {
             Add
           </Button>
         </form>
-        <ErrorNote error={save.error} />
         <div className="flex flex-wrap justify-end gap-2">
           {!settings.data.branded_terms_default && (
             <Button variant="ghost" onClick={() => save.mutate([])} disabled={save.isPending} className="mr-auto">
@@ -167,6 +166,7 @@ function TermsForm({ onDone }: { onDone: () => void }) {
             Save terms
           </Button>
         </div>
+        <ErrorNote error={save.error} />
       </div>
     </DialogBody>
   );

@@ -102,7 +102,7 @@ export function Logo({ className = "size-6 text-xs" }: { className?: string }) {
 }
 
 const fieldBase =
-  "h-11 md:h-8 min-w-0 rounded-control border border-line-strong bg-surface px-2.5 text-sm text-fg transition-colors placeholder:text-faint hover:border-line-hover focus:border-fg focus:ring-3 focus:ring-halo focus:outline-none focus-visible:outline-none disabled:opacity-60";
+  "h-11 md:h-8 min-w-0 rounded-control border border-line-strong bg-surface px-2.5 text-sm text-fg transition-colors placeholder:text-faint hover:border-line-hover focus-within:border-fg focus-within:ring-3 focus-within:ring-halo focus:outline-none focus-visible:outline-none disabled:opacity-60";
 export const inputClass = cx(fieldBase, "w-full");
 export const selectClass = cx(fieldBase, "select-chevron pr-7");
 export const labelClass = "mb-1.5 block text-xs font-medium text-muted";
@@ -429,12 +429,12 @@ export function Dialog({ open, onClose, title, children, wide }: { open: boolean
       onClick={(e) => e.target === ref.current && onClose()}
       aria-label={title}
       className={cx(
-        "m-auto max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] overflow-hidden rounded-overlay border-0 bg-surface p-0 text-fg shadow-floating",
+        "mx-auto mt-[8dvh] mb-0 max-h-[calc(92dvh-1rem)] w-[calc(100%-2rem)] overflow-hidden rounded-overlay border-0 bg-surface p-0 text-fg shadow-floating",
         wide ? "max-w-xl" : "max-w-md",
       )}
     >
       {opening > 0 && (
-        <div key={opening} className="flex max-h-[calc(100dvh-2rem)] flex-col">
+        <div key={opening} className="flex max-h-[calc(92dvh-1rem)] flex-col">
           <div className="flex shrink-0 items-center justify-between gap-4 border-b border-line py-2.5 pr-2.5 pl-4">
             <h2 className="min-w-0 truncate text-base font-semibold">{title}</h2>
             <Button variant="ghost" size="sm" onClick={onClose} aria-label="Close" icon>

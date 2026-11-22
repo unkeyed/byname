@@ -90,13 +90,13 @@ function ConfirmBody({ a, providers, onConfirmed }: { a: AccountData; providers:
     <DialogBody>
       <div className="space-y-4">
         <p className="text-sm text-muted">This change needs a recent sign-in. Prove it&apos;s you with any of these.</p>
-        <ErrorNote error={passkey.error ?? withCode.error} />
         {a.passkeys.length > 0 && (
           <Button variant="primary" className="w-full" onClick={() => passkey.mutate()} disabled={passkey.isPending}>
             <Icon name="key" className="size-3.5" />
             {passkey.isPending ? "Waiting for your passkey…" : "Use a passkey"}
           </Button>
         )}
+        <ErrorNote error={passkey.error} />
         {a.totp && (
           <form onSubmit={submit} className="space-y-2">
             <Field label="Code" hint="From your authenticator app, or one of your recovery codes.">
@@ -105,6 +105,7 @@ function ConfirmBody({ a, providers, onConfirmed }: { a: AccountData; providers:
             <Button type="submit" className="w-full" disabled={withCode.isPending}>
               Confirm
             </Button>
+            <ErrorNote error={withCode.error} />
           </form>
         )}
         {linked.length > 0 && (

@@ -3,9 +3,9 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type Fidelity, type Pair, type PairTest, type Route, type RouteOption, type SearchControl, type Surface, type SurfaceGroup, type SurfaceInput, type SurfaceKey } from "../api";
 import { fidelityInfo, usd } from "../lines";
 import { keys, useCan, useIsAdmin, useSurfaces } from "../queries";
-import { Badge, Button, Card, cx, ErrorNote, Icon, inputClass, labelClass, Pending, RelativeTime, Spinner, type Tone } from "../ui";
+import { Badge, Button, Card, cx, ErrorNote, errorMessage, Icon, inputClass, labelClass, Pending, RelativeTime, Spinner, type Tone } from "../ui";
 import { CredentialForm, testTone, useCredentials } from "./Credentials";
-import { Disclosure, FieldNote } from "./forms";
+import { Disclosure, FieldNote, NoteSlot } from "./forms";
 
 export const groupInfo: Record<SurfaceGroup, { title: string; detail: string }> = {
   apps: { title: "Consumer apps and search", detail: "The answer a person sees in the app or on the results page, read by a scraping provider." },
@@ -367,12 +367,12 @@ function SurfaceRow({
           </Disclosure>
         </div>
       )}
-      {problem && (
+      {dirty && (
         <div className="sm:pl-7">
-          <FieldNote tone="error">{problem}</FieldNote>
+          <NoteSlot>{problem ? <FieldNote tone="error">{problem}</FieldNote> : saveError != null && <FieldNote tone="error">{errorMessage(saveError)}</FieldNote>}</NoteSlot>
         </div>
       )}
-      {saveError != null && (
+      {!dirty && saveError != null && (
         <div className="mt-2 sm:pl-7">
           <ErrorNote error={saveError} />
         </div>

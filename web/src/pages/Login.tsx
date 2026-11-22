@@ -206,7 +206,6 @@ function SecondFactorStep({ factors, onRestart }: { factors: SecondFactor[]; onR
       }
     >
       <div className="space-y-3">
-        <ErrorNote error={withCode.error ?? passkey.error} />
         {takesCode && (
           <form onSubmit={submit} className="space-y-3">
             <Field label="Code">
@@ -225,6 +224,7 @@ function SecondFactorStep({ factors, onRestart }: { factors: SecondFactor[]; onR
             <Button type="submit" variant="primary" className="w-full" disabled={withCode.isPending}>
               {withCode.isPending ? "Checking…" : "Verify"}
             </Button>
+            <ErrorNote error={withCode.error} />
           </form>
         )}
         {takesCode && takesPasskey && <OrDivider />}
@@ -234,6 +234,7 @@ function SecondFactorStep({ factors, onRestart }: { factors: SecondFactor[]; onR
             {passkey.isPending ? "Waiting for your passkey…" : "Use a passkey"}
           </Button>
         )}
+        <ErrorNote error={passkey.error} />
       </div>
       <p className="mt-5 text-xs text-muted">
         Wrong account?{" "}

@@ -175,11 +175,11 @@ function ConnectForm({ initialRepo, label }: { initialRepo: string; label: strin
       >
         <input className={inputClass} type="password" autoComplete="off" spellCheck={false} value={token} onChange={(e) => setToken(e.target.value)} placeholder="github_pat_…" />
       </Field>
-      <ErrorNote error={connect.error} />
       <Button type="submit" variant="primary" disabled={!valid || connect.isPending}>
         <Icon name="github" className="size-3.5" />
         {connect.isPending ? "Checking with GitHub…" : label}
       </Button>
+      <ErrorNote error={connect.error} />
     </form>
   );
 }
@@ -327,10 +327,10 @@ function Rules({ r }: { r: RepoStatus }) {
             )}
           </div>
         )}
-        <ErrorNote error={save.error} />
         <div className="flex flex-wrap items-center justify-end gap-2">
           <SubmitButton pending={save.isPending} saved={save.isSuccess && !dirty} label="Save rules" disabled={!dirty || !complete} />
         </div>
+        <ErrorNote error={save.error} />
       </form>
     </section>
   );
@@ -402,10 +402,10 @@ function ReadSettingsForm({ initial }: { initial: ChangeSettings }) {
           />
         ))}
       </div>
-      <ErrorNote error={save.error} />
       <div className="flex flex-wrap items-center justify-end gap-2">
         <SubmitButton pending={save.isPending} saved={save.isSuccess} />
       </div>
+      <ErrorNote error={save.error} />
     </form>
   );
 }

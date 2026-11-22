@@ -140,8 +140,8 @@ function Body({
         )}
       </fieldset>
       {extra}
-      <ErrorNote error={save.error} />
       {canEdit && footer(<SubmitButton pending={save.isPending} saved={save.isSuccess} label={submitLabel} />)}
+      <ErrorNote error={save.error} />
     </form>
   );
 }

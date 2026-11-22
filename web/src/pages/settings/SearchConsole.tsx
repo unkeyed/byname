@@ -312,13 +312,13 @@ export function PropertyPicker({ s, onDone, onCancel, submitLabel }: { s: GscSta
           <span className="block text-xs text-muted">The first sync pulls every day Google keeps, about 16 months. Off, it starts with the last 28 days.</span>
         </span>
       </label>
-      <ErrorNote error={save.error} />
       <div className="flex gap-2">
         <Button type="submit" variant="primary" disabled={save.isPending}>
           {submitLabel ?? (s.property ? "Sync this property" : "Start syncing")}
         </Button>
         {onCancel && <Button onClick={onCancel}>Cancel</Button>}
       </div>
+      <ErrorNote error={save.error} />
     </form>
   );
 }

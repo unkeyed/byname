@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, type BrandEntry, type BrandInput } from "../api";
 import { keys, useBrands, useCan } from "../queries";
 import { Badge, Button, Card, ConfirmButton, cx, EmptyState, ErrorNote, Field, Icon, inputClass, Pending, selectClass } from "../ui";
-import { FieldNote } from "./forms";
+import { FieldNote, NoteSlot } from "./forms";
 import { commonWordAliases, parseHosts, splitList } from "./rules";
 
 type Kind = BrandInput["kind"];
@@ -151,7 +151,7 @@ function BrandRowForm({ all, editing, onDone }: { all: BrandEntry[]; editing?: B
           <Field label="Name">
             <input className={inputClass} value={d.name} onChange={(e) => set({ name: e.target.value })} placeholder="Kestrel" aria-invalid={tried && !!nameError} autoFocus={!!editing} />
           </Field>
-          {tried && nameError && <FieldNote tone="error">{nameError}</FieldNote>}
+          <NoteSlot>{tried && nameError && <FieldNote tone="error">{nameError}</FieldNote>}</NoteSlot>
         </div>
         <div>
           <Field label="Domain">
@@ -191,7 +191,6 @@ function BrandRowForm({ all, editing, onDone }: { all: BrandEntry[]; editing?: B
           <FieldNote tone="info">{kindInfo[d.kind].detail}</FieldNote>
         </div>
       </div>
-      <ErrorNote error={save.error} />
       <div className="flex justify-end gap-2">
         {onDone && (
           <Button variant="ghost" onClick={onDone}>
@@ -209,6 +208,7 @@ function BrandRowForm({ all, editing, onDone }: { all: BrandEntry[]; editing?: B
           )}
         </Button>
       </div>
+      <ErrorNote error={save.error} />
     </form>
   );
 }

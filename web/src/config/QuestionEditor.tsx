@@ -130,7 +130,6 @@ function EditorBody({
       )}
       {tried && rows.length === 0 && <FieldNote tone="error">Add at least one question.</FieldNote>}
       {tried && invalid.length > 0 && <FieldNote tone="error">Fix the {invalid.length === 1 ? "question" : `${invalid.length} questions`} marked above first.</FieldNote>}
-      {!carry && <ErrorNote error={save.error} />}
       {canEdit &&
         footer(
           <SubmitButton
@@ -139,6 +138,7 @@ function EditorBody({
             label={submitLabel ?? (current ? `Save as version ${current.version + 1}` : "Save questions")}
           />,
         )}
+      {!carry && <ErrorNote error={save.error} />}
 
       <Dialog open={carry !== null} onClose={() => setCarry(null)} title={`Save version ${(current?.version ?? 0) + 1}`} wide>
         {carry && current && (

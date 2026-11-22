@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { api, type MatchMode, type Settings, type SettingsView } from "../api";
 import { keys, useCan, useSettings } from "../queries";
 import { Button, cx, ErrorNote, Field, Icon, inputClass, labelClass, Pending, selectClass } from "../ui";
-import { defaultFooter, FieldNote, NumberField, ReadOnlyNote, SubmitButton, useSaveSettings, type Footer } from "./forms";
+import { defaultFooter, FieldNote, NoteSlot, NumberField, ReadOnlyNote, SubmitButton, useSaveSettings, type Footer } from "./forms";
 import { browserTimeZone, commonWordAliases, formatNumber, languages, markets, parseHost, parseHosts, parseNumber, splitList, timeZones } from "./rules";
 
 const matchModes: { mode: MatchMode; title: string; detail: string }[] = [
@@ -99,7 +99,7 @@ function BrandFormBody({ initial, retention, footer, onSaved, submitLabel }: { i
             <Field label="Brand name">
               <input className={inputClass} value={name} onChange={(e) => setName(e.target.value)} placeholder="Northwind" autoComplete="organization" aria-invalid={tried && !!nameError} />
             </Field>
-            {tried && nameError && <FieldNote tone="error">{nameError}</FieldNote>}
+            <NoteSlot>{tried && nameError && <FieldNote tone="error">{nameError}</FieldNote>}</NoteSlot>
           </div>
           <div>
             <Field label="Primary domain">
@@ -115,13 +115,15 @@ function BrandFormBody({ initial, retention, footer, onSaved, submitLabel }: { i
                 aria-invalid={tried && "error" in primaryParse}
               />
             </Field>
-            {"error" in primaryParse ? (
-              (tried || primary.trim()) && <FieldNote tone="error">{primaryParse.error}</FieldNote>
-            ) : primaryParse.trimmed ? (
-              <FieldNote tone="info">Kept the host only: {primaryParse.host}. Links to it and its subdomains count as citations.</FieldNote>
-            ) : (
-              <FieldNote tone="info">Links to it and its subdomains count as citations.</FieldNote>
-            )}
+            <NoteSlot>
+              {"error" in primaryParse ? (
+                (tried || primary.trim()) && <FieldNote tone="error">{primaryParse.error}</FieldNote>
+              ) : primaryParse.trimmed ? (
+                <FieldNote tone="info">Kept the host only: {primaryParse.host}. Links to it and its subdomains count as citations.</FieldNote>
+              ) : (
+                <FieldNote tone="info">Links to it and its subdomains count as citations.</FieldNote>
+              )}
+            </NoteSlot>
           </div>
         </div>
 
@@ -258,8 +260,8 @@ function BrandFormBody({ initial, retention, footer, onSaved, submitLabel }: { i
         )}
       </fieldset>
 
-      <ErrorNote error={save.error} />
       {canEdit && footer(<SubmitButton pending={save.isPending} saved={save.isSuccess} label={submitLabel} />)}
+      <ErrorNote error={save.error} />
     </form>
   );
 }

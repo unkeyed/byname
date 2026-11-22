@@ -185,9 +185,11 @@ function SearchForm({ s, canEdit }: { s: Settings; canEdit: boolean }) {
       </section>
 
       {canEdit && (
-        <div className="flex flex-wrap items-center justify-end gap-2">
+        <div className="space-y-2">
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <SubmitButton pending={save.isPending} saved={saved && !save.isPending} />
+          </div>
           <ErrorNote error={save.error} />
-          <SubmitButton pending={save.isPending} saved={saved && !save.isPending} />
         </div>
       )}
     </form>

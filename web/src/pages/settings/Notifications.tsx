@@ -344,7 +344,6 @@ function ChannelForm({ channel, events, onDone }: { channel?: NotificationChanne
               On. Turned off, the channel keeps its settings and gets nothing.
             </label>
           )}
-          <ErrorNote error={save.error} />
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={() => onDone()}>
               Cancel
@@ -353,6 +352,7 @@ function ChannelForm({ channel, events, onDone }: { channel?: NotificationChanne
               {editing ? "Save" : "Add channel"}
             </Button>
           </div>
+          <ErrorNote error={save.error} />
         </div>
       </DialogBody>
     </form>

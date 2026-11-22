@@ -169,13 +169,13 @@ function GoalForm({ goal, onDone }: { goal: Goal | null; onDone: () => void }) {
         ) : (
           <p className="text-xs text-muted">A goal with the same metric, window and due date is replaced.</p>
         )}
-        <ErrorNote error={save.error} />
         <div className="flex justify-end gap-2">
           <Button onClick={onDone}>Cancel</Button>
           <Button type="submit" variant="primary" disabled={!valid || save.isPending}>
             {goal ? "Save goal" : "Add goal"}
           </Button>
         </div>
+        <ErrorNote error={save.error} />
       </form>
     </DialogBody>
   );

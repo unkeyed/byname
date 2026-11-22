@@ -28,7 +28,6 @@ export interface StepNav {
 export function StepFooter({ nav, skip, children, note }: { nav: StepNav; skip?: boolean; children?: ReactNode; note?: ReactNode }) {
   return (
     <div className="space-y-2 border-t border-line pt-4">
-      <ErrorNote error={nav.error} />
       <div className="flex flex-wrap items-center gap-2">
         {nav.back && (
           <Link to={nav.back} className={buttonClass({ variant: "ghost" })}>
@@ -45,6 +44,7 @@ export function StepFooter({ nav, skip, children, note }: { nav: StepNav; skip?:
         )}
         {children}
       </div>
+      <ErrorNote error={nav.error} />
     </div>
   );
 }
