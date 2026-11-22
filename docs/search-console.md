@@ -1,6 +1,6 @@
 # Search Console
 
-Byname puts your Google Search Console numbers on the same timeline as your AI answers: daily clicks, impressions, CTR and position, brand against non-brand clicks, top pages and queries, and progress toward search goals. It reads Search Console straight from Google's API with read-only access. No third party sits in between, and Treg is not involved.
+Search Console is Google's free report of how often your site appears in Google results and how many people click. Byname puts its numbers on **Google search > Traffic**, on the same timeline as your AI answers: daily clicks, appearances (impressions), click rate (CTR, clicks divided by appearances) and average position (1 is the top), clicks from searches with your name against searches without it, top pages and searches, and progress toward goals. It reads Search Console straight from Google's API with read-only access. No third party sits in between, and Treg is not involved.
 
 You connect it in onboarding's fifth step, **Search Console**, or later under **Settings > Search Console**. Both offer the same Google sign-in, service account form and property picker. Only an Admin can connect it, and connecting needs a sign-in within the last 15 minutes. In onboarding, someone who is not an Admin sees a note to skip the step. The step offers **Skip** until a property is picked, and **Continue** after. There are two ways in:
 
@@ -55,7 +55,7 @@ Byname accepts a key with `type` `service_account`, a `client_email` and an RSA 
 | Domain | `sc-domain:example.com` | Every protocol and subdomain of the domain |
 | URL prefix | `https://www.example.com/` | Only URLs that start with the prefix |
 
-Pick a domain property when you have one. It counts traffic to every subdomain, the same way a link to any of your domains counts as a citation.
+Pick a domain property when you have one. It counts traffic to every subdomain, the same way a link to any of your domains counts as linking to your site.
 
 ## The sync
 
@@ -64,18 +64,18 @@ Pick a domain property when you have one. It counts traffic to every subdomain, 
 - Each sync pulls web search data per day four ways: site totals, by query, by page, and by query and page. It pages through 25,000 rows a request and commits 30 days at a time, so a long backfill that stops resumes where it left off.
 - Google marks recent days as not yet final. Byname stores them as partial, using Google's `firstIncompleteDate`, and overwrites them on the next sync. A final day is never replaced by a partial one. Search Console data lags about three days.
 - Two replicas never sync at once. The sync takes a Postgres advisory lock.
-- After a sync that succeeds, Byname checks goals and 28-day clicks, and raises **Goal reached** and **Search moved** alerts. [Notifications](notifications.md#events) says when each fires.
-- After a sync that succeeds, Byname also asks URL Inspection about pages with site changes and takes the change reads that are due. See [Changes](changes.md#recrawl-watch).
+- After a sync that succeeds, Byname checks goals and 28-day clicks, and raises **Goal reached** and **Google clicks moved** alerts. [Alerts](notifications.md#events) says when each fires.
+- After a sync that succeeds, Byname also asks URL Inspection about pages with site changes and works out the change results that are due. See [Site changes](changes.md#recrawl-watch).
 
-**Settings > Search Console** shows the property, the last sync and its error. **Change the connection** deletes the stored credential and stops syncing. The numbers already synced stay on the **Search** page.
+**Settings > Search Console** shows the property, the last sync and its error. **Change the connection** deletes the stored credential and stops syncing. The numbers already synced stay on **Google search > Traffic**.
 
 ## Branded search terms
 
-A query is brand when it contains one of your branded terms, ignoring case. By default the terms are your brand's name and aliases, lowercased, and they follow the name and aliases until someone changes them.
+A search counts as one with your name when it contains one of your branded terms, ignoring case. Every other search is a search without your name, which the API calls non-brand. By default the terms are your brand's name and aliases, lowercased, and they follow the name and aliases until someone changes them.
 
-You can change them in three places: the **Branded search terms** field in onboarding's first step, **Brand and domain**, the same field under **Settings > General**, and **Branded terms** on the brand card of the **Search** page. Agents use `PUT /v1/settings/branded-terms` or the `update_branded_terms` tool. **Use name and aliases**, or saving an empty list, goes back to the default.
+You can change them in three places: the **Branded search terms** field in onboarding's first step, **Brand and domain**, the same field under **Settings > General**, and **Branded terms** on the brand card of **Google search > Traffic**. Agents use `PUT /v1/settings/branded-terms` or the `update_branded_terms` tool. **Use name and aliases**, or saving an empty list, goes back to the default.
 
-Google hides rare queries, which come back with no query text. Byname counts those clicks as anonymized, never as non-brand, so non-brand clicks are a floor, not an estimate.
+Google hides rare queries, which come back with no query text. Byname counts those clicks as anonymized, never as searches without your name, so `non_brand_clicks`, the clicks from searches without your name, is a floor, not an estimate.
 
 ## Goals
 
@@ -83,9 +83,9 @@ A goal is a target for one metric over a trailing window, reached by a due date:
 
 | Field | Values |
 |---|---|
-| Metric | `clicks`, `impressions` or `non_brand_clicks` |
+| Metric | `clicks`, `impressions` (appearances) or `non_brand_clicks` (clicks from searches without your name) |
 | Window | 28 or 90 days |
 | Target | A whole number |
 | Due date | A date, such as `2030-06-30` |
 
-The **Search** page shows each goal's progress over its window, ending on the latest final day. Goals live in the database, so a new target needs no deploy. Editors and Admins add them on the **Search** page, or with `POST /v1/goals` and the `upsert_goal` MCP tool. Adding a goal with the same metric, window and due date as an existing one changes that goal's target.
+**Google search > Traffic** shows each goal's progress over its window, ending on the latest final day. Goals live in the database, so a new target needs no deploy. Editors and Admins add them on **Google search > Traffic**, or with `POST /v1/goals` and the `upsert_goal` MCP tool. Adding a goal with the same metric, window and due date as an existing one changes that goal's target.

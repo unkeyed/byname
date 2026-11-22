@@ -1,6 +1,6 @@
 # Social
 
-The **Social** page shows the public posts that name you on X, Reddit, Hacker News, LinkedIn, YouTube, Threads and Bluesky. You name the people and accounts to leave out, such as your team and your company's own accounts, so the page and the digest show what everyone else says. A digest of each day or week goes to your notification channels.
+The **Social** page shows the public posts that name you on X, Reddit, Hacker News, LinkedIn, YouTube, Threads and Bluesky. You name the people and accounts to leave out, such as your team and your company's own accounts, so the page and the digest show what everyone else says. A digest of each day or week shows under **Alerts** and goes wherever you send alerts.
 
 Six networks are searched through Treg with your Treg token. Bluesky is searched through its own public API, which needs no key and costs nothing. Without a Treg token, Byname searches Bluesky only.
 
@@ -10,7 +10,7 @@ Social is off until someone turns it on under **Settings > Social**, because the
 
 ## Where each network's posts come from
 
-Treg has no single search across social networks, so Byname pins one search per network, the same way it pins one endpoint per surface.
+Treg has no single search across social networks, so Byname pins one search per network, the same way it pins one endpoint per AI app.
 
 | Network | Searched through | Endpoint | Price per call | What a mention is |
 |---|---|---|---|---|
@@ -36,7 +36,7 @@ Anyone can read **Settings > Social**. An Editor or Admin can change it.
 - **Search every.** 1, 3, 6, 12 or 24 hours. The default is 6.
 - **Digest.** Daily or weekly, and for weekly the day the week starts. The default is weekly, starting Monday. Days follow the instance's time zone.
 
-The Treg token is set by an Admin under **Settings > Credentials**. See [Treg](engines/treg.md).
+The Treg token is set by an Admin under **Settings > Treg**. Treg is the service that runs each question and bills you per answer. See [Treg](engines/treg.md).
 
 ## Leave people out
 
@@ -58,20 +58,26 @@ The scheduler runs the search as the `social_fetch` job, inside the container, e
 - Each post is stored once, keyed by its network and the network's own post id. Finding a post again updates its engagement and keeps when it was first seen.
 - Each call and the posts it found are stored together, so a search cut off midway keeps the calls it finished, and the next search goes on from the newest post stored.
 
-Social searches share the monthly spend cap under **Settings > Limits** with AI checks. Before each Treg call Byname adds up this month's checks and social searches. Once the cap is reached, the Treg networks are skipped and the job ends as `capped`. Bluesky still runs, since it costs nothing. If Treg refuses a call, for example for an empty balance, the Treg networks are skipped and the job ends as `refused`. A provider error on one network is recorded on that network, and the other networks carry on.
+Social searches share the monthly spend cap under **Settings > Schedule and limits** with AI checks. Before each Treg call Byname adds up this month's checks and social searches. Once the cap is reached, the Treg networks are skipped and the job ends as `capped`. Bluesky still runs, since it costs nothing. If Treg refuses a call, for example for an empty balance, the Treg networks are skipped and the job ends as `refused`. A provider error on one network is recorded on that network, and the other networks carry on.
 
 Bluesky can start asking for sign-in at any time. When it answers `401` or `403`, Byname marks Bluesky **Unavailable** on **Settings > Social** and the **Social** page, skips it for the rest of that search, and notes it on the job. It tries again at the next search. The posts found so far stay.
 
 ## The digest
 
-When a day or week ends, Byname raises the **Social digest** event, once per period. It covers the posts first seen in the period, without the accounts left out at that moment, and has:
+When a day or week ends, Byname raises the **Social digest** alert, once per period. It covers the posts first seen in the period, without the accounts left out at that moment. It reads as a few sentences, then the top posts, for example:
 
-- the number of new mentions, and how many more came from left-out accounts,
-- the count per network, with each network's most engaged posts,
-- the new voices, the accounts whose first mention fell in the period,
-- what the period's searches cost, and how many Treg calls reported no cost.
+> Social digest: 12 new posts named you in the week of Nov 16
+>
+> 5 were on X, 4 on Reddit and 3 on Hacker News.
+> 3 people who had not mentioned you before posted about you: @dana, u/ledgerfan and 1 other.
+> 2 more posts came from accounts you left out, so they are not counted.
+> The posts people engaged with most:
+> @dana on X, with 40 likes, replies and reposts: “Northwind sorted our invoices” https://x.com/dana/status/1
+> Searching for posts cost $0.0138.
 
-A period in which nothing was searched raises no digest. The digest goes to every channel subscribed to **Social digest** and shows in the app to anyone with `results:read`. See [Notifications](notifications.md). The top of the **Social** page shows the latest period that has ended.
+The event's payload carries the same facts as numbers: the new mentions and how many more came from left-out accounts, the count per network with each network's most engaged posts, the new people, the accounts whose first mention fell in the period, and what the period's searches cost, with how many Treg calls reported no cost.
+
+A period in which nothing was searched raises no digest. The digest goes wherever **Settings > Alerts** sends **Social digest**, and shows in the app to anyone with `results:read`. See [Alerts](notifications.md). The top of the **Social** page shows the latest period that has ended.
 
 The digest is data only. Byname does not write a summary of it with a model.
 

@@ -2,16 +2,16 @@
 
 Byname reads its configuration from environment variables when it starts. `cmd/byname/main.go` reads them all in `loadConfig`, and this page lists every one. A change takes effect on the next start.
 
-Environment variables hold only secrets and infrastructure. Everything about your brand, questions, surfaces, schedule, provider keys, Search Console, site changes and notifications lives in Postgres. You set those in onboarding, in **Settings**, or through the REST API and MCP, so there are no schedule or provider-key variables.
+Environment variables hold only secrets and infrastructure. Everything about your brand, questions, AI apps, schedule, provider keys, Search Console, site changes and alerts lives in Postgres. You set those in onboarding, in **Settings**, or through the REST API and MCP, so there are no schedule or provider-key variables.
 
 | Variable | Required | Default | What it does |
 |---|---|---|---|
 | `DATABASE_URL` | Yes | none | The Postgres connection URL, for example `postgres://user:pass@host:5432/byname`. |
-| `ENCRYPTION_KEY` | Yes | none | 32 random bytes as base64 or hex, from `openssl rand -base64 32`. Encrypts provider keys, the Search Console credential, the GitHub token for site changes, notification channel secrets and TOTP seeds in the database. |
+| `ENCRYPTION_KEY` | Yes | none | 32 random bytes as base64 or hex, from `openssl rand -base64 32`. Encrypts provider keys, the Search Console credential, the GitHub token for site changes, the secrets of the places alerts go and TOTP seeds in the database. |
 | `ENCRYPTION_KEY_PREVIOUS` | No | none | The key you are rotating away from. Set it for one restart after changing `ENCRYPTION_KEY`. |
 | `MIGRATION_DATABASE_URL` | No | `DATABASE_URL` | A connection URL for a role that can create tables. Byname applies migrations through it, so `DATABASE_URL` can be a role that only reads and writes data. |
 | `PORT` | No | `8080` | The port the HTTP server listens on. |
-| `PUBLIC_URL` | No | `http://localhost:$PORT` | The URL people open Byname at, such as `https://byname.example.com`. Passkeys, sign-in callbacks, the Search Console callback, links in notifications and MCP sign-in depend on it. |
+| `PUBLIC_URL` | No | `http://localhost:$PORT` | The URL people open Byname at, such as `https://byname.example.com`. Passkeys, sign-in callbacks, the Search Console callback, links in alerts and MCP sign-in depend on it. |
 | `SETUP_TOKEN` | No | random | The token of the setup link, at least 32 characters. See [The setup link](sign-in.md#the-setup-link). |
 | `PASSWORD_LOGIN` | No | `false` | `true` lets people set a password, which always needs a second step. |
 | `ALLOWED_EMAIL_DOMAINS` | No | none | Comma-separated domains, such as `example.com`, whose addresses can join without an invite through Google Workspace or the OIDC issuer, in the role `ALLOWED_EMAIL_DOMAINS_ROLE` names. GitHub accounts always need an invite. |
@@ -72,10 +72,10 @@ MIGRATION_DATABASE_URL='postgres://admin:pass@host:5432/byname' byname migrate
 
 Byname hashes the tokens it only compares, such as session cookies, API keys, OAuth tokens and recovery codes. It must read some secrets back, so it encrypts those with AES-256-GCM under `ENCRYPTION_KEY`:
 
-- the Treg token and every provider key under **Settings > Credentials**
+- the Treg token under **Settings > Treg** and every key under **Settings > Provider keys**
 - the Search Console credential: the Google refresh token or the service account key
 - the GitHub token for site changes
-- each notification channel's secret: an SMTP password, an email API key, a Slack webhook URL or a webhook signing secret
+- the secret of each place alerts go: an SMTP password, an email API key, a Slack webhook URL or a webhook signing secret
 - each person's TOTP seed
 
 A database backup, a replica or a read-only role then reveals none of them. Each value is bound to its row, so copying one into another row does not decrypt it there.
@@ -86,7 +86,7 @@ Generate the key once and store it with your other secrets:
 openssl rand -base64 32
 ```
 
-If you lose the key, Byname cannot read those secrets and exits at start, naming the first one it could not read. To start again without them, delete the encrypted rows, then re-enter the keys under **Settings > Credentials**, reconnect Search Console, the GitHub repository under **Settings > Site changes** and the notification channels, and have each person set up their authenticator app again:
+If you lose the key, Byname cannot read those secrets and exits at start, naming the first one it could not read. To start again without them, delete the encrypted rows, then re-enter the Treg token under **Settings > Treg** and the keys under **Settings > Provider keys**, reconnect Search Console and the GitHub repository under **Settings > Site changes**, add where alerts go again under **Settings > Alerts**, and have each person set up their authenticator app again:
 
 ```sql
 DELETE FROM credential;
@@ -152,7 +152,7 @@ Never set these in production. Each one sends Byname's outbound calls, or lets i
 | `GSC_GOOGLE_BASE_URL` | Sends every Google call the Search Console connection makes, sign-in included, to this URL. |
 | `GITHUB_API_BASE_URL` | Sends every GitHub call that site changes make to this URL instead of `https://api.github.com`, such as a fake GitHub on localhost. |
 | `BLUESKY_BASE_URL` | Sends social search on Bluesky to this URL instead of `https://api.bsky.app`, such as a fake on localhost. |
-| `RESEND_BASE_URL` | Sends email API notification channels to this URL instead of `https://api.resend.com`. |
-| `SOURCES_ALLOW_PRIVATE_IPS` | `true` lets cited-source fetching reach private and loopback addresses, such as a fake site on localhost. Off by default, so a cited link cannot make Byname fetch from your internal network. |
+| `RESEND_BASE_URL` | Sends alerts that go by email through Resend to this URL instead of `https://api.resend.com`. |
+| `SOURCES_ALLOW_PRIVATE_IPS` | `true` lets the fetch of pages that answers link to reach private and loopback addresses, such as a fake site on localhost. Off by default, so a link in an answer cannot make Byname fetch from your internal network. |
 
 The tests read their own variables, which the server never reads. `TEST_DATABASE_URL` points the Go tests at a Postgres role that can create databases. `make e2e` reads `BASE_URL`, `E2E_SETUP_TOKEN`, `E2E_PUBLIC_URL`, `E2E_PASSKEY_FILE` and `E2E_ADMIN_EMAIL`. [CONTRIBUTING.md](../CONTRIBUTING.md) explains both.

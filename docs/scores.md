@@ -1,6 +1,6 @@
 # How answers are scored
 
-Every answer Byname stores says whether it named you, whether it linked to your site, and where you came among the brands it named. The scores on **Overview**, **Competitors**, **Gaps**, **Compare** and every chart add those up. This page covers the two things that most often make a score look better or worse than it is: questions that name your brand, and aliases that are everyday words.
+Every answer Byname stores says whether it named you, whether it linked to your site, and where you came among the brands it named. The scores on **This week**, **AI answers > Competitors**, **AI answers > Missed questions**, **AI answers > What changed** and every chart add those up. This page covers the two things that most often make a score look better or worse than it is: questions that name your brand, and aliases that are everyday words.
 
 ## Named you
 
@@ -10,21 +10,21 @@ Linking to one of your domains, or a subdomain of one, counts apart. An answer t
 
 ## Questions that name your brand
 
-A question such as "Is Northwind a good invoicing app?" puts your name in front of the AI, so its answers name you almost every time. Counted, that one question can lift your named-you rate and make you look like the leader against competitors when no buyer would ever ask that way.
+A question such as "Is Northwind a good invoicing app?" puts your name in front of the AI, so its answers name you almost every time. Counted, that one question can lift how often AI apps named you and make you look like the leader against competitors when no buyer would ever ask that way.
 
-So Byname still asks a question that names your brand and shows its answers on **Prompts**, in the questions table and in the question's history, but leaves its answers out of every score:
+So Byname still asks a question that names your brand and shows its answers on **AI answers > Questions**, in the questions table and in the question's history, where it says **Left out of scores**. It leaves its answers out of every score:
 
-- the named-you rate and the linked-to-your-site rate, per check and per line,
+- Named you and Linked to your site, per check and per AI app,
 - share of mentions, your position and your rank against competitors,
-- **Gaps**, where such a question never appears,
-- the gained, lost and moved counts on **Compare** and in the **Check completed** alert,
-- the engine drawer for each surface.
+- **AI answers > Missed questions**, where such a question never appears,
+- the answers that started or stopped naming you on **AI answers > What changed** and in the **Check completed** alert,
+- the panel for each AI app.
 
 A question names your brand by the same rules answers are scored with, above. Byname works it out again whenever you change the questions, your brand's name or aliases, the match mode, or a competitor's name, and on every start.
 
-To count one anyway, an Editor or Admin calls `PUT /v1/questions/{id}/scoring` with `{"count_in_scores": true}`, or the `set_question_scoring` tool. `false` leaves any question out, and `null` goes back to the default. The choice covers the earlier versions of the question, so charts don't jump where the question set changed, and it carries on into later versions. Only a question of the current set takes it.
+To count one anyway, an Editor or Admin clicks **Count it anyway** on the question, or calls `PUT /v1/questions/{id}/scoring` with `{"count_in_scores": true}`, or the `set_question_scoring` tool. `false` leaves any question out, and `null` goes back to the default. The choice covers the earlier versions of the question, so charts don't jump where the question set changed, and it carries on into later versions. Only a question of the current set takes it.
 
-Each question in `GET /v1/questions` has `names_brand` and `count_in_scores`. Each question in a results response has `counts_in_scores`. A check in `GET /v1/runs` has `succeeded`, every answer that did not fail, and `scored`, the ones that count. Its `mentioned` and `cited` are out of `scored`.
+Each question in `GET /v1/questions` has `names_brand` and `count_in_scores`. Each question in a results response has `counts_in_scores`. A check in `GET /v1/runs` has `succeeded`, every answer that did not fail, and `scored`, the ones that count. Its `mentioned`, the answers that named you, and `cited`, the answers that linked to your site, are out of `scored`.
 
 ## Aliases that are everyday words
 

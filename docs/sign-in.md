@@ -32,7 +32,7 @@ Every person has one of three roles. A role grants scopes, and the same scopes a
 
 | Role | Scopes | Also manages |
 |---|---|---|
-| Admin | `results:read`, `runs:write`, `config:write` | The Treg token and provider keys, Search Console, the GitHub repo for site changes, notification channels, API keys, connected apps and the team |
+| Admin | `results:read`, `runs:write`, `config:write` | The Treg token and provider keys, Search Console, the GitHub repo for site changes, where alerts go, API keys, connected apps and the team |
 | Editor | `results:read`, `runs:write`, `config:write` | Nothing beyond the scopes |
 | Viewer | `results:read` | Nothing beyond the scope |
 
@@ -40,9 +40,9 @@ The scopes mean:
 
 | Scope | Allows |
 |---|---|
-| `results:read` | Read runs, answers, raw responses, questions, brands, Search Console data, goals, site changes, control pages, the repo connection and settings. Never a secret. |
-| `runs:write` | Queue a check with **Run now**, and pause and resume scheduled checks. |
-| `config:write` | Edit the brand, competitors, questions and question sets, surfaces and models, the schedule, spend caps and run limits, goals, branded search terms, site changes logged by hand, control pages, path rules, and when change reads fall and what counts as a move. |
+| `results:read` | Read checks, answers, raw responses, questions, brands, Search Console data, goals, site changes, comparison pages, the repo connection, alerts and settings. Never a secret. |
+| `runs:write` | Queue a check with **Check now**, and pause and resume scheduled checks. |
+| `config:write` | Edit the brand, competitors, questions and question sets, AI apps and models, the schedule, spend caps and check limits, goals, branded search terms, site changes logged by hand, comparison pages, path rules, and when change results fall and what counts as a move. |
 
 The admin-only parts are never reachable with a key or an MCP token, whatever its scopes. Only a signed-in Admin can set them, and Byname never returns a stored secret through any API. Viewers see no write actions in the UI, and the API refuses them with `403`.
 
@@ -89,7 +89,7 @@ Some changes need a sign-in within the last 15 minutes:
 - inviting a teammate, changing a role or removing a teammate
 - setting or deleting a provider key or the Treg token
 - connecting Search Console
-- adding or editing a notification channel
+- adding or editing where alerts go
 
 After 15 minutes, Byname asks the person to confirm with a passkey or an app code. A person with neither confirms through a linked provider, which Byname asks to check them again (`prompt=login`).
 

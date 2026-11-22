@@ -79,7 +79,7 @@ Unkey stores variables per environment. Set these on the **production** environm
 | Variable | Value |
 |---|---|
 | `DATABASE_URL` | The read/write connection URL from step 2. Write-only. |
-| `ENCRYPTION_KEY` | 32 random bytes from `openssl rand -base64 32`. Write-only. Keep a copy in your password manager: Unkey cannot show a write-only value again, and Byname cannot read its stored provider keys and channel secrets without it. The agent saves it to `~/.byname-encryption-key` with mode `600` and asks you to move it. |
+| `ENCRYPTION_KEY` | 32 random bytes from `openssl rand -base64 32`. Write-only. Keep a copy in your password manager: Unkey cannot show a write-only value again, and Byname cannot read its stored provider keys and the secrets of the places alerts go without it. The agent saves it to `~/.byname-encryption-key` with mode `600` and asks you to move it. |
 | `SETUP_TOKEN` | 32 or more random characters, from `openssl rand -hex 32`. Write-only. You open the setup link with it in step 9. |
 | `CLIENT_IP_HEADER` | `X-Forwarded-For`. Unkey's gateway sets it to the client's address, so Byname throttles each client on its own instead of everyone behind the gateway at once. |
 

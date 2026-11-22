@@ -1,8 +1,8 @@
-# Changes
+# Site changes
 
-The **Changes** page answers one question: did a change you shipped to your site move the page in Google search once Google recrawled it? Byname records each change to a page, waits for Google's first crawl of the page after the change, and then compares the page's Search Console numbers before and after against control pages you leave alone.
+**Google search > Site changes** answers one question: did a change you shipped to your site help the page in Google once Google saw it? Byname records each change to a page, waits until Google sees the change, which is Google's first crawl of the page after it, and then compares the page's Search Console numbers before and after with comparison pages: a few steady pages you promise not to edit.
 
-A change comes from one of two places. Byname reads pull requests merged into your site's GitHub repository, or someone logs the change by hand. Either way, the crawl and the reads need Search Console. Without it, Byname still records changes but cannot see Google crawl them or take their reads. [Search Console](search-console.md) explains the connection and the daily sync.
+A change comes from one of two places. Byname reads pull requests merged into your site's GitHub repository, or someone logs the change by hand. Either way, seeing Google's crawl and working out the results need Search Console. Without it, Byname still records changes but cannot see Google crawl them or work out their results. [Search Console](search-console.md) explains the connection and the daily sync.
 
 `internal/changes` holds all of it, and this page follows that package.
 
@@ -25,9 +25,9 @@ Each poll lists the pull requests merged into the default branch, newest update 
 
 For each merged pull request, Byname maps every changed file through the path rules and stores one change per page. A page whose files include an added file is a new page. Otherwise, a page with a removed file is removed, and any other page is an edit. A pull request read twice updates its changes in place, so no change is stored twice.
 
-GitHub sends the token's expiry in the `GitHub-Authentication-Token-Expiration` header on every call made with a fine-grained token. Byname records it on each poll and each **Test**, and **Settings > Site changes** shows it. A token without an expiry shows **Never**. Within 14 days of the expiry, Settings and the **Changes** page warn, and Byname raises a **Token expiring** alert, which only Admins see. See [Notifications](notifications.md).
+GitHub sends the token's expiry in the `GitHub-Authentication-Token-Expiration` header on every call made with a fine-grained token. Byname records it on each poll and each **Test**, and **Settings > Site changes** shows it. A token without an expiry shows **Never**. Within 14 days of the expiry, Settings and **Google search > Site changes** warn, and Byname raises a **Token expiring** alert, which only Admins see. See [Alerts](notifications.md).
 
-When a poll fails, Settings and the **Changes** page show why. A `401` from GitHub means the token expired or was revoked. A `404` means the repository does not exist or the token cannot read it.
+When a poll fails, Settings and **Google search > Site changes** show why. A `401` from GitHub means the token expired or was revoked. A `404` means the repository does not exist or the token cannot read it.
 
 ## Map files to pages
 
@@ -51,7 +51,7 @@ An Admin edits the rules under **Settings > Site changes**. A key or MCP connect
 
 ## Log a change by hand
 
-For a site without GitHub, or a change made outside it, an Editor or Admin clicks **Log a change** on the **Changes** page. A change logged by hand needs:
+For a site without GitHub, or a change made outside it, an Editor or Admin clicks **Log a change** on **Google search > Site changes**. A change logged by hand needs:
 
 - the page's full URL, as Search Console reports it
 - what changed: **New page**, **Edit** or **Removed**
@@ -63,63 +63,63 @@ Only a change logged by hand can be deleted. A change from GitHub follows the re
 
 ## Recrawl watch
 
-A verdict is only fair once Google has seen the change, so the clock starts at Google's first crawl after it, not at the merge. After each Search Console sync that completes, Byname runs the `recrawl_watch` job and then the `verdicts` job.
+A result is only fair once Google has seen the change, so the clock starts at Google's first crawl after it, not at the merge. After each Search Console sync that completes, Byname runs the `recrawl_watch` job and then the `verdicts` job.
 
-Recrawl watch asks Google's URL Inspection API about each page with a change that Google has not crawled since, the oldest change first. It records Google's verdict, the coverage state, the last crawl time, and the canonical URLs. When the last crawl is after the change, that crawl becomes the change's first crawl. The interim and final read days then follow from the crawl's day in the instance's time zone.
+Recrawl watch asks Google's URL Inspection API about each page with a change that Google has not crawled since, the oldest change first. It records Google's inspection result, the coverage state, the last crawl time, and the canonical URLs. When the last crawl is after the change, that crawl becomes the change's first crawl, shown as **Google saw it**. The days of the first and final results then follow from the crawl's day in the instance's time zone.
 
 - Byname spends at most 200 inspections per Pacific Time day, the day Google's quota follows. Google allows 2,000 per property. Pages past the cap wait for the next day's sync.
 - URL Inspection reports only Google's latest crawl of a page, not each crawl. Byname inspects a waiting page after each daily sync, so the first crawl it records is within a day of the real one. If Google crawled twice between two inspections, Byname records the later crawl.
 - URL Inspection reads what Google knows. It cannot ask Google to crawl or index a page.
 
-The change's timeline in the **Changes** page lists each inspection.
+The change's timeline on **Google search > Site changes** lists each inspection.
 
-## How a change gets its verdict
+## How a change gets its result
 
-Verdicts are experimental. The method is new and has few real verdicts behind it yet, so the app labels every read **Experimental**. Check a surprising verdict against the page's numbers on the Search page before acting on it.
+Results are experimental. The method is new and has few real results behind it yet, so the app labels every result **Experimental**. Check a surprising result against the page's numbers on **Google search > Traffic** before acting on it.
 
-Each change gets two reads, counted in days from the day of its first crawl:
+Each change gets two results, counted in days from the day Google saw it:
 
-1. The interim read, after 17 days by default. It is provisional, and the page marks it so.
-2. The final read, after 31 days by default. It sets the change's verdict and raises a **Change verdict** alert.
+1. The first result, after 17 days by default. It is provisional, and the page marks it so.
+2. The final result, after 31 days by default. It settles whether the change helped and raises a **Change result** alert.
 
-The `verdicts` job takes each read on or after its day, as days in the instance's time zone, and stores each read once. It also stores each change's before numbers, the page's totals over the final-read length ending the day before the merge, once Search Console has finalized those days.
+The `verdicts` job works out each result on or after its day, as days in the instance's time zone, and stores each one once. It also stores each change's before numbers, the page's totals over the final result's length ending the day before the merge, once Search Console has finalized those days.
 
-`assess` in `internal/changes/verdict.go` defines the method. Each read is a difference-in-differences check. The change in the page's numbers, minus the change in the control pages' numbers over the same days, removes what moved every page, such as seasonality or a swing in demand.
+`assess` in `internal/changes/verdict.go` defines the method. Each result is a difference-in-differences check. The change in the page's numbers, minus the change in the comparison pages' numbers over the same days, removes what moved every page, such as seasonality or a swing in demand.
 
 ### Windows
 
-Search Console reports Pacific Time days, so Byname places merges and crawls on Pacific Time days. The read's length is 17 days for the interim read and 31 for the final read, by default.
+Search Console reports Pacific Time days, so Byname places merges and crawls on Pacific Time days. The length is 17 days for the first result and 31 for the final result, by default.
 
-- The after window runs from the day after the first crawl for the read's length. It stops early at the latest day Search Console has finalized. Call its length `n` days.
+- The after window runs from the day after the first crawl for the result's length. It stops early at the latest day Search Console has finalized. Call its length `n` days.
 - The before window is the `n` days that end the day before the merge.
 - The days from the merge to the first crawl are in neither window. The page had changed, but Google had not seen it.
 
 ### Totals
 
-Only days that Search Console marks final count. A day the page has no row for had no impressions. Byname totals the changed page and the control set over each window. The control set is every control page whose hold date is on or after the read day, without the changed page itself.
+Only days that Search Console marks final count. A day the page has no row for had no impressions. Byname totals the changed page and the comparison set over each window. The comparison set is every comparison page whose hold date is on or after the result's day, without the changed page itself.
 
-- Clicks and impressions are sums.
-- Position is the mean of the daily average positions, weighted by impressions.
-- CTR is clicks over impressions.
+- Clicks and appearances (impressions) are sums.
+- Average position is the mean of the daily average positions, weighted by appearances. 1 is the top.
+- Click rate (CTR) is clicks over appearances.
 
 ### Not enough data
 
-A read's outcome is `insufficient_data`, with the reason, when:
+A result's outcome is `insufficient_data`, not enough data, with the reason, when:
 
 - the after window has fewer than 7 final days
 - the stored Search Console history does not reach back to the start of the before window
-- there are no active control pages
-- the page, or the control set, had no impressions in the before window or in the after window
+- there are no active comparison pages
+- the page, or the comparison set, had no appearances in the before window or in the after window
 
 ### Deltas
 
-Each delta is the page's change minus the control set's change:
+Each delta is the page's change minus the comparison set's change:
 
 | Delta | Formula | Reads as |
 |---|---|---|
-| Position | (page after - page before) - (control after - control before), in places | Negative means the page moved up |
-| CTR | The same over CTR, in percentage points | Positive means the page gained clicks per impression |
-| Impressions | (page after / page before) / (control after / control before), a ratio | Above 1 means the page gained on the controls |
+| Average position | (page after - page before) - (comparison after - comparison before), in places | Negative means the page moved up |
+| Click rate (CTR) | The same over click rate, in percentage points | Positive means the page gained clicks per appearance |
+| Appearances (impressions) | (page after / page before) / (comparison after / comparison before), a ratio | Above 1 means the page gained on the comparison pages |
 
 ### Signals and outcome
 
@@ -127,39 +127,39 @@ Each delta that passes its threshold is a signal, for the better or for the wors
 
 | Metric | Improved at | Worsened at | Default threshold |
 |---|---|---|---|
-| Position | -T places or less | +T places or more | 2.5 places |
-| CTR | +T points or more | -T points or less | 0.8 percentage points |
-| Impressions | A ratio of T or more | A ratio of 1/T or less | 2.7 |
+| Average position | -T places or less | +T places or more | 2.5 places |
+| Click rate (CTR) | +T points or more | -T points or less | 0.8 percentage points |
+| Appearances (impressions) | A ratio of T or more | A ratio of 1/T or less | 2.7 |
 
-The outcome is `improved` when at least one signal improved and none worsened, and `worsened` when at least one worsened and none improved. It is `no_change` when no signal fired, or when signals point both ways.
+The outcome is `improved`, shown as helped, when at least one signal improved and none worsened, and `worsened`, shown as hurt, when at least one worsened and none improved. It is `no_change` when no signal fired, or when signals point both ways.
 
-## Change the read days and thresholds
+## Change the result days and thresholds
 
-The days and thresholds above are defaults. An Admin changes them under **Settings > Site changes**, in **Reads**. A key or MCP connection with `config:write` can change them with `PUT /v1/changes/settings` or the `update_change_settings` tool.
+The days and thresholds above are defaults. An Admin changes them under **Settings > Site changes**. A key or MCP connection with `config:write` can change them with `PUT /v1/changes/settings` or the `update_change_settings` tool.
 
 | Setting | Field | Default | Allowed |
 |---|---|---|---|
-| Interim read | `interim_days` | 17 | 7 to 90 days |
-| Final read | `verdict_days` | 31 | 14 to 180 days, and more than `interim_days` |
-| Position | `position` | 2.5 | More than 0, at most 50 places |
-| CTR | `ctr_points` | 0.8 | More than 0, at most 50 points |
-| Impressions | `impressions_ratio` | 2.7 | More than 1, at most 100 |
+| First result | `interim_days` | 17 | 7 to 90 days |
+| Final result | `verdict_days` | 31 | 14 to 180 days, and more than `interim_days` |
+| Average position | `position` | 2.5 | More than 0, at most 50 places |
+| Click rate (CTR) | `ctr_points` | 0.8 | More than 0, at most 50 points |
+| Appearances (impressions) | `impressions_ratio` | 2.7 | More than 1, at most 100 |
 
-A change already crawled keeps the read days it was given. Every read taken after a save uses the new thresholds.
+A change Google has already seen keeps the result days it was given. Every result worked out after a save uses the new thresholds.
 
-## Control pages
+## Comparison pages
 
-Control pages are the baseline every read compares against. Each is a page you promise not to change until its hold date, the last day it counts. Pick pages with steady traffic that are like the pages you change.
+Comparison pages are the baseline every result compares against. Each is a page you promise not to change until its hold date, the last day it counts. Pick pages with steady traffic that are like the pages you change. The API calls them control pages.
 
-An Editor or Admin adds them on the **Changes** page, under **Control pages**. A key or MCP connection with `config:write` can use `POST /v1/control-pages` or the `upsert_control_page` tool. Adding a URL that is already a control page changes its hold date and note.
+An Editor or Admin adds them on **Google search > Site changes**, under **Comparison pages**. A key or MCP connection with `config:write` can use `POST /v1/control-pages` or the `upsert_control_page` tool. Adding a URL that is already a comparison page changes its hold date and note.
 
-A control page counts in a read while its hold date is on or after the read day, in the instance's time zone. After that, the page shows as **Ended** and drops out of the control set. A changed page never counts as its own control. Byname does not check whether a control page changed during its hold. A control page you change early skews every read that uses it, and with no active control pages every read is `insufficient_data`.
+A comparison page counts in a result while its hold date is on or after the result's day, in the instance's time zone. After that, the page shows as **Ended** and drops out of the comparison set. A changed page never counts as its own comparison. Byname does not check whether a comparison page changed during its hold. A comparison page you change early skews every result that uses it, and with no active comparison pages every result is `insufficient_data`.
 
-## What the Changes page shows
+## What Site changes shows
 
-The **Changes** page lists every change, the latest merge first, with its page, its pull request or manual log, the merge day, Google's first crawl after it, the interim and final reads, and its status. Opening a change shows its before numbers, both reads against the control pages, and its timeline of the merge, each inspection, the first crawl, and the read days. The **Search** page marks each merged pull request and each change logged by hand on its daily chart.
+**Google search > Site changes** lists every change, the latest merge first, with its page, its pull request or manual log, the merge day, **Google saw it**, the **First result** and **Final result**, and its status. Opening a change shows its before numbers, both results against the comparison pages, and its timeline of the merge, each inspection, the day Google saw it, and the result days. An alert about a change links to `/google/site-changes?chg=<id>`, which opens that change. **Google search > Traffic** marks each merged pull request and each change logged by hand on its daily chart.
 
-Search Console data arrives about three days late, and one page's impressions swing with demand as much as with rank. Read a verdict as evidence about one page, not as proof.
+Google data arrives about three days late, and one page's appearances swing with demand as much as with rank. Read a result as evidence about one page, not as proof.
 
 ## Routes and MCP tools
 
@@ -167,16 +167,16 @@ Each REST route has an MCP tool with the same scope, except the three that manag
 
 | Route | MCP tool | Needs | Does |
 |---|---|---|---|
-| `GET /v1/changes` | `list_changes` | `results:read` | Lists every change with its reads |
+| `GET /v1/changes` | `list_changes` | `results:read` | Lists every change with its results |
 | `GET /v1/changes/{id}` | `get_change` | `results:read` | Returns one change with its timeline and inspections |
 | `POST /v1/changes` | `log_change` | `config:write` | Logs a change by hand |
 | `DELETE /v1/changes/{id}` | `delete_change` | `config:write` | Deletes a change logged by hand |
 | `GET /v1/changes/markers` | `change_markers` | `results:read` | Lists one chart marker per merge between `from` and `to` |
-| `GET /v1/changes/settings` | `change_settings` | `results:read` | Returns the read days and thresholds |
-| `PUT /v1/changes/settings` | `update_change_settings` | `config:write` | Replaces the read days and thresholds |
-| `GET /v1/control-pages` | `list_control_pages` | `results:read` | Lists the control pages with their hold dates |
-| `POST /v1/control-pages` | `upsert_control_page` | `config:write` | Adds a control page, or updates the one with the same URL |
-| `DELETE /v1/control-pages/{id}` | `delete_control_page` | `config:write` | Removes a control page |
+| `GET /v1/changes/settings` | `change_settings` | `results:read` | Returns the result days and thresholds |
+| `PUT /v1/changes/settings` | `update_change_settings` | `config:write` | Replaces the result days and thresholds |
+| `GET /v1/control-pages` | `list_control_pages` | `results:read` | Lists the comparison pages with their hold dates |
+| `POST /v1/control-pages` | `upsert_control_page` | `config:write` | Adds a comparison page, or updates the one with the same URL |
+| `DELETE /v1/control-pages/{id}` | `delete_control_page` | `config:write` | Removes a comparison page |
 | `GET /v1/repo` | `repo_status` | `results:read` | Returns the repository, the token's expiry, the path rules and the last poll, never the token |
 | `PUT /v1/repo/rules` | `update_path_rules` | `config:write` | Replaces the path rules |
 | `PUT /v1/repo` | None | A signed-in Admin, signed in within 15 minutes | Connects a repository with a token |
