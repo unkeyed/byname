@@ -46,33 +46,8 @@ export function parseHosts(raw: string): HostsParse {
   return { hosts, trimmed };
 }
 
-/**
- * Everyday English words that brands borrow. An alias like this matches
- * sentences that are not about you, so the form warns before it is saved.
- */
-const commonWords = new Set(
-  `able access air apple arc atlas base beacon bee bird blue bolt box bridge bright build buzz cast cell chain chat check clear click cloud code
-  core craft cube dash data deck delta dot drive drop echo edge element engine fast field fire flash flow fly focus force forge form frame
-  fresh fuel fusion gate gem glass go grid ground guard harbor hive home hub ice ink iron jet key kit lab labs land launch layer leaf level
-  light line link lion live loop magnet map mark matter mesh mind mint mode motion nest net next node north nova oak ocean one open orbit
-  origin page path peak pilot pine pixel place plan planet play plus point pulse quest rain range ray reach ready relay ridge ring rise river
-  rock root route run sage scale scout seed shape shield shift signal simple sky slate snap solid space spark sphere spring square stack star
-  station stone storm stream summit sun swift sync table task terra thread tide time token tower track trail tree true unit vault vector
-  view vision volt wave way well wind wing wire wise works yard zen zero zone`.split(/\s+/),
-);
-
-/** Aliases that are everyday words, as typed. */
-export const commonWordAliases = (aliases: string[]) => aliases.filter((a) => commonWords.has(a.toLowerCase()));
-
 /** A question's identity for deduplication and carrying over, the server's rule: lowercase letters and digits only. */
 export const normalizeQuestion = (text: string) => text.toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
-
-const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-
-/** The names in text, whole word and ignoring case. */
-export function namesIn(text: string, names: string[]): string[] {
-  return names.filter((n) => n.trim() && new RegExp(`(?<![\\p{L}\\p{N}])${escapeRegExp(n.trim())}(?![\\p{L}\\p{N}])`, "iu").test(text));
-}
 
 export const questionLength = { min: 10, max: 300 };
 export const groupMax = 80;
@@ -123,6 +98,57 @@ export function parseCSV(input: string): string[][] {
 export interface DraftQuestion {
   group: string;
   text: string;
+}
+
+/** What the person tells Suggest questions about what they sell. Every field may be empty. */
+export interface SuggestInput {
+  category: string;
+  audience: string;
+  job: string;
+  competitors: string[];
+}
+
+/** "an invoicing app" becomes "invoicing app", "to send an invoice" becomes "send an invoice", so the templates read well. */
+const bare = (s: string) =>
+  s
+    .trim()
+    .replace(/\s+/g, " ")
+    .replace(/^(how (do i|to) |to )/i, "")
+    .replace(/^(a|an|the) /i, "")
+    .replace(/[?.!]+$/, "");
+
+type Fill = { category: string; audience: string; job: string; rival: string; other: string };
+
+/**
+ * The question templates. Each returns null when an input it needs is
+ * empty; perRival ones run once for each competitor. Nothing calls a model.
+ */
+const templates: { group: string; perRival?: boolean; make: (v: Fill) => string | null }[] = [
+  { group: "Best for", make: (v) => (v.category && v.audience ? `What's the best ${v.category} for ${v.audience}?` : null) },
+  { group: "Best for", make: (v) => (v.category ? `What's the best ${v.category} right now?` : null) },
+  { group: "Best for", make: (v) => (v.category && v.audience ? `Which ${v.category} do ${v.audience} recommend?` : null) },
+  { group: "Pricing", make: (v) => (v.category ? `Which ${v.category} has a free plan?` : null) },
+  { group: "Pricing", make: (v) => (v.category ? `What's the cheapest ${v.category} that is still good?` : null) },
+  { group: "How to", make: (v) => (v.job ? `How do I ${v.job}?` : null) },
+  { group: "How to", make: (v) => (v.job && v.audience ? `What's the easiest way for ${v.audience} to ${v.job}?` : null) },
+  { group: "Comparisons", perRival: true, make: (v) => (v.rival ? `${v.rival} alternatives` : null) },
+  { group: "Comparisons", perRival: true, make: (v) => (v.rival ? `Is there a cheaper alternative to ${v.rival}?` : null) },
+  { group: "Comparisons", perRival: true, make: (v) => (v.rival && v.other ? `${v.rival} vs ${v.other}: which is better?` : null) },
+];
+
+/** Draft questions from the templates, for the person to edit or remove before saving. */
+export function suggestQuestions(input: SuggestInput): DraftQuestion[] {
+  const base = { category: bare(input.category), audience: bare(input.audience), job: bare(input.job) };
+  const rivals = input.competitors.slice(0, 3);
+  // Each competitor is paired with the next, so three competitors make three "vs" questions and two make one.
+  const fills: Fill[] = rivals.map((rival, i) => ({ ...base, rival, other: rivals.length > 2 || i === 0 ? (rivals[(i + 1) % rivals.length] ?? "") : "" }));
+  const out: DraftQuestion[] = [];
+  for (const t of templates)
+    for (const v of t.perRival ? fills : [{ ...base, rival: "", other: "" }]) {
+      const text = t.make(v);
+      if (text && !questionError(t.group, text) && !out.some((q) => q.text === text)) out.push({ group: t.group, text });
+    }
+  return out;
 }
 
 /**

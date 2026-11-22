@@ -3,6 +3,8 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, type Settings, type SettingsView } from "../api";
 import { keys } from "../queries";
 import { Button, cx, Icon, inputClass, labelClass, SteadyLabel } from "../ui";
+import { refreshCosts } from "./costs";
+import { forgetNaming } from "./naming";
 import { editable, numberFields, type NumberKey } from "./rules";
 
 /**
@@ -20,6 +22,8 @@ export function useSaveSettings(onSaved?: (v: SettingsView) => unknown) {
       qc.setQueryData(keys.settings, v);
       void qc.invalidateQueries({ queryKey: keys.brands });
       void qc.invalidateQueries({ queryKey: keys.estimate });
+      void refreshCosts(qc);
+      forgetNaming(qc);
       return onSaved?.(v);
     },
   });

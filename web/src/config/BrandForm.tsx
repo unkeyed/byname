@@ -3,14 +3,15 @@ import { useQueryClient } from "@tanstack/react-query";
 import { api, type MatchMode, type Settings, type SettingsView } from "../api";
 import { keys, useCan, useSettings } from "../queries";
 import { Button, cx, ErrorNote, Field, Icon, inputClass, labelClass, Pending, selectClass } from "../ui";
-import { defaultFooter, FieldNote, NoteSlot, NumberField, ReadOnlyNote, SubmitButton, useSaveSettings, type Footer } from "./forms";
-import { browserTimeZone, commonWordAliases, formatNumber, languages, markets, parseHost, parseHosts, parseNumber, splitList, timeZones } from "./rules";
+import { defaultFooter, Disclosure, FieldNote, NoteSlot, NumberField, ReadOnlyNote, SubmitButton, useSaveSettings, type Footer } from "./forms";
+import { useCommonWords } from "./naming";
+import { browserTimeZone, formatNumber, languages, markets, parseHost, parseHosts, parseNumber, splitList, timeZones } from "./rules";
 
 const matchModes: { mode: MatchMode; title: string; detail: string }[] = [
   {
     mode: "whole_word",
     title: "Whole word, case-sensitive",
-    detail: "Counts “Northwind” and your aliases as whole words, written as you wrote them. “northwinds” or “NORTHWIND” do not count.",
+    detail: "Counts “Northwind” and your other names as whole words, written as you wrote them. “northwinds” or “NORTHWIND” do not count.",
   },
   {
     mode: "self_anywhere",
@@ -54,7 +55,7 @@ function BrandFormBody({ initial, retention, footer, onSaved, submitLabel }: { i
   const primaryParse = primary.trim() ? parseHost(primary) : { error: "Your primary domain is required, such as northwind.com." };
   const othersParse = parseHosts(others);
   const aliasList = splitList(aliases);
-  const common = commonWordAliases(aliasList);
+  const common = useCommonWords(aliasList);
   const retentionParse = keepForever ? { value: null } : parseNumber("raw_retention_days", retentionDays);
   const otherHosts = "hosts" in othersParse && "host" in primaryParse ? othersParse.hosts.filter((h) => h !== primaryParse.host) : [];
   const repeated = "hosts" in othersParse && "host" in primaryParse && othersParse.hosts.includes(primaryParse.host);
@@ -119,46 +120,46 @@ function BrandFormBody({ initial, retention, footer, onSaved, submitLabel }: { i
               {"error" in primaryParse ? (
                 (tried || primary.trim()) && <FieldNote tone="error">{primaryParse.error}</FieldNote>
               ) : primaryParse.trimmed ? (
-                <FieldNote tone="info">Kept the host only: {primaryParse.host}. Links to it and its subdomains count as citations.</FieldNote>
+                <FieldNote tone="info">Kept the host only: {primaryParse.host}. An answer that links here counts as linked to your site.</FieldNote>
               ) : (
-                <FieldNote tone="info">Links to it and its subdomains count as citations.</FieldNote>
+                <FieldNote tone="info">An answer that links here, or to a subdomain, counts as linked to your site.</FieldNote>
               )}
             </NoteSlot>
           </div>
         </div>
 
         <div>
-          <Field label="Aliases" hint={!common.length && "Comma separated. Each counts as your brand, such as “Northwind Cloud” or “NW Deploy”."}>
+          <Field label="Other names (optional)">
             <input className={inputClass} value={aliases} onChange={(e) => setAliases(e.target.value)} placeholder="Northwind Cloud, NW Deploy" />
           </Field>
-          {common.length > 0 && (
+          {common.length > 0 ? (
             <FieldNote tone="warn">
-              {common.map((c) => `“${c}”`).join(", ")} {common.length === 1 ? "is an everyday word" : "are everyday words"}, so answers that are not about you would count as
-              mentions. Prefer a longer alias, such as “{common[0]} by {name.trim() || "Northwind"}”.
+              {common.map((c) => `“${c}”`).join(", ")} {common.length === 1 ? "is an everyday word" : "are everyday words"}. An answer that says “{common[0]} up the totals” would count
+              as naming you. Use a longer form, such as “{common[0]} by {name.trim() || "Northwind"}”, or remove it.
             </FieldNote>
+          ) : (
+            <FieldNote tone="info">Comma separated. Short names or product names an answer might use for you, such as “Northwind Cloud”. Each counts as naming you.</FieldNote>
           )}
         </div>
 
-        <div>
-          <Field
-            label="Branded search terms"
-            hint={
-              !termsError &&
-              (following
-                ? "Comma separated. A Search Console query containing one counts as brand. These follow your name and aliases until you change them."
-                : "Comma separated, saved lowercased. A Search Console query containing one counts as brand.")
-            }
-          >
-            <input className={inputClass} value={shownTerms} onChange={(e) => setTermsEdit({ text: e.target.value })} placeholder={defaultTerms.join(", ") || "northwind"} autoCapitalize="none" spellCheck={false} />
-          </Field>
-          {termsError && <FieldNote tone="error">{termsError}</FieldNote>}
-          {!following && (
-            <Button size="sm" variant="ghost" className="mt-1 -ml-2" onClick={() => setTermsEdit({ follow: true })}>
-              <Icon name="reset" className="size-3.5" />
-              Use name and aliases
-            </Button>
-          )}
-        </div>
+        <Disclosure summary="Google searches for your name (optional)" open={!following || !!termsError || undefined}>
+          <p className="text-xs text-muted">
+            If you connect Google Search Console in a later step, Byname splits the Google searches that find your site into people who typed your name and everyone else. A search
+            containing one of these words counts as typing your name. They follow your name and other names until you change them.
+          </p>
+          <div>
+            <Field label="Words that mean your brand" hint={!termsError && "Comma separated, saved lowercased."}>
+              <input className={inputClass} value={shownTerms} onChange={(e) => setTermsEdit({ text: e.target.value })} placeholder={defaultTerms.join(", ") || "northwind"} autoCapitalize="none" spellCheck={false} />
+            </Field>
+            {termsError && <FieldNote tone="error">{termsError}</FieldNote>}
+            {!following && (
+              <Button size="sm" variant="ghost" className="mt-1 -ml-2" onClick={() => setTermsEdit({ follow: true })}>
+                <Icon name="reset" className="size-3.5" />
+                Use your name and other names
+              </Button>
+            )}
+          </div>
+        </Disclosure>
 
         <fieldset>
           <legend className={labelClass}>Match mode</legend>
@@ -203,7 +204,7 @@ function BrandFormBody({ initial, retention, footer, onSaved, submitLabel }: { i
         </div>
 
         <div className="grid gap-5 sm:grid-cols-3">
-          <Field label="Market" hint="Where engines that take a location ask from.">
+          <Field label="Market" hint="AI apps that take a location ask as if from here.">
             <select className={cx(selectClass, "w-full")} value={market} onChange={(e) => setMarket(e.target.value)}>
               {markets(market).map((m) => (
                 <option key={m.code} value={m.code}>
@@ -212,7 +213,7 @@ function BrandFormBody({ initial, retention, footer, onSaved, submitLabel }: { i
               ))}
             </select>
           </Field>
-          <Field label="Language" hint="For engines that take one.">
+          <Field label="Language" hint="For AI apps that take one.">
             <select className={cx(selectClass, "w-full")} value={language} onChange={(e) => setLanguage(e.target.value)}>
               {languages(language).map((l) => (
                 <option key={l.code} value={l.code}>

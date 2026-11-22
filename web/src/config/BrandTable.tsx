@@ -4,15 +4,16 @@ import { api, type BrandEntry, type BrandInput } from "../api";
 import { keys, useBrands, useCan } from "../queries";
 import { Badge, Button, Card, ConfirmButton, cx, EmptyState, ErrorNote, Field, Icon, inputClass, Pending, selectClass } from "../ui";
 import { FieldNote, NoteSlot } from "./forms";
-import { commonWordAliases, parseHosts, splitList } from "./rules";
+import { forgetNaming, useCommonWords } from "./naming";
+import { parseHosts, splitList } from "./rules";
 
 type Kind = BrandInput["kind"];
 
 export const kindInfo: Record<Kind, { label: string; detail: string }> = {
-  competitor: { label: "Competitor", detail: "Counted in share of voice and shown beside you." },
+  competitor: { label: "Competitor", detail: "A brand people buy instead of you. Counted in share of mentions and shown beside you." },
   technology: {
     label: "Technology",
-    detail: "Something answers name alongside you that nobody buys instead of you, such as Kubernetes or Redis. Stored and shown, never counted in share of voice.",
+    detail: "Named alongside you, but nobody buys it instead of you, such as Stripe or Excel. Shown, never counted in share of mentions.",
   },
 };
 
@@ -40,13 +41,15 @@ export function BrandTable() {
     <div className="space-y-4">
       {canEdit && (
         <Card className="p-4">
-          <h3 className="mb-3 text-sm font-semibold">Add a competitor or technology</h3>
+          <h3 className="mb-3 text-sm font-semibold">Add a brand</h3>
           <BrandRowForm all={all} />
         </Card>
       )}
       {others.length === 0 ? (
         <EmptyState icon="users" title="No competitors yet">
-          {canEdit ? "Add the brands you compete with. You can also start with none and add brands that the first check's answers name." : "Nobody has added competitors yet."}
+          {canEdit
+            ? "Add the brands you lose deals to. Byname doesn't find competitors on its own: it counts only the brands you list. You can skip this and add them later in Settings."
+            : "Nobody has added competitors yet."}
         </EmptyState>
       ) : (
         <Card>
@@ -69,7 +72,13 @@ export function BrandTable() {
 
 function BrandRow({ b, canEdit, onEdit }: { b: BrandEntry; canEdit: boolean; onEdit: () => void }) {
   const qc = useQueryClient();
-  const remove = useMutation({ mutationFn: () => api.brands.remove(b.id), onSuccess: () => qc.invalidateQueries({ queryKey: keys.brands }) });
+  const remove = useMutation({
+    mutationFn: () => api.brands.remove(b.id),
+    onSuccess: () => {
+      forgetNaming(qc);
+      return qc.invalidateQueries({ queryKey: keys.brands });
+    },
+  });
   const kind = b.kind === "technology" ? "technology" : "competitor";
   return (
     <li className="px-4 py-3">
@@ -115,6 +124,7 @@ function BrandRowForm({ all, editing, onDone }: { all: BrandEntry[]; editing?: B
   const save = useMutation({
     mutationFn: (body: BrandInput) => (editing ? api.brands.update(editing.id, body) : api.brands.upsert(body)),
     onSuccess: async () => {
+      forgetNaming(qc);
       await qc.invalidateQueries({ queryKey: keys.brands });
       setD(empty);
       setTried(false);
@@ -135,7 +145,7 @@ function BrandRowForm({ all, editing, onDone }: { all: BrandEntry[]; editing?: B
         : null;
   const hosts = parseHosts(d.domains);
   const aliasList = splitList(d.aliases);
-  const common = commonWordAliases(aliasList);
+  const common = useCommonWords(aliasList);
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -171,11 +181,11 @@ function BrandRowForm({ all, editing, onDone }: { all: BrandEntry[]; editing?: B
           </Field>
           {common.length > 0 ? (
             <FieldNote tone="warn">
-              {common.map((c) => `“${c}”`).join(", ")} {common.length === 1 ? "is an everyday word" : "are everyday words"} and would match answers that are not about{" "}
-              {name || "them"}.
+              {common.map((c) => `“${c}”`).join(", ")} {common.length === 1 ? "is an everyday word" : "are everyday words"}, so answers that aren&apos;t about {name || "them"} would count
+              as naming them. Use a longer form, or remove it.
             </FieldNote>
           ) : (
-            <FieldNote tone="info">Comma separated. Each counts as this brand.</FieldNote>
+            <FieldNote tone="info">Optional. Comma separated. Each counts as naming this brand.</FieldNote>
           )}
         </div>
         <div>

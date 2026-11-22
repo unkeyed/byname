@@ -2,25 +2,39 @@ import { useState, type FormEvent, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type Question, type QuestionSet, type QuestionsInput } from "../api";
 import { absoluteTime } from "../format";
-import { keys, useCan, useQuestions, useSettings } from "../queries";
-import { Badge, Button, Card, CardHeader, cx, Dialog, DialogBody, EmptyState, ErrorNote, Field, Icon, inputClass, labelClass, Pending, RelativeTime, selectClass } from "../ui";
-import { defaultFooter, FieldNote, ReadOnlyNote, SubmitButton, type Footer } from "./forms";
-import { dedupe, namesIn, normalizeQuestion, questionError, questionLength, questionsFromCSV, questionsFromLines, type DraftQuestion } from "./rules";
+import { keys, useBrands, useCan, useQuestions, useSettings } from "../queries";
+import { Badge, Button, Card, CardHeader, cx, Dialog, DialogBody, EmptyState, ErrorNote, Field, Icon, inputClass, labelClass, Pending, RelativeTime, selectClass, SteadyLabel } from "../ui";
+import { refreshCosts } from "./costs";
+import { defaultFooter, FieldNote, NoteSlot, ReadOnlyNote, SubmitButton, type Footer } from "./forms";
+import { useQuestionNaming, useSteady, type QuestionNaming } from "./naming";
+import { dedupe, normalizeQuestion, questionError, questionLength, questionsFromCSV, questionsFromLines, suggestQuestions, type DraftQuestion } from "./rules";
 
-/** A question being edited. from is the current question it was loaded from, which it carries on by default if its text changes. */
+/**
+ * A question being edited. from is the current question it was loaded
+ * from, which it carries on by default if its text changes. count is the
+ * scoring choice: true counts its answers even when it names your brand,
+ * false leaves them out, null is the default (left out only when it names
+ * your brand).
+ */
 interface Row extends DraftQuestion {
   key: number;
   from?: number;
+  count: boolean | null;
 }
 
 let nextKey = 1;
-const rowsOf = (set: QuestionSet | null): Row[] => (set?.questions ?? []).map((q) => ({ key: nextKey++, from: q.id, group: q.group, text: q.text }));
+const overrideOf = (q: Question) => (q.count_in_scores === !q.names_brand ? null : q.count_in_scores);
+const rowsOf = (set: QuestionSet | null): Row[] => (set?.questions ?? []).map((q) => ({ key: nextKey++, from: q.id, group: q.group, text: q.text, count: overrideOf(q) }));
 const clean = (s: string) => s.trim().replace(/\s+/g, " ");
+
+/** What a question names, by the server's rules: undefined until checked. */
+type Naming = (text: string) => QuestionNaming | undefined;
 
 /** Where a changed or removed current question goes: the row that carries it on, or retired. */
 type Carry = Record<number, number | "retire">;
 
 const modes = [
+  { id: "suggest", label: "Suggest" },
   { id: "one", label: "One by one" },
   { id: "list", label: "Paste a list" },
   { id: "csv", label: "CSV" },
@@ -35,12 +49,22 @@ type Mode = (typeof modes)[number]["id"];
 export function QuestionEditor({ footer = defaultFooter, onSaved, submitLabel, history }: { footer?: Footer; onSaved?: () => unknown; submitLabel?: string; history?: boolean }) {
   const current = useQuestions();
   const settings = useSettings();
-  if (current.isPending || settings.isPending) return <Pending />;
-  if (current.isError || settings.isError) return <ErrorNote error={current.error ?? settings.error} />;
-  const names = [settings.data.brand.name, ...settings.data.brand.aliases].filter(Boolean);
+  const brands = useBrands();
+  if (current.isPending || settings.isPending || brands.isPending) return <Pending />;
+  if (current.isError || settings.isError || brands.isError) return <ErrorNote error={current.error ?? settings.error ?? brands.error} />;
+  const competitors = brands.data.filter((b) => b.kind === "competitor").map((b) => b.name);
   return (
     <>
-      <EditorBody key={current.data?.id ?? 0} current={current.data} names={names} footer={footer} onSaved={onSaved} submitLabel={submitLabel} history={history} />
+      <EditorBody
+        key={current.data?.id ?? 0}
+        current={current.data}
+        brand={settings.data.brand.name}
+        competitors={competitors}
+        footer={footer}
+        onSaved={onSaved}
+        submitLabel={submitLabel}
+        history={history}
+      />
       {history && <Versions />}
     </>
   );
@@ -48,14 +72,16 @@ export function QuestionEditor({ footer = defaultFooter, onSaved, submitLabel, h
 
 function EditorBody({
   current,
-  names,
+  brand,
+  competitors,
   footer,
   onSaved,
   submitLabel,
   history,
 }: {
   current: QuestionSet | null;
-  names: string[];
+  brand: string;
+  competitors: string[];
   footer: Footer;
   onSaved?: () => unknown;
   submitLabel?: string;
@@ -68,14 +94,27 @@ function EditorBody({
   const [carry, setCarry] = useState<Carry | null>(null);
   const [tried, setTried] = useState(false);
   const groups = [...new Set(rows.map((r) => r.group))];
+  const naming = useQuestionNaming(rows.map((r) => clean(r.text)));
 
   const save = useMutation({
-    mutationFn: (body: QuestionsInput) => api.questions.put(body),
+    mutationFn: async (body: QuestionsInput) => {
+      const set = await api.questions.put(body);
+      // A scoring choice belongs to a saved question, so it is set once the new version has ids.
+      const byText = new Map(rows.map((r) => [normalizeQuestion(r.text), r]));
+      const questions = await Promise.all(
+        set.questions.map((q) => {
+          const want = byText.get(normalizeQuestion(q.text))?.count ?? null;
+          return q.count_in_scores === (want ?? !q.names_brand) ? q : api.questions.setScoring(q.id, want);
+        }),
+      );
+      return { ...set, questions };
+    },
     onSuccess: async (set) => {
       setCarry(null);
       qc.setQueryData(keys.questionSet, set);
       void qc.invalidateQueries({ queryKey: keys.questionSets });
       void qc.invalidateQueries({ queryKey: keys.estimate });
+      void refreshCosts(qc);
       await onSaved?.();
     },
   });
@@ -111,62 +150,76 @@ function EditorBody({
 
   const add = (incoming: DraftQuestion[]) => {
     const { added, dropped } = dedupe(rows, incoming);
-    setRows([...rows, ...added.map((q) => ({ ...q, group: clean(q.group), text: clean(q.text), key: nextKey++ }))]);
+    setRows([...rows, ...added.map((q) => ({ ...q, group: clean(q.group), text: clean(q.text), key: nextKey++, count: null }))]);
     return { added, dropped };
   };
 
   return (
     <div className="space-y-5">
       {!canEdit && <ReadOnlyNote />}
-      {canEdit && <AddQuestions groups={groups} onAdd={add} names={names} />}
+      {canEdit && <AddQuestions groups={groups} onAdd={add} brand={brand} competitors={competitors} empty={rows.length === 0} />}
 
-      <QuestionList rows={rows} names={names} canEdit={canEdit} onChange={setRows} tried={tried} />
+      <QuestionList rows={rows} brand={brand} naming={naming} canEdit={canEdit} onChange={setRows} tried={tried} />
 
       <form onSubmit={submit} noValidate className="space-y-5">
-      {canEdit && history && current && (
-        <Field label="Notes for this version" hint="Why the set changed, shown in the version history.">
-          <input className={inputClass} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Added three pricing questions" />
-        </Field>
-      )}
-      {tried && rows.length === 0 && <FieldNote tone="error">Add at least one question.</FieldNote>}
-      {tried && invalid.length > 0 && <FieldNote tone="error">Fix the {invalid.length === 1 ? "question" : `${invalid.length} questions`} marked above first.</FieldNote>}
-      {canEdit &&
-        footer(
-          <SubmitButton
-            pending={save.isPending}
-            saved={save.isSuccess}
-            label={submitLabel ?? (current ? `Save as version ${current.version + 1}` : "Save questions")}
-          />,
+        {canEdit && history && current && (
+          <Field label="Notes for this version" hint="Why the set changed, shown in the version history.">
+            <input className={inputClass} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Added three pricing questions" />
+          </Field>
         )}
-      {!carry && <ErrorNote error={save.error} />}
+        {tried && rows.length === 0 && <FieldNote tone="error">Add at least one question.</FieldNote>}
+        {tried && invalid.length > 0 && <FieldNote tone="error">Fix the {invalid.length === 1 ? "question" : `${invalid.length} questions`} marked above first.</FieldNote>}
+        {canEdit &&
+          footer(
+            <SubmitButton
+              pending={save.isPending}
+              saved={save.isSuccess}
+              label={submitLabel ?? (current ? `Save as version ${current.version + 1}` : "Save questions")}
+            />,
+          )}
+        {!carry && <ErrorNote error={save.error} />}
 
-      <Dialog open={carry !== null} onClose={() => setCarry(null)} title={`Save version ${(current?.version ?? 0) + 1}`} wide>
-        {carry && current && (
-          <CarryDialog
-            unmapped={unmapped}
-            auto={auto}
-            rows={rows}
-            carry={carry}
-            onChange={setCarry}
-            onConfirm={() => send(carry)}
-            pending={save.isPending}
-            error={save.error}
-          />
-        )}
-      </Dialog>
+        <Dialog open={carry !== null} onClose={() => setCarry(null)} title={`Save version ${(current?.version ?? 0) + 1}`} wide>
+          {carry && current && (
+            <CarryDialog
+              unmapped={unmapped}
+              auto={auto}
+              rows={rows}
+              carry={carry}
+              onChange={setCarry}
+              onConfirm={() => send(carry)}
+              pending={save.isPending}
+              error={save.error}
+            />
+          )}
+        </Dialog>
       </form>
     </div>
   );
 }
 
-function AddQuestions({ groups, onAdd, names }: { groups: string[]; onAdd: (qs: DraftQuestion[]) => { added: DraftQuestion[]; dropped: DraftQuestion[] }; names: string[] }) {
-  const [mode, setMode] = useState<Mode>("one");
-  const [group, setGroup] = useState(groups[0] ?? "");
+function AddQuestions({
+  groups,
+  onAdd,
+  brand,
+  competitors,
+  empty,
+}: {
+  groups: string[];
+  onAdd: (qs: DraftQuestion[]) => { added: DraftQuestion[]; dropped: DraftQuestion[] };
+  brand: string;
+  competitors: string[];
+  empty: boolean;
+}) {
+  const [mode, setMode] = useState<Mode>(empty ? "suggest" : "one");
+  const [group, setGroup] = useState(groups[0] ?? "General");
   const [text, setText] = useState("");
   const [bulk, setBulk] = useState("");
   const [bulkGroup, setBulkGroup] = useState("General");
   const [report, setReport] = useState<{ added: number; dropped: DraftQuestion[]; rejected: { q: DraftQuestion; why: string }[] } | null>(null);
   const [oneError, setOneError] = useState<string | null>(null);
+  const typed = useQuestionNaming([clean(text)]);
+  const flag = useSteady(typed(clean(text)), !text.trim());
 
   const addOne = () => {
     const err = questionError(group, text);
@@ -189,7 +242,7 @@ function AddQuestions({ groups, onAdd, names }: { groups: string[]; onAdd: (qs: 
   const readFile = (file: File | undefined) => {
     if (file) void file.text().then(setBulk);
   };
-  const flagged = text && namesIn(text, names);
+  const example = competitors[0] ? `“${competitors[0]} alternatives”` : "“Which app do freelancers use to send invoices?”";
 
   return (
     <Card>
@@ -215,14 +268,16 @@ function AddQuestions({ groups, onAdd, names }: { groups: string[]; onAdd: (qs: 
       </div>
       <div className="space-y-3 p-4">
         <p className="text-xs text-muted">
-          Write them the way a buyer would ask an AI, without your brand name. Byname sends each question exactly as written, so a question that names you
-          inflates your results. {questionLength.min} to {questionLength.max} characters each.
+          Aim for 10 to 30 questions a buyer who hasn&apos;t heard of you might ask an AI, such as “What&apos;s the best invoicing app for freelancers?” or {example}. Leave your own
+          name out: Byname sends each question exactly as written. Groups are topics you choose, like Pricing or Comparisons, so you can filter results by them later.
         </p>
-        {mode === "one" ? (
+        {mode === "suggest" ? (
+          <Suggest competitors={competitors} onAdd={onAdd} />
+        ) : mode === "one" ? (
           <div className="space-y-2">
             <div className="grid gap-2 sm:grid-cols-[12rem_1fr]">
               <Field label="Group">
-                <input className={inputClass} list="question-groups" value={group} onChange={(e) => setGroup(e.target.value)} placeholder="Deploying" />
+                <input className={inputClass} list="question-groups" value={group} onChange={(e) => setGroup(e.target.value)} placeholder="Pricing" />
               </Field>
               <Field label="Question">
                 <input
@@ -235,7 +290,7 @@ function AddQuestions({ groups, onAdd, names }: { groups: string[]; onAdd: (qs: 
                       addOne();
                     }
                   }}
-                  placeholder="What's the easiest way to deploy a Go API?"
+                  placeholder="What's the best invoicing app for freelancers?"
                 />
               </Field>
             </div>
@@ -244,8 +299,7 @@ function AddQuestions({ groups, onAdd, names }: { groups: string[]; onAdd: (qs: 
                 <option key={g} value={g} />
               ))}
             </datalist>
-            {oneError && <FieldNote tone="error">{oneError}</FieldNote>}
-            {flagged && flagged.length > 0 && <BrandFlag names={flagged} />}
+            <NoteSlot>{oneError ? <FieldNote tone="error">{oneError}</FieldNote> : flag?.names_brand && <BrandFlag brand={brand} />}</NoteSlot>
             <div className="flex justify-end">
               <Button onClick={addOne}>
                 <Icon name="plus" className="size-3.5" />
@@ -263,8 +317,8 @@ function AddQuestions({ groups, onAdd, names }: { groups: string[]; onAdd: (qs: 
                 onChange={(e) => setBulk(e.target.value)}
                 placeholder={
                   mode === "csv"
-                    ? 'group,text\nDeploying,"What\'s the easiest way to deploy a Go API?"\nPricing,"Which hosting platforms have a free tier, and what are the limits?"'
-                    : "What's the easiest way to deploy a Go API?\nWhich hosting platforms have a free tier?"
+                    ? 'group,text\nComparisons,"What\'s the best invoicing app for freelancers?"\nPricing,"Which invoicing apps have a free plan?"'
+                    : "What's the best invoicing app for freelancers?\nWhich invoicing apps have a free plan?"
                 }
               />
             </label>
@@ -290,6 +344,48 @@ function AddQuestions({ groups, onAdd, names }: { groups: string[]; onAdd: (qs: 
         )}
       </div>
     </Card>
+  );
+}
+
+/** Drafts questions from templates and what the person sells. Nothing calls a model; the drafts land in the list to edit or remove. */
+function Suggest({ competitors, onAdd }: { competitors: string[]; onAdd: (qs: DraftQuestion[]) => { added: DraftQuestion[]; dropped: DraftQuestion[] } }) {
+  const [category, setCategory] = useState("");
+  const [audience, setAudience] = useState("");
+  const [job, setJob] = useState("");
+  const [result, setResult] = useState<string | null>(null);
+  const drafts = suggestQuestions({ category, audience, job, competitors });
+  const run = () => {
+    if (!drafts.length) return setResult("Fill in at least what you sell, so there is something to build questions from.");
+    const { added } = onAdd(drafts);
+    setResult(
+      added.length
+        ? `Added ${added.length} ${added.length === 1 ? "question" : "questions"} below. Reword them the way your buyers talk, and remove any that don't fit, before you save.`
+        : "Those questions are already in your list.",
+    );
+  };
+  return (
+    <div className="space-y-3">
+      <p className="text-sm">Tell Byname what you sell and it drafts questions to start from{competitors.length > 0 && <>, including comparisons with {competitors.slice(0, 3).join(", ")}</>}.</p>
+      <div className="grid gap-3 sm:grid-cols-3">
+        <Field label="What you sell">
+          <input className={inputClass} value={category} onChange={(e) => setCategory(e.target.value)} placeholder="invoicing app" />
+        </Field>
+        <Field label="Who buys it">
+          <input className={inputClass} value={audience} onChange={(e) => setAudience(e.target.value)} placeholder="freelancers" />
+        </Field>
+        <Field label="A job it does">
+          <input className={inputClass} value={job} onChange={(e) => setJob(e.target.value)} placeholder="send an invoice" />
+        </Field>
+      </div>
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <span className="mr-auto text-xs text-muted">{drafts.length > 0 ? `${drafts.length} questions ready to add.` : "Nothing to draft yet."}</span>
+        <Button onClick={run}>
+          <Icon name="sparkles" className="size-3.5" />
+          Suggest questions
+        </Button>
+      </div>
+      <NoteSlot>{result && <FieldNote tone="info">{result}</FieldNote>}</NoteSlot>
+    </div>
   );
 }
 
@@ -327,31 +423,27 @@ function ImportReport({ added, dropped, rejected }: { added: number; dropped: Dr
   );
 }
 
-function BrandFlag({ names }: { names: string[] }) {
-  return (
-    <FieldNote tone="warn">
-      Names {names.map((n) => `“${n}”`).join(" and ")}. Byname sends the question as written, so a question that names you inflates your results. Ask it the way a buyer who
-      has not heard of you would.
-    </FieldNote>
-  );
+/** While typing: one line on what happens to a question that names you. */
+function BrandFlag({ brand }: { brand: string }) {
+  return <FieldNote tone="warn">Names {brand || "your brand"}. Byname still asks it, but leaves it out of your scores, because AI names you when the question does.</FieldNote>;
 }
 
-function QuestionList({ rows, names, canEdit, onChange, tried }: { rows: Row[]; names: string[]; canEdit: boolean; onChange: (rows: Row[]) => void; tried: boolean }) {
+function QuestionList({ rows, brand, naming, canEdit, onChange, tried }: { rows: Row[]; brand: string; naming: Naming; canEdit: boolean; onChange: (rows: Row[]) => void; tried: boolean }) {
   const [editing, setEditing] = useState<number | null>(null);
   if (rows.length === 0) {
     return (
       <EmptyState icon="message" title="No questions yet">
-        {canEdit ? "Add at least one. Calls and cost per check scale with the number of questions." : "Nobody has added questions yet."}
+        {canEdit ? "Let Byname suggest some to start from, or write your own above." : "Nobody has added questions yet."}
       </EmptyState>
     );
   }
   const groups = [...new Set(rows.map((r) => r.group))];
-  const flaggedCount = rows.filter((r) => namesIn(r.text, names).length > 0).length;
+  const leftOut = rows.filter((r) => naming(clean(r.text))?.names_brand && r.count !== true).length;
   return (
     <Card>
       <CardHeader
         title={`${rows.length} ${rows.length === 1 ? "question" : "questions"} in ${groups.length} ${groups.length === 1 ? "group" : "groups"}`}
-        description={flaggedCount > 0 ? `${flaggedCount} name your brand. Consider rewording them.` : undefined}
+        description={leftOut > 0 ? `${leftOut} ${leftOut === 1 ? "names" : "name"} ${brand || "your brand"}, so ${leftOut === 1 ? "it is" : "they are"} left out of scores.` : undefined}
       />
       <div className="divide-y divide-line border-t border-line">
         {groups.map((g) => (
@@ -378,9 +470,11 @@ function QuestionList({ rows, names, canEdit, onChange, tried }: { rows: Row[]; 
                     <QuestionRow
                       key={r.key}
                       row={r}
-                      names={names}
+                      brand={brand}
+                      names={naming(clean(r.text))?.names_brand ?? false}
                       canEdit={canEdit}
                       showError={tried}
+                      onCount={(count) => onChange(rows.map((o) => (o.key === r.key ? { ...o, count } : o)))}
                       onEdit={() => setEditing(r.key)}
                       onRemove={() => onChange(rows.filter((o) => o.key !== r.key))}
                     />
@@ -394,14 +488,48 @@ function QuestionList({ rows, names, canEdit, onChange, tried }: { rows: Row[]; 
   );
 }
 
-function QuestionRow({ row, names, canEdit, showError, onEdit, onRemove }: { row: Row; names: string[]; canEdit: boolean; showError: boolean; onEdit: () => void; onRemove: () => void }) {
-  const flagged = namesIn(row.text, names);
+function QuestionRow({
+  row,
+  brand,
+  names,
+  canEdit,
+  showError,
+  onCount,
+  onEdit,
+  onRemove,
+}: {
+  row: Row;
+  brand: string;
+  names: boolean;
+  canEdit: boolean;
+  showError: boolean;
+  onCount: (count: boolean | null) => void;
+  onEdit: () => void;
+  onRemove: () => void;
+}) {
   const error = questionError(row.group, row.text);
+  const counted = row.count === true;
   return (
     <li className="flex items-start gap-2 px-4 py-2.5">
       <div className="min-w-0 flex-1">
         <p className="text-sm [overflow-wrap:anywhere]">{row.text}</p>
-        {flagged.length > 0 && <BrandFlag names={flagged} />}
+        {names && (
+          <>
+            <div className="mt-1 flex items-center gap-1">
+              <Badge tone={counted ? "neutral" : "warn"}>{counted ? "Counted anyway" : "Left out of scores"}</Badge>
+              {canEdit && (
+                <Button size="sm" variant="ghost" className="md:-my-1" onClick={() => onCount(counted ? null : true)}>
+                  <SteadyLabel labels={["Count it anyway", "Leave it out"]} current={counted ? "Leave it out" : "Count it anyway"} />
+                </Button>
+              )}
+            </div>
+            <p className="mt-0.5 text-xs text-muted">
+              {counted
+                ? `Counts in your scores even though it names ${brand || "you"}, so AI will often name you because you asked.`
+                : `Names ${brand || "you"}, so AI will name you because you asked. Byname still asks it and shows the answers.`}
+            </p>
+          </>
+        )}
         {showError && error && <FieldNote tone="error">{error}</FieldNote>}
       </div>
       {canEdit && (
