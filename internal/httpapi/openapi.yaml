@@ -1062,6 +1062,43 @@ paths:
           $ref: "#/components/responses/NotFound"
         "503":
           $ref: "#/components/responses/Unavailable"
+  /v1/questions/{id}/brief:
+    parameters:
+      - $ref: "#/components/parameters/id"
+    get:
+      tags: [results]
+      operationId: getQuestionBrief
+      summary: A prompt for an agent working on your site to write the content that gets you named on this question.
+      description: How each pair answered the question in one run, the competitors named instead, the web searches the pairs ran and the pages they linked to, rendered as markdown in prompt. Failed answers are left out. Works for any question, not only gaps.
+      security:
+        - apiKey: [results:read]
+        - session: [results:read]
+      parameters:
+        - name: run
+          in: query
+          description: The run to read. Omit for the latest run with answers to this question on the pairs in scope.
+          schema:
+            type: integer
+            minimum: 1
+        - $ref: "#/components/parameters/surface"
+        - $ref: "#/components/parameters/model"
+      responses:
+        "200":
+          description: The brief.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Brief"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/Unavailable"
   /v1/metrics/rates:
     get:
       tags: [results]
@@ -6876,6 +6913,100 @@ components:
               items:
                 type: string
               description: The web searches the engine ran for the question. Empty where the endpoint does not expose them.
+    BriefLine:
+      description: One pair's answer to the brief's question.
+      allOf:
+        - $ref: "#/components/schemas/Series"
+        - type: object
+          required: [title, answer_id, state, position, brands, fan_out, links]
+          properties:
+            title:
+              type: string
+              description: The surface, and the model where it takes one, such as "Claude Code · claude-sonnet-4-5".
+            answer_id:
+              type: integer
+            state:
+              type: string
+              enum: [named_linked, named, linked, missed]
+              description: linked means it linked to your site without naming you.
+            position:
+              type: [integer, "null"]
+            brands:
+              type: array
+              items:
+                type: string
+              description: Your brand and competitors the answer named, in the order it named them.
+            fan_out:
+              type: array
+              items:
+                type: string
+              description: The web searches the engine ran. Empty where the endpoint does not expose them.
+            links:
+              type: array
+              items:
+                type: string
+              description: The pages the answer linked to, in answer order.
+    BriefPage:
+      type: object
+      required: [url, domain, is_self, answers, check, outreach]
+      properties:
+        url:
+          type: string
+        domain:
+          type: string
+        is_self:
+          type: boolean
+        answers:
+          type: integer
+          description: Answers that linked to it.
+        check:
+          oneOf:
+            - $ref: "#/components/schemas/PageCheck"
+            - type: "null"
+          description: Null until the page has been fetched.
+        outreach:
+          type: boolean
+          description: A page that names a competitor and not you, on a site neither yours nor a competitor's.
+    Brief:
+      type: object
+      required: [run_id, question, answered, named, linked, instead, fan_out, lines, pages, prompt]
+      properties:
+        run_id:
+          type: integer
+        question:
+          $ref: "#/components/schemas/QuestionRef"
+        answered:
+          type: integer
+          description: Answers that did not fail.
+        named:
+          type: integer
+          description: Answers that named you.
+        linked:
+          type: integer
+          description: Answers that linked to your site.
+        instead:
+          type: array
+          items:
+            type: string
+          description: Competitors named by the answers that did not name you, most often first.
+        fan_out:
+          type: array
+          items:
+            type: string
+          description: Every web search the pairs ran, those of answers that left you out first.
+        lines:
+          type: array
+          items:
+            $ref: "#/components/schemas/BriefLine"
+          description: One per pair that answered, missed first, then linked, named, and named and linked, each in pair order.
+        pages:
+          type: array
+          items:
+            $ref: "#/components/schemas/BriefPage"
+          description: The 10 pages the most answers linked to.
+        prompt:
+          type: string
+          description: Markdown to paste into an agent working on your site.
     RunRef:
       type: object
       required: [id, started_at]

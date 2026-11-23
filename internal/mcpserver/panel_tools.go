@@ -109,6 +109,12 @@ type historyInput struct {
 	Since      *time.Time `json:"since,omitempty" jsonschema:"only checks started at or after this RFC 3339 time; omit for all time"`
 }
 
+type briefInput struct {
+	QuestionID int64 `json:"question_id" jsonschema:"a question from gaps, run_questions or get_questions"`
+	RunID      int64 `json:"run_id,omitempty" jsonschema:"omit for the latest check with answers to this question from the AI apps and models in scope"`
+	results.Scope
+}
+
 type gapsInput struct {
 	RunID int64 `json:"run_id,omitempty" jsonschema:"omit for the latest check with answers from the AI apps and models in scope"`
 	results.Scope
@@ -313,6 +319,11 @@ func addResultTools(srv *mcp.Server, svc app.Services) {
 		Description: "Missed questions, where at least one AI app did not name you on a check, ranked by the share of AI apps that left you out and by search demand where Byname has a figure, with the competitors named instead and each AI app's answer with the web searches it ran, where the endpoint exposes them. Filter by AI app (surface) and model. GET /v1/gaps."},
 		func(ctx context.Context, _ core.Actor, in gapsInput) (results.Gaps, error) {
 			return r.Gaps(ctx, in.RunID, in.Scope)
+		})
+	addTool(srv, core.ResultsRead, &mcp.Tool{Name: "content_brief", Annotations: readOnly(),
+		Description: "A prompt for an agent working on your site, to write the content that gets you named and linked to on one question: how each AI app answered on a check, the competitors named instead, the web searches the apps ran and the pages they linked to, with the markdown to follow in prompt. Works for any question, not only missed ones. Filter by AI app (surface) and model. GET /v1/questions/{id}/brief."},
+		func(ctx context.Context, _ core.Actor, in briefInput) (results.Brief, error) {
+			return r.Brief(ctx, in.QuestionID, in.RunID, in.Scope)
 		})
 	addTool(srv, core.ResultsRead, &mcp.Tool{Name: "list_jobs", Annotations: readOnly(),
 		Description: "The jobs log newest first: each AI check and model list refresh with its status, error and spend. GET /v1/jobs."},
