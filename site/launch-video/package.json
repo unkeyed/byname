@@ -1,0 +1,14 @@
+{
+  "name": "byname-launch-video",
+  "private": true,
+  "type": "module",
+  "description": "Renders launch.html and its generated soundtrack into byname-launch.mp4. npm install, then npm run video (macOS: encodes and muxes with AVFoundation).",
+  "scripts": {
+    "frames": "node render.mjs",
+    "audio": "node audio.mjs",
+    "video": "node render.mjs && swift encode.swift frames byname-launch-silent.mp4 && node audio.mjs && swift mux.swift byname-launch-silent.mp4 byname-launch.wav byname-launch.mp4"
+  },
+  "devDependencies": {
+    "playwright": "1.65.1"
+  }
+}

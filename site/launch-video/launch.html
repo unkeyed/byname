@@ -1,0 +1,547 @@
+<!doctype html>
+<!--
+  The Byname launch video, 1920x1080, built from the landing page's own
+  stylesheets and markup. Every frame is a pure function of time: render(t)
+  sets the page to second t. Each scene is laid out at the site's CSS sizes
+  and zoomed to video size; data-in and data-at give an element's entrance
+  and a mark's draw time, in seconds from its scene's start. render.mjs
+  steps it at 30fps, encode.swift makes the MP4, audio.mjs reads window.CUES
+  from this page and synthesizes the soundtrack, and mux.swift adds it.
+  npm run video does all four. Open it in a browser to preview in real time.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Byname launch video</title>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&family=Instrument+Sans:wght@400;500;600&family=IBM+Plex+Mono:ital,wght@0,400;0,500;1,400&display=block" rel="stylesheet" />
+<link rel="stylesheet" href="../src/styles/base.css" />
+<link rel="stylesheet" href="../src/styles/home.css" />
+<style>
+  :root { color-scheme: light; }
+  *, *::before, *::after, .mk-svg path, path.draw { transition: none !important; animation: none !important; }
+  html, body { width: 1920px; height: 1080px; overflow: hidden; scrollbar-gutter: auto; }
+  .stage { position: relative; width: 1920px; height: 1080px; overflow: hidden; background: radial-gradient(ellipse 70% 60% at 50% 42%, #f9f7f1 0%, var(--paper) 72%); }
+  .scene { position: absolute; inset: 0; opacity: 0; visibility: hidden; }
+  .z { --z: 1.8; zoom: var(--z); width: calc(1920px / var(--z)); height: calc(1080px / var(--z)); display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .vh { margin: 0 0 30px; font-size: 40px; line-height: 1.05; text-align: center; }
+  .mk-svg path, path.draw { opacity: 0; }
+
+  .intro-logo { font-size: 100px; }
+  .intro-logo .mk { color: var(--you); }
+  .intro-meta { margin: 30px 0 0; font: 400 14px/1.5 var(--mono); color: var(--ink-3); }
+
+  .big-q { max-width: 900px; font-size: 64px; line-height: 1; letter-spacing: -0.03em; text-align: center; }
+  .big-q .mk { white-space: nowrap; }
+  .big-q .w { display: inline-block; }
+  .big-lede { margin: 30px 0 0; font-size: 21px; line-height: 1.5; color: var(--ink-2); text-align: center; }
+
+  .z-answer { --z: 1.55; }
+  .apps-row { position: relative; display: grid; grid-template-columns: 620px 400px; gap: 64px; align-items: center; }
+  .desk .ghost { inset: 0; }
+  .apps-side h3 { margin: 0 0 18px; font: 400 30px/1.12 var(--serif); letter-spacing: -0.015em; }
+  .apps-side h3 .mk { color: var(--you); margin: 0 0.12em; }
+  .apps-side .filed { columns: 2; column-gap: 28px; font-size: 15.5px; }
+  .apps-side .filed li { padding: 7px 0; }
+  .stamp { font-size: 12.5px; }
+
+  .z-table { --z: 1.6; }
+  .z-table .contents { width: 1150px; padding: 6px 30px 18px; }
+  .z-table .qtable thead th { font-size: 13.5px; padding: 12px 2px 10px; }
+  .z-table .qtable thead th span { max-width: 6em; }
+  .z-table .qtable thead th small { font-size: 13px; }
+  .z-table .qtable tbody th { padding: 8px 20px 8px 0; }
+  .z-table .q-n { font-size: 19px; }
+  .z-table .q-t { font-size: 18px; }
+  .z-table .qtable td { width: 94px; padding: 7px 2px; }
+  .z-table .qtable .q-s { width: 70px; font-size: 15px; }
+  .z-table .legend { font-size: 13.5px; margin-top: 14px; padding-top: 14px; }
+  .z-table .legend-src .mk { color: var(--ink); font-weight: 500; }
+
+  .z-story { --z: 1.7; }
+  .z-story .story { width: 1090px; }
+  .z-story .alert ul { padding-left: 16px; }
+
+  .track { display: grid; grid-template-columns: 420px 64px 470px 64px 420px; align-items: center; width: 1438px; align-self: flex-start; }
+  .track .transcript .t-body { min-height: 236px; }
+  .track .t-res { margin-bottom: 4px; }
+  .track .fix-btn { position: relative; }
+
+  .z-social { --z: 1.95; }
+  .social-digest { width: 660px; }
+  .social-digest .alert-title .mk { margin-right: 0.3em; }
+  .social-digest .mk { --sw: 2; }
+
+  .z-agents { --z: 1.68; }
+  .z-agents .agents { width: 1060px; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); align-items: center; }
+
+  .deploy { display: grid; grid-template-columns: 290px 610px; gap: 52px; align-items: center; }
+  .deploy .steps li { padding-bottom: 30px; }
+  .deploy .steps h3 { font-size: 19px; }
+  .t-user [data-type] { color: var(--ink); margin: 0; }
+  .term .t-user { font-size: 14px; margin-bottom: 12px; white-space: nowrap; }
+  .term .t-body { min-height: 330px; }
+  .tcaret { display: inline-block; width: 8px; height: 17px; margin-left: 2px; vertical-align: -3px; background: var(--ink); }
+  .chks { display: grid; gap: 9px; margin-top: 6px; }
+  .chk { display: flex; align-items: center; gap: 14px; margin: 0; font-size: 16px; }
+  .chk .box { flex: none; width: 18px; height: 18px; --sw: 2.4; }
+  .chk .mk[data-mark="underline"] { color: var(--you); font-weight: 500; }
+
+  .end-logo { font-size: 58px; }
+  .end-logo .mk { color: var(--you); }
+  .end-h { margin-top: 28px; max-width: 900px; font-size: 54px; line-height: 1.02; letter-spacing: -0.03em; text-align: center; }
+  .end-h .mk { white-space: nowrap; }
+  .end-acts { display: flex; gap: 16px; margin-top: 34px; }
+  .end-acts .btn { height: 50px; padding: 0 26px; font-size: 17px; }
+  .end-acts .btn.line { background: transparent; color: var(--ink); box-shadow: inset 0 0 0 1.5px var(--ink); }
+  .end-url { margin: 34px 0 0; font: 400 22px/1 var(--mono); }
+  .end-by { position: absolute; left: 0; right: 0; bottom: 34px; margin: 0; text-align: center; font-size: 15px; color: var(--ink-3); }
+  .end-by b { color: var(--ink); font-weight: 500; }
+</style>
+</head>
+<body>
+<div class="stage">
+
+  <section class="scene" data-scene="intro"><div class="z">
+    <div class="logo intro-logo" data-in="0.3" data-fx="grow">by<span class="mk" data-mark="circle" data-pad="0.2em 0.16em" data-sw="2.6" data-at="1.1" data-dur="0.8">name</span></div>
+    <p class="intro-meta" data-in="1.6">Open source · Self-hosted</p>
+  </div></section>
+
+  <section class="scene" data-scene="question"><div class="z">
+    <h1 class="big-q" data-words="0.35">When buyers ask AI, does it say <span class="mk" data-mark="circle" data-pad="0.16em 0.05em" data-sw="3" data-at="2.2" data-dur="0.8">your name</span>?</h1>
+    <p class="big-lede" data-in="2.7">See when ChatGPT, Google and Claude recommend you, and who they pick instead.</p>
+  </div></section>
+
+  <section class="scene" data-scene="answer"><div class="z z-answer">
+    <h2 class="vh" data-in="0.2">What buyers see. <em>Not what an API says.</em></h2>
+    <div class="apps-row">
+      <div class="desk" id="desk" data-in="0.5" data-rise="30">
+        <div class="ghost"></div>
+        <div class="ghost"></div>
+        <div class="sheet answer">
+          <article class="pane">
+            <header class="sheet-head" data-in="0.8" data-rise="8"><span>Asked in <b>ChatGPT app</b></span><span>App answer</span></header>
+            <p class="q" data-in="1.0" data-rise="10">Where should a small team deploy a public API in 2026?</p>
+            <div class="ans">
+              <p data-in="1.4" data-rise="8">It depends on your stack, but three providers come up again and again.</p>
+              <ol>
+                <li data-in="1.7" data-rise="8"><span class="li-t"><b class="mk" data-mark="underline" data-tone="instead" data-at="2.9">AWS</b> for API Gateway, Lambda and every region under one contract.</span><span class="note instead" data-in="3.3" data-rise="4">#1, named instead</span></li>
+                <li data-in="1.95" data-rise="8"><span class="li-t"><b class="mk" data-mark="circle" data-at="3.6">Unkey</b> for API keys, rate limits and compute in one place.</span><span class="note you" data-in="4.1" data-rise="4">you, #2 · linked</span></li>
+                <li data-in="2.2" data-rise="8"><span class="li-t"><b class="mk" data-mark="underline" data-tone="instead" data-at="4.4">Fly.io</b> for long-running containers close to your users.</span><span class="note instead" data-in="4.8" data-rise="4">#3</span></li>
+              </ol>
+            </div>
+            <footer class="sheet-foot" data-in="2.45" data-rise="6"><span>Linked: unkey.com, aws.amazon.com, github.com</span><span class="cost">under $0.01</span></footer>
+          </article>
+          <span class="stamp" data-in="5.2" data-fx="stamp" data-cue="stamp">Named #2</span>
+        </div>
+      </div>
+      <div class="apps-side">
+        <h3 data-in="5.9">Asked the same way in <span class="mk" data-mark="circle" data-pad="6 3" data-at="6.6">12</span> AI apps</h3>
+        <ul class="filed" id="apps"></ul>
+      </div>
+    </div>
+  </div></section>
+
+  <section class="scene" data-scene="table"><div class="z z-table">
+    <h2 class="vh" data-in="0.2">Every question your buyers ask.</h2>
+    <figure class="contents sheet" data-in="0.5" data-rise="30">
+      <table class="qtable" id="qtable"></table>
+      <figcaption class="legend">
+        <span><span class="tm mk" data-mark="circle" data-at="0.9" data-sound="none">2</span> named, at position 2</span>
+        <span><span class="tm cite mk" data-mark="tick" data-at="1.0" data-sound="none"></span> linked, not named</span>
+        <span><span class="tm miss mk" data-mark="dash" data-tone="instead" data-at="1.1" data-sound="none"></span> named someone else</span>
+        <span class="legend-src">Check #8 · Unkey · <span class="mk" data-mark="underline" id="named-mk"><span id="named">0</span> of 36 named</span></span>
+      </figcaption>
+    </figure>
+  </div></section>
+
+  <section class="scene" data-scene="dropout"><div class="z z-story">
+    <h2 class="vh" data-in="0.2">Know the day you drop out.</h2>
+    <div class="story">
+      <figure class="sheet clip" data-in="0.6" data-rise="24">
+        <header class="sheet-head"><span><b>Check #6</b> · ChatGPT app</span><span>App answer</span></header>
+        <p class="q">Which API platform has the most predictable pricing for a startup?</p>
+        <ol class="mini">
+          <li><b>AWS</b></li>
+          <li><b class="mk" data-mark="circle" data-at="1.2">Unkey</b><span class="note you" data-in="1.6" data-rise="4">you, #2 · linked</span></li>
+          <li><b>Cloudflare</b></li>
+          <li><b>Fly.io</b></li>
+          <li><b>Zuplo</b></li>
+        </ol>
+        <footer class="sheet-foot"><span>Linked: unkey.com and 3 more</span><span class="cost">under $0.01</span></footer>
+      </figure>
+      <svg class="story-arrow" viewBox="0 0 80 40"><path class="draw" pathLength="1" data-at="2.0" data-dur="0.6" data-sound="none" d="M4 24 C 22 10, 46 10, 70 20 M61 13 L71 20 L60 25" /></svg>
+      <figure class="sheet clip" data-in="2.3" data-rise="24">
+        <header class="sheet-head"><span><b>Check #7</b> · ChatGPT app</span><span>App answer</span></header>
+        <p class="q">Which API platform has the most predictable pricing for a startup?</p>
+        <ol class="mini">
+          <li><b class="mk" data-mark="underline" data-tone="instead" data-at="2.9">Fly.io</b><span class="note instead" data-in="3.3" data-rise="4">named first</span></li>
+          <li><b>Cloudflare</b></li>
+          <li><b>Zuplo</b></li>
+          <li><b>AWS</b></li>
+        </ol>
+        <p class="gone"><span class="mk caret" data-mark="caret" data-tone="instead" data-at="3.6"></span><span class="note instead" data-in="3.9" data-rise="4">Unkey: not named, and unkey.com no longer linked</span></p>
+        <footer class="sheet-foot"><span>Linked: fly.io and 3 more</span><span class="cost">under $0.01</span></footer>
+      </figure>
+      <svg class="story-arrow" viewBox="0 0 80 40"><path class="draw" pathLength="1" data-at="4.4" data-dur="0.6" data-sound="none" d="M4 22 C 24 30, 48 28, 70 18 M60 15 L71 18 L64 27" /></svg>
+      <figure class="sheet alert" data-in="4.7" data-fx="slide" data-cue="chime">
+        <header class="alert-head"><span class="alert-av">b</span><span><b>Byname</b><small>Notification</small></span></header>
+        <p class="alert-title">Check #7: 1 gained, <span class="mk" data-mark="underline" data-tone="instead" data-at="5.6">6 lost</span></p>
+        <p>Named in 24 of 36 answers.</p>
+        <p>Since check #6: 1 gained, 6 lost, 17 moved, net -5.</p>
+        <ul>
+          <li>3 lost, 3 moved: Which API platform has the most predictable pricing for a startup?</li>
+        </ul>
+        <p class="alert-link">Open in Byname</p>
+      </figure>
+    </div>
+  </div></section>
+
+  <section class="scene" data-scene="gap"><div class="z">
+    <h2 class="vh" data-in="0.2">Close the gap. <em>Then see if it worked.</em></h2>
+    <div class="track" id="track">
+      <figure class="sheet clip" id="missed" data-in="0.6" data-rise="24">
+        <header class="sheet-head"><span><b>Missed in 6 of 6</b></span><span>Missed question</span></header>
+        <p class="q">Which platform is best for hosting a Postgres-backed API close to European users?</p>
+        <p class="fix-what"><b>What to do:</b> AI named <span class="mk" data-mark="underline" data-tone="instead" data-at="1.3">Fly.io</span>, Cloudflare and AWS instead. Write a page on your site that answers this question.</p>
+        <p class="fix-act"><span class="fix-btn" id="fix-btn" data-press="2.1">Prompt for your agent</span><span class="note">a brief your coding agent writes the page from</span></p>
+      </figure>
+      <svg class="story-arrow" id="missed-arrow" viewBox="0 0 80 40"><path class="draw" pathLength="1" data-at="2.6" data-dur="0.6" data-sound="none" d="M4 24 C 22 10, 46 10, 70 20 M61 13 L71 20 L60 25" /></svg>
+      <figure class="sheet transcript" data-in="2.8" data-rise="24">
+        <p class="t-head"><span>~/unkey/www</span><span>claude</span></p>
+        <div class="t-body">
+          <p class="t-user" data-in="3.0" data-rise="4"><span>&gt;</span> <span data-type="Write the page from Byname's brief." data-at-type="3.2" data-cps="34"></span></p>
+          <p class="t-call" data-in="4.5" data-rise="4"><b>write</b> content/blog/eu-postgres-apis.mdx</p>
+          <p class="t-res" data-in="4.9" data-rise="4">+84 lines</p>
+          <p class="t-call" data-in="5.4" data-rise="4"><b>byname</b> mark_question_handled <span>question=6</span></p>
+          <p class="t-res" data-in="5.8" data-rise="4">Handled. Byname tracks it from the next check.</p>
+        </div>
+      </figure>
+      <svg class="story-arrow" viewBox="0 0 80 40"><path class="draw" pathLength="1" data-at="7.0" data-dur="0.6" data-sound="none" d="M4 22 C 24 30, 48 28, 70 18 M60 15 L71 18 L64 27" /></svg>
+      <figure class="sheet clip" data-in="7.2" data-rise="24">
+        <header class="sheet-head"><span><b>Handled</b> · unkey.com/blog/eu-postgres-apis</span><span>Two checks later</span></header>
+        <p class="q">Which platform is best for hosting a Postgres-backed API close to European users?</p>
+        <p class="fix-linked"><span class="mk" data-mark="circle" data-pad="8 5" data-at="7.8" data-sound="chime">Linked in 3 answers</span></p>
+        <ol class="mini">
+          <li><b>ChatGPT app</b></li>
+          <li><b>Claude Code</b><span class="note">Sonnet 5.5</span></li>
+          <li><b>Perplexity app</b></li>
+        </ol>
+        <footer class="sheet-foot"><span>Named you: before 0 of 6, now <b class="you-now mk" data-mark="underline" data-at="8.5">4 of 6</b></span><span>Example data</span></footer>
+      </figure>
+    </div>
+  </div></section>
+
+  <section class="scene" data-scene="social"><div class="z z-social">
+    <h2 class="vh" data-in="0.2">What people say about you. <em>Not just what AI says.</em></h2>
+    <figure class="sheet alert social-digest" data-in="0.6" data-rise="28" data-cue="chime">
+      <header class="alert-head"><span class="alert-av">b</span><span><b>Byname</b><small>Weekly social digest</small></span></header>
+      <p class="alert-title"><span class="mk" data-mark="circle" data-pad="7 4" data-at="1.4">23 posts</span> named Unkey this week</p>
+      <p data-in="1.1" data-rise="6">X 9 · Reddit 6 · Hacker News 3 · Bluesky 3 · LinkedIn 2. Your team's own accounts are left out.</p>
+      <ul>
+        <li data-in="1.9" data-rise="6"><b>Hacker News</b> · “Show HN: we moved our API keys to Unkey and deleted 2,000 lines” · 184 points</li>
+        <li data-in="2.2" data-rise="6"><b>Reddit</b> · r/webdev · “Unkey vs rolling your own rate limiter?” · 41 comments</li>
+        <li data-in="2.5" data-rise="6"><b>X</b> · “rate limits per customer in one call with unkey, finally” · 96 likes</li>
+      </ul>
+      <p class="alert-link" data-in="2.8" data-rise="6">Open Social <span class="digest-note">· example data</span></p>
+    </figure>
+  </div></section>
+
+  <section class="scene" data-scene="agent"><div class="z z-agents">
+    <h2 class="vh" data-in="0.2">Ask your agent <em>what you lost.</em></h2>
+    <div class="agents">
+      <figure class="sheet transcript" data-in="0.5" data-rise="28">
+        <p class="t-head"><span>~/unkey/www</span><span>claude</span></p>
+        <div class="t-body">
+          <p class="t-user"><span>&gt;</span> <span data-type="Which questions did we lose in check #7?" data-at-type="0.9" data-cps="34"></span></p>
+          <p class="t-call" data-in="2.3" data-rise="4"><b>byname</b> compare_runs <span>before=6 after=7</span></p>
+          <p class="t-res" data-in="2.7" data-rise="4">1 gained · <span class="mk" data-mark="circle" data-tone="instead" data-pad="8 4" data-at="3.1">6 lost</span> · 17 moved · net -5</p>
+          <div class="t-say">
+            <p data-in="3.5" data-rise="4">Check #7 lost 6 answers that check #6 had:</p>
+            <ul>
+              <li data-in="3.8" data-rise="4"><q>Which API platform has the most predictable pricing for a startup?</q> on Claude Code with Sonnet, Codex CLI and the ChatGPT app.</li>
+              <li data-in="4.1" data-rise="4"><q>What is the easiest way to add API keys and rate limits to an existing API?</q> on the ChatGPT app.</li>
+              <li data-in="4.4" data-rise="4"><q>How do I move an API off a single VPS without downtime?</q> on Google AI Overview.</li>
+            </ul>
+            <p data-in="4.8" data-rise="4">On the ChatGPT app, the pricing question now names Fly.io first.</p>
+          </div>
+        </div>
+      </figure>
+      <div class="agents-side" data-in="1.0" data-rise="20">
+        <div class="snip">
+          <h3>Add it to your agent</h3>
+<pre class="code"><span class="c"># Claude Code</span>
+claude mcp add --transport http byname \
+  https://byname.example.com/mcp</pre>
+        </div>
+      </div>
+    </div>
+  </div></section>
+
+  <section class="scene" data-scene="deploy"><div class="z">
+    <h2 class="vh" data-in="0.2">Run it on Unkey <em>with one prompt.</em></h2>
+    <div class="deploy">
+      <ol class="steps">
+        <li data-in="0.6"><h3>Add Unkey's MCP server to your agent</h3></li>
+        <li data-in="2.3"><h3>Paste the prompt into your agent</h3></li>
+        <li data-in="5.2"><h3>Open the link it gives you</h3></li>
+      </ol>
+      <figure class="sheet transcript term" data-in="0.5" data-rise="28">
+        <p class="t-head"><span>~/byname</span><span>claude</span></p>
+        <div class="t-body">
+          <p class="t-user"><span>$</span> <span data-type="claude mcp add --transport http unkey https://mcp.unkey.com" data-at-type="0.8" data-cps="46"></span></p>
+          <p class="t-user" data-in="2.3" data-rise="4"><span>&gt;</span> <span data-type="Deploy Byname to Unkey for me." data-at-type="2.4" data-cps="30"></span></p>
+          <div class="chks">
+            <p class="chk" data-in="3.5" data-rise="4"><span class="mk box" data-mark="check" data-at="3.6"></span>Project and app created on Unkey</p>
+            <p class="chk" data-in="3.95" data-rise="4"><span class="mk box" data-mark="check" data-at="4.05"></span>Secrets set as write-only</p>
+            <p class="chk" data-in="4.4" data-rise="4"><span class="mk box" data-mark="check" data-at="4.5"></span>Built from your fork in us-east-1</p>
+            <p class="chk" data-in="4.85" data-rise="4"><span class="mk box" data-mark="check" data-at="4.95"></span>Firewall and rate limits at the gateway</p>
+            <p class="chk" data-in="5.3" data-rise="4"><span class="mk box" data-mark="check" data-at="5.4"></span><span>Live at <span class="mk" data-mark="underline" data-at="5.8">https://byname-acme.unkey.app</span></span></p>
+          </div>
+        </div>
+      </figure>
+    </div>
+  </div></section>
+
+  <section class="scene" data-scene="end"><div class="z">
+    <div class="logo end-logo" data-in="0.3" data-fx="grow">by<span class="mk" data-mark="circle" data-pad="0.2em 0.16em" data-sw="2.2" data-at="0.9">name</span></div>
+    <h1 class="end-h" data-in="0.8">When buyers ask AI, does it say <span class="mk" data-mark="circle" data-pad="0.16em 0.05em" data-sw="3" data-at="1.6" data-dur="0.8">your name</span>?</h1>
+    <div class="end-acts" data-in="1.6" data-rise="16">
+      <span class="btn">Deploy on Unkey</span>
+      <span class="btn line">Star on GitHub</span>
+    </div>
+    <p class="end-url" data-in="2.1" data-rise="12">byname.dev</p>
+    <p class="end-by" data-in="2.5" data-rise="10">Open source, MIT licensed · Provided by <b>Unkey</b></p>
+  </div></section>
+</div>
+
+<script>
+  // The timeline, in seconds: each scene is visible from a to b.
+  const T = {
+    intro: [0, 4.2], question: [3.8, 9.6], answer: [9.2, 18.6], table: [18.2, 25.4], dropout: [25.0, 32.6],
+    gap: [32.2, 42.0], social: [41.6, 47.4], agent: [47.0, 54.2], deploy: [53.8, 60.6], end: [60.2, 66],
+  };
+  const DURATION = 66;
+
+  const $ = (id) => document.getElementById(id);
+  const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
+  const clamp = (x) => Math.min(1, Math.max(0, x));
+  const easeOut = (x) => 1 - Math.pow(1 - x, 3);
+  const easeInOut = (x) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
+  // The site's mark easing, cubic-bezier(.55, .05, .3, 1).
+  const penEase = (x) => {
+    let lo = 0, hi = 1, s = x;
+    for (let i = 0; i < 24; i++) { s = (lo + hi) / 2; const bx = 3 * 0.55 * s * (1 - s) ** 2 + 3 * 0.3 * s * s * (1 - s) + s ** 3; if (bx < x) lo = s; else hi = s; }
+    return 3 * 0.05 * s * (1 - s) ** 2 + 3 * s * s * (1 - s) + s ** 3;
+  };
+  const p = (t, a, d, ease = easeOut) => ease(clamp((t - a) / d));
+  const lerp = (a, b, k) => a + (b - a) * k;
+
+  // Marks, ported from the site's app.js: an SVG stroke shaped to its box and
+  // seeded from its text, so every render draws the same hand.
+  const Marks = (() => {
+    const NS = "http://www.w3.org/2000/svg";
+    const seeded = (str) => {
+      let h = 2166136261;
+      for (const c of str) h = Math.imul(h ^ c.charCodeAt(0), 16777619);
+      return () => ((h = Math.imul(h ^ (h >>> 15), 2246822507) ^ Math.imul(h ^ (h >>> 13), 3266489909)) >>> 0) / 4294967296;
+    };
+    const smooth = (pts) => {
+      const f = (n) => n.toFixed(1);
+      let d = `M${f(pts[0][0])} ${f(pts[0][1])}`;
+      for (let i = 0; i < pts.length - 1; i++) {
+        const p0 = pts[i - 1] || pts[i], p1 = pts[i], p2 = pts[i + 1], p3 = pts[i + 2] || p2;
+        d += `C${f(p1[0] + (p2[0] - p0[0]) / 6)} ${f(p1[1] + (p2[1] - p0[1]) / 6)} ${f(p2[0] - (p3[0] - p1[0]) / 6)} ${f(p2[1] - (p3[1] - p1[1]) / 6)} ${f(p2[0])} ${f(p2[1])}`;
+      }
+      return d;
+    };
+    const shapes = {
+      circle(w, h, r) {
+        const cx = w / 2, cy = h / 2, rx = w / 2, ry = h / 2;
+        const start = -2.35 + r() * 0.5, sweep = Math.PI * 2 * (1.04 + r() * 0.05);
+        const p1 = r() * 6, p2 = r() * 6, drift = 0.03 + r() * 0.04, tilt = (r() - 0.5) * 0.08;
+        const pts = [];
+        for (let i = 0; i <= 36; i++) {
+          const t = i / 36, a = start + sweep * t;
+          const k = 1 + 0.025 * Math.sin(2 * a + p1) + 0.018 * Math.sin(3 * a + p2) - drift * t;
+          const x = Math.cos(a) * rx * k, y = Math.sin(a) * ry * k;
+          pts.push([cx + x - y * tilt, cy + y + x * tilt]);
+        }
+        return smooth(pts);
+      },
+      underline(w, h, r) {
+        const sag = (r() - 0.3) * 3, pts = [];
+        for (let i = 0; i <= 8; i++) {
+          const t = i / 8;
+          pts.push([-2 + (w + 5) * t, h + 1 + Math.sin(t * Math.PI) * sag + (r() - 0.5) * 0.8 - t * 1.4]);
+        }
+        return smooth(pts);
+      },
+      dash(w, h, r) { return smooth([[w * 0.2, h * 0.58 + r() * 2], [w * 0.5, h * 0.5], [w * 0.8, h * 0.4 + r() * 2]]); },
+      tick(w, h, r) { const y = h * 0.88; return smooth([[w * 0.2, y - 1 + r()], [w * 0.5, y + 1], [w * 0.82, y - 2 + r()]]); },
+      caret(w, h, r) { return `M${(r() * 1.5).toFixed(1)} ${h.toFixed(1)}L${(w / 2 + r() - 0.5).toFixed(1)} ${(r() * 1.5).toFixed(1)}L${w.toFixed(1)} ${(h - r() * 1.5).toFixed(1)}`; },
+      check(w, h, r) { return smooth([[w * 0.08, h * (0.5 + r() * 0.08)], [w * 0.38, h * 0.86], [w * (0.92 + r() * 0.06), h * (0.06 + r() * 0.06)]]); },
+    };
+    const pads = { circle: [10, 6], underline: [0, 0], dash: [0, 0], tick: [0, 0], caret: [0, 0], check: [0, 0] };
+    function draw(el) {
+      const kind = el.dataset.mark || "circle";
+      const w = el.offsetWidth, h = el.offsetHeight;
+      const em = parseFloat(getComputedStyle(el).fontSize);
+      const [px, py] = el.dataset.pad
+        ? el.dataset.pad.split(" ").map((v) => (v.endsWith("em") ? parseFloat(v) * em : Number(v)))
+        : el.classList.contains("tm") ? [3, 3] : pads[kind];
+      if (el.dataset.sw) el.style.setProperty("--sw", el.dataset.sw);
+      const svg = document.createElementNS(NS, "svg");
+      svg.setAttribute("class", "mk-svg");
+      svg.setAttribute("width", w + px * 2 + 12);
+      svg.setAttribute("height", h + py * 2 + 12);
+      svg.style.left = `${-px - 6}px`;
+      svg.style.top = `${-py - 6}px`;
+      const path = document.createElementNS(NS, "path");
+      path.setAttribute("d", shapes[kind](w + px * 2, h + py * 2, seeded(el.textContent + kind + w)));
+      path.setAttribute("transform", "translate(6 6)");
+      path.setAttribute("pathLength", "1");
+      svg.append(path);
+      el.append(svg);
+      return path;
+    }
+    return { draw };
+  })();
+
+  const apps = ["ChatGPT app", "Gemini app", "Google AI Mode", "Google AI Overview", "Microsoft Copilot", "Bing AI Mode", "Brave AI answers", "Claude Code", "Gemini CLI", "Codex CLI", "Claude app", "Perplexity app"];
+  $("apps").innerHTML = apps.map((a, i) => `<li data-in="${(6.1 + i * 0.12).toFixed(2)}" data-rise="10">${i === 0 ? `<span class="mk" data-mark="underline" data-at="7.9">${a}</span>` : a}</li>`).join("");
+
+  const cols = [["ChatGPT app"], ["Google AI Overview"], ["Perplexity app"], ["Codex CLI"], ["Claude Code", "Opus 5.5"], ["Claude Code", "Sonnet 5.5"]];
+  // Check #8 from the homepage: a position, "-" for someone else named, "l" for linked only.
+  const rows = [
+    ["Where should a small team deploy a public API in 2026?", [1, 1, 2, 2, 2, 2]],
+    ["What is the easiest way to add API keys and rate limits to an existing API?", [2, 1, 1, 2, 1, 4]],
+    ["Which API platform has the most predictable pricing for a startup?", ["-", 2, 3, 1, 3, 4]],
+    ["How do I move an API off a single VPS without downtime?", [2, 3, 2, 1, 1, 1]],
+    ["What are good alternatives to running my own API gateway?", [3, 2, 5, 3, 1, 1]],
+    ["Which platform is best for hosting a Postgres-backed API close to European users?", ["-", "-", "l", "-", "l", "-"]],
+  ];
+  const CELL0 = 1.5, CELL_STEP = 0.08;
+  const cellAt = (r, c) => CELL0 + (r * 6 + c) * CELL_STEP;
+  $("qtable").innerHTML =
+    `<thead><tr><th class="q-h">Question</th>${cols.map(([a, m]) => `<th><span>${a}${m ? `<small>${m}</small>` : ""}</span></th>`).join("")}<th class="q-s">Named</th></tr></thead><tbody>` +
+    rows.map(([q, cells], r) => {
+      const named = cells.filter((c) => typeof c === "number").length;
+      const tds = cells.map((c, k) => {
+        const at = cellAt(r, k).toFixed(2);
+        if (c === "-") return `<td><span class="tm miss mk" data-mark="dash" data-tone="instead" data-at="${at}" data-sound="cell"></span></td>`;
+        if (c === "l") return `<td><span class="tm cite mk" data-mark="tick" data-at="${at}" data-sound="cell"></span></td>`;
+        return `<td><span class="tm mk named" data-mark="circle" data-at="${at}" data-dur="0.45" data-sound="cell" data-in="${at}" data-rise="6">${c}</span></td>`;
+      }).join("");
+      return `<tr><th data-in="${(0.8 + r * 0.1).toFixed(2)}" data-rise="6"><div class="q-cell"><span class="q-n">${r + 1}</span><span class="q-t">${q}</span></div></th>${tds}<td class="q-s"${named ? "" : ' style="color:var(--instead)"'} data-in="${(cellAt(r, 5) + 0.3).toFixed(2)}" data-rise="4">${named}<small> of 6</small></td></tr>`;
+    }).join("") + "</tbody>";
+  $("named-mk").dataset.at = (cellAt(5, 5) + 0.6).toFixed(2);
+
+  for (const h of $$("[data-words]")) {
+    const a = Number(h.dataset.words);
+    let i = 0;
+    const wrap = (node) => {
+      for (const child of [...node.childNodes]) {
+        if (child.nodeType === 3) {
+          const frag = document.createDocumentFragment();
+          for (const part of child.textContent.split(/(\s+)/)) {
+            if (!part) continue;
+            if (/^\s+$/.test(part)) { frag.append(part); continue; }
+            const w = document.createElement("span");
+            w.className = "w"; w.textContent = part; w.dataset.in = (a + i++ * 0.14).toFixed(2); w.dataset.fx = "word";
+            frag.append(w);
+          }
+          child.replaceWith(frag);
+        } else if (child.classList.contains("mk")) {
+          child.dataset.in = (a + i++ * 0.14).toFixed(2); child.dataset.fx = "word";
+        }
+      }
+    };
+    wrap(h);
+  }
+
+  const sceneOf = (el) => T[el.closest("[data-scene]").dataset.scene][0];
+  let scenes = [], enters = [], marks = [], typed = [], presses = [], CUES = [];
+  const panOf = (el) => { const r = el.getBoundingClientRect(); return Math.max(-0.6, Math.min(0.6, ((r.left + r.width / 2) / 1920) * 2 - 1)); };
+  function build() {
+    scenes = $$("[data-scene]").map((el) => ({ el, a: T[el.dataset.scene][0], b: T[el.dataset.scene][1] }));
+    enters = $$("[data-in]").map((el) => ({ el, at: sceneOf(el) + Number(el.dataset.in), rise: Number(el.dataset.rise ?? 22), fx: el.dataset.fx || "rise" }));
+    marks = [
+      ...$$(".mk[data-at]").map((el) => ({ el, path: Marks.draw(el), kind: el.dataset.mark || "circle" })),
+      ...$$("path.draw[data-at]").map((el) => ({ el, path: el, kind: "arrow" })),
+    ].map((m) => ({ ...m, at: sceneOf(m.el) + Number(m.el.dataset.at), dur: Number(m.el.dataset.dur ?? (m.kind === "circle" ? 0.65 : 0.45)), sound: m.el.dataset.sound || m.kind }));
+    typed = $$("[data-type]").map((el) => ({ el, text: el.dataset.type, at: sceneOf(el) + Number(el.dataset.atType), cps: Number(el.dataset.cps) }));
+    presses = $$("[data-press]").map((el) => ({ el, at: sceneOf(el) + Number(el.dataset.press) }));
+    CUES = [
+      ...marks.filter((m) => m.sound !== "none").map((m) => ({ t: m.at, kind: m.sound, mark: m.kind, dur: m.dur, pan: panOf(m.el) })),
+      ...enters.filter((e) => e.el.dataset.cue).map((e) => ({ t: e.at + 0.15, kind: e.el.dataset.cue, dur: 0, pan: panOf(e.el) })),
+      ...presses.map((e) => ({ t: e.at, kind: "press", dur: 0, pan: panOf(e.el) })),
+    ].sort((x, y) => x.t - y.t);
+    window.CUES = CUES;
+  }
+
+  function set(el, { o = 1, y = 0, x = 0, s = 1, r = 0, blur = 0 } = {}) {
+    el.style.opacity = o;
+    el.style.transform = `translate(${x}px, ${y}px) scale(${s})${r ? ` rotate(${r}deg)` : ""}`;
+    el.style.filter = blur > 0.05 ? `blur(${blur}px)` : "none";
+  }
+  const fx = {
+    rise: (el, t, e) => { const k = p(t, e.at, 0.7); set(el, { o: k, y: (1 - k) * e.rise, blur: (1 - k) * 5 }); },
+    word: (el, t, e) => { const k = p(t, e.at, 0.7); set(el, { o: k, y: (1 - k) * 22, blur: (1 - k) * 7 }); },
+    grow: (el, t, e) => { const k = p(t, e.at, 0.9); set(el, { o: k, s: 0.93 + 0.07 * k, blur: (1 - k) * 6 }); },
+    slide: (el, t, e) => { const k = p(t, e.at, 0.75); set(el, { o: k, x: (1 - k) * 40, blur: (1 - k) * 4 }); },
+    stamp: (el, t, e) => { const k = p(t, e.at, 0.32, (x) => 1 - Math.pow(1 - x, 2)); set(el, { o: k * 0.92, s: 1.35 - 0.35 * k, r: -6 }); },
+  };
+  function scene(s, t) {
+    const out = p(t, s.b - 0.6, 0.6, easeInOut);
+    const k = p(t, s.a, 0.6) * (1 - out);
+    s.el.style.opacity = k;
+    s.el.style.transform = `translateY(${-out * 30}px)`;
+    s.el.style.visibility = k > 0.001 ? "visible" : "hidden";
+  }
+  const caret = (t) => (Math.floor(t * 2.2) % 2 === 0 ? '<span class="tcaret"></span>' : "");
+
+  function render(t) {
+    for (const s of scenes) scene(s, t);
+    for (const e of enters) fx[e.fx](e.el, t, e);
+    for (const m of marks) {
+      const k = p(t, m.at, m.dur, penEase);
+      m.path.style.strokeDashoffset = 1 - k;
+      m.path.style.opacity = t >= m.at ? 1 : 0;
+    }
+    for (const y of typed) {
+      const n = Math.max(0, Math.floor((t - y.at) * y.cps));
+      const typing = t >= y.at - 0.4 && n < y.text.length + 6;
+      y.el.innerHTML = y.text.slice(0, n).replace(/&/g, "&amp;").replace(/</g, "&lt;") + (typing ? caret(t) : "");
+    }
+    for (const b of presses) {
+      const d = t - b.at, down = d >= 0 && d < 0.18;
+      b.el.style.transform = `scale(${down ? 0.95 : 1})`;
+      b.el.style.background = d >= 0 && d < 0.9 ? "var(--ink)" : "";
+      b.el.style.color = d >= 0 && d < 0.9 ? "var(--paper)" : "";
+    }
+
+    const named = marks.filter((m) => m.el.classList.contains("named") && t >= m.at + m.dur * 0.6).length;
+    $("named").textContent = named;
+
+    const shift = 1 - p(t, T.answer[0] + 5.6, 0.9, easeInOut);
+    $("desk").style.translate = `${shift * 232}px 0`;
+    $("track").style.transform = `translateX(${lerp(56, 56 - 484, p(t, T.gap[0] + 6.4, 1.0, easeInOut))}px)`;
+    $("missed").style.opacity = Math.min(Number($("missed").style.opacity), 1 - p(t, T.gap[0] + 6.4, 0.7));
+    $("missed-arrow").style.opacity = 1 - p(t, T.gap[0] + 6.4, 0.7);
+  }
+
+  window.DURATION = DURATION;
+  window.T = T;
+  window.render = render;
+  const faces = ['400 20px "Newsreader"', 'italic 400 20px "Newsreader"', '500 20px "Newsreader"', '400 20px "Instrument Sans"', '500 20px "Instrument Sans"', '600 20px "Instrument Sans"', '400 20px "IBM Plex Mono"', '500 20px "IBM Plex Mono"', 'italic 400 20px "IBM Plex Mono"'];
+  window.ready = Promise.all(faces.map((f) => document.fonts.load(f))).then(() => document.fonts.ready).then(() => { build(); render(0); });
+  if (!location.hash.includes("render")) {
+    window.ready.then(() => {
+      const start = performance.now();
+      const loop = () => { render(((performance.now() - start) / 1000) % DURATION); requestAnimationFrame(loop); };
+      loop();
+    });
+  }
+</script>
+</body>
+</html>
