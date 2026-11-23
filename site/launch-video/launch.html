@@ -5,9 +5,9 @@
   sets the page to second t. Each scene is laid out at the site's CSS sizes
   and zoomed to video size; data-in and data-at give an element's entrance
   and a mark's draw time, in seconds from its scene's start. render.mjs
-  steps it at 30fps, encode.swift makes the MP4, audio.mjs reads window.CUES
-  from this page and synthesizes the soundtrack, and mux.swift adds it.
-  npm run video does all four. Open it in a browser to preview in real time.
+  steps it at 30fps, encode.swift makes the MP4, audio.mjs synthesizes the
+  soundtrack to this timeline, and mux.swift adds it. npm run video does all
+  four. Open it in a browser to preview in real time.
 -->
 <html lang="en">
 <head>
@@ -131,7 +131,7 @@
             </div>
             <footer class="sheet-foot" data-in="2.45" data-rise="6"><span>Linked: unkey.com, aws.amazon.com, github.com</span><span class="cost">under $0.01</span></footer>
           </article>
-          <span class="stamp" data-in="5.2" data-fx="stamp" data-cue="stamp">Named #2</span>
+          <span class="stamp" data-in="5.2" data-fx="stamp">Named #2</span>
         </div>
       </div>
       <div class="apps-side">
@@ -146,9 +146,9 @@
     <figure class="contents sheet" data-in="0.5" data-rise="30">
       <table class="qtable" id="qtable"></table>
       <figcaption class="legend">
-        <span><span class="tm mk" data-mark="circle" data-at="0.9" data-sound="none">2</span> named, at position 2</span>
-        <span><span class="tm cite mk" data-mark="tick" data-at="1.0" data-sound="none"></span> linked, not named</span>
-        <span><span class="tm miss mk" data-mark="dash" data-tone="instead" data-at="1.1" data-sound="none"></span> named someone else</span>
+        <span><span class="tm mk" data-mark="circle" data-at="0.9">2</span> named, at position 2</span>
+        <span><span class="tm cite mk" data-mark="tick" data-at="1.0"></span> linked, not named</span>
+        <span><span class="tm miss mk" data-mark="dash" data-tone="instead" data-at="1.1"></span> named someone else</span>
         <span class="legend-src">Check #8 · Unkey · <span class="mk" data-mark="underline" id="named-mk"><span id="named">0</span> of 36 named</span></span>
       </figcaption>
     </figure>
@@ -169,7 +169,7 @@
         </ol>
         <footer class="sheet-foot"><span>Linked: unkey.com and 3 more</span><span class="cost">under $0.01</span></footer>
       </figure>
-      <svg class="story-arrow" viewBox="0 0 80 40"><path class="draw" pathLength="1" data-at="2.0" data-dur="0.6" data-sound="none" d="M4 24 C 22 10, 46 10, 70 20 M61 13 L71 20 L60 25" /></svg>
+      <svg class="story-arrow" viewBox="0 0 80 40"><path class="draw" pathLength="1" data-at="2.0" data-dur="0.6" d="M4 24 C 22 10, 46 10, 70 20 M61 13 L71 20 L60 25" /></svg>
       <figure class="sheet clip" data-in="2.3" data-rise="24">
         <header class="sheet-head"><span><b>Check #7</b> · ChatGPT app</span><span>App answer</span></header>
         <p class="q">Which API platform has the most predictable pricing for a startup?</p>
@@ -182,8 +182,8 @@
         <p class="gone"><span class="mk caret" data-mark="caret" data-tone="instead" data-at="3.6"></span><span class="note instead" data-in="3.9" data-rise="4">Unkey: not named, and unkey.com no longer linked</span></p>
         <footer class="sheet-foot"><span>Linked: fly.io and 3 more</span><span class="cost">under $0.01</span></footer>
       </figure>
-      <svg class="story-arrow" viewBox="0 0 80 40"><path class="draw" pathLength="1" data-at="4.4" data-dur="0.6" data-sound="none" d="M4 22 C 24 30, 48 28, 70 18 M60 15 L71 18 L64 27" /></svg>
-      <figure class="sheet alert" data-in="4.7" data-fx="slide" data-cue="chime">
+      <svg class="story-arrow" viewBox="0 0 80 40"><path class="draw" pathLength="1" data-at="4.4" data-dur="0.6" d="M4 22 C 24 30, 48 28, 70 18 M60 15 L71 18 L64 27" /></svg>
+      <figure class="sheet alert" data-in="4.7" data-fx="slide">
         <header class="alert-head"><span class="alert-av">b</span><span><b>Byname</b><small>Notification</small></span></header>
         <p class="alert-title">Check #7: 1 gained, <span class="mk" data-mark="underline" data-tone="instead" data-at="5.6">6 lost</span></p>
         <p>Named in 24 of 36 answers.</p>
@@ -205,7 +205,7 @@
         <p class="fix-what"><b>What to do:</b> AI named <span class="mk" data-mark="underline" data-tone="instead" data-at="1.3">Fly.io</span>, Cloudflare and AWS instead. Write a page on your site that answers this question.</p>
         <p class="fix-act"><span class="fix-btn" id="fix-btn" data-press="2.1">Prompt for your agent</span><span class="note">a brief your coding agent writes the page from</span></p>
       </figure>
-      <svg class="story-arrow" id="missed-arrow" viewBox="0 0 80 40"><path class="draw" pathLength="1" data-at="2.6" data-dur="0.6" data-sound="none" d="M4 24 C 22 10, 46 10, 70 20 M61 13 L71 20 L60 25" /></svg>
+      <svg class="story-arrow" id="missed-arrow" viewBox="0 0 80 40"><path class="draw" pathLength="1" data-at="2.6" data-dur="0.6" d="M4 24 C 22 10, 46 10, 70 20 M61 13 L71 20 L60 25" /></svg>
       <figure class="sheet transcript" data-in="2.8" data-rise="24">
         <p class="t-head"><span>~/unkey/www</span><span>claude</span></p>
         <div class="t-body">
@@ -216,11 +216,11 @@
           <p class="t-res" data-in="5.8" data-rise="4">Handled. Byname tracks it from the next check.</p>
         </div>
       </figure>
-      <svg class="story-arrow" viewBox="0 0 80 40"><path class="draw" pathLength="1" data-at="7.0" data-dur="0.6" data-sound="none" d="M4 22 C 24 30, 48 28, 70 18 M60 15 L71 18 L64 27" /></svg>
+      <svg class="story-arrow" viewBox="0 0 80 40"><path class="draw" pathLength="1" data-at="7.0" data-dur="0.6" d="M4 22 C 24 30, 48 28, 70 18 M60 15 L71 18 L64 27" /></svg>
       <figure class="sheet clip" data-in="7.2" data-rise="24">
         <header class="sheet-head"><span><b>Handled</b> · unkey.com/blog/eu-postgres-apis</span><span>Two checks later</span></header>
         <p class="q">Which platform is best for hosting a Postgres-backed API close to European users?</p>
-        <p class="fix-linked"><span class="mk" data-mark="circle" data-pad="8 5" data-at="7.8" data-sound="chime">Linked in 3 answers</span></p>
+        <p class="fix-linked"><span class="mk" data-mark="circle" data-pad="8 5" data-at="7.8">Linked in 3 answers</span></p>
         <ol class="mini">
           <li><b>ChatGPT app</b></li>
           <li><b>Claude Code</b><span class="note">Sonnet 5.5</span></li>
@@ -233,7 +233,7 @@
 
   <section class="scene" data-scene="social"><div class="z z-social">
     <h2 class="vh" data-in="0.2">What people say about you. <em>Not just what AI says.</em></h2>
-    <figure class="sheet alert social-digest" data-in="0.6" data-rise="28" data-cue="chime">
+    <figure class="sheet alert social-digest" data-in="0.6" data-rise="28">
       <header class="alert-head"><span class="alert-av">b</span><span><b>Byname</b><small>Weekly social digest</small></span></header>
       <p class="alert-title"><span class="mk" data-mark="circle" data-pad="7 4" data-at="1.4">23 posts</span> named Unkey this week</p>
       <p data-in="1.1" data-rise="6">X 9 · Reddit 6 · Hacker News 3 · Bluesky 3 · LinkedIn 2. Your team's own accounts are left out.</p>
@@ -428,9 +428,9 @@ claude mcp add --transport http byname \
       const named = cells.filter((c) => typeof c === "number").length;
       const tds = cells.map((c, k) => {
         const at = cellAt(r, k).toFixed(2);
-        if (c === "-") return `<td><span class="tm miss mk" data-mark="dash" data-tone="instead" data-at="${at}" data-sound="cell"></span></td>`;
-        if (c === "l") return `<td><span class="tm cite mk" data-mark="tick" data-at="${at}" data-sound="cell"></span></td>`;
-        return `<td><span class="tm mk named" data-mark="circle" data-at="${at}" data-dur="0.45" data-sound="cell" data-in="${at}" data-rise="6">${c}</span></td>`;
+        if (c === "-") return `<td><span class="tm miss mk" data-mark="dash" data-tone="instead" data-at="${at}"></span></td>`;
+        if (c === "l") return `<td><span class="tm cite mk" data-mark="tick" data-at="${at}"></span></td>`;
+        return `<td><span class="tm mk named" data-mark="circle" data-at="${at}" data-dur="0.45" data-in="${at}" data-rise="6">${c}</span></td>`;
       }).join("");
       return `<tr><th data-in="${(0.8 + r * 0.1).toFixed(2)}" data-rise="6"><div class="q-cell"><span class="q-n">${r + 1}</span><span class="q-t">${q}</span></div></th>${tds}<td class="q-s"${named ? "" : ' style="color:var(--instead)"'} data-in="${(cellAt(r, 5) + 0.3).toFixed(2)}" data-rise="4">${named}<small> of 6</small></td></tr>`;
     }).join("") + "</tbody>";
@@ -460,23 +460,16 @@ claude mcp add --transport http byname \
   }
 
   const sceneOf = (el) => T[el.closest("[data-scene]").dataset.scene][0];
-  let scenes = [], enters = [], marks = [], typed = [], presses = [], CUES = [];
-  const panOf = (el) => { const r = el.getBoundingClientRect(); return Math.max(-0.6, Math.min(0.6, ((r.left + r.width / 2) / 1920) * 2 - 1)); };
+  let scenes = [], enters = [], marks = [], typed = [], presses = [];
   function build() {
     scenes = $$("[data-scene]").map((el) => ({ el, a: T[el.dataset.scene][0], b: T[el.dataset.scene][1] }));
     enters = $$("[data-in]").map((el) => ({ el, at: sceneOf(el) + Number(el.dataset.in), rise: Number(el.dataset.rise ?? 22), fx: el.dataset.fx || "rise" }));
     marks = [
       ...$$(".mk[data-at]").map((el) => ({ el, path: Marks.draw(el), kind: el.dataset.mark || "circle" })),
       ...$$("path.draw[data-at]").map((el) => ({ el, path: el, kind: "arrow" })),
-    ].map((m) => ({ ...m, at: sceneOf(m.el) + Number(m.el.dataset.at), dur: Number(m.el.dataset.dur ?? (m.kind === "circle" ? 0.65 : 0.45)), sound: m.el.dataset.sound || m.kind }));
+    ].map((m) => ({ ...m, at: sceneOf(m.el) + Number(m.el.dataset.at), dur: Number(m.el.dataset.dur ?? (m.kind === "circle" ? 0.65 : 0.45)) }));
     typed = $$("[data-type]").map((el) => ({ el, text: el.dataset.type, at: sceneOf(el) + Number(el.dataset.atType), cps: Number(el.dataset.cps) }));
     presses = $$("[data-press]").map((el) => ({ el, at: sceneOf(el) + Number(el.dataset.press) }));
-    CUES = [
-      ...marks.filter((m) => m.sound !== "none").map((m) => ({ t: m.at, kind: m.sound, mark: m.kind, dur: m.dur, pan: panOf(m.el) })),
-      ...enters.filter((e) => e.el.dataset.cue).map((e) => ({ t: e.at + 0.15, kind: e.el.dataset.cue, dur: 0, pan: panOf(e.el) })),
-      ...presses.map((e) => ({ t: e.at, kind: "press", dur: 0, pan: panOf(e.el) })),
-    ].sort((x, y) => x.t - y.t);
-    window.CUES = CUES;
   }
 
   function set(el, { o = 1, y = 0, x = 0, s = 1, r = 0, blur = 0 } = {}) {
@@ -531,7 +524,6 @@ claude mcp add --transport http byname \
   }
 
   window.DURATION = DURATION;
-  window.T = T;
   window.render = render;
   const faces = ['400 20px "Newsreader"', 'italic 400 20px "Newsreader"', '500 20px "Newsreader"', '400 20px "Instrument Sans"', '500 20px "Instrument Sans"', '600 20px "Instrument Sans"', '400 20px "IBM Plex Mono"', '500 20px "IBM Plex Mono"', 'italic 400 20px "IBM Plex Mono"'];
   window.ready = Promise.all(faces.map((f) => document.fonts.load(f))).then(() => document.fonts.ready).then(() => { build(); render(0); });
