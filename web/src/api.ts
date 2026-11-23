@@ -880,6 +880,46 @@ export interface Gap {
   pairs: GapPair[];
 }
 
+export type LineState = "named_linked" | "named" | "linked" | "missed";
+
+export interface BriefLine extends Series {
+  /** "Claude Code · claude-sonnet-4-5", or "ChatGPT app" for a surface that takes no model. */
+  title: string;
+  answer_id: number;
+  /** linked: linked to your site without naming you. */
+  state: LineState;
+  position: number | null;
+  /** Your brand and competitors the answer named, in the order it named them. */
+  brands: string[];
+  fan_out: string[];
+  links: string[];
+}
+
+export interface BriefPage {
+  url: string;
+  domain: string;
+  is_self: boolean;
+  answers: number;
+  check: PageCheck | null;
+  outreach: boolean;
+}
+
+/** One question on one check, as a prompt for an agent that writes your site's content. */
+export interface Brief {
+  run_id: number;
+  question: QuestionRef;
+  answered: number;
+  named: number;
+  linked: number;
+  instead: string[];
+  fan_out: string[];
+  /** Those that left you out first. */
+  lines: BriefLine[];
+  pages: BriefPage[];
+  /** Markdown to paste into an agent working on your site. */
+  prompt: string;
+}
+
 export interface RunRef {
   id: number;
   started_at: Timestamp;
@@ -1824,6 +1864,7 @@ export const api = {
   answer: (id: number) => request<Answer>("GET", `/v1/answers/${id}`),
   compare: (before: number, after: number) => request<Comparison>("GET", `/v1/compare${qs({ before, after })}`),
   history: (question: number, since?: Timestamp) => request<History>("GET", `/v1/questions/${question}/history${qs({ since })}`),
+  brief: (question: number, run?: number, f: ResultsFilter = {}) => request<Brief>("GET", `/v1/questions/${question}/brief${qs({ run, surface: f.surface, model: f.model })}`),
   gaps: (run?: number, f: ResultsFilter = {}) => request<{ run_id: number; gaps: Gap[] }>("GET", `/v1/gaps${qs({ run, surface: f.surface, model: f.model })}`),
   prompts: (f: ResultsFilter) => request<Prompts>("GET", `/v1/prompts${qs({ ...f })}`),
   sources: (f: ResultsFilter) => request<Sources>("GET", `/v1/sources${qs({ ...f })}`),

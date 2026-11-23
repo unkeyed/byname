@@ -442,7 +442,11 @@ export function Dialog({ open, onClose, title, children, wide }: { open: boolean
   return (
     <dialog
       ref={ref}
-      onClose={onClose}
+      // React passes close up the component tree though the DOM event does not bubble, so without this a dialog opened in a drawer closes the drawer too.
+      onClose={(e) => {
+        e.stopPropagation();
+        onClose();
+      }}
       onClick={(e) => e.target === ref.current && onClose()}
       aria-label={title}
       className={cx(

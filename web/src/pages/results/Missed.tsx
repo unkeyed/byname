@@ -5,6 +5,7 @@ import { useLabels } from "../../lines";
 import { keys, useAnsweredRuns, useSettings, useSurfaces } from "../../queries";
 import { Badge, Button, Card, CardHeader, cx, EmptyState, ErrorNote, Icon, Pending, scrollArea, ScrollX, useLoading } from "../../ui";
 import { useFilter, useView } from "../../view";
+import { AgentPromptButton } from "./AgentPrompt";
 import { ViewHeader } from "./Header";
 import { Instead } from "./Questions";
 import { LeftOutBadge } from "./Scoring";
@@ -86,7 +87,7 @@ function pitchByCompetitor(pages: SourcePage[]): Map<string, SourcePage[]> {
 }
 
 /** What to do about one missed question, built from who AI named and the pages it links to that name them. */
-function WhatToDo({ gap, pitch }: { gap: Gap; pitch: Map<string, SourcePage[]> }) {
+function WhatToDo({ gap, pitch, run, filter }: { gap: Gap; pitch: Map<string, SourcePage[]>; run: number; filter: ResultsFilter }) {
   const names = gap.named_on_miss;
   const pages = [...new Map(names.flatMap((n) => pitch.get(n) ?? []).map((p) => [p.url, p])).values()].slice(0, 2);
   return (
@@ -115,6 +116,9 @@ function WhatToDo({ gap, pitch }: { gap: Gap; pitch: Map<string, SourcePage[]> }
       ) : (
         "Write a page on your site that answers this question directly, so AI has something of yours to read and link to."
       )}
+      <div className="mt-2">
+        <AgentPromptButton question={gap.question.id} run={run} filter={filter} />
+      </div>
     </div>
   );
 }
@@ -179,7 +183,7 @@ function MissedQuestions({ filter }: { filter: ResultsFilter }) {
                       )}
                     </div>
                     <div className="relative z-[1]">
-                      <WhatToDo gap={g} pitch={pitch} />
+                      <WhatToDo gap={g} pitch={pitch} run={gaps.data.run_id} filter={filter} />
                     </div>
                     <Searches pairs={g.pairs} />
                   </div>
