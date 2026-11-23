@@ -540,6 +540,9 @@ function QuestionRow({
   );
 }
 
+/** The row being edited is on screen already, so focusing its field must not scroll the page under the reader. */
+const focusInPlace = (el: HTMLTextAreaElement | null) => el?.focus({ preventScroll: true });
+
 function RowEditor({ row, others, onSave, onCancel }: { row: Row; others: Row[]; onSave: (r: Row) => void; onCancel: () => void }) {
   const [group, setGroup] = useState(row.group);
   const [text, setText] = useState(row.text);
@@ -557,7 +560,7 @@ function RowEditor({ row, others, onSave, onCancel }: { row: Row; others: Row[];
           <input className={inputClass} list="question-groups" value={group} onChange={(e) => setGroup(e.target.value)} />
         </Field>
         <Field label={`Question (${clean(text).length} of ${questionLength.max})`}>
-          <textarea className={cx(inputClass, "h-auto min-h-16 py-1.5")} rows={2} value={text} onChange={(e) => setText(e.target.value)} autoFocus />
+          <textarea className={cx(inputClass, "h-auto min-h-16 py-1.5")} rows={2} value={text} onChange={(e) => setText(e.target.value)} ref={focusInPlace} />
         </Field>
       </div>
       {error && <FieldNote tone="error">{error}</FieldNote>}

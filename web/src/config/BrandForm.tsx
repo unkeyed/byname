@@ -242,8 +242,10 @@ function BrandFormBody({ initial, retention, footer, onSaved, submitLabel }: { i
               Forever
             </label>
             <div className="flex min-h-11 items-center gap-2 text-sm md:min-h-9">
-              <input type="radio" name="retention" id="retention-days" checked={!keepForever} onChange={() => setKeepForever(false)} />
-              <label htmlFor="retention-days">For</label>
+              <label className="flex min-h-11 items-center gap-2 md:min-h-9">
+                <input type="radio" name="retention" checked={!keepForever} onChange={() => setKeepForever(false)} />
+                For
+              </label>
               <span className="w-20">
                 <input
                   type="number"
