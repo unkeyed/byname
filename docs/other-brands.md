@@ -22,16 +22,16 @@ A read that fails never fails the check. The answer simply has no other brands u
 
 Before choosing, we compared two ways of finding brands on 50 answers labelled by hand, 494 brands in all, from ChatGPT, Gemini, Google AI Mode, Claude, Perplexity and Copilot:
 
-| Way | Precision | Recall | Cost an answer |
+| Way | Precision | Recall | Cost per 1,000 answers |
 |---|---|---|---|
 | The answer's layout: list items, bold lead-ins, headings, table rows and the sites it links to | 50% | 49% | Free |
-| A small model (Claude Haiku 4.5) | 96% | 86% | About $0.002 |
+| A small model (Claude Haiku 4.5) | 96% | 86% | About $2.00 |
 
 The layout finds a brand only where an answer formats it, so it misses brands named in plain sentences, and it mistakes headings such as "Best for" and "Pricing" for brands. The model reads the sentence. Most of what it misses is a parent company named in passing, such as "Microsoft" next to "Microsoft Teams".
 
 ## What it costs
 
-Reading an answer costs about $0.002 for an answer of 3,000 characters: DataForSEO charges $0.0006 a call, plus the model's tokens. **Settings > Competitors** shows the average of your own reads once there are some, and what a check costs at that price.
+Reading 1,000 answers of 3,000 characters costs about $2.00: DataForSEO charges $0.60 for 1,000 calls, plus the model's tokens. **Settings > Competitors** shows the average of your own reads once there are some, and what a check costs at that price.
 
 - A check's reads count toward that check. They are in its estimate before you **Check now**, in onboarding's review, in **Check history**, and against the spend cap for one check: a check stops asking questions once its answers and its reads reach the cap.
 - Every read counts toward the monthly spend cap, which checks, social searches and other brands share.
@@ -60,7 +60,7 @@ What changes the scores is tracking. Adding a competitor, from this list or unde
 
 Byname looks each brand up once on Context.dev, through Treg: by its domain when it has one, otherwise by its name. It keeps the logo and the brand's main colour in its database, and serves the logo itself from `GET /v1/brands/{id}/logo`, so your browser never loads anything from a third party. Until a logo is stored, and for a brand Context.dev doesn't know, a monogram takes its place: the first letter, in a colour taken from the name, in the same square, so nothing moves when the logo arrives.
 
-- A lookup that finds the brand costs 10 Context.dev credits, about $0.025. One that finds nothing is free, and that brand is not looked up again. A lookup that fails is tried again a day later, at most three times; one Treg refuses uses up no try. Any lookup that was charged counts toward the monthly limit.
+- A lookup that finds the brand costs 10 Context.dev credits, about $0.03. One that finds nothing is free, and that brand is not looked up again. A lookup that fails is tried again a day later, at most three times; one Treg refuses uses up no try. Any lookup that was charged counts toward the monthly limit.
 - At most 100 new brands are looked up a calendar month by default. Change the limit under **Settings > Competitors > Other brands**, where the price and the most it can cost a month are shown. Your brand and your competitors come first, then the brands answers name most.
 - Lookups count toward the monthly spend cap, in `month.brands_usd`, and show in **Check history** as **Looking up logos**.
 

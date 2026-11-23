@@ -193,7 +193,7 @@ function Unread() {
       <p className="min-w-0 flex-1 text-muted">
         {running
           ? `Reading past answers: ${b.latest!.read} read so far. The list fills in as it goes.`
-          : `${answers(b.unread)} from earlier checks ${b.unread === 1 ? "was" : "were"} never read for other brands. Reading them costs about ${money(b.cost_usd)}, once.`}
+          : `${answers(b.unread)} from earlier checks ${b.unread === 1 ? "was" : "were"} never read for other brands. Reading them costs ${money(b.cost_usd, "about")}, once.`}
       </p>
       {canRun && !running && b.ready && (
         <Button size="sm" variant="secondary" onClick={() => setAsking(true)}>
@@ -204,7 +204,7 @@ function Unread() {
         <DialogBody>
           <div className="space-y-3 text-sm">
             <p>
-              Read {answers(b.unread)} for the brands they name? That costs about {money(b.cost_usd)}, charged once through Treg and counted against your
+              Read {answers(b.unread)} for the brands they name? That costs {money(b.cost_usd, "about")}, charged once through Treg and counted against your
               monthly spend cap.
             </p>
             <p className="text-muted">It runs in the background and shows in Check history. Answers from new checks are read as they come in.</p>

@@ -21,6 +21,8 @@ lint:
 	go vet -tags e2e ./e2e/
 	cd web && npm test
 	@! grep -rnE '(^|[ "])([a-z]+:)?overflow-(y-)?(auto|scroll)([ "]|$$)' web/src --include='*.tsx' | grep -v '^web/src/ui.tsx:' || { echo "scroll containers take scrollArea from web/src/ui.tsx"; exit 1; }
+	@! grep -rnE '[Aa]bout \$$?\{money\(' web/src || { echo "write an estimate as money(usd, \"about\"), which drops the about for under a cent"; exit 1; }
+	@! grep -rnE '\$$[0-9]+\.[0-9]{3,}' docs || { echo "docs write money in whole cents, as the app does: give a price under a cent per 1,000"; exit 1; }
 
 web:
 	cd web && npm ci && npm run build
