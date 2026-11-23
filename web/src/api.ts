@@ -762,6 +762,8 @@ export interface OtherBrands {
   /** 0 when latest_run is the first check. */
   previous_run: number;
   hidden: number;
+  /** A brand is listed once answers to at least this many different questions offered it as a choice. */
+  min_questions: number;
   brands: OtherBrand[];
 }
 
@@ -787,7 +789,7 @@ export interface HiddenBrand {
 export interface OtherBrandsSettings {
   has_token: boolean;
   onboarded: boolean;
-  find: { on: boolean; cost_per_answer_usd: number; model: string };
+  find: { on: boolean; cost_per_answer_usd: number; model: string; min_questions: number };
   logos: { on: boolean; cost_per_brand_usd: number; month_limit: number; month_max_usd: number; this_month: number; logos: number };
 }
 
@@ -795,6 +797,7 @@ export interface OtherBrandsSettingsInput {
   find?: boolean;
   logos?: boolean;
   logo_month_limit?: number;
+  min_questions?: number;
 }
 
 export interface BrandBackfill {

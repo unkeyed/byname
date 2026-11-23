@@ -58,8 +58,10 @@ type Call struct {
 	Token          string
 	IdempotencyKey string
 	Replay         bool
-	// Find is a call reading an answer for other brands.
+	// Find is a call reading an answer for other brands, and Sent its
+	// request body.
 	Find bool
+	Sent string
 }
 
 // Refusal makes the fake answer as Treg refusing on its own behalf.
@@ -173,6 +175,9 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request) {
 	c := Call{Tool: tool, Token: r.Header.Get("X-Treg-Token"), IdempotencyKey: r.Header.Get("Idempotency-Key")}
 	sent, _ := io.ReadAll(r.Body)
 	c.Find = tool == engines.BrandFinder.ID && bytes.Contains(sent, []byte(`"system_message"`))
+	if c.Find {
+		c.Sent = string(sent)
+	}
 	s.mu.Lock()
 	body, known := s.bodies[tool]
 	if c.Find {

@@ -30,6 +30,8 @@ func TestOtherBrandsOverHTTP(t *testing.T) {
 	person, agent := login(t, c)
 	reader := c.withKey(t, person, core.ResultsRead)
 	configure(t, person, agent)
+	// The configured questions are fewer than the default minimum for listing a brand.
+	agent.call("PUT", "/v1/other-brands/settings", map[string]int{"min_questions": 1}, http.StatusOK, nil)
 	agent.call("POST", "/v1/runs", nil, http.StatusCreated, nil)
 	if err := c.svc.Checks.Work(context.Background()); err != nil {
 		t.Fatal(err)

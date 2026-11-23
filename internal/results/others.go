@@ -17,10 +17,13 @@ type OtherBrands struct {
 	Read     int `json:"read" jsonschema:"of those, answers read for other brands; an unread answer names none here yet"`
 	// LatestRun is the newest check in range, and PreviousRun the check
 	// before it, which each brand's change is against.
-	LatestRun   int64        `json:"latest_run" jsonschema:"the newest check in range, 0 when none"`
-	PreviousRun int64        `json:"previous_run" jsonschema:"the check before latest_run on these AI apps, 0 when latest_run is the first"`
-	Hidden      int          `json:"hidden" jsonschema:"brands someone marked as not a competitor; list them with GET /v1/other-brands/hidden"`
-	Brands      []OtherBrand `json:"brands"`
+	LatestRun   int64 `json:"latest_run" jsonschema:"the newest check in range, 0 when none"`
+	PreviousRun int64 `json:"previous_run" jsonschema:"the check before latest_run on these AI apps, 0 when latest_run is the first"`
+	Hidden      int   `json:"hidden" jsonschema:"brands someone marked as not a competitor; list them with GET /v1/other-brands/hidden"`
+	// MinQuestions is how many different questions' answers must offer a
+	// brand as a choice before it is listed.
+	MinQuestions int          `json:"min_questions" jsonschema:"a brand is listed once answers to at least this many different questions offered it as a choice"`
+	Brands       []OtherBrand `json:"brands"`
 }
 
 // OtherBrand is one brand you don't track and how often answers named it.
@@ -56,8 +59,9 @@ func (s *Service) OtherBrands(ctx context.Context, since *time.Time, sc Scope) (
 	args := scopeArgs(since, sc, ByPair)[:3]
 	err := s.db.QueryRow(ctx, `SELECT count(*) FILTER (WHERE a.status <> 'failed'),
 			count(*) FILTER (WHERE a.status <> 'failed' AND EXISTS (SELECT 1 FROM brand_call c WHERE c.purpose = 'find' AND c.answer_id = a.id AND c.status = 'ok')),
-			coalesce(max(a.run_id), 0), (SELECT count(*) FROM brand WHERE kind = 'hidden')`+scopedFrom+scopedWhere+counted, args...).
-		Scan(&out.Answered, &out.Read, &out.LatestRun, &out.Hidden)
+			coalesce(max(a.run_id), 0), (SELECT count(*) FROM brand WHERE kind = 'hidden'),
+			(SELECT other_brands_min_questions FROM instance_settings)`+scopedFrom+scopedWhere+counted, args...).
+		Scan(&out.Answered, &out.Read, &out.LatestRun, &out.Hidden, &out.MinQuestions)
 	if err != nil || out.LatestRun == 0 {
 		return out, err
 	}
@@ -67,13 +71,17 @@ func (s *Service) OtherBrands(ctx context.Context, since *time.Time, sc Scope) (
 	if err != nil {
 		return out, err
 	}
+	// A brand is listed once answers to enough different questions offered
+	// it as a choice; one named only as a tool or an example never is.
 	rows, err := s.db.Query(ctx, `SELECT b.id, b.name, coalesce(b.domains[1], ''), count(*),
 			count(*) FILTER (WHERE a.run_id = $4), (SELECT count(*) FROM discovered_mention d2 JOIN answer a2 ON a2.id = d2.answer_id
 				JOIN surface_model m2 ON m2.id = a2.surface_model_id JOIN question q2 ON q2.id = a2.question_id
-				WHERE d2.brand_id = b.id AND a2.run_id = $5 AND a2.status <> 'failed' AND q2.counts_in_scores
+				WHERE d2.brand_id = b.id AND a2.run_id = $5 AND a2.status <> 'failed' AND q2.counts_in_scores AND d2.offered IS NOT FALSE
 				AND ($2::text = '' OR m2.surface_key = $2) AND ($3::text = '' OR m2.model = $3))`+scopedFrom+`
-			JOIN discovered_mention d ON d.answer_id = a.id JOIN brand b ON b.id = d.brand_id AND b.kind = 'untracked'`+
-		scopedWhere+counted+`AND a.status <> 'failed' GROUP BY b.id ORDER BY count(*) DESC, lower(b.name)`,
+			JOIN discovered_mention d ON d.answer_id = a.id AND d.offered IS NOT FALSE JOIN brand b ON b.id = d.brand_id AND b.kind = 'untracked'`+
+		scopedWhere+counted+`AND a.status <> 'failed' GROUP BY b.id
+			HAVING count(DISTINCT a.question_id) >= (SELECT other_brands_min_questions FROM instance_settings)
+			ORDER BY count(*) DESC, lower(b.name)`,
 		append(args, out.LatestRun, out.PreviousRun)...)
 	if err != nil {
 		return out, err
@@ -95,7 +103,7 @@ func (s *Service) OtherBrands(ctx context.Context, since *time.Time, sc Scope) (
 		return out, err
 	}
 	rows, err = s.db.Query(ctx, `SELECT d.brand_id, q.id, q.text, count(*)`+scopedFrom+`
-			JOIN discovered_mention d ON d.answer_id = a.id JOIN brand b ON b.id = d.brand_id AND b.kind = 'untracked'`+
+			JOIN discovered_mention d ON d.answer_id = a.id AND d.offered IS NOT FALSE JOIN brand b ON b.id = d.brand_id AND b.kind = 'untracked'`+
 		scopedWhere+counted+`AND a.status <> 'failed' GROUP BY 1, 2, 3`, args...)
 	if err != nil {
 		return out, err

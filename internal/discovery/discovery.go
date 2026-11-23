@@ -69,17 +69,20 @@ const maxAttempts = 3
 // limit; TestPromptFitsTheTool checks.
 const (
 	system = `You read one answer from an AI assistant and list every brand it names: companies, and products or services sold by a company. ` +
-		`Reply with JSON only: {"brands":[{"name":"...","kind":"brand","domain":"..."}]}, in order of first mention. ` +
+		`Reply with JSON only: {"brands":[{"name":"...","kind":"brand","domain":"...","offered":true}]}, in order of first mention. ` +
 		`Use kind "technology" for languages, standards, protocols and open-source projects with no single vendor. ` +
 		`domain is the brand's main website, or "" if unsure. Leave out people, places, and sites cited only as sources.`
-	prompt = `List the brands named in the answer above. JSON only.`
+	prompt = `List the brands named in the answer above. Set offered to true for a brand the answer offers as a choice for the question asked, ` +
+		`and false for one it names for another reason, such as a tool, a host, an integration or an example. JSON only.`
 )
 
-// Found is one brand the model listed.
+// Found is one brand the model listed. Offered is whether the answer
+// offers it as a choice for the question, nil when the model did not say.
 type Found struct {
-	Name   string `json:"name"`
-	Kind   string `json:"kind"`
-	Domain string `json:"domain"`
+	Name    string `json:"name"`
+	Kind    string `json:"kind"`
+	Domain  string `json:"domain"`
+	Offered *bool  `json:"offered"`
 }
 
 // parseFound reads the model's reply: the JSON object in it, fenced or
@@ -177,10 +180,14 @@ func (s *Service) Find(ctx context.Context, answerID, runID int64, text string) 
 // declined the call, so a pass can stop asking.
 func (s *Service) find(ctx context.Context, treg engines.Treg, r read, c call) (*engines.Refusal, error) {
 	var attempt int
-	if err := s.db.QueryRow(ctx, `SELECT count(*) + 1 FROM brand_call WHERE purpose = 'find' AND answer_id = $1 AND status <> 'refused'`, r.answer).Scan(&attempt); err != nil {
+	var question string
+	if err := s.db.QueryRow(ctx, `SELECT (SELECT count(*) + 1 FROM brand_call WHERE purpose = 'find' AND answer_id = $1 AND status <> 'refused'),
+			q.text FROM answer a JOIN question q ON q.id = a.question_id WHERE a.id = $1`, r.answer).Scan(&attempt, &question); err != nil {
 		return nil, err
 	}
-	parts, _ := engines.SplitForLLM(r.text)
+	// The question comes first, so the model can tell a brand offered as an
+	// answer to it from one named along the way.
+	parts, _ := engines.SplitForLLM("The question asked: " + question + "\n\nThe answer:\n" + r.text)
 	res, err := treg.Ask(ctx, engines.LLMTask{
 		Tool: engines.BrandFinder, System: system, Context: parts, Prompt: prompt, MaxOutputTokens: 1500,
 		IdempotencyKey: fmt.Sprintf("byname/find/answer-%d/%d", r.answer, attempt),
@@ -246,8 +253,8 @@ func (s *Service) record(ctx context.Context, tx pgx.Tx, answerID int64, found [
 			return err
 		}
 		ord++
-		if _, err := tx.Exec(ctx, `INSERT INTO discovered_mention (answer_id, brand_id, ord) VALUES ($1, $2, $3)
-			ON CONFLICT (answer_id, brand_id) DO NOTHING`, answerID, id, ord); err != nil {
+		if _, err := tx.Exec(ctx, `INSERT INTO discovered_mention (answer_id, brand_id, ord, offered) VALUES ($1, $2, $3, $4)
+			ON CONFLICT (answer_id, brand_id) DO UPDATE SET offered = discovered_mention.offered OR excluded.offered`, answerID, id, ord, f.Offered); err != nil {
 			return err
 		}
 	}

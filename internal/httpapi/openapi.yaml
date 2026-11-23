@@ -7683,11 +7683,14 @@ components:
                 type: boolean
     OtherBrands:
       type: object
-      required: [answered, read, latest_run, previous_run, hidden, brands]
+      required: [answered, read, latest_run, previous_run, hidden, min_questions, brands]
       properties:
         answered:
           type: integer
           description: Answers in range that did not fail, the N in "named in M of N answers".
+        min_questions:
+          type: integer
+          description: A brand is listed once answers to at least this many different questions offered it as a choice, not just named it.
         read:
           type: integer
           description: Of those, answers read for other brands. An unread answer names none here yet.
@@ -7759,7 +7762,7 @@ components:
           type: boolean
         find:
           type: object
-          required: [on, cost_per_answer_usd, model]
+          required: [on, cost_per_answer_usd, model, min_questions]
           properties:
             on:
               type: boolean
@@ -7768,6 +7771,9 @@ components:
               description: The mean of past reads, or the sampled price before any.
             model:
               type: string
+            min_questions:
+              type: integer
+              description: A brand is listed once answers to at least this many different questions offered it as a choice.
         logos:
           type: object
           required: [on, cost_per_brand_usd, month_limit, month_max_usd, this_month, logos]
@@ -7799,6 +7805,10 @@ components:
           type: integer
           minimum: 0
           maximum: 1000
+        min_questions:
+          type: integer
+          minimum: 1
+          maximum: 50
     BrandBackfill:
       type: object
       required: [unread, cost_per_answer_usd, cost_usd, ready, latest]

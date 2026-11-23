@@ -27,6 +27,7 @@ type FindSettings struct {
 	On               bool    `json:"on" jsonschema:"new answers are read for other brands while a Treg token is stored"`
 	CostPerAnswerUSD float64 `json:"cost_per_answer_usd" jsonschema:"what reading one answer costs: the mean of past reads, or the sampled price before any"`
 	Model            string  `json:"model" jsonschema:"the model that reads answers, through Treg"`
+	MinQuestions     int     `json:"min_questions" jsonschema:"a brand is listed once answers to at least this many different questions offered it as a choice"`
 }
 
 // LogosSettings is looking up brands' logos and colours on Context.dev.
@@ -41,9 +42,9 @@ type LogosSettings struct {
 
 func (s *Service) Settings(ctx context.Context) (Settings, error) {
 	out := Settings{Find: FindSettings{Model: engines.BrandFinder.Model}}
-	err := s.db.QueryRow(ctx, `SELECT find_brands, brand_logos, brand_logo_month_limit, onboarded_at IS NOT NULL,
+	err := s.db.QueryRow(ctx, `SELECT find_brands, other_brands_min_questions, brand_logos, brand_logo_month_limit, onboarded_at IS NOT NULL,
 			(SELECT count(*) FROM brand_logo) FROM instance_settings`).
-		Scan(&out.Find.On, &out.Logos.On, &out.Logos.MonthLimit, &out.Onboarded, &out.Logos.Logos)
+		Scan(&out.Find.On, &out.Find.MinQuestions, &out.Logos.On, &out.Logos.MonthLimit, &out.Onboarded, &out.Logos.Logos)
 	if err != nil {
 		return out, err
 	}
@@ -73,15 +74,20 @@ type SettingsInput struct {
 	Find           *bool `json:"find,omitempty" jsonschema:"true to read each new answer for other brands, which costs a fraction of a cent an answer"`
 	Logos          *bool `json:"logos,omitempty" jsonschema:"true to look up the logos of your brand, your competitors and the brands answers name"`
 	LogoMonthLimit *int  `json:"logo_month_limit,omitempty" jsonschema:"the most new brands looked up a month, 0 to 1000"`
+	MinQuestions   *int  `json:"min_questions,omitempty" jsonschema:"list a brand once answers to at least this many different questions offered it, 1 to 50"`
 }
 
 func (s *Service) PutSettings(ctx context.Context, in SettingsInput) (Settings, error) {
 	if in.LogoMonthLimit != nil && (*in.LogoMonthLimit < 0 || *in.LogoMonthLimit > 1000) {
 		return Settings{}, fmt.Errorf("%w: logo_month_limit must be 0 to 1000", core.ErrInvalid)
 	}
+	if in.MinQuestions != nil && (*in.MinQuestions < 1 || *in.MinQuestions > 50) {
+		return Settings{}, fmt.Errorf("%w: min_questions must be 1 to 50", core.ErrInvalid)
+	}
 	err := pgx.BeginFunc(ctx, s.db, func(tx pgx.Tx) error {
 		_, err := tx.Exec(ctx, `UPDATE instance_settings SET find_brands = coalesce($1, find_brands), brand_logos = coalesce($2, brand_logos),
-			brand_logo_month_limit = coalesce($3, brand_logo_month_limit), updated_at = now()`, in.Find, in.Logos, in.LogoMonthLimit)
+			brand_logo_month_limit = coalesce($3, brand_logo_month_limit), other_brands_min_questions = coalesce($4, other_brands_min_questions),
+			updated_at = now()`, in.Find, in.Logos, in.LogoMonthLimit, in.MinQuestions)
 		return err
 	})
 	if err != nil {

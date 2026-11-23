@@ -25,6 +25,7 @@ function Form({ s }: { s: Settings }) {
   const [find, setFind] = useState(s.find.on);
   const [logos, setLogos] = useState(s.logos.on);
   const [limit, setLimit] = useState(String(s.logos.month_limit));
+  const [minQ, setMinQ] = useState(String(s.find.min_questions));
   const [saved, setSaved] = useState(false);
   const save = useMutation({
     mutationFn: api.otherBrands.putSettings,
@@ -37,10 +38,12 @@ function Form({ s }: { s: Settings }) {
   });
   const n = Number(limit);
   const bad = !Number.isInteger(n) || n < 0 || n > 1000;
+  const q = Number(minQ);
+  const badQ = !Number.isInteger(q) || q < 1 || q > 50;
   const submit = (e: FormEvent) => {
     e.preventDefault();
     setSaved(false);
-    if (!bad) save.mutate({ find, logos, logo_month_limit: n });
+    if (!bad && !badQ) save.mutate({ find, logos, logo_month_limit: n, min_questions: q });
   };
   const calls = costs.data?.checks.check.calls ?? 0;
   return (
@@ -62,10 +65,23 @@ function Form({ s }: { s: Settings }) {
           <span>
             <span className="font-medium">Find other brands in answers</span>
             <span className="mt-0.5 block text-muted">
-              A small model reads each new answer and lists the brands it names{calls > 0 && `, ${money(s.find.cost_per_answer_usd * calls, "about")} for a check of ${calls} answers`}. If a read fails, the check still finishes and the answer is read again later.
+              A small model reads each new answer and lists the brands it offers as a choice{calls > 0 && `, ${money(s.find.cost_per_answer_usd * calls, "about")} for a check of ${calls} answers`}. If a read fails, the check still finishes and the answer is read again later.
             </span>
           </span>
         </label>
+        <div className={cx(!find && "opacity-60")}>
+          <label htmlFor="min-questions" className={labelClass}>
+            List a brand once it is offered for this many questions
+          </label>
+          <div className="w-28">
+            <input id="min-questions" type="number" inputMode="numeric" min={1} max={50} step={1} value={minQ} disabled={!canEdit} onChange={(e) => setMinQ(e.target.value)} className={cx(inputClass, "tabular-nums", badQ && "border-danger")} aria-invalid={badQ || undefined} />
+          </div>
+          <NoteSlot>
+            <p className={cx("mt-1 text-xs", badQ ? "text-danger" : "text-faint")}>
+              {badQ ? "Enter a whole number from 1 to 50." : "A brand an answer only mentions, such as a tool or a host, never counts."}
+            </p>
+          </NoteSlot>
+        </div>
         <label className="flex items-start gap-3">
           <input type="checkbox" className="mt-1 size-3.5 accent-[var(--fg)]" checked={logos} disabled={!canEdit} onChange={(e) => setLogos(e.target.checked)} />
           <span>
@@ -95,7 +111,7 @@ function Form({ s }: { s: Settings }) {
         <ErrorNote error={save.error} />
         {canEdit && (
           <div className="flex flex-wrap items-center justify-end gap-2">
-            <SubmitButton pending={save.isPending} saved={saved} disabled={bad} />
+            <SubmitButton pending={save.isPending} saved={saved} disabled={bad || badQ} />
           </div>
         )}
       </form>

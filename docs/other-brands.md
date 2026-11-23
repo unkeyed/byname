@@ -1,6 +1,6 @@
 # Other brands and logos
 
-People new to AI answers rarely know who they compete with there. The brands an AI app suggests instead of you are often not the ones you would list yourself. So Byname reads each answer for every brand it names, and lists the ones you don't track under **AI answers > Competitors > Also named in answers**. One click tracks a brand as a competitor.
+People new to AI answers rarely know who they compete with there. The brands an AI app suggests instead of you are often not the ones you would list yourself. So Byname reads each answer for the brands it offers as a choice, and lists the ones you don't track under **AI answers > Competitors > Also named in answers**. One click tracks a brand as a competitor.
 
 Byname also shows a logo next to every brand in its lists: your brand, your competitors and the brands you don't track.
 
@@ -8,7 +8,7 @@ Both go through [Treg](engines/treg.md), the service that runs each question and
 
 ## How an answer is read
 
-Right after a check stores an answer, a small model reads it and lists the brands it names: companies, and products or services a company sells. The model is Claude Haiku 4.5, through DataForSEO's LLM Responses tool on Treg, with web search off. It reads the first 5,000 characters of the answer, which covers almost every answer.
+Right after a check stores an answer, a small model reads it, with the question it answers, and lists the brands it names: companies, and products or services a company sells. For each brand it says whether the answer offers it as a choice for the question, or names it for another reason, such as a tool, a host, an integration or an example. An answer to "Where should a small team deploy an API?" offers Fly.io, and only mentions GitHub when it says "deploy from GitHub". The model is Claude Haiku 4.5, through DataForSEO's LLM Responses tool on Treg, with web search off. It reads the question and the first 5,000 characters of the answer, which covers almost every answer.
 
 Byname keeps a brand from that list only when it is not one you track:
 
@@ -42,6 +42,8 @@ Reading 1,000 answers of 3,000 characters costs about $2.00: DataForSEO charges 
 Answers stored before reading was on, or whose check stopped before they were read, can be read once. **Also named in answers** says how many there are and what reading them costs, and **Read past answers** asks before it starts. It runs in the background within a minute, shows in **Check history** as **Reading answers for other brands**, and stops at the monthly spend cap.
 
 ## Also named in answers
+
+A brand is listed once answers to at least 3 different questions offered it as a choice. A brand answers only mention along the way is never listed, however often. Change the 3 under **Settings > Competitors > Other brands**, from 1 to 50. Answers read before Byname asked whether a brand was offered count as offering every brand they name.
 
 Each brand shows how many of the answers in the selected range named it, the questions it was named for most, and the change between the latest check and the one before. The list counts only answers that count in scores, so a question that [names your brand](scores.md#questions-that-name-your-brand) adds nothing.
 

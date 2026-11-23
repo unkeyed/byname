@@ -53,7 +53,7 @@ export function AlsoNamed({ filter }: { filter: ResultsFilter }) {
         title="Also named in answers"
         description={
           d.read > 0
-            ? `Brands AI answers named that you don't track, from ${d.read} of ${answers(d.answered)} read in this range. They count in no score until you track one.`
+            ? `Brands you don't track that AI answers offered as a choice for at least ${questions(d.min_questions)}, from ${d.read} of ${answers(d.answered)} read in this range. They count in no score until you track one.`
             : "Brands AI answers name that you don't track. People new to AI answers rarely know who they compete with there, so Byname reads each answer and lists every brand it names."
         }
       >
@@ -162,11 +162,13 @@ function Empty({ d, on }: { d: OtherBrands; on: boolean }) {
       </EmptyState>
     );
   return (
-    <EmptyState icon="users" title="No other brands named">
-      The answers read so far named only you and the competitors you track. New brands show here as soon as an answer names one.
+    <EmptyState icon="users" title="No other brands yet">
+      No brand you don't track was offered as a choice for at least {questions(d.min_questions)} in this range. Brands answers only mention along the way, such as a tool or a host, are never listed.
     </EmptyState>
   );
 }
+
+const questions = (n: number) => (n === 1 ? "1 question" : `${n} questions`);
 
 /** Answers from before reading was on, with what reading them costs and a button that asks first. */
 function Unread() {

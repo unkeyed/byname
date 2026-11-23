@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -43,7 +44,17 @@ func setup(t *testing.T, mod func(*config.Settings)) *env {
 	checkstest.Seed(t, e.config, e.treg, mod)
 	e.found = discovery.New(e.db, e.config, discovery.Options{Now: func() time.Time { return e.now }})
 	e.results = results.New(e.db)
+	// A seeded check asks two questions, fewer than the default minimum
+	// for listing a brand.
+	e.minQuestions(t, 1)
 	return e
+}
+
+func (e *env) minQuestions(t *testing.T, n int) {
+	t.Helper()
+	if _, err := e.found.PutSettings(context.Background(), discovery.SettingsInput{MinQuestions: &n}); err != nil {
+		t.Fatal(err)
+	}
 }
 
 // check runs one check to the end, reading answers for other brands when
@@ -541,4 +552,49 @@ func findReply(t *testing.T, text string) []byte {
 		t.Fatal(err)
 	}
 	return b
+}
+
+func TestOnlyBrandsOfferedForEnoughQuestionsAreListed(t *testing.T) {
+	ctx := context.Background()
+	e := setup(t, nil)
+	e.treg.SetFindBody(findReply(t, `{"brands":[{"name":"Fabrikam Deploy","kind":"brand","domain":"","offered":true},`+
+		`{"name":"GitHub","kind":"brand","domain":"github.com","offered":false}]}`))
+	e.check(t, true)
+
+	listed := func() []string {
+		t.Helper()
+		o, err := e.results.OtherBrands(ctx, nil, results.Scope{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		var names []string
+		for _, b := range o.Brands {
+			names = append(names, b.Name)
+		}
+		return names
+	}
+	if got := listed(); !slices.Equal(got, []string{"Fabrikam Deploy"}) {
+		t.Errorf("listed %v, want only Fabrikam Deploy: GitHub was named as a tool, not offered as a choice", got)
+	}
+	if n := e.count(t, `SELECT count(*) FROM discovered_mention d JOIN brand b ON b.id = d.brand_id WHERE b.name = 'GitHub' AND d.offered = false`); n == 0 {
+		t.Error("GitHub's mentions were not stored as not offered")
+	}
+	e.minQuestions(t, 2)
+	if got := listed(); !slices.Equal(got, []string{"Fabrikam Deploy"}) {
+		t.Errorf("with a minimum of 2 questions, listed %v, want Fabrikam Deploy, offered for both", got)
+	}
+	e.minQuestions(t, 3)
+	if got := listed(); len(got) != 0 {
+		t.Errorf("with a minimum of 3 questions, listed %v, want none: a seeded check asks two", got)
+	}
+
+	asked := false
+	for _, c := range e.treg.Calls() {
+		if c.Find && strings.Contains(c.Sent, "The question asked: "+checkstest.Questions[0].Text) {
+			asked = true
+		}
+	}
+	if !asked {
+		t.Error("no read sent the question with the answer, so the model cannot tell a choice from a passing mention")
+	}
 }
