@@ -366,6 +366,32 @@ func (s *server) listGaps(w http.ResponseWriter, r *http.Request, _ core.Actor) 
 	return respond(w, http.StatusOK, v, err)
 }
 
+func (s *server) listHandled(w http.ResponseWriter, r *http.Request, _ core.Actor) error {
+	v, err := s.svc.Results.Handled(r.Context())
+	return respond(w, http.StatusOK, v, err)
+}
+
+func (s *server) markQuestionHandled(w http.ResponseWriter, r *http.Request, a core.Actor) error {
+	id, err := pathID(r, "question")
+	if err != nil {
+		return err
+	}
+	var b config.QuestionPageInput
+	if err := readJSON(r, &b); err != nil {
+		return err
+	}
+	v, err := s.svc.Config.MarkHandled(r.Context(), a, id, b)
+	return respond(w, http.StatusOK, v, err)
+}
+
+func (s *server) unmarkQuestionPage(w http.ResponseWriter, r *http.Request, _ core.Actor) error {
+	id, err := pathID(r, "marked page")
+	if err != nil {
+		return err
+	}
+	return noContent(w, s.svc.Config.UnmarkPage(r.Context(), id))
+}
+
 func (s *server) listJobs(w http.ResponseWriter, r *http.Request, _ core.Actor) error {
 	limit, err := queryInt(r, "limit")
 	if err != nil {

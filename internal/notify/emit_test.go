@@ -153,3 +153,69 @@ func TestNotificationsReadAsSentences(t *testing.T) {
 		t.Errorf("search notification %q at %q", moved.Title, moved.Path)
 	}
 }
+
+// A check whose answers are the first to link to a marked page raises
+// page_linked once, however many later checks link to it again.
+func TestFirstLinkToAMarkedPageRaisesPageLinkedOnce(t *testing.T) {
+	ctx := context.Background()
+	db := testdb.New(t)
+	treg := tregtest.New(t)
+	alerts := notify.New(db, results.New(db), notify.Options{Secrets: secretbox.ForTest(), PublicURL: &url.URL{Scheme: "https", Host: "byname.example"}})
+	cfg := config.New(db, config.Options{Secrets: secretbox.ForTest(), TregBaseURL: treg.URL, Alerts: alerts})
+	checkstest.Seed(t, cfg, treg, nil)
+	treg.SetBody("dataforseo.x.ai-optimization-claude-llm-responses-live", []byte(`{"status_code":20000,"tasks":[{"status_code":20000,"result":[{"model_name":"claude-sonnet-4-5-20250929",
+		"items":[{"type":"message","sections":[{"type":"text","text":"Northwind Cloud does this well.",
+		"annotations":[{"title":"Zero downtime deploys","url":"https://www.northwind.example/blog/zero-downtime?utm_source=claude"}]}]}]}]}]}`))
+	runs := checks.New(db, cfg, checks.Options{Alerts: alerts})
+	check := func() int64 {
+		t.Helper()
+		run, _, err := runs.RunNow(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := runs.Work(ctx); err != nil {
+			t.Fatal(err)
+		}
+		return run.ID
+	}
+	linked := func() []notify.Alert {
+		t.Helper()
+		list, err := alerts.Alerts(ctx, reader, notify.AlertQuery{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		var out []notify.Alert
+		for _, a := range list.Alerts {
+			if a.Kind == notify.PageLinked {
+				out = append(out, a)
+			}
+		}
+		return out
+	}
+
+	check()
+	set, err := cfg.CurrentQuestions(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := cfg.MarkHandled(ctx, core.Actor{}, set.Questions[0].ID, config.QuestionPageInput{URL: "https://northwind.example/blog/zero-downtime"}); err != nil {
+		t.Fatal(err)
+	}
+	if got := linked(); len(got) != 0 {
+		t.Fatalf("page_linked before a check since the mark = %+v", got)
+	}
+	second := check()
+	check()
+	if err := alerts.RunFinished(ctx, second); err != nil {
+		t.Fatal(err)
+	}
+	got := linked()
+	if len(got) != 1 {
+		t.Fatalf("page_linked alerts = %+v, want one", got)
+	}
+	a := got[0]
+	want := "2 answers linked to it, the first since you marked it as answering “" + set.Questions[0].Text + "”."
+	if a.Title != "Claude Code linked to northwind.example/blog/zero-downtime" || len(a.Lines) != 1 || a.Lines[0] != want || a.Path != "/ai/missed?tab=handled" {
+		t.Errorf("page_linked = %q %q at %q", a.Title, a.Lines, a.Path)
+	}
+}

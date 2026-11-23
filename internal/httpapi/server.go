@@ -99,6 +99,11 @@ var routes = []route{
 	{"GET /v1/metrics/summary", needs(core.ResultsRead), (*server).summary},
 	{"GET /v1/metrics/competitors", needs(core.ResultsRead), (*server).competitors},
 	{"GET /v1/gaps", needs(core.ResultsRead), (*server).listGaps},
+	// Handled questions: pages marked as answering a question, and the
+	// answers that link to them since.
+	{"GET /v1/handled", needs(core.ResultsRead), (*server).listHandled},
+	{"POST /v1/questions/{id}/pages", needs(core.ConfigWrite), (*server).markQuestionHandled},
+	{"DELETE /v1/question-pages/{id}", needs(core.ConfigWrite), (*server).unmarkQuestionPage},
 	{"GET /v1/jobs", needs(core.ResultsRead), (*server).listJobs},
 	// Prompts, cited sources and the engine drawer.
 	{"GET /v1/prompts", needs(core.ResultsRead), (*server).prompts},

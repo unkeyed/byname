@@ -24,6 +24,7 @@ const (
 	ChangeVerdict   Kind = "change_verdict"
 	TokenExpiring   Kind = "token_expiring"
 	SocialDigest    Kind = "social_digest"
+	PageLinked      Kind = "page_linked"
 )
 
 // Audience is who may read an event's notifications in the app.
@@ -100,6 +101,7 @@ var registry = []KindInfo{
 	kind[ChangeVerdictPayload](ChangeVerdict, "Change result", "A site change got its final result, compared with your comparison pages.", Readers),
 	kind[TokenExpiringPayload](TokenExpiring, "Token expiring", "The GitHub token for site changes expires soon.", Admins),
 	kind[SocialDigestPayload](SocialDigest, "Social digest", "The day's or week's posts that name you on social networks, without the accounts you left out.", Readers),
+	kind[PageLinkedPayload](PageLinked, "Your page was linked", "An AI answer linked for the first time to a page you marked as answering a missed question.", Readers),
 }
 
 // Kinds is every event kind Byname can raise, in display order.
@@ -347,6 +349,29 @@ func (p TokenExpiringPayload) message() Message {
 		Lines:  []string{"Paste a new token under Settings > Site changes before it expires, or site changes stop updating."},
 		Path:   "/settings/site-changes",
 		Action: "Open site change settings",
+	}
+}
+
+// PageLinkedPayload is a page marked as answering a question that a
+// check's answers linked to for the first time since it was marked. Apps
+// and Answers are that check's.
+type PageLinkedPayload struct {
+	PageID       int64    `json:"page_id"`
+	URL          string   `json:"url"`
+	QuestionText string   `json:"question_text" jsonschema:"the question the page was marked as answering"`
+	Apps         []string `json:"apps" jsonschema:"the AI apps whose answers linked to it, by name"`
+	Answers      int      `json:"answers" jsonschema:"that check's answers that linked to it, to any question"`
+}
+
+func (PageLinkedPayload) Kind() Kind { return PageLinked }
+
+func (p PageLinkedPayload) message() Message {
+	page := strings.TrimSuffix(strings.TrimPrefix(strings.TrimPrefix(p.URL, "https://"), "http://"), "/")
+	return Message{
+		Title:  fmt.Sprintf("%s linked to %s", sentenceList(p.Apps), page),
+		Lines:  []string{fmt.Sprintf("%s linked to it, the first since you marked it as answering “%s”.", count(p.Answers, "answer", "answers"), p.QuestionText)},
+		Path:   "/ai/missed?tab=handled",
+		Action: "Open handled questions",
 	}
 }
 

@@ -152,7 +152,8 @@ var runEvents = map[string]func(context.Context, *Service, results.Run) (Payload
 
 // RunFinished emits the event for a finished run: check_completed with the
 // comparison to the previous run, or spend_cap_reached, check_refused or
-// check_failed. A run still open raises nothing.
+// check_failed, then page_linked for each marked page its answers were the
+// first to link to. A run still open raises nothing.
 func (s *Service) RunFinished(ctx context.Context, runID int64) error {
 	r, err := s.results.Run(ctx, runID)
 	if err != nil {
@@ -166,7 +167,30 @@ func (s *Service) RunFinished(ctx context.Context, runID int64) error {
 	if err != nil {
 		return err
 	}
-	return s.Emit(ctx, Event{Subject: fmt.Sprintf("run/%d", runID), Payload: p})
+	if err := s.Emit(ctx, Event{Subject: fmt.Sprintf("run/%d", runID), Payload: p}); err != nil {
+		return err
+	}
+	links, err := s.results.LinkedFirstTime(ctx, runID)
+	if err != nil {
+		return err
+	}
+	for _, l := range links {
+		apps := []string{}
+		for _, pair := range l.Pairs {
+			app := string(pair.Surface)
+			if spec, ok := engines.Lookup(pair.Surface); ok {
+				app = spec.Title
+			}
+			if !slices.Contains(apps, app) {
+				apps = append(apps, app)
+			}
+		}
+		if err := s.Emit(ctx, Event{Subject: fmt.Sprintf("page/%d/linked", l.PageID),
+			Payload: PageLinkedPayload{PageID: l.PageID, URL: l.URL, QuestionText: l.Question, Apps: apps, Answers: l.Answers}}); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // checkCompleted compares a run with the previous run that has answers,

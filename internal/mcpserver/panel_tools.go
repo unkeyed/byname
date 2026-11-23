@@ -75,6 +75,11 @@ type questionScoringInput struct {
 	config.QuestionScoringInput
 }
 
+type markHandledInput struct {
+	QuestionID int64 `json:"question_id" jsonschema:"the question the page answers, from gaps or get_questions"`
+	config.QuestionPageInput
+}
+
 type stepInput struct {
 	Step config.StepKey `json:"step" jsonschema:"brand, competitors, questions, surfaces, search_console, social or schedule"`
 }
@@ -319,6 +324,21 @@ func addResultTools(srv *mcp.Server, svc app.Services) {
 		Description: "Missed questions, where at least one AI app did not name you on a check, ranked by the share of AI apps that left you out and by search demand where Byname has a figure, with the competitors named instead and each AI app's answer with the web searches it ran, where the endpoint exposes them. Filter by AI app (surface) and model. GET /v1/gaps."},
 		func(ctx context.Context, _ core.Actor, in gapsInput) (results.Gaps, error) {
 			return r.Gaps(ctx, in.RunID, in.Scope)
+		})
+	addTool(srv, core.ResultsRead, &mcp.Tool{Name: "list_handled_pages", Annotations: readOnly(),
+		Description: "Every page marked as answering a question: the answers since it was marked that link to it, to any question and from any AI app, with the first and latest check that did, and how the question's answers named you on the last check before the mark and on the latest check since. Links match without www., query or trailing slash. GET /v1/handled."},
+		func(ctx context.Context, _ core.Actor, _ noInput) (results.HandledPages, error) {
+			return r.Handled(ctx)
+		})
+	addTool(srv, core.ConfigWrite, &mcp.Tool{Name: "mark_question_handled", Annotations: mutates(false, true),
+		Description: "Mark a question as handled by a page you published to answer it. Byname then tracks every later answer that links to the page, for any question, and notifies once when one first does. Marking the same page again keeps the first mark. POST /v1/questions/{id}/pages."},
+		func(ctx context.Context, a core.Actor, in markHandledInput) (config.QuestionPage, error) {
+			return svc.Config.MarkHandled(ctx, a, in.QuestionID, in.QuestionPageInput)
+		})
+	addTool(srv, core.ConfigWrite, &mcp.Tool{Name: "unmark_question_page", Annotations: mutates(true, true),
+		Description: "Remove a page marked as answering a question, and its tracking. DELETE /v1/question-pages/{id}."},
+		func(ctx context.Context, _ core.Actor, in byID) (deleted, error) {
+			return deleted{in.ID}, svc.Config.UnmarkPage(ctx, in.ID)
 		})
 	addTool(srv, core.ResultsRead, &mcp.Tool{Name: "content_brief", Annotations: readOnly(),
 		Description: "A prompt for an agent working on your site, to write the content that gets you named and linked to on one question: how each AI app answered on a check, the competitors named instead, the web searches the apps ran and the pages they linked to, with the markdown to follow in prompt. Works for any question, not only missed ones. Filter by AI app (surface) and model. GET /v1/questions/{id}/brief."},

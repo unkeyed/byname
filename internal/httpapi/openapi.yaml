@@ -1253,6 +1253,95 @@ paths:
           $ref: "#/components/responses/NotFound"
         "503":
           $ref: "#/components/responses/Unavailable"
+  /v1/handled:
+    get:
+      tags: [results]
+      operationId: listHandled
+      summary: Every page marked as answering a question, and the answers that link to it since it was marked.
+      description: >-
+        An answer links to a marked page when one of its links is the same
+        page without the scheme, www., query, fragment or trailing slash,
+        so https://www.northwind.example/blog/x/?ref=chatgpt links to
+        northwind.example/blog/x. Answers to any question count, from any
+        AI app, given at or after the mark. before and now say how the
+        marked question's answers named you on the last check before the
+        mark and on the latest check since, following the question through
+        later question set versions.
+      security:
+        - apiKey: [results:read]
+        - session: [results:read]
+      responses:
+        "200":
+          description: The marked pages.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HandledPages"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /v1/questions/{id}/pages:
+    parameters:
+      - $ref: "#/components/parameters/id"
+    post:
+      tags: [config]
+      operationId: markQuestionHandled
+      summary: Mark a question as handled by a page you published to answer it.
+      description: >-
+        Byname then tracks every later answer that links to the page, for
+        any question, and raises page_linked once when one first does.
+        Marking the same page again, in any spelling that matches it, keeps
+        the first mark and when it started.
+      security:
+        - apiKey: [config:write]
+        - session: [config:write]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QuestionPageInput"
+      responses:
+        "200":
+          description: The marked page.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuestionPage"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /v1/question-pages/{id}:
+    parameters:
+      - $ref: "#/components/parameters/id"
+    delete:
+      tags: [config]
+      operationId: unmarkQuestionPage
+      summary: Remove a page marked as answering a question, and its tracking.
+      security:
+        - apiKey: [config:write]
+        - session: [config:write]
+      responses:
+        "204":
+          description: Removed.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/Unavailable"
   /v1/jobs:
     get:
       tags: [results]
@@ -4351,7 +4440,7 @@ components:
   schemas:
     EventKindName:
       type: string
-      enum: [check_completed, check_refused, check_failed, spend_cap_reached, pair_paused, goal_reached, search_moved, change_verdict, token_expiring, social_digest]
+      enum: [check_completed, check_refused, check_failed, spend_cap_reached, pair_paused, goal_reached, search_moved, change_verdict, token_expiring, social_digest, page_linked]
     EventKind:
       type: object
       description: One kind of event a channel can subscribe to.
@@ -4577,6 +4666,26 @@ components:
           type: number
         spend_missing_calls:
           type: integer
+    PageLinkedPayload:
+      type: object
+      description: page_linked. A check's answers linked for the first time to a page marked as answering a question.
+      required: [page_id, url, question_text, apps, answers]
+      properties:
+        page_id:
+          type: integer
+        url:
+          type: string
+        question_text:
+          type: string
+          description: The question the page was marked as answering.
+        apps:
+          type: array
+          items:
+            type: string
+          description: The AI apps whose answers linked to it, by name.
+        answers:
+          type: integer
+          description: That check's answers that linked to it, to any question.
     Alert:
       type: object
       description: One notification, an event as the app shows it. lines are the text email and Slack send.
@@ -4608,6 +4717,7 @@ components:
             - $ref: "#/components/schemas/ChangeVerdictPayload"
             - $ref: "#/components/schemas/TokenExpiringPayload"
             - $ref: "#/components/schemas/SocialDigestPayload"
+            - $ref: "#/components/schemas/PageLinkedPayload"
         created_at:
           type: string
           format: date-time
@@ -6551,7 +6661,7 @@ components:
     Gap:
       type: object
       description: A question where at least one pair did not name you in the run.
-      required: [question, engines, named, competitors, opportunity, demand, named_on_miss, pairs]
+      required: [question, engines, named, competitors, opportunity, demand, named_on_miss, pairs, pages]
       properties:
         question:
           $ref: "#/components/schemas/QuestionRef"
@@ -6582,6 +6692,125 @@ components:
           items:
             $ref: "#/components/schemas/GapPair"
           description: Each pair's answer, in pair order.
+        pages:
+          type: array
+          items:
+            $ref: "#/components/schemas/MarkedPage"
+          description: Pages marked as answering this question, under any version of it, most recently marked first.
+    MarkedPage:
+      type: object
+      description: A page marked as answering a question, as its row in the gaps shows it.
+      required: [id, url, added_at, linked]
+      properties:
+        id:
+          type: integer
+        url:
+          type: string
+        added_at:
+          type: string
+          format: date-time
+        linked:
+          type: integer
+          description: Answers since it was marked that link to it, to any question.
+    QuestionPageInput:
+      type: object
+      required: [url]
+      additionalProperties: false
+      properties:
+        url:
+          type: string
+          maxLength: 2000
+          description: The page's address, such as https://northwind.example/blog/zero-downtime. https:// is assumed when left out.
+    QuestionPage:
+      type: object
+      description: A page marked as answering a question.
+      required: [id, question_id, url, added_at]
+      properties:
+        id:
+          type: integer
+        question_id:
+          type: integer
+        url:
+          type: string
+        added_at:
+          type: string
+          format: date-time
+          description: When it was first marked. Answers from then on count as linking to it.
+    Naming:
+      type: object
+      description: How one check's answers to a question named you.
+      required: [run_id, run_started_at, answered, named]
+      properties:
+        run_id:
+          type: integer
+        run_started_at:
+          type: string
+          format: date-time
+        answered:
+          type: integer
+          description: Answers that did not fail.
+        named:
+          type: integer
+          description: Answers that named you.
+    HandledPage:
+      type: object
+      description: A page marked as answering a question, and what happened since.
+      required: [id, url, question, added_at, added_by, linked, before, now]
+      properties:
+        id:
+          type: integer
+        url:
+          type: string
+        question:
+          $ref: "#/components/schemas/QuestionRef"
+        added_at:
+          type: string
+          format: date-time
+        added_by:
+          type: string
+          description: Who marked it. Empty for an API key or a person since removed.
+        linked:
+          type: object
+          description: Every answer since the page was marked that links to it, to any question, from any AI app.
+          required: [answers, questions, pairs, first_run_id, first_at, latest_run_id]
+          properties:
+            answers:
+              type: integer
+            questions:
+              type: integer
+              description: Distinct questions those answers were to.
+            pairs:
+              type: array
+              items:
+                $ref: "#/components/schemas/PairRef"
+              description: The AI apps and models those answers came from, in pair order.
+            first_run_id:
+              type: [integer, "null"]
+              description: The check that first linked to it. Null until one does.
+            first_at:
+              type: [string, "null"]
+              format: date-time
+            latest_run_id:
+              type: [integer, "null"]
+        before:
+          description: The question's last check before the page was marked. Null when there was none.
+          oneOf:
+            - $ref: "#/components/schemas/Naming"
+            - type: "null"
+        now:
+          description: The question's latest check since the page was marked. Null until one runs.
+          oneOf:
+            - $ref: "#/components/schemas/Naming"
+            - type: "null"
+    HandledPages:
+      type: object
+      required: [pages]
+      properties:
+        pages:
+          type: array
+          items:
+            $ref: "#/components/schemas/HandledPage"
+          description: Most recently marked first.
     Gaps:
       type: object
       required: [run_id, gaps]
