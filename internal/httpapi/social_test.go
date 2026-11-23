@@ -3,10 +3,9 @@ package httpapi
 import (
 	"context"
 	"fmt"
+	"github.com/unkeyed/byname/internal/social/socialtest"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -27,19 +26,10 @@ var socialFixtures = map[string]string{
 	"tikhub.x.threads-web-search-recent": "tikhub.x.threads-web-search-recent.synthetic.json",
 }
 
-func socialFixture(t *testing.T, name string) []byte {
-	t.Helper()
-	b, err := os.ReadFile(filepath.Join("..", "social", "testdata", name))
-	if err != nil {
-		t.Fatal(err)
-	}
-	return b
-}
-
 // fakeBluesky serves the recorded Bluesky search answer, so no test calls
 // the real Bluesky.
 func fakeBluesky(t *testing.T) string {
-	body := socialFixture(t, "bluesky.searchPosts.json")
+	body := socialtest.Naming(t, socialtest.Fixture(t, "bluesky.searchPosts.json"))
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write(body) }))
 	t.Cleanup(srv.Close)
 	return srv.URL
@@ -51,7 +41,7 @@ func seedMentions(t *testing.T, c client) {
 	t.Helper()
 	ctx := context.Background()
 	for tool, file := range socialFixtures {
-		c.treg.SetBody(tool, socialFixture(t, file))
+		c.treg.SetBody(tool, socialtest.Naming(t, socialtest.Fixture(t, file)))
 	}
 	if _, err := c.svc.Config.PutSettings(ctx, checkstest.Settings()); err != nil {
 		t.Fatal(err)

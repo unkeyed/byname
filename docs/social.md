@@ -24,6 +24,8 @@ Treg has no single search across social networks, so Byname pins one search per 
 
 The prices are the Treg catalog's, checked on November 22, 2026. Every Treg call sends `X-Treg-Route-Max-Cost`, a ceiling a few times the listed price, so Treg refuses a dearer fallback source instead of charging for it. What a call cost is read from Treg's `X-Treg-Cost-Micro` header. A Treg call without that header is recorded as a missing cost, never as $0. A Bluesky call is recorded as a known $0, which is not a missing cost.
 
+A network's search matches loosely, on stems, similar words and parts of names, so it returns posts that never say what you searched for. Byname keeps a post only when its text or its link names the term as a whole word, in any case: for the term Unkey, "unkey", "@unkey", "#unkey" and "unkey.com" count, and "monkey" or a post that never says Unkey does not.
+
 Each network's answer is parsed into one shape: the post, its link, the author's handle and name, the text, when it was posted, and the engagement the network reports. A count the network does not report is empty, not 0. YouTube search gives only a video's age, such as "2 years ago", so its posting time is worked out from the time of the search and marked approximate. YouTube posts are ranked by views. Posts on the other networks are ranked by likes, replies, reposts and score added up.
 
 ## Set it up

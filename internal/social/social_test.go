@@ -2,6 +2,7 @@ package social_test
 
 import (
 	"context"
+	"github.com/unkeyed/byname/internal/social/socialtest"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -46,7 +47,7 @@ type fakeBluesky struct {
 }
 
 func newFakeBluesky(t *testing.T) *fakeBluesky {
-	body := fixture(t, "bluesky.searchPosts.json")
+	body := socialtest.Naming(t, fixture(t, "bluesky.searchPosts.json"))
 	f := &fakeBluesky{}
 	f.Server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		f.mu.Lock()
@@ -108,7 +109,7 @@ func newEnv(t *testing.T, token bool) *env {
 	t.Helper()
 	e := &env{t: t, ctx: context.Background(), db: testdb.New(t), treg: tregtest.New(t), bsky: newFakeBluesky(t), now: time.Date(2026, 11, 18, 12, 0, 0, 0, time.UTC)}
 	for tool, file := range tregFixtures {
-		e.treg.SetBody(tool, fixture(t, file))
+		e.treg.SetBody(tool, socialtest.Naming(t, fixture(t, file)))
 	}
 	e.cfg = config.New(e.db, config.Options{Secrets: secretbox.ForTest(), TregBaseURL: e.treg.URL})
 	if _, err := e.cfg.PutSettings(e.ctx, checkstest.Settings()); err != nil {
@@ -257,6 +258,7 @@ func TestFetchStoresEachPostOnce(t *testing.T) {
 	e.treg.Reset()
 	e.now = e.now.Add(6 * time.Hour)
 	x := strings.Replace(string(fixture(t, "anyapi.x.search.posts.json")), `"likeCount": 0,`, `"likeCount": 31,`, 1)
+	x = string(socialtest.Naming(t, []byte(x)))
 	e.treg.SetBody("anyapi.x.search.posts", []byte(x))
 	e.fetch()
 	if n := e.count(`SELECT count(*) FROM social_mention`); n != 14 {
@@ -503,3 +505,43 @@ func TestSettingsValidate(t *testing.T) {
 }
 
 func itoa(n int64) string { return strconv.FormatInt(n, 10) }
+
+// A network's search matches loosely, so a post that does not name the
+// term as a word, in its text or its link, is never kept.
+func TestPostsThatDoNotNameTheTermAreLeftOut(t *testing.T) {
+	e := newEnv(t, true)
+	at := itoa(e.now.Add(-time.Hour).Unix())
+	post := func(id, text string) string {
+		return `{"id":"` + id + `","url":"https://x.com/i/web/status/` + id + `","authorUsername":"someone","authorName":"Someone","text":"` + text +
+			`","createdUtc":` + at + `,"likeCount":1,"replyCount":0,"retweetCount":0,"viewCount":1}`
+	}
+	e.treg.SetBody("anyapi.x.search.posts", []byte(`{"output":{"data":{"items":[`+
+		post("1", "Moved our API keys to northwind cloud last week")+","+
+		post("2", "Thanks @Northwind Cloud team!")+","+
+		post("3", "Northwind Cloudy skies all weekend")+","+
+		post("4", "The pharaoh had one rule: keep the pig out of the vault")+
+		`],"nextCursor":null},"found":true}}`))
+	e.fetch()
+	var ids []string
+	rows, err := e.db.Query(e.ctx, `SELECT post_id FROM social_mention WHERE network = 'x' ORDER BY post_id`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			t.Fatal(err)
+		}
+		ids = append(ids, id)
+	}
+	if !slices.Equal(ids, []string{"1", "2"}) {
+		t.Fatalf("kept X posts %v, want 1 and 2: 3 says Cloudy, not Cloud, and 4 never names Northwind Cloud", ids)
+	}
+	var raw int
+	if err := e.db.QueryRow(e.ctx, `SELECT count(*) FROM social_mention WHERE network = 'linkedin'`).Scan(&raw); err != nil {
+		t.Fatal(err)
+	}
+	if raw == 0 {
+		t.Fatal("the LinkedIn recording, which names Northwind Cloud in every post here, kept nothing")
+	}
+}

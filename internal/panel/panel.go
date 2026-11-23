@@ -170,6 +170,12 @@ func mentions(text string, brands []Brand, mode MatchMode) []Mention {
 	return out
 }
 
+// NamesTerm reports whether text names term as a whole word, in any case.
+// "Unkey", "@unkey", "#unkey" and "unkey.com" name Unkey; "monkey" does not.
+func NamesTerm(text, term string) bool {
+	return len(wholeWord(strings.ToLower(text), strings.ToLower(strings.TrimSpace(term)), 0)) > 0
+}
+
 func wholeWord(text, term string, brand int) []span {
 	if term == "" {
 		return nil

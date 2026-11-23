@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/unkeyed/byname/internal/panel"
 	"io"
 	"net/http"
 	"strings"
@@ -278,7 +279,9 @@ func (s *Service) call(ctx context.Context, treg engines.Treg, n spec, q search)
 			return err
 		}
 		for _, p := range page.Posts {
-			if p.ID == "" {
+			// A network's search matches loosely, so a post is kept only when
+			// its text or link names the term.
+			if p.ID == "" || !panel.NamesTerm(p.Text+" "+p.URL, q.Term) {
 				continue
 			}
 			e := p.Engagement
