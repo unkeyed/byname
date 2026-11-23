@@ -587,6 +587,7 @@ var mcpTools = map[string]string{
 	"GET /v1/answers/{id}":           "get_answer",
 	"GET /v1/compare":                "compare_runs",
 	"GET /v1/questions/{id}/history": "question_history",
+	"GET /v1/questions/{id}/brief":   "content_brief",
 	"GET /v1/metrics/rates":          "mention_rates",
 	"GET /v1/metrics/share":          "share_of_mentions",
 	"GET /v1/metrics/summary":        "results_summary",

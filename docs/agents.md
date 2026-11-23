@@ -117,7 +117,7 @@ Keys live in Postgres by default, or in Unkey when `UNKEY_ROOT_KEY` and `UNKEY_A
 
 ## MCP tools
 
-Byname's MCP server has 83 tools. Every REST route an API key can call has one with the same scope, except `DELETE /v1/keys/current`, since MCP clients sign in with OAuth instead of a key, and `GET /v1/brands/{id}/logo`, an image for the browser. A test keeps the two in step. Read tools are marked read-only, and `delete_brand`, `delete_goal`, `delete_change`, `delete_control_page` and `remove_left_out_account` are marked destructive, so a client can ask before it runs them.
+Byname's MCP server has 84 tools. Every REST route an API key can call has one with the same scope, except `DELETE /v1/keys/current`, since MCP clients sign in with OAuth instead of a key, and `GET /v1/brands/{id}/logo`, an image for the browser. A test keeps the two in step. Read tools are marked read-only, and `delete_brand`, `delete_goal`, `delete_change`, `delete_control_page` and `remove_left_out_account` are marked destructive, so a client can ask before it runs them.
 
 | Tool | Scope | REST | What it does |
 |---|---|---|---|
@@ -192,6 +192,7 @@ Byname's MCP server has 83 tools. Every REST route an API key can call has one w
 | `results_summary` | `results:read` | `GET /v1/metrics/summary` | The headline per check: how many answers named you or linked to your site out of those answered, and your share of mentions. |
 | `competitors` | `results:read` | `GET /v1/metrics/competitors` | Share of mentions over the checks in range: each brand's mentions, share and rank, and how often each line's answers named each brand. |
 | `gaps` | `results:read` | `GET /v1/gaps` | Missed questions, where at least one AI app did not name you on a check, ranked by the share of AI apps that left you out and by search demand where Byname has a figure, with the competitors named instead and each AI app's answer with the web searches it ran, where the endpoint exposes them. |
+| `content_brief` | `results:read` | `GET /v1/questions/{id}/brief` | A prompt for an agent working on your site, to write the content that gets you named and linked to on one question: how each AI app answered on a check, the competitors named instead, the web searches the apps ran and the pages they linked to, with the markdown to follow in prompt. Works for any question, not only missed ones. Filter by AI app (surface) and model. |
 | `list_jobs` | `results:read` | `GET /v1/jobs` | The jobs log newest first: each AI check and model list refresh with its status, error and spend. |
 | `search_console_status` | `results:read` | `GET /v1/gsc` | Whether Search Console is connected, the property synced, the last sync and its error, the latest day Google has finalized and the partial days the next sync overwrites. |
 | `search_summary` | `results:read` | `GET /v1/search/summary` | The Search Console headline: clicks, appearances (impressions), click rate (CTR), average position, and clicks from searches with your name, without it (non-brand) and anonymized over the latest 28 days ending on the latest final day, with the 28 days before for the trend. |
@@ -205,7 +206,7 @@ Byname's MCP server has 83 tools. Every REST route an API key can call has one w
 | `delete_goal` | `config:write` | `DELETE /v1/goals/{id}` | Delete a search goal. |
 | `update_branded_terms` | `config:write` | `PUT /v1/settings/branded-terms` | Replace the branded search terms. |
 
-The server's instructions tell an agent where to start: `list_runs`, then `compare_runs` for the answers that started or stopped naming you, `gaps` for missed questions, and `question_history` for one question over time. They also say that each AI app and model is its own line with its own accuracy label, never averaged with another, and that naming you and linking to your site are counted apart.
+The server's instructions tell an agent where to start: `list_runs`, then `compare_runs` for the answers that started or stopped naming you, `gaps` for missed questions, `content_brief` for a prompt that tells an agent working on your site what to write to win one, and `question_history` for one question over time. They also say that each AI app and model is its own line with its own accuracy label, never averaged with another, and that naming you and linking to your site are counted apart.
 
 When a tool fails, its error says what to do next. An invalid value names the field and what it accepts, and a missing record says how to find or create one. An internal failure shows only a `request_id`, and the server log has the cause under the same id.
 
@@ -233,6 +234,13 @@ Find the missed questions, where some AI app did not name you:
 
 ```sh
 curl "https://byname.example.com/v1/gaps" \
+	-H "Authorization: Bearer byn_..."
+```
+
+Get a prompt that tells the agent working in your site's repository what to write so AI apps name you on one question. `prompt` is the markdown to paste in, and the rest of the answer is the same facts as data. In the app, **Prompt for your agent** on each question under **AI answers > Missed questions**, and at the top of the question drawer, opens the same prompt with a copy button:
+
+```sh
+curl "https://byname.example.com/v1/questions/12/brief" \
 	-H "Authorization: Bearer byn_..."
 ```
 

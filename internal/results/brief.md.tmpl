@@ -1,0 +1,81 @@
+# Get {{.Brand}} into AI answers to "{{.Question.Text}}"
+
+People ask AI assistants this question, and the answers decide which products they look at. Your job is to write or improve content so that AI assistants name {{.Brand}} in their answer and link to {{.Brand}}'s site. Everything below comes from Byname, which asked AI apps this question on {{.Day}} (check #{{.RunID}}) for {{.Market}} readers in language "{{.Language}}" and got {{.Answered}} {{if eq .Answered 1}}answer{{else}}answers{{end}}, one per app and model. Write in that language for those readers.
+
+{{.Brand}}'s sites: {{list .Domains}}.
+
+## Where {{.Brand}} stands
+
+- Named {{.Brand}}: {{.Named}} of {{.Answered}}.
+- Linked to {{.Brand}}'s site: {{.Linked}} of {{.Answered}}.
+{{- if .Instead}}
+- Named instead, most often first: {{list .Instead}}.
+{{- end}}
+
+{{range .Lines}}### {{.Title}}
+
+- {{if eq .State "named_linked"}}Named {{$.Brand}}{{if .Position}} as brand #{{.Position}}{{end}} and linked to its site.
+{{- else if eq .State "named"}}Named {{$.Brand}}{{if .Position}} as brand #{{.Position}}{{end}} but did not link to its site.
+{{- else if eq .State "linked"}}Linked to {{$.Brand}}'s site but never named {{$.Brand}} in the text.
+{{- else}}Did not name {{$.Brand}} or link to its site.{{end}}
+{{- if .Brands}}
+- Brands it named, in order: {{list .Brands}}.
+{{- end}}
+{{- if .FanOut}}
+- What it searched the web for: {{quoted .FanOut}}.
+{{- end}}
+{{- if .Links}}
+- Pages it linked to: {{list .Links}}.
+{{- end}}
+
+{{end -}}
+
+{{- if .Pages}}## Pages the AI apps read for this question
+
+These are the pages the answers linked to, most linked first, with what each page's HTML says.
+
+{{range .Pages}}- {{.URL}}, linked in {{.Answers}} {{if eq .Answers 1}}answer{{else}}answers{{end}}.
+{{- if .IsSelf}} This is {{$.Brand}}'s own page.{{end}}
+{{- if .Check}}{{if eq .Check.Status "ok"}}
+{{- if .Check.SelfPresent}}{{if deref .Check.SelfPresent}} Names {{$.Brand}}.{{else}} Does not name {{$.Brand}}.{{end}}{{end}}
+{{- if .Check.Competitors}} Names {{list .Check.Competitors}}.{{end}}
+{{- else}} Byname could not read it.{{end}}{{else}} Byname has not read it yet.{{end}}
+{{end}}
+{{end -}}
+
+{{- if .Excerpts}}## What the answers said
+
+Read these to learn what the AI apps look for: the criteria they compare on, the claims they repeat and the sources they trust. Each is cut to its opening.
+
+{{range .Excerpts}}### {{.Title}}{{if eq .State "missed"}}, which left {{$.Brand}} out{{else if eq .State "linked"}}, which linked to {{$.Brand}} without naming it{{end}}
+
+{{blockquote .Excerpt}}
+
+{{end}}
+{{- end -}}
+
+## Your task
+
+1. Find where {{.Brand}}'s site content lives. If you are working in its repository, read the existing pages, their format and their tone before you write anything.
+2. Look for a page that already answers this question. Improve it if one exists. Otherwise write one new page focused on this question. A focused page beats a paragraph buried in a long one.
+3. Write so an AI assistant can quote you:
+   - Answer the question in the first two sentences, and name {{.Brand}} in them.
+{{- if .FanOut}}
+   - Answer each web search the AI apps ran, under a heading that reads like it: {{quoted .FanOut}}.
+{{- end}}
+{{- if .Instead}}
+   - Compare {{.Brand}} with {{list .Instead}} fairly. Say where each one fits. Assistants repeat specific, checkable facts such as prices, limits, supported platforms and numbers, so use them.
+{{- end}}
+   - Use headings, short paragraphs and lists, and a table where you compare. Put the text in the HTML the server sends, since many AI crawlers do not run JavaScript.
+   - End with a short FAQ that answers close variants of the question.
+{{- if .SelfUnnamed}}
+4. The AI apps linked to {{.Brand}}'s own {{if eq (len .SelfUnnamed) 1}}page{{else}}pages{{end}} {{list .SelfUnnamed}}, and {{if eq (len .SelfUnnamed) 1}}its{{else}}their{{end}} HTML does not name {{.Brand}}. Make sure {{if eq (len .SelfUnnamed) 1}}it states{{else}}they state{{end}} the name {{.Brand}} in the text and {{if eq (len .SelfUnnamed) 1}}answers{{else}}answer{{end}} the question plainly.
+{{- end}}
+{{if .SelfUnnamed}}5{{else}}4{{end}}. Use only facts you can confirm from the repository, the live site or the docs. Where a fact you need is missing, leave a TODO a person will see. Never invent customers, numbers, quotes or benchmarks, and never make a false claim about a competitor.
+{{- if .Outreach}}
+{{if .SelfUnnamed}}6{{else}}5{{end}}. Some pages the AI apps read name a competitor and not {{.Brand}}: {{range $i, $p := .Outreach}}{{if $i}}, {{end}}{{$p.URL}}{{end}}. List each with one line on what to ask its owner to add about {{.Brand}}. Do not contact anyone.
+{{- end}}
+
+## When you finish
+
+Reply with the files you wrote or changed, which of the searches above the content answers{{if .Outreach}}, every TODO left for a person and the outreach list{{else}} and every TODO left for a person{{end}}. Byname asks this question again on its next check, so the team will see whether the answers change.

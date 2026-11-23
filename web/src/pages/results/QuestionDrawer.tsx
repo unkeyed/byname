@@ -9,6 +9,7 @@ import { keys, useBrands, useSettings, useSurfaces } from "../../queries";
 import { Markdown } from "../../markdown";
 import { Badge, Button, cx, ErrorNote, Icon, LoadBoundary, Pending, scrollArea, ScrollX, selectClass, useModal } from "../../ui";
 import { useFilter, useView } from "../../view";
+import { AgentPromptButton } from "./AgentPrompt";
 import { PageMark } from "./Missed";
 import { Segmented } from "./Header";
 import { CountAnyway, LeftOutBadge, leftOutWhy } from "./Scoring";
@@ -93,6 +94,11 @@ function Body({ question, onClose }: { question: number; onClose: () => void }) 
         <div className="min-w-0 flex-1">
           <div className="text-xs text-muted">{history.data.question.group || "Question"}</div>
           <h2 className="text-base font-semibold">{history.data.question.text}</h2>
+          {selPoint && (
+            <div className="mt-2">
+              <AgentPromptButton question={selPoint.question_id} run={selPoint.run_id} filter={filter} />
+            </div>
+          )}
           {!history.data.question.counts_in_scores && (
             <div className="mt-2 space-y-1 text-xs text-muted">
               <p className="flex flex-wrap items-center gap-2">

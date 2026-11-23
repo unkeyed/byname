@@ -299,6 +299,19 @@ func (s *server) questionHistory(w http.ResponseWriter, r *http.Request, _ core.
 	return respond(w, http.StatusOK, v, err)
 }
 
+func (s *server) questionBrief(w http.ResponseWriter, r *http.Request, _ core.Actor) error {
+	id, err := pathID(r, "question")
+	if err != nil {
+		return err
+	}
+	run, err := queryInt(r, "run")
+	if err != nil {
+		return err
+	}
+	v, err := s.svc.Results.Brief(r.Context(), id, int64(run), queryScope(r))
+	return respond(w, http.StatusOK, v, err)
+}
+
 func (s *server) runQuestions(w http.ResponseWriter, r *http.Request, _ core.Actor) error {
 	id, err := pathID(r, "run")
 	if err != nil {

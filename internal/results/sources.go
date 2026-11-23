@@ -94,12 +94,7 @@ func (s *Service) Sources(ctx context.Context, since *time.Time, sc Scope) (Sour
 	if err != nil {
 		return out, err
 	}
-	var rivals []string
-	for _, b := range brands {
-		if b.Kind == panel.KindCompetitor {
-			rivals = append(rivals, b.Domains...)
-		}
-	}
+	rivals := rivalDomains(brands)
 	pages, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (SourcePage, error) {
 		var p SourcePage
 		var status *string
@@ -112,8 +107,8 @@ func (s *Service) Sources(ctx context.Context, since *time.Time, sc Scope) (Sour
 			check.Status, check.FetchedAt = *status, *fetched
 			check.Competitors = competitorsIn(check.Brands, kinds)
 			p.Check = &check
-			p.Outreach = !p.IsSelf && !onDomains(p.Domain, rivals) && check.SelfPresent != nil && !*check.SelfPresent && len(check.Competitors) > 0
 		}
+		p.Outreach = outreach(p.Domain, p.IsSelf, p.Check, rivals)
 		return p, nil
 	})
 	if err != nil {
@@ -185,6 +180,22 @@ func competitorsIn(names []string, kinds map[string]panel.BrandKind) []string {
 		}
 	}
 	return out
+}
+
+func rivalDomains(brands []panel.Brand) []string {
+	var out []string
+	for _, b := range brands {
+		if b.Kind == panel.KindCompetitor {
+			out = append(out, b.Domains...)
+		}
+	}
+	return out
+}
+
+// outreach reports whether a cited page names a competitor and not you, on
+// a site that is neither yours nor a competitor's.
+func outreach(domain string, isSelf bool, check *PageCheck, rivals []string) bool {
+	return check != nil && !isSelf && !onDomains(domain, rivals) && check.SelfPresent != nil && !*check.SelfPresent && len(check.Competitors) > 0
 }
 
 // onDomains reports whether host is one of domains or a subdomain of one.

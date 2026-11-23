@@ -38,6 +38,7 @@ export const keys = {
   history: (question: number, since?: string) => ["results", "history", question, since] as const,
   answer: (id: number) => ["answer", id] as const,
   compare: (before: number, after: number) => ["results", "compare", before, after] as const,
+  brief: (question: number, run: number, f: ResultsFilter = {}) => ["results", "brief", question, run, f.surface, f.model] as const,
   gaps: (run: number, f: ResultsFilter = {}) => ["results", "gaps", run, f.surface, f.model] as const,
   prompts: (f: ResultsFilter) => ["results", "prompts", f] as const,
   sources: (f: ResultsFilter) => ["results", "sources", f] as const,

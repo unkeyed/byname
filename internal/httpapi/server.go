@@ -93,6 +93,7 @@ var routes = []route{
 	{"GET /v1/answers/{id}", needs(core.ResultsRead), (*server).getAnswer},
 	{"GET /v1/compare", needs(core.ResultsRead), (*server).compareRuns},
 	{"GET /v1/questions/{id}/history", needs(core.ResultsRead), (*server).questionHistory},
+	{"GET /v1/questions/{id}/brief", needs(core.ResultsRead), (*server).questionBrief},
 	{"GET /v1/metrics/rates", needs(core.ResultsRead), (*server).mentionRates},
 	{"GET /v1/metrics/share", needs(core.ResultsRead), (*server).shareOfMentions},
 	{"GET /v1/metrics/summary", needs(core.ResultsRead), (*server).summary},
