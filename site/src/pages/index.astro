@@ -11,12 +11,12 @@ import { repo, summary, title } from "../lib/site";
   <section class="hero wrap" id="top" aria-labelledby="hero-title">
     <div class="hero-copy">
       <h1 id="hero-title">When buyers ask AI, does it say <span class="mk" data-mark="circle" data-pad="0.16em 0.05em" data-sw="3">your name</span>?</h1>
-      <p class="hero-lede">Buyers ask ChatGPT, Google and Claude which product to use. You never see what they're told. Byname asks the same questions every few days, keeps every answer, and tells you when you're named, when you're not, and who got named instead.</p>
+      <p class="hero-lede">See when ChatGPT, Google and Claude recommend you, and who they pick instead.</p>
       <div class="hero-acts">
         <a class="btn" href="#deploy">Deploy on Unkey</a>
         <a class="go" href={repo}>View on GitHub</a>
       </div>
-      <p class="hero-meta">Open source and MIT licensed. You run it, so the answers are yours.</p>
+      <p class="hero-meta">Open source · Self-hosted · MIT licensed</p>
     </div>
 
     <div class="desk">
@@ -76,9 +76,8 @@ import { repo, summary, title } from "../lib/site";
 
   <section class="sec wrap" id="questions" aria-labelledby="questions-title">
     <div class="sec-head">
-      <p class="kicker"><span>1</span>Where you stand</p>
-      <h2 id="questions-title">Every question you win. <em>Every one you don't.</em></h2>
-      <p class="sec-lede">Write down what your buyers ask. Byname asks each question in every AI app you pick, word for word, every time. It never puts your name in the question, so you see what a buyer would see.</p>
+      <h2 id="questions-title">Every question your buyers ask.</h2>
+      <p class="sec-lede">Asked in twelve AI apps, the same way every time.</p>
     </div>
     <figure class="contents sheet" data-reveal>
       <div class="contents-scroll">
@@ -98,9 +97,8 @@ import { repo, summary, title } from "../lib/site";
 
   <section class="sec wrap" id="lost" aria-labelledby="lost-title">
     <div class="sec-head">
-      <p class="kicker"><span>2</span>When you drop out</p>
-      <h2 id="lost-title">Second in check #6. <em>Gone in check #7.</em></h2>
-      <p class="sec-lede">An AI app stops naming you and starts naming a competitor. Nothing in your analytics shows it. Byname compares every answer with the last one and tells you in Slack, by email or at a webhook as soon as the check ends.</p>
+      <h2 id="lost-title">Know the day you drop out.</h2>
+      <p class="sec-lede">A Slack message when an AI app stops naming you.</p>
     </div>
     <div class="story" data-reveal>
       <figure class="sheet clip" aria-labelledby="c6-cap">
@@ -143,7 +141,6 @@ import { repo, summary, title } from "../lib/site";
       </figure>
     </div>
     <div class="proof">
-      <p class="proof-note">The link opens this: every answer you lost between the two checks. <span>A real screenshot of the app, with example data.</span></p>
       <figure class="sheet shot">
         <picture>
           <source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="/screens/compare-lost-sm-dark.webp" width="758" height="490" />
@@ -156,12 +153,9 @@ import { repo, summary, title } from "../lib/site";
   </section>
 
   <section class="sec wrap" id="apps" aria-labelledby="apps-title">
-    <div class="sec-head sec-head-split">
-      <div>
-        <p class="kicker"><span>3</span>The real apps</p>
-        <h2 id="apps-title">What buyers see. <em>Not what an API says.</em></h2>
-      </div>
-      <p class="sec-lede">The ChatGPT app can answer differently from OpenAI's API. Byname reads the app itself wherever it can, and labels every other answer by how close it gets, so you know how far to trust it.</p>
+    <div class="sec-head">
+      <h2 id="apps-title">What buyers see. <em>Not what an API says.</em></h2>
+      <p class="sec-lede">Read from the real apps wherever possible.</p>
     </div>
     <div class="register sheet" data-reveal>
       <article class="grade">
@@ -195,16 +189,12 @@ import { repo, summary, title } from "../lib/site";
         </ul>
       </article>
     </div>
-    <p class="grades-foot">One <a class="link" href="/docs/engines/treg">Treg</a> token runs all twelve and reports what each answer cost. Or bring your own provider keys. <a class="link" href="/docs/engines/surfaces">How each app is read</a></p>
   </section>
 
   <section class="sec wrap" id="search" aria-labelledby="search-title">
-    <div class="sec-head sec-head-split">
-      <div>
-        <p class="kicker"><span>4</span>Page changes</p>
-        <h2 id="search-title">You rewrote a page. <em>Did it help?</em></h2>
-      </div>
-      <p class="sec-lede">Byname reads your Google Search Console numbers every day and marks each page change on the chart, from a merged pull request or one you log by hand. A month after Google sees the change, it tells you whether the page did better than the pages you left alone.</p>
+    <div class="sec-head">
+      <h2 id="search-title">Did that page change help?</h2>
+      <p class="sec-lede">Search Console and every page change on one chart, with a verdict a month later.</p>
     </div>
     <div class="chart-block" data-reveal>
       <figure class="chart sheet">
@@ -215,8 +205,7 @@ import { repo, summary, title } from "../lib/site";
         <div class="verdict-text">
           <p class="verdict-k">/docs/ratelimiting</p>
           <p class="verdict-v"><span class="mk" data-mark="circle" data-pad="12 6">Helped</span> <span class="exp">experimental</span></p>
-          <p>Rewritten on Oct 7. In the month after Google saw it, the page climbed 4.07 places and its click rate rose 0.97 points more than the pages left alone.</p>
-          <p class="verdict-how">Measuring against untouched pages cancels out the ups and downs that hit every page.</p>
+          <p>Up 4.07 places against the pages left alone.</p>
         </div>
         <figure class="sheet shot">
           <picture>
@@ -231,12 +220,9 @@ import { repo, summary, title } from "../lib/site";
   </section>
 
   <section class="sec wrap" id="agents" aria-labelledby="agents-title">
-    <div class="sec-head sec-head-split">
-      <div>
-        <p class="kicker"><span>5</span>Agents</p>
-        <h2 id="agents-title">Ask your agent <em>what you lost.</em></h2>
-      </div>
-      <p class="sec-lede">Your coding agent can read Byname, signed in as you. Ask what dropped this week and fix the page in the same session.</p>
+    <div class="sec-head">
+      <h2 id="agents-title">Ask your agent <em>what you lost.</em></h2>
+      <p class="sec-lede">Byname has an MCP server. Your agent signs in as you.</p>
     </div>
     <div class="agents">
       <figure class="sheet transcript" data-reveal aria-label="A coding agent asks Byname which questions were lost in check #7 and answers from compare_runs.">
@@ -260,23 +246,18 @@ import { repo, summary, title } from "../lib/site";
       <div class="agents-side">
         <div class="snip">
           <h3>Add it to your agent</h3>
-          <p>Claude Code, Cursor and Claude Desktop connect over MCP. Your browser opens, you approve what the agent may do, and that's it. No key to copy.</p>
 <pre class="code"><span class="c"># Claude Code</span>
 claude mcp add --transport http byname \
   https://byname.example.com/mcp</pre>
-          <p>Scripts use the <a class="link" href="/docs/agents">REST API</a> with a key that can only do what you allow.</p>
         </div>
       </div>
     </div>
   </section>
 
   <section class="sec wrap" id="deploy" aria-labelledby="deploy-title">
-    <div class="sec-head sec-head-split">
-      <div>
-        <p class="kicker"><span>6</span>Run it</p>
-        <h2 id="deploy-title">One prompt. <em>Your agent puts it on Unkey.</em></h2>
-      </div>
-      <p class="sec-lede">Byname runs in your own account, so the answers, your API keys and the bill stay with you. Paste the prompt into your coding agent. It asks for a Postgres URL, sets Byname up on Unkey, and hands you a link to sign in.</p>
+    <div class="sec-head">
+      <h2 id="deploy-title">Run it on Unkey <em>with one prompt.</em></h2>
+      <p class="sec-lede">Your data, your keys, your bill.</p>
     </div>
     <div class="run">
       <div class="run-steps">
@@ -287,8 +268,8 @@ claude mcp add --transport http byname \
 claude mcp add --transport http unkey \
   https://mcp.unkey.com</pre>
           </li>
-          <li><h3>Copy the prompt into your agent</h3><p>You approve each step. Your API keys never go through the agent. You enter them in Byname once it's running.</p></li>
-          <li><h3>Open the link it gives you</h3><p>Add your brand, your questions and a spend cap. Byname stops when it reaches the cap.</p></li>
+          <li><h3>Paste the prompt into your agent</h3></li>
+          <li><h3>Open the link it gives you</h3></li>
         </ol>
         <div class="run-acts">
           <button class="btn" type="button" data-copy-prompt data-label="Copy the prompt">
@@ -306,7 +287,7 @@ claude mcp add --transport http unkey \
     <div class="anywhere">
       <div>
         <h3>Or run it anywhere with Docker</h3>
-        <p>It's one container and a Postgres database. On your machine, this starts both. Open the link it prints. <a class="link" href="/docs/self-hosting">Self-host Byname</a> covers other hosts, and <a class="link" href="/docs/deploy-unkey">Deploy on Unkey</a> covers every step by hand.</p>
+        <p>One container and Postgres. <a class="link" href="/docs/self-hosting">Self-hosting guide</a></p>
       </div>
 <pre class="code">git clone https://github.com/unkeyed/byname.git
 cd byname

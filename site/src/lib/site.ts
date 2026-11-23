@@ -5,7 +5,7 @@ export const repo = "https://github.com/unkeyed/byname";
 
 export const title = "Byname: find out when AI answers name you";
 export const summary =
-  "Buyers ask ChatGPT, Google and Claude which product to use, and you can't see what they're told. Byname asks your buyers' questions in twelve AI apps every few days, keeps every answer, and tells you when you're named, when you're not, and who got named instead.";
+  "See when ChatGPT, Google and Claude recommend your product, and who they pick instead. Open source and self-hosted.";
 
 // The docs sidebar, in reading order. scripts/check-docs.mjs fails the build
 // when a file under docs/ is missing here or a listed page does not exist.
