@@ -25,6 +25,9 @@ export const scopeInfo: Record<Scope, { title: string; detail: string }> = {
 export const roles = ["admin", "editor", "viewer"] as const;
 export type Role = (typeof roles)[number];
 
+/** How a role is written in the app. The API's values stay lower case. */
+export const roleLabel: Record<Role, string> = { admin: "Admin", editor: "Editor", viewer: "Viewer" };
+
 export const roleInfo: Record<Role, string> = {
   admin: "Everything, including API keys, connected apps and the team",
   editor: "Reads results, starts checks and changes setup",

@@ -2,7 +2,7 @@ import { useState, type FormEvent } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useReauthMutation } from "./Reauth";
 import { useNavigate } from "react-router";
-import { api, inviteURL, roleInfo, roles, type Email, type Role } from "../../api";
+import { api, inviteURL, roleInfo, roleLabel, roles, type Email, type Role } from "../../api";
 import { keys, useAuthOptions, useMe } from "../../queries";
 import { Avatar, Badge, Button, Card, ConfirmButton, CopyField, cx, ErrorNote, inputClass, Pending, RelativeTime, selectClass } from "../../ui";
 import { SettingsHeader, SettingsSubhead } from "./Settings";
@@ -31,7 +31,7 @@ export function Team() {
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="min-w-0 font-medium [overflow-wrap:anywhere]">{i.email}</span>
                   <Badge tone="info">Invite pending</Badge>
-                  <Badge>{i.role}</Badge>
+                  <Badge>{roleLabel[i.role]}</Badge>
                 </div>
                 <CopyField value={i.url} label="Copy link" />
                 <p className="text-xs text-muted">Send this link to them. It works once and expires in 7 days. It is not shown again after you leave this page.</p>
@@ -72,11 +72,13 @@ function Members() {
   return (
     <>
       <Card>
-        <ul aria-label="Team members" className="divide-y divide-line">
+        {/* One grid for every row, so the joined dates, roles and Remove line up whatever each Remove's confirm text reserves.
+            On a phone the role and Remove go on a second line, under the name. */}
+        <ul aria-label="Team members" className="grid grid-cols-[auto_minmax(0,1fr)_auto] gap-x-3 divide-y divide-line sm:grid-cols-[auto_minmax(0,1fr)_auto_auto_auto]">
           {users.data.map((u) => (
-            <li key={u.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
+            <li key={u.id} className="col-span-full grid grid-cols-subgrid items-center gap-y-2 px-4 py-3">
               <Avatar label={u.name || u.email} size={32} />
-              <div className="min-w-0 flex-1 basis-40">
+              <div className="col-span-2 min-w-0 sm:col-span-1">
                 <div className="flex min-w-0 items-center gap-2">
                   <span className="min-w-0 truncate font-medium" title={u.name || u.email}>
                     {u.name || u.email}
@@ -89,32 +91,31 @@ function Members() {
                   </div>
                 )}
               </div>
-              <div className="ml-auto flex shrink-0 items-center gap-2">
-                <span className="hidden shrink-0 text-xs text-muted sm:inline">
-                  Joined <RelativeTime iso={u.created_at} />
-                </span>
-                <select
-                  aria-label={`Role of ${u.name || u.email}`}
-                  className={selectClass}
-                  value={u.role}
-                  disabled={setRole.isPending}
-                  onChange={(e) => setRole.mutate({ id: u.id, role: e.target.value as Role })}
-                >
-                  {roles.map((r) => (
-                    <option key={r} value={r} title={roleInfo[r]}>
-                      {r}
-                    </option>
-                  ))}
-                </select>
-                <ConfirmButton
-                  label={`Remove ${u.name || u.email}`}
-                  confirmLabel={me.data?.user_id === u.id ? "Remove you and sign out?" : "Remove?"}
-                  onConfirm={() => remove.mutate(u.id)}
-                  disabled={remove.isPending}
-                >
-                  Remove
-                </ConfirmButton>
-              </div>
+              <span className="hidden text-right text-xs whitespace-nowrap text-muted sm:block">
+                Joined <RelativeTime iso={u.created_at} />
+              </span>
+              <select
+                aria-label={`Role of ${u.name || u.email}`}
+                className={cx(selectClass, "col-start-2 w-28 sm:col-start-auto")}
+                value={u.role}
+                disabled={setRole.isPending}
+                onChange={(e) => setRole.mutate({ id: u.id, role: e.target.value as Role })}
+              >
+                {roles.map((r) => (
+                  <option key={r} value={r} title={roleInfo[r]}>
+                    {roleLabel[r]}
+                  </option>
+                ))}
+              </select>
+              <ConfirmButton
+                label={`Remove ${u.name || u.email}`}
+                confirmLabel={me.data?.user_id === u.id ? "Remove you and sign out?" : "Remove?"}
+                onConfirm={() => remove.mutate(u.id)}
+                disabled={remove.isPending}
+                className="w-full"
+              >
+                Remove
+              </ConfirmButton>
             </li>
           ))}
         </ul>
@@ -184,7 +185,7 @@ function Invite({ onSent }: { onSent: (i: SentInvite) => void }) {
         <select aria-label="Role" className={cx(selectClass, "sm:w-28 sm:shrink-0")} value={role} onChange={(e) => setRole(e.target.value as Role)}>
           {roles.map((r) => (
             <option key={r} value={r}>
-              {r}
+              {roleLabel[r]}
             </option>
           ))}
         </select>
