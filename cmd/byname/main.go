@@ -18,6 +18,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -50,6 +51,7 @@ var version = "dev" // set by -ldflags at build
 // DATABASE_URL and ENCRYPTION_KEY are required.
 type config struct {
 	DB         *pgxpool.Config  // DATABASE_URL, required
+	DBSizeSet  bool             // DATABASE_URL sets pool_max_conns, which is then used as it is
 	MigrateDB  *pgxpool.Config  // MIGRATION_DATABASE_URL, optional: migrations run as this role instead of DATABASE_URL's
 	Port       string           // PORT, default 8080 (Unkey sets it)
 	Unkey      auth.UnkeyConfig // UNKEY_ROOT_KEY + UNKEY_API_ID, both or neither
@@ -135,8 +137,42 @@ func loadSecrets() (*secretbox.Box, error) {
 // loadConfig reads and validates the environment. Every config error is
 // reported here, before anything connects, with the variable's name.
 // defaultPoolSize is how many connections Byname opens in all when
-// DATABASE_URL does not set pool_max_conns. openLanes splits them.
-const defaultPoolSize = 20
+// DATABASE_URL does not set pool_max_conns and the database allows enough.
+// openLanes splits them, and minPoolSize is the fewest it can split.
+const (
+	defaultPoolSize = 20
+	minPoolSize     = 8
+)
+
+// budget is the connection budget for a database that allows this role
+// allowed connections: at most a third of them, so a second copy running
+// during a deploy, a migration and other apps on the same database still
+// get connections, and never below what openLanes needs.
+func budget(configured, allowed int32) int32 {
+	return min(configured, max(minPoolSize, allowed/3))
+}
+
+// fitBudget lowers cfg's connection budget to fit what the database allows
+// this role. When the database cannot say, the budget is left alone.
+func fitBudget(ctx context.Context, log *slog.Logger, cfg *pgxpool.Config) {
+	conn, err := pgx.ConnectConfig(ctx, cfg.ConnConfig)
+	if err != nil {
+		return
+	}
+	defer conn.Close(ctx)
+	var allowed int32
+	err = conn.QueryRow(ctx, `SELECT least(current_setting('max_connections')::int - current_setting('superuser_reserved_connections')::int,
+		coalesce(nullif((SELECT rolconnlimit FROM pg_roles WHERE rolname = current_user), -1), 2147483647))`).Scan(&allowed)
+	if err != nil {
+		log.Warn("could not read how many connections the database allows; using the full budget", "budget", cfg.MaxConns, "err", err)
+		return
+	}
+	cfg.MaxConns = budget(cfg.MaxConns, allowed)
+	if allowed/3 < minPoolSize {
+		log.Warn("the database allows few connections, so a second copy during a deploy may not get any; raise its limit or set pool_max_conns",
+			"allowed", allowed, "budget", cfg.MaxConns)
+	}
+}
 
 // openLanes opens the three pools Lanes routes between. Four connections
 // hold locks, one for each job the scheduler can run at once; the rest of
@@ -180,9 +216,18 @@ func loadConfig() (config, error) {
 	}
 	// pgx sizes the pool from the CPU count, 4 on a small instance, too few
 	// to split between requests and background work, so the budget is
-	// larger unless the URL sets it.
-	if !strings.Contains(dbURL, "pool_max_conns") {
+	// larger unless the URL sets it. An idle connection is closed after a
+	// minute, so a copy holds only what it uses, and each is named, so the
+	// database's own lists show which are Byname's.
+	c.DBSizeSet = strings.Contains(dbURL, "pool_max_conns")
+	if !c.DBSizeSet {
 		db.MaxConns = defaultPoolSize
+	}
+	if !strings.Contains(dbURL, "pool_max_conn_idle_time") {
+		db.MaxConnIdleTime = time.Minute
+	}
+	if db.ConnConfig.RuntimeParams["application_name"] == "" {
+		db.ConnConfig.RuntimeParams["application_name"] = "byname"
 	}
 	c.DB = db
 	if migrateURL := os.Getenv("MIGRATION_DATABASE_URL"); migrateURL != "" {
@@ -408,6 +453,9 @@ func run(log *slog.Logger) error {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, os.Interrupt)
 	defer stop()
 
+	if !cfg.DBSizeSet {
+		fitBudget(ctx, log, cfg.DB)
+	}
 	pool, err := openLanes(ctx, cfg.DB)
 	if err != nil {
 		return err
