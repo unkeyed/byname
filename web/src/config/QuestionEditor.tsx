@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type Question, type QuestionSet, type QuestionsInput } from "../api";
 import { absoluteTime } from "../format";
 import { keys, useBrands, useCan, useQuestions, useSettings } from "../queries";
-import { Badge, Button, Card, CardHeader, cx, Dialog, DialogBody, EmptyState, ErrorNote, Field, Icon, inputClass, labelClass, Pending, RelativeTime, selectClass, SteadyLabel } from "../ui";
+import { Badge, Button, Card, CardHeader, cx, Dialog, DialogBody, EmptyState, ErrorNote, Field, focusInPlace, Icon, inputClass, labelClass, Pending, RelativeTime, selectClass, SteadyLabel } from "../ui";
 import { defaultFooter, FieldNote, NoteSlot, ReadOnlyNote, SubmitButton, type Footer } from "./forms";
 import { useQuestionNaming, useSteady, type QuestionNaming } from "./naming";
 import { dedupe, normalizeQuestion, questionError, questionLength, questionsFromCSV, questionsFromLines, suggestQuestions, type DraftQuestion } from "./rules";
@@ -540,8 +540,6 @@ function QuestionRow({
   );
 }
 
-/** The row being edited is on screen already, so focusing its field must not scroll the page under the reader. */
-const focusInPlace = (el: HTMLTextAreaElement | null) => el?.focus({ preventScroll: true });
 
 function RowEditor({ row, others, onSave, onCancel }: { row: Row; others: Row[]; onSave: (r: Row) => void; onCancel: () => void }) {
   const [group, setGroup] = useState(row.group);

@@ -22,6 +22,7 @@ lint:
 	cd web && npm test
 	@! grep -rnE '(^|[ "])([a-z]+:)?overflow-(y-)?(auto|scroll)([ "]|$$)' web/src --include='*.tsx' | grep -v '^web/src/ui.tsx:' || { echo "scroll containers take scrollArea from web/src/ui.tsx"; exit 1; }
 	@! grep -rnE '[Aa]bout \$$?\{money\(' web/src || { echo "write an estimate as money(usd, \"about\"), which drops the about for under a cent"; exit 1; }
+	@! grep -rnE 'ref=\{\([a-z]+\) *=>[^}]*focus\(' web/src || { echo "focus a field with ref={focusInPlace} from web/src/ui.tsx: an inline ref callback runs on every render and steals focus while typing"; exit 1; }
 	@! grep -rnE '\$$[0-9]+\.[0-9]{3,}' docs || { echo "docs write money in whole cents, as the app does: give a price under a cent per 1,000"; exit 1; }
 
 web:

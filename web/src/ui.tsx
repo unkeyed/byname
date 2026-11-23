@@ -628,3 +628,11 @@ export function useMedia(query: string): boolean {
 
 /** Tailwind's md breakpoint. Below it the app is laid out for a phone. */
 export const useWide = () => useMedia("(min-width: 48rem)");
+
+/**
+ * A ref that focuses its field without scrolling, once, when the field
+ * appears. It is one function for the whole app, so React never calls it
+ * again on a re-render: an inline ref callback runs on every keystroke and
+ * pulls focus back from the field being typed in.
+ */
+export const focusInPlace = (el: HTMLElement | null) => el?.focus({ preventScroll: true });

@@ -2,7 +2,7 @@ import { useState, type FormEvent } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, type BrandEntry, type BrandInput } from "../api";
 import { keys, useBrands, useCan } from "../queries";
-import { Badge, Button, Card, ConfirmButton, cx, EmptyState, ErrorNote, Field, Icon, inputClass, Pending, selectClass } from "../ui";
+import { Badge, Button, Card, ConfirmButton, cx, EmptyState, ErrorNote, Field, focusInPlace, Icon, inputClass, Pending, selectClass } from "../ui";
 import { FieldNote, NoteSlot } from "./forms";
 import { forgetNaming, useCommonWords } from "./naming";
 import { parseHosts, splitList } from "./rules";
@@ -161,7 +161,7 @@ function BrandRowForm({ all, editing, onDone }: { all: BrandEntry[]; editing?: B
       <div className="grid gap-3 sm:grid-cols-2">
         <div>
           <Field label="Name">
-            <input className={inputClass} value={d.name} onChange={(e) => set({ name: e.target.value })} placeholder="Kestrel" aria-invalid={tried && !!nameError} ref={(el) => void (editing && el?.focus({ preventScroll: true }))} />
+            <input className={inputClass} value={d.name} onChange={(e) => set({ name: e.target.value })} placeholder="Kestrel" aria-invalid={tried && !!nameError} ref={editing ? focusInPlace : undefined} />
           </Field>
           <NoteSlot>{tried && nameError && <FieldNote tone="error">{nameError}</FieldNote>}</NoteSlot>
         </div>
