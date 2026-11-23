@@ -6897,7 +6897,7 @@ components:
       allOf:
         - $ref: "#/components/schemas/Series"
         - type: object
-          required: [answer_id, status, named, position, fan_out]
+          required: [answer_id, status, named, position, fan_out, links]
           properties:
             answer_id:
               type: integer
@@ -6913,6 +6913,11 @@ components:
               items:
                 type: string
               description: The web searches the engine ran for the question. Empty where the endpoint does not expose them.
+            links:
+              type: array
+              items:
+                type: string
+              description: The pages the answer linked to, in order, without your own site's.
     BriefLine:
       description: One pair's answer to the brief's question.
       allOf:

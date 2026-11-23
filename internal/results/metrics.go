@@ -238,6 +238,9 @@ type GapPair struct {
 	// FanOut is the web searches the engine ran for the question, empty
 	// where the endpoint does not expose them.
 	FanOut []string `json:"fan_out"`
+	// Links are the pages the answer linked to, in order, leaving out your
+	// own site's.
+	Links []string `json:"links" jsonschema:"the pages the answer linked to, in order, without your own site's"`
 }
 
 type Gaps struct {
@@ -291,18 +294,43 @@ func (s *Service) Gaps(ctx context.Context, runID int64, sc Scope) (Gaps, error)
 	if err != nil {
 		return Gaps{}, err
 	}
+	links, err := s.answerLinks(ctx, answers)
+	if err != nil {
+		return Gaps{}, err
+	}
 	out := Gaps{RunID: runID, Gaps: []Gap{}}
 	for _, g := range panel.RankGaps(gaps) {
 		row := Gap{Question: questions[g.Question], Engines: g.Engines, Named: g.Named, Competitors: g.Competitors,
 			Opportunity: g.Opportunity(), Demand: g.Demand, NamedOnMiss: namedInstead(byQuestion[g.Question], brands), Pairs: []GapPair{}}
 		for _, a := range byQuestion[g.Question] {
 			row.Pairs = append(row.Pairs, GapPair{Series: a.series, AnswerID: a.id, Status: a.scored.Status, Named: a.scored.Mentioned,
-				Position: nullPosition(a.scored.Position), FanOut: a.fanOut})
+				Position: nullPosition(a.scored.Position), FanOut: a.fanOut, Links: append([]string{}, links[a.id]...)})
 		}
 		slices.SortStableFunc(row.Pairs, func(a, b GapPair) int { return cmp.Compare(a.Pair.ID, b.Pair.ID) })
 		out.Gaps = append(out.Gaps, row)
 	}
 	return out, nil
+}
+
+// answerLinks is each answer's linked pages, in order, without your own
+// site's.
+func (s *Service) answerLinks(ctx context.Context, answers []scoredAnswer) (map[int64][]string, error) {
+	ids := make([]int64, len(answers))
+	for i, a := range answers {
+		ids[i] = a.id
+	}
+	rows, err := s.db.Query(ctx, `SELECT answer_id, url FROM citation WHERE answer_id = ANY($1) AND NOT is_self ORDER BY answer_id, ord`, ids)
+	if err != nil {
+		return nil, err
+	}
+	out := map[int64][]string{}
+	var id int64
+	var url string
+	_, err = pgx.ForEachRow(rows, []any{&id, &url}, func() error {
+		out[id] = append(out[id], url)
+		return nil
+	})
+	return out, err
 }
 
 func (s *Service) questionRefs(ctx context.Context, ids []panel.QuestionID) (map[panel.QuestionID]QuestionRef, error) {

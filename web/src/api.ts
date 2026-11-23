@@ -868,6 +868,8 @@ export interface GapPair extends Series {
   position: number | null;
   /** The web searches the engine ran; empty where the endpoint does not expose them. */
   fan_out: string[] | null;
+  /** The pages the answer linked to, in order, without your own site's. */
+  links: string[];
 }
 
 export interface Gap {

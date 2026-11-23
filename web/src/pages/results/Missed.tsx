@@ -53,20 +53,37 @@ export function Missed() {
   );
 }
 
-/** How many AI apps left you out, as words and a bar of one block per app. */
+/** How many AI apps left you out. */
 function MissedIn({ gap }: { gap: Gap }) {
-  const missed = gap.engines - gap.named;
   return (
-    <span className="flex w-24 shrink-0 flex-col items-start gap-1">
-      <span className="text-xs leading-tight font-medium">
-        Missed in <span className="tabular-nums">{missed}</span> of <span className="tabular-nums">{gap.engines}</span>
-      </span>
-      <span className="flex gap-0.5" aria-hidden="true">
-        {Array.from({ length: gap.engines }, (_, i) => (
-          <span key={i} className={cx("h-1 w-2.5 rounded-full", i < missed ? "bg-danger" : "bg-success")} />
-        ))}
-      </span>
+    <span className="w-24 shrink-0 text-xs leading-tight font-medium">
+      Missed in <span className="tabular-nums">{gap.engines - gap.named}</span> of <span className="tabular-nums">{gap.engines}</span>
     </span>
+  );
+}
+
+/**
+ * Which AI apps named you, by name: the shorter of the two lists, so a
+ * question most apps missed lists the few that named you, and one most
+ * named lists the few that missed you.
+ */
+function WhoNamedYou({ gap }: { gap: Gap }) {
+  const surfaces = useSurfaces();
+  const labels = useLabels(surfaces.data);
+  const named = gap.pairs.filter((p) => p.named);
+  const missed = gap.pairs.filter((p) => !p.named);
+  const names = (ps: GapPair[]) => list(ps.map((p) => labels.line(p.pair)));
+  if (named.length === 0) return <p className="text-xs text-danger">No AI app named you.</p>;
+  if (named.length <= missed.length)
+    return (
+      <p className="text-xs text-muted">
+        <span className="font-medium text-success">Named you:</span> {names(named)}
+      </p>
+    );
+  return (
+    <p className="text-xs text-muted">
+      <span className="font-medium text-danger">Missed you:</span> {names(missed)}
+    </p>
   );
 }
 
@@ -86,10 +103,14 @@ function pitchByCompetitor(pages: SourcePage[]): Map<string, SourcePage[]> {
   return by;
 }
 
-/** What to do about one missed question, built from who AI named and the pages it links to that name them. */
+/**
+ * What to do about one missed question, built from who AI named and the
+ * pages this question's missed answers linked to that name them and not you.
+ */
 function WhatToDo({ gap, pitch, run, filter }: { gap: Gap; pitch: Map<string, SourcePage[]>; run: number; filter: ResultsFilter }) {
   const names = gap.named_on_miss;
-  const pages = [...new Map(names.flatMap((n) => pitch.get(n) ?? []).map((p) => [p.url, p])).values()].slice(0, 2);
+  const linked = new Set(gap.pairs.filter((p) => !p.named).flatMap((p) => p.links));
+  const pages = [...new Map(names.flatMap((n) => pitch.get(n) ?? []).filter((p) => linked.has(p.url)).map((p) => [p.url, p])).values()].slice(0, 2);
   return (
     <div className="rounded-control bg-subtle px-2.5 py-2 text-xs">
       <span className="font-medium">What to do: </span>
@@ -98,7 +119,7 @@ function WhatToDo({ gap, pitch, run, filter }: { gap: Gap; pitch: Map<string, So
           AI named {list(names.slice(0, 3))} instead.{" "}
           {pages.length > 0 ? (
             <>
-              It links to{" "}
+              Its answers link to{" "}
               {pages.map((p, i) => (
                 <span key={p.url}>
                   {i > 0 && " and "}
@@ -170,6 +191,7 @@ function MissedQuestions({ filter }: { filter: ResultsFilter }) {
                         <LeftOutBadge question={g.question} />
                       </div>
                     </div>
+                    <WhoNamedYou gap={g} />
                     <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted tabular-nums">
                       {hasDemand && (
                         <span>

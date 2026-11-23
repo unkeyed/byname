@@ -45,6 +45,24 @@ func TestGapsRankingAndVisibleOn(t *testing.T) {
 		if !slices.IsSortedFunc(g.Pairs, func(a, b results.GapPair) int { return int(a.Pair.ID - b.Pair.ID) }) {
 			t.Errorf("%q: pairs out of pair order", g.Question.Text)
 		}
+		for _, p := range g.Pairs {
+			var want []string
+			if err := e.db.QueryRow(ctx, `SELECT coalesce(array_agg(url ORDER BY ord), '{}') FROM citation WHERE answer_id = $1 AND NOT is_self`, p.AnswerID).Scan(&want); err != nil {
+				t.Fatal(err)
+			}
+			if !slices.Equal(p.Links, want) {
+				t.Errorf("%q answer %d links %v, want its own linked pages %v, without your site's", g.Question.Text, p.AnswerID, p.Links, want)
+			}
+		}
+	}
+	linked := 0
+	for _, g := range all.Gaps {
+		for _, p := range g.Pairs {
+			linked += len(p.Links)
+		}
+	}
+	if linked == 0 {
+		t.Error("no answer carries a linked page, so the test proves nothing")
 	}
 
 	claude, err := e.results.Gaps(ctx, 0, results.Scope{Surface: engines.ClaudeCode})
