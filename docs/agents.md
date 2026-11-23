@@ -240,7 +240,7 @@ curl "https://byname.example.com/v1/gaps" \
 	-H "Authorization: Bearer byn_..."
 ```
 
-Get a prompt that tells the agent working in your site's repository what to write so AI apps name you on one question. `prompt` is the markdown to paste in, and the rest of the answer is the same facts as data. In the app, **Prompt for your agent** on each question under **AI answers > Missed questions**, and at the top of the question drawer, opens the same prompt with a copy button:
+Get a prompt that tells the agent working in your site's repository what to write so AI apps name you on one question. `prompt` is the markdown to paste in, and the rest of the answer is the same facts as data. The prompt ends by asking the agent to mark the question as handled by the page once it is live, with `mark_question_handled`, so Byname tracks the answers that link to it. See [Handled questions](handled.md). In the app, **Prompt for your agent** on each question under **AI answers > Missed questions**, and at the top of the question drawer, opens the same prompt with a copy button:
 
 ```sh
 curl "https://byname.example.com/v1/questions/12/brief" \

@@ -34,6 +34,8 @@ Copy the connection URL. Most managed providers require TLS, so keep `sslmode=re
 postgres://byname:secret@ep-example-123.us-east-1.aws.neon.tech/byname?sslmode=require
 ```
 
+Use the direct connection, or a session-mode pooler. A transaction-mode pooler, such as PgBouncer on PlanetScale's port 6432 or Supabase's pooler on port 6543, does not work: Byname's background jobs hold session locks, which a transaction-mode pooler drops between statements.
+
 If the provider gives you a read/write role and a separate admin role that can create tables, as PlanetScale Postgres does, copy both URLs. The read/write URL becomes `DATABASE_URL`. The admin URL is used once, in step 6, and never stored on Unkey.
 
 ## 3. Fork the repository
@@ -60,6 +62,7 @@ Set these on the **production** environment, in its build and runtime settings (
 | Health check | `GET /healthz`. It answers 200 while the process runs and does not query the database, so a database outage does not restart the instance. |
 | Region | Set it explicitly, for example `us-east-1`, close to your database. The default region may be elsewhere. |
 | Replicas | `1` |
+| Watch paths | `cmd/**`, `internal/**`, `web/**`, `go.mod`, `go.sum`, `Dockerfile` and `.dockerignore`, so a change to the docs or the site does not redeploy the app. |
 
 Unkey then sends traffic to an instance only after `/healthz` answers 200, and restarts an instance that stops answering. You can also set the health check through Unkey's API:
 
@@ -70,7 +73,7 @@ curl -X POST https://api.unkey.com/v2/environments.updateSettings \
 	-d '{"project":"byname","app":"default","environment":"production","healthcheck":{"method":"GET","path":"/healthz"}}'
 ```
 
-From now on, each push to your fork's default branch deploys to production. Pushes to other branches create preview deployments, which use the **preview** environment and its own variables. If you set `DATABASE_URL` on preview, use a separate database. A preview that points at the production database applies its migrations to production data.
+From now on, each push to your fork's default branch deploys to production. Pushes to other branches create preview deployments, which use the **preview** environment and its own variables. Turn off auto-deploy on the preview environment (`environments.updateSettings` with `autoDeploy: false`) unless you give it its own database. A preview that points at the production database applies its migrations to production data.
 
 ## 5. Set the environment variables
 
@@ -121,6 +124,8 @@ Byname throttles failed sign-ins on its own as well. The gateway policies stop s
 Create a deployment on production (`deployments.createDeployment`), or click **Deploy**. Follow it until it is ready (`deployments.getDeployment` and `deployments.listBuildLogs`).
 
 Find the deployment's stable URL, without a deployment id. It has the form `https://<project>-<workspace>.unkey.app`, or `https://<project>-<app>-<workspace>.unkey.app` when the app slug is not `default`. Set `PUBLIC_URL` to it, then deploy again. Variables and gateway policies apply only to a new deployment, and passkeys, OAuth callbacks and MCP sign-in work only at `PUBLIC_URL`.
+
+Once the second deployment is ready and current, stop the first one (`deployments.stopDeployment`, or **Stop** in the dashboard). Unkey keeps a previous deployment running after a new one takes over, and every running copy holds database connections. Do the same after every later deploy. Byname takes at most a quarter of the connections the database allows, so a copy or two left running never locks the app out, but they still use connections, and their background jobs run with their old settings.
 
 If the deployment does not start, open its logs. Byname logs the name of any missing or invalid variable and exits, for example `DATABASE_URL is required`.
 

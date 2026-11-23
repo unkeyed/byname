@@ -41,10 +41,13 @@ Only the Admin who started the sign-in can finish it. If Google sends no refresh
 
 ## Connect with a service account
 
-1. In Google Cloud, under **IAM & Admin > Service accounts**, create a service account. It needs no roles in the project.
-2. On the service account, under **Keys**, add a key of type **JSON** and download it.
-3. In Search Console, open the property's **Settings > Users and permissions** and add the service account's `client_email` as a user with **Restricted** permission. Read access is all Byname needs.
-4. In Byname, choose **Or use a service account**, paste the whole JSON key, and pick the property.
+1. In the [Google Cloud console](https://console.cloud.google.com), pick or create a project, and under **APIs & Services > Library**, enable the **Google Search Console API**. Without it, every sync fails with "API has not been used in project".
+2. Under **IAM & Admin > Service accounts**, create a service account. It needs no roles in the project.
+3. On the service account, under **Keys**, add a key of type **JSON** and download it.
+4. In Search Console, open the property's **Settings > Users and permissions** and add the service account's `client_email` as a user with **Restricted** permission. Read access is all Byname needs.
+5. In Byname, choose **Or use a service account**, paste the whole JSON key, and pick the property. Then delete the downloaded file, or keep it only in a password manager. Byname stores its own encrypted copy.
+
+If Google says **Service account key creation is disabled**, your Google Cloud organization enforces the `iam.disableServiceAccountKeyCreation` policy. Use [Sign in with Google](#connect-with-sign-in-with-google) instead, with an **Internal** consent screen so the sign-in does not expire, or ask an organization policy admin to allow keys for this one project.
 
 Byname accepts a key with `type` `service_account`, a `client_email` and an RSA `private_key`.
 

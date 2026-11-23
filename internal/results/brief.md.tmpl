@@ -78,4 +78,6 @@ Read these to learn what the AI apps look for: the criteria they compare on, the
 
 ## When you finish
 
-Reply with the files you wrote or changed, which of the searches above the content answers{{if .Outreach}}, every TODO left for a person and the outreach list{{else}} and every TODO left for a person{{end}}. Byname asks this question again on its next check, so the team will see whether the answers change.
+Reply with the files you wrote or changed, which of the searches above the content answers{{if .Outreach}}, every TODO left for a person and the outreach list{{else}} and every TODO left for a person{{end}}.
+
+Once the page is live, mark this question as handled by its URL, so Byname tracks every later answer that links to it and whether the question starts naming {{.Brand}}. With Byname's MCP server, call mark_question_handled with question_id {{.Question.ID}} and the page's URL. Otherwise tell the team to click Mark as handled on this question under AI answers > Missed questions.

@@ -11,7 +11,7 @@ export const deployPrompt = `Deploy Byname (https://github.com/unkeyed/byname) t
    Signing in opens Unkey in my browser, where I can also create an account. Do every Unkey step below through the MCP tools.
 
 2. Ask me
-   For a Postgres connection URL (Neon, Supabase, PlanetScale Postgres, RDS or similar), ideally in AWS us-east-1. If the provider gives a read/write role and a separate admin role that can create tables, ask for both URLs.
+   For a Postgres connection URL (Neon, Supabase, PlanetScale Postgres, RDS or similar), ideally in AWS us-east-1. It must be the direct connection, or a session-mode pooler, not a transaction-mode pooler such as PgBouncer on port 6432 or Supabase on port 6543: Byname holds session locks for its background jobs. If the provider gives a read/write role and a separate admin role that can create tables, ask for both URLs.
    Do not ask me for a Treg token or provider keys. I enter those in Byname's onboarding after the deploy.
 
 3. Fork Byname
@@ -20,7 +20,8 @@ export const deployPrompt = `Deploy Byname (https://github.com/unkeyed/byname) t
 4. Create the project and app on Unkey
    - Create a project with slug byname (projects.createProject).
    - Create an app with slug default, sourced from my fork's default branch (apps.createApp with git.repository). If Unkey's GitHub App cannot see the fork, get the install link with github.installApp, give it to me, and retry once I have granted access.
-   - On the production environment (environments.updateSettings): Dockerfile "Dockerfile", root directory ".", port 8080, health check GET /healthz, and regions set to us-east-1, or the region closest to my database, with 1 replica. The default region may be elsewhere, so set it explicitly.
+   - On the production environment (environments.updateSettings): Dockerfile "Dockerfile", root directory ".", port 8080, health check GET /healthz, and regions set to us-east-1, or the region closest to my database, with 1 replica. The default region may be elsewhere, so set it explicitly. Set watchPaths to cmd/**, internal/**, web/**, go.mod, go.sum, Dockerfile and .dockerignore, so a change to the docs or the site does not redeploy the app.
+   - On the preview environment, set autoDeploy to false. A preview has no variables of its own, and must never point at the production database.
 
 5. Set production variables (environments.setEnvironmentVariables), every secret as writeonly
    - DATABASE_URL: the read/write URL.
@@ -41,9 +42,11 @@ export const deployPrompt = `Deploy Byname (https://github.com/unkeyed/byname) t
 8. Deploy
    - Create a deployment on production (deployments.createDeployment) and follow it with deployments.getDeployment and deployments.listBuildLogs until it is ready.
    - Set PUBLIC_URL to the stable address without a deployment id, https://byname-<workspace>.unkey.app, then deploy again. Variables and gateway policies only apply to a new deployment, and passkeys only work at PUBLIC_URL.
+   - Once the second deployment is ready and current, stop the first one (deployments.stopDeployment). Unkey keeps a previous deployment running, and every running copy holds database connections.
 
 9. Check and hand over
    - PUBLIC_URL/healthz and PUBLIC_URL/auth/setup/SETUP_TOKEN both answer 200, and PUBLIC_URL/.env answers 403.
    - Give me PUBLIC_URL/setup/SETUP_TOKEN to create the first account with a passkey. Tell me to add a second passkey under Settings > Account.
    - Tell me the next stop is onboarding: my brand and domain, competitors, questions, where people ask with a Treg token or my own keys, Search Console, and the schedule with spend caps. Nothing runs until I finish it.
+   - Tell me that each later deploy leaves the previous deployment running, and to stop it once the new one is current.
    - Finish with a short summary: the URL, the Unkey project, the variables you set, where the encryption key is saved, and anything you could not do.`;

@@ -15,6 +15,8 @@ Byname is an open source app you run yourself that shows how your brand shows up
 
 - **What a person sees, or labeled as not.** You pick the AI apps people use, not the models behind them. Each one is pinned to the endpoint closest to the real app, and every answer is labeled **Real app answer**, **Same model, not the full tool**, or **Stand-in (not the real app)**. Labels are charted apart and never averaged.
 - **Every answer kept.** The raw response, the cost of every call, every brand mention with its position, and every citation. A call that reported no cost is flagged, never stored as $0.
+- **From a missed question to a fix.** Each question an AI app missed you on shows the brands named instead, the pages its answers link to, and a brief your coding agent can write a page from. Mark the question as handled by that page, and Byname tracks every later answer that links to it and whether the question starts naming you.
+- **Who else gets named, and who talks about you.** Byname finds the brands answers offer instead of you, so you can track them as competitors, and searches X, Reddit, Hacker News, LinkedIn, YouTube, Threads and Bluesky for posts that name you.
 - **Your keys, your limits.** One Treg token runs every AI app, or bring your own provider keys and gateways, app by app. A spend cap per check and an optional monthly cap bound the bill.
 - **Built for agents.** Claude Code, Cursor and other MCP clients sign in as you in the browser, with the scopes you pick. Scripts use scoped API keys that can expire.
 - **MIT licensed. Yours to run, change and keep.** One container and a Postgres database, on Unkey or any host. The scheduler runs inside it, so there is no cron to set up.
