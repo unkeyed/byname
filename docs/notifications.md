@@ -31,8 +31,9 @@ Webhook and Slack URLs must use `https`, or `http` to `localhost` for a receiver
 | Change result | `change_verdict` | A site change got its final result against your comparison pages, 31 days after Google first saw the change by default. The first result raises nothing. Its link opens the change on **Google search > Site changes**. See [Site changes](changes.md). | Anyone with `results:read` |
 | Token expiring | `token_expiring` | The hourly GitHub poll, or **Test** under **Settings > Site changes**, finds that the token expires within 14 days. | Admins only |
 | Social digest | `social_digest` | A day or week of social searches ended. It says how many new posts named you and on which networks, how many people posted about you for the first time with at most three names, and how many posts from left-out accounts are not counted, then quotes the five posts people engaged with most. It never says what the searches cost: see **Settings > Schedule and limits** for spend. Its link opens the **Social** page at that period. See [Social](social.md). | Anyone with `results:read` |
+| Your page was linked | `page_linked` | A check's answers were the first to link to a page you marked as answering a missed question. It names the AI apps that linked to it and how many answers did. Its link opens **AI answers > Missed questions > Handled**. See [Handled questions](handled.md). | Anyone with `results:read` |
 
-Each event has a natural key, its kind and what it happened to, such as one check. Raising the same event twice stores and sends it once. For the five events that do not come from a check, the key decides how often each one fires:
+Each event has a natural key, its kind and what it happened to, such as one check. Raising the same event twice stores and sends it once. For the events below, the key decides how often each one fires:
 
 | Event | Fires once per |
 |---|---|
@@ -41,6 +42,7 @@ Each event has a natural key, its kind and what it happened to, such as one chec
 | `change_verdict` | Change. |
 | `token_expiring` | Repository and token expiry date. A new token with a new expiry date warns again. |
 | `social_digest` | Day or week, such as `week/2026-11-16`. A period in which nothing was searched raises none. |
+| `page_linked` | Marked page. Removing the mark and marking the page again lets it fire again. |
 
 ## Delivery and retries
 

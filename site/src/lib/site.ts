@@ -13,7 +13,7 @@ export const sections = [
   { title: "Get started", pages: ["self-hosting", "deploy-unkey", "configuration", "sign-in"] },
   {
     title: "AI apps",
-    pages: ["engines/surfaces", "scores", "other-brands", "engines/treg", "engines/scraping-providers", "engines/model-providers", "engines/gateways"],
+    pages: ["engines/surfaces", "scores", "other-brands", "handled", "engines/treg", "engines/scraping-providers", "engines/model-providers", "engines/gateways"],
   },
   { title: "Connect", pages: ["search-console", "agents", "notifications", "changes", "social"] },
 ];

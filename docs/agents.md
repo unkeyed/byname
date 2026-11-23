@@ -117,7 +117,7 @@ Keys live in Postgres by default, or in Unkey when `UNKEY_ROOT_KEY` and `UNKEY_A
 
 ## MCP tools
 
-Byname's MCP server has 84 tools. Every REST route an API key can call has one with the same scope, except `DELETE /v1/keys/current`, since MCP clients sign in with OAuth instead of a key, and `GET /v1/brands/{id}/logo`, an image for the browser. A test keeps the two in step. Read tools are marked read-only, and `delete_brand`, `delete_goal`, `delete_change`, `delete_control_page` and `remove_left_out_account` are marked destructive, so a client can ask before it runs them.
+Byname's MCP server has 87 tools. Every REST route an API key can call has one with the same scope, except `DELETE /v1/keys/current`, since MCP clients sign in with OAuth instead of a key, and `GET /v1/brands/{id}/logo`, an image for the browser. A test keeps the two in step. Read tools are marked read-only, and `delete_brand`, `delete_goal`, `delete_change`, `delete_control_page`, `remove_left_out_account` and `unmark_question_page` are marked destructive, so a client can ask before it runs them.
 
 | Tool | Scope | REST | What it does |
 |---|---|---|---|
@@ -192,6 +192,9 @@ Byname's MCP server has 84 tools. Every REST route an API key can call has one w
 | `results_summary` | `results:read` | `GET /v1/metrics/summary` | The headline per check: how many answers named you or linked to your site out of those answered, and your share of mentions. |
 | `competitors` | `results:read` | `GET /v1/metrics/competitors` | Share of mentions over the checks in range: each brand's mentions, share and rank, and how often each line's answers named each brand. |
 | `gaps` | `results:read` | `GET /v1/gaps` | Missed questions, where at least one AI app did not name you on a check, ranked by the share of AI apps that left you out and by search demand where Byname has a figure, with the competitors named instead and each AI app's answer with the web searches it ran, where the endpoint exposes them. |
+| `list_handled_pages` | `results:read` | `GET /v1/handled` | Every page marked as answering a question: the answers since it was marked that link to it, for any question and from any AI app, and how the question named you on the check before the mark and on the latest since. See [Handled questions](handled.md). |
+| `mark_question_handled` | `config:write` | `POST /v1/questions/{id}/pages` | Mark a question as handled by a page you published to answer it. Byname tracks every later answer that links to the page. |
+| `unmark_question_page` | `config:write` | `DELETE /v1/question-pages/{id}` | Remove a marked page and its tracking. |
 | `content_brief` | `results:read` | `GET /v1/questions/{id}/brief` | A prompt for an agent working on your site, to write the content that gets you named and linked to on one question: how each AI app answered on a check, the competitors named instead, the web searches the apps ran and the pages they linked to, with the markdown to follow in prompt. Works for any question, not only missed ones. Filter by AI app (surface) and model. |
 | `list_jobs` | `results:read` | `GET /v1/jobs` | The jobs log newest first: each AI check and model list refresh with its status, error and spend. |
 | `search_console_status` | `results:read` | `GET /v1/gsc` | Whether Search Console is connected, the property synced, the last sync and its error, the latest day Google has finalized and the partial days the next sync overwrites. |
