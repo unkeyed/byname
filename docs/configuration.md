@@ -6,7 +6,7 @@ Environment variables hold only secrets and infrastructure. Everything about you
 
 | Variable | Required | Default | What it does |
 |---|---|---|---|
-| `DATABASE_URL` | Yes | none | The Postgres connection URL, for example `postgres://user:pass@host:5432/byname`. Byname opens up to 20 connections. To change that, add `pool_max_conns`, as in `...?sslmode=verify-full&pool_max_conns=10`. Keep it above the check's concurrency plus 10, or pages wait while a check runs. |
+| `DATABASE_URL` | Yes | none | The Postgres connection URL, for example `postgres://user:pass@host:5432/byname`. Byname opens up to 20 connections: half for pages, the REST API and MCP, half for checks and other background work, so a running check never makes a page wait. To change the total, add `pool_max_conns`, as in `...?sslmode=verify-full&pool_max_conns=10`. |
 | `ENCRYPTION_KEY` | Yes | none | 32 random bytes as base64 or hex, from `openssl rand -base64 32`. Encrypts provider keys, the Search Console credential, the GitHub token for site changes, the secrets of the places notifications go and TOTP seeds in the database. |
 | `ENCRYPTION_KEY_PREVIOUS` | No | none | The key you are rotating away from. Set it for one restart after changing `ENCRYPTION_KEY`. |
 | `MIGRATION_DATABASE_URL` | No | `DATABASE_URL` | A connection URL for a role that can create tables. Byname applies migrations through it, so `DATABASE_URL` can be a role that only reads and writes data. |

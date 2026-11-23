@@ -4,14 +4,16 @@
 //
 // A run moves queued -> running -> completed | capped | refused | failed.
 // Only one run executes at a time across every process sharing the
-// database, under a session advisory lock held on its own connection, so a
-// process that dies mid-run frees the lock with its connection and the next
-// one resumes the run. A resumed run skips every pair that already has an
-// answer, so it never asks twice and never starts a second run.
+// database. The process executing it holds a lease on the run row and
+// renews it while it works, so a process that dies, hangs or is replaced
+// stops renewing and the next one takes the run over once the lease
+// passes. A resumed run skips every pair that already has an answer, so it
+// never asks twice and never starts a second run.
 package checks
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"github.com/unkeyed/byname/internal/db"
@@ -66,6 +68,10 @@ type Service struct {
 	finder Finder
 	// writer lets one answer at a time be stored.
 	writer sync.Mutex
+	// owner names this process on the leases it takes, and lease is how long
+	// one holds without a renewal.
+	owner string
+	lease time.Duration
 }
 
 // Finder reads each stored answer for the brands it names that nobody
@@ -91,6 +97,9 @@ type Options struct {
 	Alerts Alerts
 	// Finder, when set, reads each answer for other brands.
 	Finder Finder
+	// Lease is how long a claim on a run holds without a renewal, 90 seconds
+	// unless set. Tests shorten it.
+	Lease time.Duration
 }
 
 func New(db db.Pool, cfg *config.Service, o Options) *Service {
@@ -103,7 +112,11 @@ func New(db db.Pool, cfg *config.Service, o Options) *Service {
 	if o.Log == nil {
 		o.Log = slog.Default()
 	}
-	return &Service{db: db, config: cfg, now: o.Now, sleep: o.Sleep, log: o.Log, wake: make(chan struct{}, 1), alerts: o.Alerts, finder: o.Finder}
+	if o.Lease == 0 {
+		o.Lease = 90 * time.Second
+	}
+	return &Service{db: db, config: cfg, now: o.Now, sleep: o.Sleep, log: o.Log, wake: make(chan struct{}, 1), alerts: o.Alerts, finder: o.Finder,
+		owner: rand.Text(), lease: o.Lease}
 }
 
 func sleep(ctx context.Context, d time.Duration) error {
@@ -121,11 +134,11 @@ func sleep(ctx context.Context, d time.Duration) error {
 // it up without waiting for its next tick.
 func (s *Service) Wake() <-chan struct{} { return s.wake }
 
-// Lock keys. claimLock serializes creating runs; runLock is held for as
-// long as a process executes runs.
+// Lock keys, each held for one short transaction. claimLock serializes
+// creating runs, leaseLock taking a lease on one.
 const (
 	claimLock = `hashtext('byname.checks.claim')`
-	runLock   = `hashtext('byname.checks.run')`
+	leaseLock = `hashtext('byname.checks.lease')`
 )
 
 const runColumns = `id, status, trigger, question_set_id, queued_at`
@@ -235,39 +248,84 @@ func (s *Service) ClaimDue(ctx context.Context) (int64, error) {
 
 // Work executes open runs, oldest first and a running one before any
 // queued one, until none is left. It returns at once when another process
-// is already executing runs. The lock lives on a dedicated connection, so
-// if this process dies the lock goes with the connection.
+// holds a live lease on a run.
 func (s *Service) Work(ctx context.Context) error {
-	conn, err := s.db.Acquire(ctx)
-	if err != nil {
-		return err
-	}
-	defer conn.Release()
-	var locked bool
-	if err := conn.QueryRow(ctx, `SELECT pg_try_advisory_lock(`+runLock+`)`).Scan(&locked); err != nil || !locked {
-		return err
-	}
-	defer func() {
-		// A pooled connection that kept the lock would block every other
-		// process forever, so one that cannot unlock is closed instead.
-		if _, err := conn.Exec(context.WithoutCancel(ctx), `SELECT pg_advisory_unlock(`+runLock+`)`); err != nil {
-			_ = conn.Conn().Close(context.WithoutCancel(ctx))
-		}
-	}()
 	for {
-		var id int64
-		err := s.db.QueryRow(ctx, `SELECT id FROM run WHERE status IN ('queued', 'running')
-			ORDER BY status = 'running' DESC, id LIMIT 1`).Scan(&id)
+		id, err := s.claim(ctx)
+		if err != nil || id == 0 {
+			return err
+		}
+		if err := s.runLeased(ctx, id); err != nil {
+			return err
+		}
+	}
+}
+
+// claim takes the lease on the next open run, or returns 0 when there is
+// none or another process's lease on one has not passed. Lease times are
+// the database's clock, so processes with skewed clocks agree.
+func (s *Service) claim(ctx context.Context) (int64, error) {
+	var id int64
+	err := pgx.BeginFunc(ctx, s.db, func(tx pgx.Tx) error {
+		if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(`+leaseLock+`)`); err != nil {
+			return err
+		}
+		err := tx.QueryRow(ctx, `UPDATE run SET lease_owner = $1, lease_until = now() + make_interval(secs => $2)
+			WHERE id = (SELECT id FROM run WHERE status IN ('queued', 'running') ORDER BY status = 'running' DESC, id LIMIT 1)
+				AND NOT EXISTS (SELECT 1 FROM run WHERE status IN ('queued', 'running') AND lease_until > now() AND lease_owner <> $1)
+			RETURNING id`, s.owner, s.lease.Seconds()).Scan(&id)
 		if err == pgx.ErrNoRows {
 			return nil
 		}
-		if err != nil {
-			return err
+		return err
+	})
+	return id, err
+}
+
+// runLeased executes a run while renewing its lease. When a renewal finds
+// the lease taken, or none succeeds for a whole lease, the run is stopped
+// where it is, for its new owner to resume. The lease is given back when
+// the run ends or this process stops, so the next one need not wait it out.
+func (s *Service) runLeased(ctx context.Context, id int64) error {
+	work, stop := context.WithCancelCause(ctx)
+	defer stop(nil)
+	renewed := make(chan struct{})
+	go func() {
+		defer close(renewed)
+		last := time.Now()
+		t := time.NewTicker(s.lease / 3)
+		defer t.Stop()
+		for {
+			select {
+			case <-work.Done():
+				return
+			case <-t.C:
+			}
+			tag, err := s.db.Exec(work, `UPDATE run SET lease_until = now() + make_interval(secs => $3)
+				WHERE id = $1 AND lease_owner = $2`, id, s.owner, s.lease.Seconds())
+			switch {
+			case err == nil && tag.RowsAffected() == 0:
+				stop(fmt.Errorf("another process took over check #%d", id))
+				return
+			case err == nil:
+				last = time.Now()
+			case time.Since(last) >= s.lease:
+				stop(fmt.Errorf("could not renew the lease on check #%d for %s: %w", id, s.lease, err))
+				return
+			}
 		}
-		if err := s.RunCheck(ctx, id); err != nil {
-			return err
-		}
+	}()
+	err := s.RunCheck(work, id)
+	stop(nil)
+	<-renewed
+	if _, rerr := s.db.Exec(context.WithoutCancel(ctx), `UPDATE run SET lease_owner = NULL, lease_until = NULL
+		WHERE id = $1 AND lease_owner = $2`, id, s.owner); rerr != nil && err == nil {
+		s.log.Warn("give back the lease on a check", "run", id, "err", rerr)
 	}
+	if cause := context.Cause(work); err != nil && cause != nil && !errors.Is(cause, context.Canceled) {
+		return cause
+	}
+	return err
 }
 
 // PruneRaw drops raw responses older than raw_retention_days, when set.

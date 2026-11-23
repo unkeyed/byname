@@ -346,3 +346,75 @@ func TestRunCompletesWhenTheDatabaseDropsItsConnections(t *testing.T) {
 		t.Fatalf("after the database dropped every connection mid-check: %+v, want completed with all 12 answers", r)
 	}
 }
+
+func TestAHungProcessHoldsACheckOnlyUntilItsLeasePasses(t *testing.T) {
+	e := setup(t, nil)
+	ctx := context.Background()
+	id := e.runNow(t)
+	if _, err := e.db.Exec(ctx, `UPDATE run SET lease_owner = 'hung', lease_until = now() + interval '1 hour' WHERE id = $1`, id); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.checks.Work(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if r := e.run(t, id); r.Status != checks.Queued || e.treg.Answers() != 0 {
+		t.Fatalf("while another process's lease is live: %+v and %d calls, want it left queued and untouched", r, e.treg.Answers())
+	}
+	if _, err := e.db.Exec(ctx, `UPDATE run SET lease_until = now() - interval '1 second' WHERE id = $1`, id); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.checks.Work(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if r := e.run(t, id); r.Status != checks.Completed || r.Answers != 12 {
+		t.Fatalf("after the hung process's lease passed: %+v, want completed with 12 answers", r)
+	}
+	var owner *string
+	if err := e.db.QueryRow(ctx, `SELECT lease_owner FROM run WHERE id = $1`, id).Scan(&owner); err != nil || owner != nil {
+		t.Fatalf("lease owner after the check = %v (%v), want it given back", owner, err)
+	}
+}
+
+func TestAProcessThatLosesItsLeaseStopsAndTheNextResumes(t *testing.T) {
+	e := setup(t, func(s *config.Settings) { s.Concurrency = 1 })
+	ctx := context.Background()
+	short := func() *checks.Service {
+		return checks.New(e.db, e.config, checks.Options{Lease: 300 * time.Millisecond, Sleep: func(context.Context, time.Duration) error { return nil }})
+	}
+	var id int64
+	var mu sync.Mutex
+	calls := 0
+	e.treg.Before(func(c tregtest.Call) *tregtest.Refusal {
+		if strings.HasSuffix(c.Tool, "-models") {
+			return nil
+		}
+		mu.Lock()
+		calls++
+		n := calls
+		mu.Unlock()
+		if n == 3 {
+			if _, err := e.db.Exec(ctx, `UPDATE run SET lease_owner = 'other' WHERE id = $1`, id); err != nil {
+				t.Error(err)
+			}
+		}
+		time.Sleep(60 * time.Millisecond)
+		return nil
+	})
+	id = e.runNow(t)
+	err := short().Work(ctx)
+	if err == nil || !strings.Contains(err.Error(), "another process took over") {
+		t.Fatalf("work after losing the lease = %v, want it to stop because another process took over", err)
+	}
+	if r := e.run(t, id); r.Status != checks.Running || r.Answers >= 12 {
+		t.Fatalf("after losing the lease: %+v, want it still running, unfinished", r)
+	}
+	if _, err := e.db.Exec(ctx, `UPDATE run SET lease_until = now() - interval '1 second' WHERE id = $1`, id); err != nil {
+		t.Fatal(err)
+	}
+	if err := short().Work(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if r := e.run(t, id); r.Status != checks.Completed || r.Answers != 12 || r.Failed != 0 {
+		t.Fatalf("after the next process resumed it: %+v, want completed with 12 answers", r)
+	}
+}

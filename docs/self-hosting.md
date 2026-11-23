@@ -94,6 +94,7 @@ The container contract is short:
 - One process serves the web UI, the REST API under `/v1`, the MCP server at `/mcp` and `/healthz`, and runs the scheduler.
 - On `SIGTERM`, Byname stops taking new requests and waits up to 20 seconds for open requests to finish. A check in progress stops queueing calls and resumes on the next start.
 - Byname keeps no state on disk. You can run several replicas against one database. Migrations, the setup link, scheduled checks, the Search Console sync and the site changes jobs each take a Postgres advisory lock, so a second replica never starts the same check, sync or poll twice.
+- One check runs at a time across every replica. The replica running it renews a lease on it every 30 seconds. If that replica crashes, hangs or is replaced by a new deployment, another one takes the check over within 90 seconds and carries on from the last stored answer. A lost database connection pauses a check instead of failing it, and the next pass resumes it.
 - Byname writes JSON logs to stdout.
 
 ## How the schedule works
