@@ -29,7 +29,7 @@ The fastest way to a running Byname. Add Unkey's MCP server to your coding agent
 claude mcp add --transport http unkey https://mcp.unkey.com
 ```
 
-Then copy the deploy prompt from the landing page, [byname.dev](https://byname.dev/#deploy), into the agent. The same prompt is in [`site/index.html`](site/index.html). It asks for your Postgres URL, deploys Byname to Unkey, and gives you the link to create your account. To do it by hand, follow [Deploy on Unkey](docs/deploy-unkey.md).
+Then copy the deploy prompt from the landing page, [byname.dev](https://byname.dev/#deploy), into the agent. The same prompt is in [`site/src/lib/prompt.ts`](site/src/lib/prompt.ts), and served as Markdown at [byname.dev/deploy-prompt.md](https://byname.dev/deploy-prompt.md). It asks for your Postgres URL, deploys Byname to Unkey, and gives you the link to create your account. To do it by hand, follow [Deploy on Unkey](docs/deploy-unkey.md).
 
 ### Run it locally with Docker
 

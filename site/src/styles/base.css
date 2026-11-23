@@ -15,8 +15,8 @@
   --you-wash: rgb(35 64 209 / .07);
   --instead: #c2381a;
   --instead-wash: rgb(194 56 26 / .07);
-  --serif: "Newsreader", Georgia, "Times New Roman", serif;
-  --sans: "Instrument Sans", ui-sans-serif, system-ui, sans-serif;
+  --serif: "Newsreader Variable", "Newsreader", Georgia, "Times New Roman", serif;
+  --sans: "Instrument Sans Variable", "Instrument Sans", ui-sans-serif, system-ui, sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
   --shadow: 0 1px 0 rgb(21 19 15 / .04), 0 2px 6px rgb(21 19 15 / .05), 0 18px 40px -18px rgb(21 19 15 / .22);
   --shadow-sm: 0 1px 0 rgb(21 19 15 / .04), 0 1px 3px rgb(21 19 15 / .06), 0 8px 20px -12px rgb(21 19 15 / .2);

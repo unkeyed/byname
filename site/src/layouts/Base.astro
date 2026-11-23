@@ -1,0 +1,115 @@
+---
+// Every page: head metadata, the masthead and the footer.
+import "@fontsource-variable/newsreader/opsz.css";
+import "@fontsource-variable/newsreader/opsz-italic.css";
+import "@fontsource-variable/instrument-sans";
+import "@fontsource/ibm-plex-mono/400.css";
+import "@fontsource/ibm-plex-mono/400-italic.css";
+import "@fontsource/ibm-plex-mono/500.css";
+import "../styles/base.css";
+import { origin, repo } from "../lib/site";
+
+interface Props {
+  title: string;
+  description: string;
+  /** Overrides description for Open Graph and Twitter cards. */
+  ogDescription?: string;
+  path: string;
+  type?: "website" | "article";
+  /** The page as Markdown, for agents. */
+  markdown?: string;
+  bodyClass?: string;
+  docs?: boolean;
+}
+const { title, description, ogDescription = description, path, type = "website", markdown, bodyClass, docs = false } = Astro.props;
+const url = origin + path;
+const links = [
+  { href: "/#questions", label: "How it works" },
+  { href: "/#agents", label: "Agents" },
+  { href: "/docs/", label: "Docs", current: docs },
+  { href: repo, label: "GitHub" },
+];
+---
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <meta name="theme-color" content="#f4f1ea" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#1a1814" media="(prefers-color-scheme: dark)" />
+    <link rel="canonical" href={url} />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    {markdown && <link rel="alternate" type="text/markdown" href={markdown} />}
+    <link rel="alternate" type="text/plain" title="llms.txt" href="/llms.txt" />
+    <meta property="og:type" content={type} />
+    <meta property="og:site_name" content="Byname" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={ogDescription} />
+    <meta property="og:url" content={url} />
+    <meta property="og:image" content={`${origin}/og.png`} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Byname: when buyers ask AI, does it say your name? An AI answer marked up by Byname: Unkey circled at position 2, the products named instead underlined." />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={ogDescription} />
+    <meta name="twitter:image" content={`${origin}/og.png`} />
+  </head>
+  <body class={bodyClass}>
+    <a class="skip" href="#main">Skip to content</a>
+    <header class="mast">
+      <div class="wrap mast-in">
+        <a class="logo" href="/" aria-label="Byname home">by<span class="mk" data-mark="circle" data-pad="6 5">name</span></a>
+        <nav class="mast-links" aria-label="Site">
+          {links.map((l) => <a href={l.href} aria-current={l.current ? "page" : undefined}>{l.label}</a>)}
+        </nav>
+        <a class="btn btn-sm" href="/#deploy">Deploy on Unkey</a>
+        <details class="mast-menu">
+          <summary aria-label="Menu"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 6.5h14M3 13.5h14" /></svg></summary>
+          <nav class="mast-sheet sheet" aria-label="Menu">
+            {links.map((l) => <a href={l.href}>{l.label}</a>)}
+            <a class="btn" href="/#deploy">Deploy on Unkey</a>
+          </nav>
+        </details>
+      </div>
+    </header>
+
+    <slot />
+
+    <footer class="foot">
+      <div class="wrap foot-grid">
+        <div>
+          <a class="logo" href="/" aria-label="Byname home">by<span class="mk" data-mark="circle" data-pad="6 5">name</span></a>
+          <p class="foot-tag">Find out when AI answers name you, and who they name instead.</p>
+          <p class="foot-meta">MIT licensed. Provided by <a href="https://www.unkey.com">Unkey</a>.</p>
+        </div>
+        <nav aria-labelledby="f-product"><h2 id="f-product">Product</h2><ul>
+          <li><a href="/#questions">Where you stand</a></li>
+          <li><a href="/#lost">When you drop out</a></li>
+          <li><a href="/#apps">The real apps</a></li>
+          <li><a href="/#search">Page changes</a></li>
+          <li><a href="/#agents">Agents</a></li>
+          <li><a href="/#deploy">Deploy on Unkey</a></li>
+        </ul></nav>
+        <nav aria-labelledby="f-docs"><h2 id="f-docs">Docs</h2><ul>
+          <li><a href="/docs/self-hosting">Self-host</a></li>
+          <li><a href="/docs/engines/surfaces">AI apps and accuracy labels</a></li>
+          <li><a href="/docs/search-console">Search Console</a></li>
+          <li><a href="/docs/notifications">Notifications</a></li>
+          <li><a href="/docs/agents">Agents</a></li>
+          <li><a href="/llms.txt">llms.txt</a></li>
+        </ul></nav>
+        <nav aria-labelledby="f-project"><h2 id="f-project">Project</h2><ul>
+          <li><a href={repo}>GitHub</a></li>
+          <li><a href={`${repo}/blob/main/LICENSE`}>MIT license</a></li>
+          <li><a href={`${repo}/issues`}>Issues</a></li>
+          <li><a href="https://www.unkey.com">Unkey</a></li>
+        </ul></nav>
+      </div>
+    </footer>
+    <div class="toast" role="status" aria-live="polite"></div>
+    <script is:inline src="/app.js" defer></script>
+  </body>
+</html>

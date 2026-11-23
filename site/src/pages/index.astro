@@ -1,0 +1,319 @@
+---
+import Base from "../layouts/Base.astro";
+import QuestionsTable from "../components/QuestionsTable.astro";
+import SearchChart from "../components/SearchChart.astro";
+import "../styles/home.css";
+import { deployPrompt } from "../lib/prompt";
+import { repo, summary, title } from "../lib/site";
+---
+<Base title={title} description={summary} path="/" markdown="/llms.txt">
+<main id="main">
+  <section class="hero wrap" id="top" aria-labelledby="hero-title">
+    <div class="hero-copy">
+      <h1 id="hero-title">When buyers ask AI, does it say <span class="mk" data-mark="circle" data-pad="0.16em 0.05em" data-sw="3">your name</span>?</h1>
+      <p class="hero-lede">Buyers ask ChatGPT, Google and Claude which product to use. You never see what they're told. Byname asks the same questions every few days, keeps every answer, and tells you when you're named, when you're not, and who got named instead.</p>
+      <div class="hero-acts">
+        <a class="btn" href="#deploy">Deploy on Unkey</a>
+        <a class="go" href={repo}>View on GitHub</a>
+      </div>
+      <p class="hero-meta">Open source and MIT licensed. You run it, so the answers are yours.</p>
+    </div>
+
+    <div class="desk">
+      <div class="ghost" aria-hidden="true"></div>
+      <div class="ghost" aria-hidden="true"></div>
+      <div class="sheet answer" data-hero>
+        <article class="pane" id="pane-0" role="tabpanel" aria-labelledby="tab-0" data-stamp="Named #2" data-stamp-tone="you">
+          <header class="sheet-head"><span>Asked in <b>ChatGPT app</b></span><span>App answer</span></header>
+          <p class="q">Where should a small team deploy a public API in 2026?</p>
+          <div class="ans">
+            <p>It depends on your stack, but three providers come up again and again.</p>
+            <ol>
+              <li><span class="li-t"><b class="mk" data-mark="underline" data-tone="instead">AWS</b> for API Gateway, Lambda and every region under one contract.</span><span class="note instead">#1, named instead</span></li>
+              <li><span class="li-t"><b class="mk" data-mark="circle">Unkey</b> for API keys, rate limits and compute in one place.</span><span class="note you">you, #2 · linked</span></li>
+              <li><span class="li-t"><b class="mk" data-mark="underline" data-tone="instead">Fly.io</b> for long-running containers close to your users.</span><span class="note instead">#3</span></li>
+            </ol>
+          </div>
+          <footer class="sheet-foot"><span>Linked: unkey.com, aws.amazon.com, github.com</span><span class="cost">under $0.01</span></footer>
+        </article>
+        <article class="pane" id="pane-1" role="tabpanel" aria-labelledby="tab-1" data-stamp="Named #1" data-stamp-tone="you" hidden>
+          <header class="sheet-head"><span>Asked in <b>Google AI Mode</b></span><span>App answer</span></header>
+          <p class="q">What is the easiest way to add API keys and rate limits to an existing API?</p>
+          <div class="ans">
+            <p>Use a service that issues the keys and enforces the limits for you, so your API only checks one response.</p>
+            <ol>
+              <li><span class="li-t"><b class="mk" data-mark="circle">Unkey</b> issues and verifies keys, with a rate limit on each key, in one call.</span><span class="note you">you, #1 · linked</span></li>
+              <li><span class="li-t"><b class="mk" data-mark="underline" data-tone="instead">Zuplo</b> adds key auth and rate limits as policies on its gateway.</span><span class="note instead">#2</span></li>
+              <li><span class="li-t"><b class="mk" data-mark="underline" data-tone="instead">Cloudflare</b> rate limits at the edge, with rules you set per route.</span><span class="note instead">#3</span></li>
+            </ol>
+          </div>
+          <footer class="sheet-foot"><span>Linked: unkey.com, zuplo.com</span><span class="cost">under $0.01</span></footer>
+        </article>
+        <article class="pane" id="pane-2" role="tabpanel" aria-labelledby="tab-2" data-stamp="Not named" data-stamp-tone="instead" hidden>
+          <header class="sheet-head"><span>Asked in <b>Claude Code</b> · claude-sonnet-5-5</span><span>Same model and search</span></header>
+          <p class="q">Which platform is best for hosting a Postgres-backed API close to European users?</p>
+          <div class="ans">
+            <p>Choose a provider with a Frankfurt or Amsterdam region and managed Postgres in the same place.</p>
+            <ol>
+              <li><span class="li-t"><b class="mk" data-mark="underline" data-tone="instead">Fly.io</b> runs your API and managed Postgres in Frankfurt.</span><span class="note instead">named instead</span></li>
+              <li><span class="li-t"><b class="mk" data-mark="underline" data-tone="instead">Cloudflare</b> puts edge routing in front of a regional database.</span><span class="note instead">named instead</span></li>
+              <li><span class="li-t"><b class="mk" data-mark="underline" data-tone="instead">AWS</b> keeps API Gateway and RDS together in Frankfurt.</span><span class="note instead">named instead</span></li>
+            </ol>
+          </div>
+          <footer class="sheet-foot"><span>Searched: managed postgres frankfurt, eu api hosting</span><span class="cost">$0.05</span></footer>
+        </article>
+        <span class="stamp" aria-hidden="true"></span>
+      </div>
+      <div class="asked">
+        <div class="asked-tabs" role="tablist" aria-label="Where the question was asked">
+          <button type="button" role="tab" id="tab-0" aria-controls="pane-0" aria-selected="true">ChatGPT app</button>
+          <button type="button" role="tab" id="tab-1" aria-controls="pane-1" aria-selected="false" tabindex="-1">Google AI Mode</button>
+          <button type="button" role="tab" id="tab-2" aria-controls="pane-2" aria-selected="false" tabindex="-1">Claude Code</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec wrap" id="questions" aria-labelledby="questions-title">
+    <div class="sec-head">
+      <p class="kicker"><span>1</span>Where you stand</p>
+      <h2 id="questions-title">Every question you win. <em>Every one you don't.</em></h2>
+      <p class="sec-lede">Write down what your buyers ask. Byname asks each question in every AI app you pick, word for word, every time. It never puts your name in the question, so you see what a buyer would see.</p>
+    </div>
+    <figure class="contents sheet" data-reveal>
+      <div class="contents-scroll">
+        <table class="qtable">
+          <caption class="sr-only">Check #8 for Unkey, with example data: each question in each AI app.</caption>
+          <QuestionsTable />
+        </table>
+      </div>
+      <figcaption class="legend">
+        <span><span class="tm mk" data-mark="circle" aria-hidden="true">2</span> named, at position 2</span>
+        <span><span class="tm cite mk" data-mark="tick" aria-hidden="true"></span> linked, not named</span>
+        <span><span class="tm miss mk" data-mark="dash" data-tone="instead" aria-hidden="true"></span> named someone else</span>
+        <span class="legend-src">Check #8 · Unkey, example data · 29 of 36 named</span>
+      </figcaption>
+    </figure>
+  </section>
+
+  <section class="sec wrap" id="lost" aria-labelledby="lost-title">
+    <div class="sec-head">
+      <p class="kicker"><span>2</span>When you drop out</p>
+      <h2 id="lost-title">Second in check #6. <em>Gone in check #7.</em></h2>
+      <p class="sec-lede">An AI app stops naming you and starts naming a competitor. Nothing in your analytics shows it. Byname compares every answer with the last one and tells you in Slack, by email or at a webhook as soon as the check ends.</p>
+    </div>
+    <div class="story" data-reveal>
+      <figure class="sheet clip" aria-labelledby="c6-cap">
+        <header class="sheet-head"><span id="c6-cap"><b>Check #6</b> · ChatGPT app</span><span>App answer</span></header>
+        <p class="q">Which API platform has the most predictable pricing for a startup?</p>
+        <ol class="mini">
+          <li><b>AWS</b></li>
+          <li><b class="mk" data-mark="circle">Unkey</b><span class="note you">you, #2 · linked</span></li>
+          <li><b>Cloudflare</b></li>
+          <li><b>Fly.io</b></li>
+          <li><b>Zuplo</b></li>
+        </ol>
+        <footer class="sheet-foot"><span>Linked: unkey.com and 3 more</span><span class="cost">under $0.01</span></footer>
+      </figure>
+      <svg class="story-arrow" viewBox="0 0 80 40" aria-hidden="true"><path class="draw" pathLength="1" d="M4 24 C 22 10, 46 10, 70 20 M61 13 L71 20 L60 25" /></svg>
+      <figure class="sheet clip" aria-labelledby="c7-cap">
+        <header class="sheet-head"><span id="c7-cap"><b>Check #7</b> · ChatGPT app</span><span>App answer</span></header>
+        <p class="q">Which API platform has the most predictable pricing for a startup?</p>
+        <ol class="mini">
+          <li><b class="mk" data-mark="underline" data-tone="instead">Fly.io</b><span class="note instead">named first</span></li>
+          <li><b>Cloudflare</b></li>
+          <li><b>Zuplo</b></li>
+          <li><b>AWS</b></li>
+        </ol>
+        <p class="gone"><span class="mk caret" data-mark="caret" data-tone="instead" aria-hidden="true"></span><span class="note instead">Unkey: not named, and unkey.com no longer linked</span></p>
+        <footer class="sheet-foot"><span>Linked: fly.io and 3 more</span><span class="cost">under $0.01</span></footer>
+      </figure>
+      <svg class="story-arrow" viewBox="0 0 80 40" aria-hidden="true"><path class="draw" pathLength="1" d="M4 22 C 24 30, 48 28, 70 18 M60 15 L71 18 L64 27" style="--d:.5s" /></svg>
+      <figure class="sheet alert" aria-labelledby="alert-cap">
+        <header class="alert-head"><span class="alert-av" aria-hidden="true">b</span><span><b id="alert-cap">Byname</b><small>#visibility in Slack</small></span></header>
+        <p class="alert-title">Check #7: 1 gained, 6 lost</p>
+        <p>Named in 24 of 36 answers.</p>
+        <p>Since check #6: 1 gained, 6 lost, 17 moved, net -5.</p>
+        <ul>
+          <li>1 gained, 1 lost, 4 moved: What is the easiest way to add API keys and rate limits to an existing API?</li>
+          <li><span class="mk" data-mark="underline" data-tone="instead">3 lost</span>, 3 moved: Which API platform has the most predictable pricing for a startup?</li>
+          <li>1 lost, 5 moved: How do I move an API off a single VPS without downtime?</li>
+        </ul>
+        <p class="alert-link">Open in Byname</p>
+      </figure>
+    </div>
+    <div class="proof">
+      <p class="proof-note">The link opens this: every answer you lost between the two checks. <span>A real screenshot of the app, with example data.</span></p>
+      <figure class="sheet shot">
+        <picture>
+          <source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="/screens/compare-lost-sm-dark.webp" width="758" height="490" />
+          <source media="(max-width: 600px)" srcset="/screens/compare-lost-sm.webp" width="758" height="490" />
+          <source media="(prefers-color-scheme: dark)" srcset="/screens/compare-lost-dark.webp" width="1818" height="1066" />
+          <img src="/screens/compare-lost.webp" width="1818" height="1066" loading="lazy" decoding="async" alt="Byname's What changed view for check #6 against check #7, showing the 6 lost answers. The pricing question lost Claude Code with claude-sonnet-5-5 (#2, then linked but not named), Codex CLI (#3, then not named) and the ChatGPT app (#2, then not named)." />
+        </picture>
+      </figure>
+    </div>
+  </section>
+
+  <section class="sec wrap" id="apps" aria-labelledby="apps-title">
+    <div class="sec-head sec-head-split">
+      <div>
+        <p class="kicker"><span>3</span>The real apps</p>
+        <h2 id="apps-title">What buyers see. <em>Not what an API says.</em></h2>
+      </div>
+      <p class="sec-lede">The ChatGPT app can answer differently from OpenAI's API. Byname reads the app itself wherever it can, and labels every other answer by how close it gets, so you know how far to trust it.</p>
+    </div>
+    <div class="register sheet" data-reveal>
+      <article class="grade">
+        <div class="grade-h">
+          <p class="grade-n"><span class="mk" data-mark="circle" data-pad="9 6">7</span> apps</p>
+          <h3>App answer</h3>
+          <p>Read from the app a person uses.</p>
+        </div>
+        <ul class="filed">
+          <li>ChatGPT app</li><li>Gemini app</li><li>Google AI Mode</li><li>Google AI Overview</li><li>Microsoft Copilot</li><li>Bing AI Mode</li><li>Brave AI answers</li>
+        </ul>
+      </article>
+      <article class="grade">
+        <div class="grade-h">
+          <p class="grade-n"><span class="mk" data-mark="circle" data-pad="9 6">3</span> apps</p>
+          <h3>Same model and search</h3>
+          <p>The model your team picks, with web search on.</p>
+        </div>
+        <ul class="filed">
+          <li>Claude Code</li><li>Gemini CLI</li><li>Codex CLI</li>
+        </ul>
+      </article>
+      <article class="grade">
+        <div class="grade-h">
+          <p class="grade-n"><span class="mk" data-mark="circle" data-pad="9 6">2</span> apps</p>
+          <h3>Close stand-in</h3>
+          <p>The nearest match where the app can't be read. Never passed off as the app.</p>
+        </div>
+        <ul class="filed">
+          <li>Claude app</li><li>Perplexity app</li>
+        </ul>
+      </article>
+    </div>
+    <p class="grades-foot">One <a class="link" href="/docs/engines/treg">Treg</a> token runs all twelve and reports what each answer cost. Or bring your own provider keys. <a class="link" href="/docs/engines/surfaces">How each app is read</a></p>
+  </section>
+
+  <section class="sec wrap" id="search" aria-labelledby="search-title">
+    <div class="sec-head sec-head-split">
+      <div>
+        <p class="kicker"><span>4</span>Page changes</p>
+        <h2 id="search-title">You rewrote a page. <em>Did it help?</em></h2>
+      </div>
+      <p class="sec-lede">Byname reads your Google Search Console numbers every day and marks each page change on the chart, from a merged pull request or one you log by hand. A month after Google sees the change, it tells you whether the page did better than the pages you left alone.</p>
+    </div>
+    <div class="chart-block" data-reveal>
+      <figure class="chart sheet">
+        <figcaption class="chart-cap"><span>Clicks per day · unkey.com, example data</span><span>Aug 23 to Nov 20, 2026</span></figcaption>
+        <SearchChart />
+      </figure>
+      <div class="verdict">
+        <div class="verdict-text">
+          <p class="verdict-k">/docs/ratelimiting</p>
+          <p class="verdict-v"><span class="mk" data-mark="circle" data-pad="12 6">Helped</span> <span class="exp">experimental</span></p>
+          <p>Rewritten on Oct 7. In the month after Google saw it, the page climbed 4.07 places and its click rate rose 0.97 points more than the pages left alone.</p>
+          <p class="verdict-how">Measuring against untouched pages cancels out the ups and downs that hit every page.</p>
+        </div>
+        <figure class="sheet shot">
+          <picture>
+            <source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="/screens/verdict-sm-dark.webp" width="676" height="674" />
+            <source media="(max-width: 600px)" srcset="/screens/verdict-sm.webp" width="676" height="674" />
+            <source media="(prefers-color-scheme: dark)" srcset="/screens/verdict-dark.webp" width="1480" height="1180" />
+            <img src="/screens/verdict.webp" width="1480" height="1180" loading="lazy" decoding="async" alt="The final result for the change to /docs/ratelimiting in Byname, marked Helped and Experimental. Compared with the comparison pages, average position moved -4.07 places and click rate rose 0.97 points, both past their margins. Appearances rose by a factor of 1.43, within margin." />
+          </picture>
+        </figure>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec wrap" id="agents" aria-labelledby="agents-title">
+    <div class="sec-head sec-head-split">
+      <div>
+        <p class="kicker"><span>5</span>Agents</p>
+        <h2 id="agents-title">Ask your agent <em>what you lost.</em></h2>
+      </div>
+      <p class="sec-lede">Your coding agent can read Byname, signed in as you. Ask what dropped this week and fix the page in the same session.</p>
+    </div>
+    <div class="agents">
+      <figure class="sheet transcript" data-reveal aria-label="A coding agent asks Byname which questions were lost in check #7 and answers from compare_runs.">
+        <p class="t-head"><span>~/unkey/www</span><span>claude</span></p>
+        <div class="t-body">
+          <p class="t-user"><span aria-hidden="true">&gt;</span> Which questions did we lose in check #7?</p>
+          <p class="t-call"><b>byname</b> compare_runs <span>before=6 after=7</span></p>
+          <p class="t-res">1 gained · <span class="mk" data-mark="circle" data-tone="instead" data-pad="8 4">6 lost</span> · 17 moved · net -5</p>
+          <div class="t-say">
+            <p>Check #7 lost 6 answers that check #6 had:</p>
+            <ul>
+              <li><q>Which API platform has the most predictable pricing for a startup?</q> on Claude Code with Sonnet, Codex CLI and the ChatGPT app.</li>
+              <li><q>What is the easiest way to add API keys and rate limits to an existing API?</q> on the ChatGPT app.</li>
+              <li><q>How do I move an API off a single VPS without downtime?</q> on Google AI Overview.</li>
+              <li><q>What are good alternatives to running my own API gateway?</q> on the Perplexity app.</li>
+            </ul>
+            <p>On the ChatGPT app, the pricing question now names Fly.io first.</p>
+          </div>
+        </div>
+      </figure>
+      <div class="agents-side">
+        <div class="snip">
+          <h3>Add it to your agent</h3>
+          <p>Claude Code, Cursor and Claude Desktop connect over MCP. Your browser opens, you approve what the agent may do, and that's it. No key to copy.</p>
+<pre class="code"><span class="c"># Claude Code</span>
+claude mcp add --transport http byname \
+  https://byname.example.com/mcp</pre>
+          <p>Scripts use the <a class="link" href="/docs/agents">REST API</a> with a key that can only do what you allow.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec wrap" id="deploy" aria-labelledby="deploy-title">
+    <div class="sec-head sec-head-split">
+      <div>
+        <p class="kicker"><span>6</span>Run it</p>
+        <h2 id="deploy-title">One prompt. <em>Your agent puts it on Unkey.</em></h2>
+      </div>
+      <p class="sec-lede">Byname runs in your own account, so the answers, your API keys and the bill stay with you. Paste the prompt into your coding agent. It asks for a Postgres URL, sets Byname up on Unkey, and hands you a link to sign in.</p>
+    </div>
+    <div class="run">
+      <div class="run-steps">
+        <ol class="steps">
+          <li>
+            <h3>Add Unkey's MCP server to your agent</h3>
+<pre class="code"><span class="c"># Claude Code. Other agents: mcp.unkey.com/install</span>
+claude mcp add --transport http unkey \
+  https://mcp.unkey.com</pre>
+          </li>
+          <li><h3>Copy the prompt into your agent</h3><p>You approve each step. Your API keys never go through the agent. You enter them in Byname once it's running.</p></li>
+          <li><h3>Open the link it gives you</h3><p>Add your brand, your questions and a spend cap. Byname stops when it reaches the cap.</p></li>
+        </ol>
+        <div class="run-acts">
+          <button class="btn" type="button" data-copy-prompt data-label="Copy the prompt">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2.5" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>
+            <span class="copy-state">Copy the prompt</span>
+          </button>
+          <a class="go" href="https://app.unkey.com">Create an Unkey account</a>
+        </div>
+      </div>
+      <figure class="sheet prompt">
+        <figcaption class="prompt-head"><span>deploy-byname-on-unkey.md</span><button class="copy-sm" type="button" data-copy-prompt data-label="Copy"><span class="copy-state">Copy</span></button></figcaption>
+        <pre id="agent-prompt" tabindex="0" aria-label="Agent prompt">{deployPrompt}</pre>
+      </figure>
+    </div>
+    <div class="anywhere">
+      <div>
+        <h3>Or run it anywhere with Docker</h3>
+        <p>It's one container and a Postgres database. On your machine, this starts both. Open the link it prints. <a class="link" href="/docs/self-hosting">Self-host Byname</a> covers other hosts, and <a class="link" href="/docs/deploy-unkey">Deploy on Unkey</a> covers every step by hand.</p>
+      </div>
+<pre class="code">git clone https://github.com/unkeyed/byname.git
+cd byname
+echo "ENCRYPTION_KEY=$(openssl rand -base64 32)" &gt;&gt; .env
+docker compose up -d --build --wait
+docker compose logs app | grep -A2 'Open this link'</pre>
+    </div>
+  </section>
+</main>
+</Base>

@@ -1,13 +1,13 @@
-# Deploy Byname to Unkey Deploy
+# Deploy Byname to Unkey
 
-This guide puts Byname on [Unkey Deploy](https://www.unkey.com/docs/compute/get-started/deploy-from-github), connected to a Postgres database you host elsewhere. At the end, Byname runs at an `unkey.app` URL and you are signed in to its onboarding.
+This guide runs Byname on [Unkey](https://www.unkey.com/docs/compute/get-started/deploy-from-github) compute, connected to a Postgres database you host elsewhere. At the end, Byname runs at an `unkey.app` URL and you are signed in to its onboarding.
 
 The deploy prompt on the [landing page](https://byname.dev/#deploy) has a coding agent do these nine steps for you through Unkey's MCP server, and points the agent at this page for Byname's settings. Each step below says what the agent does and how to do it by hand.
 
 You need:
 
 - An Unkey account with a Compute plan. Unkey needs a plan before it deploys anything.
-- A Postgres database. Unkey Deploy has no managed database and no persistent disk, and Byname keeps nothing on disk.
+- A Postgres database. Unkey has no managed database and no persistent disk, and Byname keeps nothing on disk.
 - A GitHub account for your fork of `unkeyed/byname`.
 
 Provider keys, the Treg token and Search Console are not part of the deployment. You enter them in Byname's onboarding after step 9, so neither the agent nor Unkey's environment ever holds them.

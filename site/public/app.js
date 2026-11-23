@@ -220,21 +220,9 @@ const Hero = (() => {
   return { redraw: () => Marks.drawAll(panes[current]) };
 })();
 
-// Ledger notes sit in the margin beside the row they speak about.
-function placeNotes() {
-  const box = $(".ledger-notes");
-  if (!box) return;
-  const beside = getComputedStyle($(".lnote", box)).position === "absolute";
-  for (const note of $$(".lnote", box)) {
-    const row = $(`.ltable tr[data-check="${note.dataset.for}"]`);
-    note.style.top = beside ? `${row.getBoundingClientRect().top - box.getBoundingClientRect().top + row.offsetHeight / 2}px` : "";
-  }
-}
-
 function redraw() {
   $$(".mk").filter((m) => !m.closest("[data-hero]")).forEach(Marks.draw);
   Hero?.redraw();
-  placeNotes();
 }
 redraw();
 document.fonts?.ready.then(redraw);

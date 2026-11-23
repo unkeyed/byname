@@ -1,6 +1,6 @@
 # Self-host Byname
 
-Byname is one container plus a Postgres database. This guide runs it with Docker Compose on your own machine, then on any host that runs containers. To deploy on Unkey Deploy, follow [Deploy Byname to Unkey Deploy](deploy-unkey.md).
+Byname is one container plus a Postgres database. This guide runs it with Docker Compose on your own machine, then on any host that runs containers. To run it on Unkey, follow [Deploy Byname to Unkey](deploy-unkey.md).
 
 ## Run it with Docker Compose
 

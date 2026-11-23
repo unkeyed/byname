@@ -16,7 +16,7 @@ Environment variables hold only secrets and infrastructure. Everything about you
 | `PASSWORD_LOGIN` | No | `false` | `true` lets people set a password, which always needs a second step. |
 | `ALLOWED_EMAIL_DOMAINS` | No | none | Comma-separated domains, such as `example.com`, whose addresses can join without an invite through Google Workspace or the OIDC issuer, in the role `ALLOWED_EMAIL_DOMAINS_ROLE` names. GitHub accounts always need an invite. |
 | `ALLOWED_EMAIL_DOMAINS_ROLE` | No | `viewer` | The role of someone who joins through `ALLOWED_EMAIL_DOMAINS`: `viewer` or `editor`. `admin` is refused, because an admin manages credentials and the team; invite admins by name. |
-| `CLIENT_IP_HEADER` | No | none | The header your proxy writes the client IP to, such as `X-Forwarded-For`. Byname throttles failed sign-ins and OAuth requests per client IP. Set it to `X-Forwarded-For` on Unkey Deploy. |
+| `CLIENT_IP_HEADER` | No | none | The header your proxy writes the client IP to, such as `X-Forwarded-For`. Byname throttles failed sign-ins and OAuth requests per client IP. Set it to `X-Forwarded-For` on Unkey. |
 | `GOOGLE_CLIENT_ID` | No | none | A Google OAuth client ID. Set it with `GOOGLE_CLIENT_SECRET` to offer Google sign-in. |
 | `GOOGLE_CLIENT_SECRET` | No | none | The Google OAuth client secret for sign-in. |
 | `GITHUB_CLIENT_ID` | No | none | A GitHub OAuth app client ID. Set it with `GITHUB_CLIENT_SECRET` to offer GitHub sign-in. |
@@ -104,7 +104,7 @@ To rotate the key:
 
 ## `PORT`
 
-The Docker image sets `PORT=8080`. Unkey Deploy sets `PORT` for you and sends traffic and health checks to it.
+The Docker image sets `PORT=8080`. Unkey sets `PORT` for you and sends traffic and health checks to it.
 
 ## `PUBLIC_URL`
 

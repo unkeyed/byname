@@ -63,12 +63,12 @@ make e2e E2E_SETUP_TOKEN=<token from the setup link>
 
 The suite creates its account with a software passkey and saves the passkey, so later runs need no token. `e2e/doc.go` lists the other variables. The e2e tests carry the `e2e` build tag, so `go test ./...` skips them.
 
-The docs site renders `docs/*.md` and fails on a broken link between docs or a missing heading:
+The site in `site/` is an Astro app that serves the landing page and renders `docs/*.md`. Its build fails on a doc missing from the sidebar, a broken link between docs, or a missing heading:
 
 ```sh
-cd site/docs-build
+cd site
 npm ci
-node build.mjs ../../docs ../out/docs
+npm run build   # or npm run dev to preview at localhost:4321
 ```
 
 ## Follow the house rules
@@ -89,7 +89,7 @@ A surface is a row in a table, so adding one touches a few known places and noth
 1. Add the surface key to `internal/engines/engines.go`, and a row to `registry` in `internal/engines/registry.go` with its title, pinned endpoint and default fidelity. A new provider family gets its own file, such as `internal/engines/serpapi.go`, with the request builder and the parser for its native response.
 2. Add a migration that allows the new key in the `surface` table's `CHECK` constraint. Released migrations stay untouched, so this is a new file.
 3. Add at least one real response body as `internal/engines/testdata/<family>/<endpoint id>.json`, or a hand-made one as `<endpoint id>.<case>.synthetic.json`, and the expected parse as `<name>.want.json` next to it. `TestEveryEndpointHasFixtures` fails until you do, and `go test ./internal/engines -update` writes the `.want.json` files from the parser for you to review.
-4. Document it: add the surface to the table in `docs/engines/surfaces.md`, or a page under `docs/engines/` for a new route family, and add that page to the sidebar in `site/docs-build/build.mjs`.
+4. Document it: add the surface to the table in `docs/engines/surfaces.md`, or a page under `docs/engines/` for a new route family, and add that page to the sidebar in `site/src/lib/site.ts`.
 
 A direct model provider or gateway is a row in `adapters` in `internal/engines/routes.go` plus its own file, with fixtures under `testdata/<provider>/`.
 
@@ -104,4 +104,4 @@ git push origin v0.1.0
 
 `.github/workflows/release.yml` builds the image for `linux/amd64` and `linux/arm64` and pushes it to `ghcr.io/unkeyed/byname` with the version (`0.1.0`), the minor version (`0.1`), and `latest`. A pre-release tag such as `v0.2.0-rc.1` gets only its own version.
 
-Unkey Deploy and `docker pull` need the image without credentials. After the first release, check that the package's visibility is **Public** in the package settings on GitHub.
+Unkey and `docker pull` need the image without credentials. After the first release, check that the package's visibility is **Public** in the package settings on GitHub.
