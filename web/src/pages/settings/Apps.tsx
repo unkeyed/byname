@@ -1,7 +1,7 @@
 import { Link } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../api";
-import { keys, useMe } from "../../queries";
+import { keys } from "../../queries";
 import { Badge, Card, CodeBlock, ConfirmButton, EmptyState, ErrorNote, Icon, Pending, RelativeTime } from "../../ui";
 import { SettingsHeader, SettingsSubhead } from "./Settings";
 
@@ -14,7 +14,6 @@ export function snippets(origin: string) {
 }
 
 export function Apps() {
-  const me = useMe();
   const s = snippets(location.origin);
 
   return (
@@ -25,11 +24,6 @@ export function Apps() {
         <SettingsSubhead className="mb-0">Connect an MCP client</SettingsSubhead>
         <CodeBlock label="Claude Code" code={s.claude} />
         <CodeBlock label="Cursor (.cursor/mcp.json)" code={s.cursor} />
-        <p className="text-sm text-muted">
-          There is no key to paste. The first time the agent reaches Byname, it opens your browser: sign in, check the app&apos;s name and where it sends
-          you back, choose what it may do, and approve. From then on it acts as{" "}
-          <span className="font-medium text-fg">Claude Code (via {me.data?.name ?? "you"})</span>, never with more than your role allows.
-        </p>
       </section>
 
       <section className="mt-8">

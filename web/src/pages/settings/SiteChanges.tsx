@@ -269,22 +269,6 @@ function Rules({ r }: { r: RepoStatus }) {
   return (
     <section>
       <SettingsSubhead>Path rules</SettingsSubhead>
-      <div className="mb-4 space-y-1.5 text-sm text-muted">
-        <p>Each rule turns a file in the repo into the page on your site it builds, so Byname knows which page a change touched. The first rule a file matches wins; a file no rule matches is ignored. After you save changed rules, the next hourly read goes through the last 30 days of merges again with them.</p>
-        <ul className="list-disc space-y-1 pl-5 text-xs">
-          <li>
-            <code className="font-mono text-fg">*</code> matches within one folder: <code className="font-mono">content/blog/*.mdx</code> matches <code className="font-mono">content/blog/launch.mdx</code>.
-          </li>
-          <li>
-            <code className="font-mono text-fg">**</code> matches any number of folders, including none: <code className="font-mono">app/**/page.tsx</code> matches <code className="font-mono">app/page.tsx</code> and{" "}
-            <code className="font-mono">app/pricing/page.tsx</code>.
-          </li>
-          <li>
-            <code className="font-mono text-fg">{"{1}"}</code>, <code className="font-mono text-fg">{"{2}"}</code> in the URL are what the first and second wildcard matched: <code className="font-mono [overflow-wrap:anywhere]">https://{domain}/blog/{"{1}"}</code> gives{" "}
-            <code className="font-mono [overflow-wrap:anywhere]">https://{domain}/blog/launch</code>.
-          </li>
-        </ul>
-      </div>
       <form onSubmit={submit} className="space-y-3">
         <Button onClick={add} disabled={rows.length >= 50}>
           <Icon name="plus" className="size-3.5" />

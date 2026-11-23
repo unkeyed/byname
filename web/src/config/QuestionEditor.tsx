@@ -241,7 +241,6 @@ function AddQuestions({
   const readFile = (file: File | undefined) => {
     if (file) void file.text().then(setBulk);
   };
-  const example = competitors[0] ? `“${competitors[0]} alternatives”` : "“Which app do freelancers use to send invoices?”";
 
   return (
     <Card>
@@ -266,10 +265,6 @@ function AddQuestions({
         </div>
       </div>
       <div className="space-y-3 p-4">
-        <p className="text-xs text-muted">
-          Aim for 10 to 30 questions a buyer who hasn&apos;t heard of you might ask an AI, such as “What&apos;s the best invoicing app for freelancers?” or {example}. Leave your own
-          name out: Byname sends each question exactly as written. Groups are topics you choose, like Pricing or Comparisons, so you can filter results by them later.
-        </p>
         {mode === "suggest" ? (
           <Suggest competitors={competitors} onAdd={onAdd} />
         ) : mode === "one" ? (

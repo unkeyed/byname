@@ -153,12 +153,6 @@ function SignInMethods() {
           {password_login ? <Badge tone="success">On, with a second step</Badge> : <Badge>Off</Badge>}
         </li>
       </ul>
-      <p className="border-t border-line px-4 py-3 text-xs leading-relaxed text-muted">
-        Providers are set by env vars on the server: <code className="font-mono">GOOGLE_CLIENT_ID</code> and <code className="font-mono">GOOGLE_CLIENT_SECRET</code>,{" "}
-        <code className="font-mono">GITHUB_CLIENT_ID</code> and <code className="font-mono">GITHUB_CLIENT_SECRET</code>, or <code className="font-mono">OIDC_ISSUER</code>,{" "}
-        <code className="font-mono">OIDC_CLIENT_ID</code>, <code className="font-mono">OIDC_CLIENT_SECRET</code> and <code className="font-mono">OIDC_NAME</code>. Set{" "}
-        <code className="font-mono">PASSWORD_LOGIN</code> to allow passwords. Restart Byname after a change.
-      </p>
     </Card>
   );
 }

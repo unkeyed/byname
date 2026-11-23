@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { api, type MatchMode, type Settings, type SettingsView } from "../api";
 import { keys, useCan, useSettings } from "../queries";
 import { Button, cx, ErrorNote, Field, Icon, inputClass, labelClass, Pending, selectClass } from "../ui";
-import { defaultFooter, Disclosure, FieldNote, NoteSlot, NumberField, ReadOnlyNote, SubmitButton, useSaveSettings, type Footer } from "./forms";
+import { defaultFooter, Disclosure, FieldNote, NoteSlot, ReadOnlyNote, SubmitButton, useSaveSettings, type Footer } from "./forms";
 import { useCommonWords } from "./naming";
 import { browserTimeZone, formatNumber, languages, markets, parseHost, parseHosts, parseNumber, splitList, timeZones } from "./rules";
 
@@ -57,6 +57,7 @@ function BrandFormBody({ initial, retention, footer, onSaved, submitLabel }: { i
   const aliasList = splitList(aliases);
   const common = useCommonWords(aliasList);
   const retentionParse = keepForever ? { value: null } : parseNumber("raw_retention_days", retentionDays);
+  const retentionError = !keepForever && "error" in retentionParse ? retentionParse.error : undefined;
   const otherHosts = "hosts" in othersParse && "host" in primaryParse ? othersParse.hosts.filter((h) => h !== primaryParse.host) : [];
   const repeated = "hosts" in othersParse && "host" in primaryParse && othersParse.hosts.includes(primaryParse.host);
   const defaultTerms = [...new Set([name.trim().replace(/\s+/g, " "), ...aliasList].filter(Boolean).map((t) => t.toLowerCase()))];
@@ -235,28 +236,33 @@ function BrandFormBody({ initial, retention, footer, onSaved, submitLabel }: { i
 
         {retention && (
           <fieldset>
-            <legend className={labelClass}>Raw response retention</legend>
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-6">
-              <label className="flex min-h-11 items-center gap-2 text-sm md:min-h-0">
-                <input type="radio" name="retention" checked={keepForever} onChange={() => setKeepForever(true)} />
-                Keep forever
-              </label>
-              <div className="flex items-start gap-2">
-                <label className="-m-4 flex p-4 md:m-0 md:p-0">
-                  <input type="radio" name="retention" aria-label="Keep for a number of days" className="md:mt-2" checked={!keepForever} onChange={() => setKeepForever(false)} />
-                </label>
-                <NumberField
-                  name="raw_retention_days"
+            <legend className={labelClass}>Keep raw responses</legend>
+            <label className="flex min-h-11 items-center gap-2 text-sm md:min-h-9">
+              <input type="radio" name="retention" checked={keepForever} onChange={() => setKeepForever(true)} />
+              Forever
+            </label>
+            <div className="flex min-h-11 items-center gap-2 text-sm md:min-h-9">
+              <input type="radio" name="retention" id="retention-days" checked={!keepForever} onChange={() => setKeepForever(false)} />
+              <label htmlFor="retention-days">For</label>
+              <span className="w-20">
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  step={1}
+                  min={1}
+                  aria-label="Days to keep raw responses"
                   value={retentionDays}
-                  onChange={(v) => {
-                    setRetentionDays(v);
+                  aria-invalid={retentionError ? true : undefined}
+                  onChange={(e) => {
+                    setRetentionDays(e.target.value);
                     setKeepForever(false);
                   }}
-                  error={!keepForever && "error" in retentionParse ? retentionParse.error : undefined}
-                  hint="Scores and citations stay. Only the provider's raw response is deleted."
+                  className={cx(inputClass, "tabular-nums", retentionError && "border-danger")}
                 />
-              </div>
+              </span>
+              days
             </div>
+            <NoteSlot>{retentionError ? <FieldNote tone="error">{retentionError}</FieldNote> : <p className="mt-1 text-xs text-faint">Scores and citations are kept either way.</p>}</NoteSlot>
           </fieldset>
         )}
       </fieldset>
