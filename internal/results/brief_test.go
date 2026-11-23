@@ -94,7 +94,7 @@ func TestBrief(t *testing.T) {
 			t.Errorf("prompt where every answer named and linked to you has %q:\n%s", s, gemini.Prompt)
 		}
 	}
-	if !strings.Contains(gemini.Prompt, "Named Northwind: 1 of 1 answers.") {
+	if !strings.Contains(gemini.Prompt, "Named Northwind: 1 of 1.") {
 		t.Errorf("gemini prompt lacks its standing:\n%s", gemini.Prompt)
 	}
 	unrendered(t, gemini.Prompt)
