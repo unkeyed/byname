@@ -141,15 +141,15 @@ func loadSecrets() (*secretbox.Box, error) {
 // openLanes splits them, and minPoolSize is the fewest it can split.
 const (
 	defaultPoolSize = 20
-	minPoolSize     = 8
+	minPoolSize     = 5
 )
 
 // budget is the connection budget for a database that allows this role
-// allowed connections: at most a third of them, so a second copy running
-// during a deploy, a migration and other apps on the same database still
-// get connections, and never below what openLanes needs.
+// allowed connections: at most a quarter of them, so the copies running
+// side by side during a deploy, a migration and other apps on the same
+// database still get connections, and never below what openLanes needs.
 func budget(configured, allowed int32) int32 {
-	return min(configured, max(minPoolSize, allowed/3))
+	return min(configured, max(minPoolSize, allowed/4))
 }
 
 // fitBudget lowers cfg's connection budget to fit what the database allows
@@ -168,22 +168,20 @@ func fitBudget(ctx context.Context, log *slog.Logger, cfg *pgxpool.Config) {
 		return
 	}
 	cfg.MaxConns = budget(cfg.MaxConns, allowed)
-	if allowed/3 < minPoolSize {
+	if allowed/4 < minPoolSize {
 		log.Warn("the database allows few connections, so a second copy during a deploy may not get any; raise its limit or set pool_max_conns",
 			"allowed", allowed, "budget", cfg.MaxConns)
 	}
 }
 
-// openLanes opens the three pools Lanes routes between. Four connections
-// hold locks, one for each job the scheduler can run at once; the rest of
-// the budget is split between requests, which get half rounded up, and
-// background work, with at least 2 each.
+// openLanes opens the three pools Lanes routes between. Up to four
+// connections hold locks, one for each job the scheduler can run at once,
+// and a small budget gets one, so those jobs take turns. The rest is split
+// between requests, which get half rounded up, and background work, with
+// at least 2 each: 5 in all at the least.
 func openLanes(ctx context.Context, cfg *pgxpool.Config) (db.Lanes, error) {
-	const lockConns = 4
 	web, jobs, locks := cfg.Copy(), cfg.Copy(), cfg.Copy()
-	locks.MaxConns = lockConns
-	web.MaxConns = max(2, (cfg.MaxConns-lockConns+1)/2)
-	jobs.MaxConns = max(2, cfg.MaxConns-lockConns-web.MaxConns)
+	web.MaxConns, jobs.MaxConns, locks.MaxConns = split(cfg.MaxConns)
 	var l db.Lanes
 	for _, p := range []struct {
 		to  **pgxpool.Pool
@@ -197,6 +195,14 @@ func openLanes(ctx context.Context, cfg *pgxpool.Config) (db.Lanes, error) {
 		*p.to = pool
 	}
 	return l, nil
+}
+
+// split divides a connection budget between the three pools.
+func split(total int32) (web, jobs, locks int32) {
+	locks = max(1, min(4, (total-4)/2))
+	web = max(2, (total-locks+1)/2)
+	jobs = max(2, total-locks-web)
+	return web, jobs, locks
 }
 
 func loadConfig() (config, error) {

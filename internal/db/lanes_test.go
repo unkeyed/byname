@@ -60,7 +60,7 @@ func TestJobsHoldingLocksStillGetConnectionsForTheirWork(t *testing.T) {
 		t.Cleanup(p.Close)
 		return p
 	}
-	lanes := db.Lanes{Web: open(1), Jobs: open(1), Locks: open(2)}
+	lanes := db.Lanes{Web: open(1), Jobs: open(1), Locks: open(1)}
 
 	// Two jobs each take a lock and then query, as the scheduler's jobs do.
 	// With locks held on work connections, each would wait for the other's.
