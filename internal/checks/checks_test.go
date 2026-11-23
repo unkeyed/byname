@@ -317,3 +317,32 @@ func TestKilledRunResumes(t *testing.T) {
 		t.Fatalf("%d runs, want 1", runs)
 	}
 }
+
+func TestRunCompletesWhenTheDatabaseDropsItsConnections(t *testing.T) {
+	e := setup(t, func(s *config.Settings) { s.Concurrency = 4 })
+	var mu sync.Mutex
+	calls := 0
+	e.treg.Before(func(c tregtest.Call) *tregtest.Refusal {
+		mu.Lock()
+		defer mu.Unlock()
+		if strings.HasSuffix(c.Tool, "-models") {
+			return nil
+		}
+		if calls++; calls == 5 {
+			if _, err := e.db.Exec(context.Background(), `SELECT pg_terminate_backend(pid) FROM pg_stat_activity
+				WHERE datname = current_database() AND pid <> pg_backend_pid()`); err != nil {
+				t.Error(err)
+			}
+		}
+		return nil
+	})
+	id := e.runNow(t)
+	for pass := 0; pass < 3; pass++ {
+		if err := e.checks.Work(context.Background()); err == nil {
+			break
+		}
+	}
+	if r := e.run(t, id); r.Status != checks.Completed || r.Answers != 12 || r.Failed != 0 {
+		t.Fatalf("after the database dropped every connection mid-check: %+v, want completed with all 12 answers", r)
+	}
+}

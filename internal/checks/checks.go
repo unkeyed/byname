@@ -16,6 +16,7 @@ import (
 	"fmt"
 	"github.com/unkeyed/byname/internal/db"
 	"log/slog"
+	"sync"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -63,6 +64,8 @@ type Service struct {
 	wake   chan struct{}
 	alerts Alerts
 	finder Finder
+	// writer lets one answer at a time be stored.
+	writer sync.Mutex
 }
 
 // Finder reads each stored answer for the brands it names that nobody

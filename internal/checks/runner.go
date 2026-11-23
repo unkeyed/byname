@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/unkeyed/byname/internal/config"
 	"github.com/unkeyed/byname/internal/core"
@@ -54,12 +55,29 @@ type call struct {
 }
 
 // outcome is why a run stopped queueing calls, the first reason wins.
+// halted is set instead when the database failed for longer than the
+// retries cover: the run is not finished, and the next pass resumes it.
 type outcome struct {
 	mu      sync.Mutex
 	status  Status
 	message string
 	code    string
 	spent   float64
+	halted  error
+}
+
+func (o *outcome) halt(err error) {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	if o.halted == nil {
+		o.halted = err
+	}
+}
+
+func (o *outcome) haltedBy() error {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	return o.halted
 }
 
 func (o *outcome) stop(status Status, message, code string) {
@@ -73,7 +91,7 @@ func (o *outcome) stop(status Status, message, code string) {
 func (o *outcome) stopped() bool {
 	o.mu.Lock()
 	defer o.mu.Unlock()
-	return o.status != ""
+	return o.status != "" || o.halted != nil
 }
 
 func (o *outcome) setSpent(v float64) {
@@ -124,6 +142,9 @@ func (s *Service) RunCheck(ctx context.Context, runID int64) error {
 	s.execute(ctx, p, out)
 	if err := ctx.Err(); err != nil {
 		return err
+	}
+	if err := out.haltedBy(); err != nil {
+		return fmt.Errorf("check #%d paused, the next pass resumes it: %w", runID, err)
 	}
 	if !out.stopped() {
 		out.stop(Completed, "", "")
@@ -227,7 +248,11 @@ func (s *Service) execute(ctx context.Context, p plan, out *outcome) {
 			defer func() { <-slots }()
 			if err := s.ask(ctx, p, c, out); err != nil && ctx.Err() == nil {
 				s.log.Error("store answer", "run", p.runID, "question", c.question.ID, "pair", c.pair.ID, "err", err)
-				out.stop(Failed, "could not store an answer: "+err.Error(), "")
+				if permanent(err) {
+					out.stop(Failed, "could not store an answer: "+err.Error(), "")
+				} else {
+					out.halt(err)
+				}
 			}
 		})
 	}
@@ -274,7 +299,7 @@ func (s *Service) ask(ctx context.Context, p plan, c call, out *outcome) error {
 	if err != nil {
 		res = engines.Result{Status: engines.StatusFailed, Error: err.Error()}
 	}
-	answerID, spent, err := s.store(ctx, p, c, res, attempt)
+	answerID, spent, err := s.storeRetrying(ctx, p, c, res, attempt)
 	if err != nil {
 		return err
 	}
@@ -313,9 +338,45 @@ func backoffFor(r *engines.Refusal, n int) time.Duration {
 	return min(d, maxBackoff)
 }
 
+// storeRetries is how many times a store that failed on the connection,
+// not on the data, is tried again before the pass halts.
+const storeRetries = 4
+
+// storeRetrying stores one answer, one at a time across the run's calls so
+// a check holds a single connection for writing however many calls are in
+// flight, and tries again with backoff when the database is unreachable.
+func (s *Service) storeRetrying(ctx context.Context, p plan, c call, res engines.Result, attempts int) (int64, float64, error) {
+	s.writer.Lock()
+	defer s.writer.Unlock()
+	for try := 0; ; try++ {
+		id, spent, err := s.store(ctx, p, c, res, attempts)
+		if err == nil || permanent(err) || try == storeRetries || ctx.Err() != nil {
+			return id, spent, err
+		}
+		if s.sleep(ctx, time.Second<<try) != nil {
+			return 0, 0, err
+		}
+	}
+}
+
+// permanent reports whether a database error comes from the statement or
+// its data, which retrying cannot fix, rather than from the connection.
+func permanent(err error) bool {
+	var pgErr *pgconn.PgError
+	if !errors.As(err, &pgErr) {
+		return false
+	}
+	switch pgErr.Code[:2] {
+	case "22", "23", "42":
+		return true
+	}
+	return false
+}
+
 // store upserts one answer with its mentions and citations and returns
-// its id and the run's spend. The run row is locked first, so concurrent
-// answers sum the spend one after another and none is lost.
+// its id and the run's spend. The run row is locked first, so the spend is
+// summed one answer after another. The statements go in two batches, so an
+// answer costs the same few round trips however far the database is.
 func (s *Service) store(ctx context.Context, p plan, c call, res engines.Result, attempts int) (int64, float64, error) {
 	// The brands are read for each answer, so a competitor tracked while
 	// the check runs counts in the answers stored after it.
@@ -327,10 +388,9 @@ func (s *Service) store(ctx context.Context, p plan, c call, res engines.Result,
 	var spent float64
 	var answerID int64
 	err = pgx.BeginFunc(ctx, s.db, func(tx pgx.Tx) error {
-		if _, err := tx.Exec(ctx, `SELECT 1 FROM run WHERE id = $1 FOR UPDATE`, p.runID); err != nil {
-			return err
-		}
-		err := tx.QueryRow(ctx, `INSERT INTO answer (run_id, question_id, surface_model_id, endpoint, fidelity, reported_model,
+		first := &pgx.Batch{}
+		first.Queue(`SELECT 1 FROM run WHERE id = $1 FOR UPDATE`, p.runID)
+		first.Queue(`INSERT INTO answer (run_id, question_id, surface_model_id, endpoint, fidelity, reported_model,
 				status, error, attempts, mentioned, cited, position, cost_usd, text, raw, fan_out, call_id)
 			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
 			ON CONFLICT (run_id, question_id, surface_model_id) DO UPDATE SET endpoint = excluded.endpoint,
@@ -341,31 +401,28 @@ func (s *Service) store(ctx context.Context, p plan, c call, res engines.Result,
 			RETURNING id`,
 			p.runID, c.question.ID, c.pair.ID, c.via.Endpoint, c.pair.Fidelity, res.ReportedModel,
 			res.Status, res.Error, attempts, scored.Mentioned, scored.Cited, nullPosition(scored.Position), res.CostUSD,
-			res.Text, rawJSON(res.Raw), append([]string{}, res.FanOut...), res.CallID).Scan(&answerID)
-		if err != nil {
+			res.Text, rawJSON(res.Raw), append([]string{}, res.FanOut...), res.CallID).QueryRow(func(row pgx.Row) error {
+			return row.Scan(&answerID)
+		})
+		if err := tx.SendBatch(ctx, first).Close(); err != nil {
 			return err
 		}
-		for _, q := range []string{`DELETE FROM brand_mention WHERE answer_id = $1`, `DELETE FROM citation WHERE answer_id = $1`} {
-			if _, err := tx.Exec(ctx, q, answerID); err != nil {
-				return err
-			}
-		}
+		rest := &pgx.Batch{}
+		rest.Queue(`DELETE FROM brand_mention WHERE answer_id = $1`, answerID)
+		rest.Queue(`DELETE FROM citation WHERE answer_id = $1`, answerID)
 		for _, m := range scored.Mentions {
-			if _, err := tx.Exec(ctx, `INSERT INTO brand_mention (answer_id, brand_id, position) VALUES ($1, $2, $3)`,
-				answerID, m.Brand, nullPosition(m.Position)); err != nil {
-				return err
-			}
+			rest.Queue(`INSERT INTO brand_mention (answer_id, brand_id, position) VALUES ($1, $2, $3)`, answerID, m.Brand, nullPosition(m.Position))
 		}
 		for i, ci := range scored.Citations {
-			if _, err := tx.Exec(ctx, `INSERT INTO citation (answer_id, ord, url, domain, is_self) VALUES ($1, $2, $3, $4, $5)`,
-				answerID, i, ci.URL, ci.Domain, ci.IsSelf); err != nil {
-				return err
-			}
+			rest.Queue(`INSERT INTO citation (answer_id, ord, url, domain, is_self) VALUES ($1, $2, $3, $4, $5)`, answerID, i, ci.URL, ci.Domain, ci.IsSelf)
 		}
-		return tx.QueryRow(ctx, `UPDATE run SET
+		rest.Queue(`UPDATE run SET
 				spend_usd = (SELECT coalesce(sum(cost_usd), 0) FROM answer WHERE run_id = $1),
 				spend_missing_calls = (SELECT count(*) FROM answer WHERE run_id = $1 AND cost_usd IS NULL AND status <> 'failed')
-			WHERE id = $1 RETURNING `+runSpent, p.runID).Scan(&spent)
+			WHERE id = $1 RETURNING `+runSpent, p.runID).QueryRow(func(row pgx.Row) error {
+			return row.Scan(&spent)
+		})
+		return tx.SendBatch(ctx, rest).Close()
 	})
 	return answerID, spent, err
 }
