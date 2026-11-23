@@ -138,23 +138,29 @@ func loadSecrets() (*secretbox.Box, error) {
 // DATABASE_URL does not set pool_max_conns. openLanes splits them.
 const defaultPoolSize = 20
 
-// openLanes opens the two pools Lanes routes between, splitting the
-// connection budget: half, rounded up, for requests, the rest for
-// background work, and at least 2 each.
+// openLanes opens the three pools Lanes routes between. Four connections
+// hold locks, one for each job the scheduler can run at once; the rest of
+// the budget is split between requests, which get half rounded up, and
+// background work, with at least 2 each.
 func openLanes(ctx context.Context, cfg *pgxpool.Config) (db.Lanes, error) {
-	web, jobs := cfg.Copy(), cfg.Copy()
-	web.MaxConns = max(2, (cfg.MaxConns+1)/2)
-	jobs.MaxConns = max(2, cfg.MaxConns-web.MaxConns)
-	webPool, err := pgxpool.NewWithConfig(ctx, web)
-	if err != nil {
-		return db.Lanes{}, err
+	const lockConns = 4
+	web, jobs, locks := cfg.Copy(), cfg.Copy(), cfg.Copy()
+	locks.MaxConns = lockConns
+	web.MaxConns = max(2, (cfg.MaxConns-lockConns+1)/2)
+	jobs.MaxConns = max(2, cfg.MaxConns-lockConns-web.MaxConns)
+	var l db.Lanes
+	for _, p := range []struct {
+		to  **pgxpool.Pool
+		cfg *pgxpool.Config
+	}{{&l.Web, web}, {&l.Jobs, jobs}, {&l.Locks, locks}} {
+		pool, err := pgxpool.NewWithConfig(ctx, p.cfg)
+		if err != nil {
+			l.Close()
+			return db.Lanes{}, err
+		}
+		*p.to = pool
 	}
-	jobsPool, err := pgxpool.NewWithConfig(ctx, jobs)
-	if err != nil {
-		webPool.Close()
-		return db.Lanes{}, err
-	}
-	return db.Lanes{Web: webPool, Jobs: jobsPool}, nil
+	return l, nil
 }
 
 func loadConfig() (config, error) {
@@ -406,8 +412,7 @@ func run(log *slog.Logger) error {
 	if err != nil {
 		return err
 	}
-	defer pool.Web.Close()
-	defer pool.Jobs.Close()
+	defer pool.Close()
 	if err := migrate(ctx, pool.Web, cfg.MigrateDB); err != nil {
 		return err
 	}
@@ -486,7 +491,7 @@ func run(log *slog.Logger) error {
 	jobs.Go(func() { alerts.Run(db.Background(ctx)) })
 	log.Info("Byname listening", "port", cfg.Port, "version", version, "keys", authn.Keys.Mode(),
 		"public_url", cfg.Auth.PublicURL.String(), "password_login", cfg.Auth.PasswordLogin, "providers", len(cfg.Auth.Providers),
-		"db_pool_web", pool.Web.Config().MaxConns, "db_pool_jobs", pool.Jobs.Config().MaxConns)
+		"db_pool_web", pool.Web.Config().MaxConns, "db_pool_jobs", pool.Jobs.Config().MaxConns, "db_pool_locks", pool.Locks.Config().MaxConns)
 
 	select {
 	case err := <-served:

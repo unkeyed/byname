@@ -10,6 +10,8 @@ import (
 
 // Pool is what the services query through. A *pgxpool.Pool is one, and so
 // is Lanes, which keeps background work off the connections requests need.
+// Acquire is only for holding a session advisory lock: the work done under
+// the lock goes through the other methods.
 type Pool interface {
 	Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
 	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
@@ -22,8 +24,13 @@ type Pool interface {
 // under Background (checks, syncs, deliveries) to Jobs, everything else,
 // which is requests, to Web. A check that fills Jobs never makes a page
 // wait for a connection.
+//
+// Connections that hold a session lock come from Locks, never from the
+// pools that do the work. A job holding a lock and waiting for a Jobs
+// connection then never blocks another job holding a Jobs connection, so
+// no number of jobs can wedge the pools, however small they are.
 type Lanes struct {
-	Web, Jobs *pgxpool.Pool
+	Web, Jobs, Locks *pgxpool.Pool
 }
 
 type backgroundKey struct{}
@@ -55,4 +62,13 @@ func (l Lanes) QueryRow(ctx context.Context, sql string, args ...any) pgx.Row {
 
 func (l Lanes) Begin(ctx context.Context) (pgx.Tx, error) { return l.pick(ctx).Begin(ctx) }
 
-func (l Lanes) Acquire(ctx context.Context) (*pgxpool.Conn, error) { return l.pick(ctx).Acquire(ctx) }
+func (l Lanes) Acquire(ctx context.Context) (*pgxpool.Conn, error) { return l.Locks.Acquire(ctx) }
+
+// Close closes every pool that is open.
+func (l Lanes) Close() {
+	for _, p := range []*pgxpool.Pool{l.Web, l.Jobs, l.Locks} {
+		if p != nil {
+			p.Close()
+		}
+	}
+}
