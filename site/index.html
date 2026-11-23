@@ -16,7 +16,7 @@
 <meta property="og:image" content="https://byname.dev/og.png" />
 <meta property="og:image:width" content="1200" />
 <meta property="og:image:height" content="630" />
-<meta property="og:image:alt" content="Byname: when buyers ask AI, does it say your name? An AI answer marked up by Byname: the example brand circled at position 2 and cited, the brands named instead underlined." />
+<meta property="og:image:alt" content="Byname: when buyers ask AI, does it say your name? An AI answer marked up by Byname: the example brand circled at position 2 and linked, the brands named instead underlined." />
 <meta name="twitter:card" content="summary_large_image" />
 <meta name="twitter:title" content="Byname: find out when AI answers name you" />
 <meta name="twitter:description" content="Open source and self-hosted. MIT licensed. Deploy it on Unkey in one prompt." />
@@ -63,7 +63,7 @@
   <section class="hero wrap" id="top" aria-labelledby="hero-title">
     <div class="hero-copy">
       <h1 id="hero-title">When buyers ask AI, does it say <span class="mk" data-mark="circle" data-pad="0.16em 0.05em" data-sw="3">your name</span>?</h1>
-      <p class="hero-lede">Byname asks your buyers' questions in the ChatGPT app, Google AI Mode, Claude Code and nine other places, on a schedule. It keeps every answer, marks who was named and cited, and tells you when that changes.</p>
+      <p class="hero-lede">Byname asks your buyers' questions in the ChatGPT app, Google AI Mode, Claude Code and nine other places, on a schedule. It keeps every answer, marks who was named and linked, and tells you when that changes.</p>
       <div class="hero-acts">
         <a class="btn" href="#run">Deploy on Unkey</a>
         <a class="go" href="https://github.com/unkeyed/byname">View on GitHub</a>
@@ -77,29 +77,29 @@
       <div class="sheet answer" data-hero>
         <article class="pane" id="pane-0" role="tabpanel" aria-labelledby="tab-0" data-stamp="Named #2" data-stamp-tone="you">
           <header class="sheet-head"><span>Asked in <b>ChatGPT app</b></span><span>App answer</span></header>
-          <p class="q">Which hosting platform should a small SaaS team use in 2026?</p>
+          <p class="q">Where should a small team deploy a public API in 2026?</p>
           <div class="ans">
             <p>It depends on your stack, but three providers come up again and again.</p>
             <ol>
-              <li><span class="li-t"><b class="mk" data-mark="underline" data-tone="instead">Litware Cloud</b> for enterprise contracts and region pinning.</span><span class="note instead">#1, named instead</span></li>
-              <li><span class="li-t"><b class="mk" data-mark="circle">Northwind</b> for a managed platform with preview environments and per-team budgets.</span><span class="note you">you, #2 · cited</span></li>
-              <li><span class="li-t"><b class="mk" data-mark="underline" data-tone="instead">Tailspin Hosting</b> for long-running containers at a flat monthly price.</span><span class="note instead">#3</span></li>
+              <li><span class="li-t"><b class="mk" data-mark="underline" data-tone="instead">AWS</b> for API Gateway, Lambda and every region under one contract.</span><span class="note instead">#1, named instead</span></li>
+              <li><span class="li-t"><b class="mk" data-mark="circle">Unkey</b> for deploys with API keys, rate limits and a gateway built in.</span><span class="note you">you, #2 · linked</span></li>
+              <li><span class="li-t"><b class="mk" data-mark="underline" data-tone="instead">Fly.io</b> for long-running containers close to your users.</span><span class="note instead">#3</span></li>
             </ol>
           </div>
-          <footer class="sheet-foot"><span>Cited: northwind.example, litware.example, docs.example.org</span><span class="cost">under $0.01</span></footer>
+          <footer class="sheet-foot"><span>Linked: unkey.com, aws.amazon.com, github.com</span><span class="cost">under $0.01</span></footer>
         </article>
         <article class="pane" id="pane-1" role="tabpanel" aria-labelledby="tab-1" data-stamp="Named #1" data-stamp-tone="you" hidden>
           <header class="sheet-head"><span>Asked in <b>Google AI Mode</b></span><span>App answer</span></header>
-          <p class="q">What is the easiest way to get preview environments for every pull request?</p>
+          <p class="q">What is the easiest way to add API keys and rate limits to an existing API?</p>
           <div class="ans">
             <p>Pick a platform that builds a preview for each pull request and removes it when the branch merges.</p>
             <ol>
-              <li><span class="li-t"><b class="mk" data-mark="circle">Northwind</b> gives every pull request a preview URL and its own seeded database.</span><span class="note you">you, #1 · cited</span></li>
-              <li><span class="li-t"><b class="mk" data-mark="underline" data-tone="instead">Fabrikam Deploy</b> builds previews through a GitHub Action you maintain.</span><span class="note instead">#2</span></li>
-              <li><span class="li-t"><b class="mk" data-mark="underline" data-tone="instead">Contoso Edge</b> routes previews at the edge, with one shared database.</span><span class="note instead">#3</span></li>
+              <li><span class="li-t"><b class="mk" data-mark="circle">Unkey</b> issues and verifies keys, with a rate limit on each key, in one call.</span><span class="note you">you, #1 · linked</span></li>
+              <li><span class="li-t"><b class="mk" data-mark="underline" data-tone="instead">Zuplo</b> adds key auth and rate limits as policies on its gateway.</span><span class="note instead">#2</span></li>
+              <li><span class="li-t"><b class="mk" data-mark="underline" data-tone="instead">Cloudflare</b> rate limits at the edge, with rules you set per route.</span><span class="note instead">#3</span></li>
             </ol>
           </div>
-          <footer class="sheet-foot"><span>Cited: northwind.example, fabrikam.example</span><span class="cost">under $0.01</span></footer>
+          <footer class="sheet-foot"><span>Linked: unkey.com, zuplo.com</span><span class="cost">under $0.01</span></footer>
         </article>
         <article class="pane" id="pane-2" role="tabpanel" aria-labelledby="tab-2" data-stamp="Not named" data-stamp-tone="instead" hidden>
           <header class="sheet-head"><span>Asked in <b>Claude Code</b> · claude-sonnet-5-5</span><span>Same model and search</span></header>
@@ -107,9 +107,9 @@
           <div class="ans">
             <p>Choose a provider with a Frankfurt or Amsterdam region and managed Postgres in the same place.</p>
             <ol>
-              <li><span class="li-t"><b class="mk" data-mark="underline" data-tone="instead">Tailspin Hosting</b> runs managed Postgres in Frankfurt with read replicas.</span><span class="note instead">named instead</span></li>
-              <li><span class="li-t"><b class="mk" data-mark="underline" data-tone="instead">Contoso Edge</b> puts edge routing in front of a regional database.</span><span class="note instead">named instead</span></li>
-              <li><span class="li-t"><b class="mk" data-mark="underline" data-tone="instead">Fabrikam Deploy</b> keeps container deploys and data inside the EU.</span><span class="note instead">named instead</span></li>
+              <li><span class="li-t"><b class="mk" data-mark="underline" data-tone="instead">Fly.io</b> runs your API and managed Postgres in Frankfurt.</span><span class="note instead">named instead</span></li>
+              <li><span class="li-t"><b class="mk" data-mark="underline" data-tone="instead">Cloudflare</b> puts edge routing in front of a regional database.</span><span class="note instead">named instead</span></li>
+              <li><span class="li-t"><b class="mk" data-mark="underline" data-tone="instead">AWS</b> keeps API Gateway and RDS together in Frankfurt.</span><span class="note instead">named instead</span></li>
             </ol>
           </div>
           <footer class="sheet-foot"><span>Searched: managed postgres frankfurt, eu api hosting</span><span class="cost">$0.05</span></footer>
@@ -135,25 +135,25 @@
     <figure class="contents sheet" data-reveal>
       <div class="contents-scroll">
         <table class="qtable">
-          <caption class="sr-only">Check #8 for Northwind Cloud, an example brand: each question on each surface and model.</caption>
+          <caption class="sr-only">Check #8 for Unkey, with example data: each question on each surface and model.</caption>
 <!-- contents -->
 <thead><tr><th scope="col" class="q-h">Question</th><th scope="col"><span>ChatGPT app</span></th><th scope="col"><span>Google AI Overview</span></th><th scope="col"><span>Perplexity app</span></th><th scope="col"><span>Codex CLI</span></th><th scope="col"><span>Claude Code<small>Opus 5.5</small></span></th><th scope="col"><span>Claude Code<small>Sonnet 5.5</small></span></th><th scope="col" class="q-s">Named</th></tr></thead>
 <tbody>
-<tr><th scope="row"><div class="q-cell"><span class="q-n">1</span><span class="q-t">Which hosting platform should a small SaaS team use in 2026?</span></div></th><td data-s="ChatGPT"><span class="tm mk" data-mark="circle" aria-hidden="true">1</span><span class="sr-only">ChatGPT app: named #1</span></td><td data-s="AI Overview"><span class="tm mk" data-mark="circle" aria-hidden="true">1</span><span class="sr-only">Google AI Overview: named #1</span></td><td data-s="Perplexity"><span class="tm mk" data-mark="circle" aria-hidden="true">2</span><span class="sr-only">Perplexity app: named #2</span></td><td data-s="Codex"><span class="tm mk" data-mark="circle" aria-hidden="true">2</span><span class="sr-only">Codex CLI: named #2</span></td><td data-s="Opus"><span class="tm mk" data-mark="circle" aria-hidden="true">2</span><span class="sr-only">Claude Code Opus 5.5: named #2</span></td><td data-s="Sonnet"><span class="tm mk" data-mark="circle" aria-hidden="true">2</span><span class="sr-only">Claude Code Sonnet 5.5: named #2</span></td><td class="q-s">6<small> of 6</small></td></tr>
-<tr><th scope="row"><div class="q-cell"><span class="q-n">2</span><span class="q-t">What is the easiest way to get preview environments for every pull request?</span></div></th><td data-s="ChatGPT"><span class="tm mk" data-mark="circle" aria-hidden="true">2</span><span class="sr-only">ChatGPT app: named #2</span></td><td data-s="AI Overview"><span class="tm mk" data-mark="circle" aria-hidden="true">1</span><span class="sr-only">Google AI Overview: named #1</span></td><td data-s="Perplexity"><span class="tm mk" data-mark="circle" aria-hidden="true">1</span><span class="sr-only">Perplexity app: named #1</span></td><td data-s="Codex"><span class="tm mk" data-mark="circle" aria-hidden="true">2</span><span class="sr-only">Codex CLI: named #2</span></td><td data-s="Opus"><span class="tm mk" data-mark="circle" aria-hidden="true">1</span><span class="sr-only">Claude Code Opus 5.5: named #1</span></td><td data-s="Sonnet"><span class="tm mk" data-mark="circle" aria-hidden="true">4</span><span class="sr-only">Claude Code Sonnet 5.5: named #4</span></td><td class="q-s">6<small> of 6</small></td></tr>
-<tr><th scope="row"><div class="q-cell"><span class="q-n">3</span><span class="q-t">Which cloud platform has the most predictable pricing for a startup?</span></div></th><td data-s="ChatGPT"><span class="tm miss mk" data-mark="dash" data-tone="instead" aria-hidden="true"></span><span class="sr-only">ChatGPT app: not named</span></td><td data-s="AI Overview"><span class="tm mk" data-mark="circle" aria-hidden="true">2</span><span class="sr-only">Google AI Overview: named #2</span></td><td data-s="Perplexity"><span class="tm mk" data-mark="circle" aria-hidden="true">3</span><span class="sr-only">Perplexity app: named #3</span></td><td data-s="Codex"><span class="tm mk" data-mark="circle" aria-hidden="true">1</span><span class="sr-only">Codex CLI: named #1</span></td><td data-s="Opus"><span class="tm mk" data-mark="circle" aria-hidden="true">3</span><span class="sr-only">Claude Code Opus 5.5: named #3</span></td><td data-s="Sonnet"><span class="tm mk" data-mark="circle" aria-hidden="true">4</span><span class="sr-only">Claude Code Sonnet 5.5: named #4</span></td><td class="q-s">5<small> of 6</small></td></tr>
-<tr><th scope="row"><div class="q-cell"><span class="q-n">4</span><span class="q-t">How do I move a Node.js app off a single VPS without downtime?</span></div></th><td data-s="ChatGPT"><span class="tm mk" data-mark="circle" aria-hidden="true">2</span><span class="sr-only">ChatGPT app: named #2</span></td><td data-s="AI Overview"><span class="tm mk" data-mark="circle" aria-hidden="true">3</span><span class="sr-only">Google AI Overview: named #3</span></td><td data-s="Perplexity"><span class="tm mk" data-mark="circle" aria-hidden="true">2</span><span class="sr-only">Perplexity app: named #2</span></td><td data-s="Codex"><span class="tm mk" data-mark="circle" aria-hidden="true">1</span><span class="sr-only">Codex CLI: named #1</span></td><td data-s="Opus"><span class="tm mk" data-mark="circle" aria-hidden="true">1</span><span class="sr-only">Claude Code Opus 5.5: named #1</span></td><td data-s="Sonnet"><span class="tm mk" data-mark="circle" aria-hidden="true">1</span><span class="sr-only">Claude Code Sonnet 5.5: named #1</span></td><td class="q-s">6<small> of 6</small></td></tr>
-<tr><th scope="row"><div class="q-cell"><span class="q-n">5</span><span class="q-t">What are good alternatives to managing my own container cluster?</span></div></th><td data-s="ChatGPT"><span class="tm mk" data-mark="circle" aria-hidden="true">3</span><span class="sr-only">ChatGPT app: named #3</span></td><td data-s="AI Overview"><span class="tm mk" data-mark="circle" aria-hidden="true">2</span><span class="sr-only">Google AI Overview: named #2</span></td><td data-s="Perplexity"><span class="tm mk" data-mark="circle" aria-hidden="true">5</span><span class="sr-only">Perplexity app: named #5</span></td><td data-s="Codex"><span class="tm mk" data-mark="circle" aria-hidden="true">3</span><span class="sr-only">Codex CLI: named #3</span></td><td data-s="Opus"><span class="tm mk" data-mark="circle" aria-hidden="true">1</span><span class="sr-only">Claude Code Opus 5.5: named #1</span></td><td data-s="Sonnet"><span class="tm mk" data-mark="circle" aria-hidden="true">1</span><span class="sr-only">Claude Code Sonnet 5.5: named #1</span></td><td class="q-s">6<small> of 6</small></td></tr>
-<tr><th scope="row"><div class="q-cell"><span class="q-n">6</span><span class="q-t">Which platform is best for hosting a Postgres-backed API close to European users?</span></div></th><td data-s="ChatGPT"><span class="tm miss mk" data-mark="dash" data-tone="instead" aria-hidden="true"></span><span class="sr-only">ChatGPT app: not named</span></td><td data-s="AI Overview"><span class="tm miss mk" data-mark="dash" data-tone="instead" aria-hidden="true"></span><span class="sr-only">Google AI Overview: not named</span></td><td data-s="Perplexity"><span class="tm cite mk" data-mark="tick" aria-hidden="true">c</span><span class="sr-only">Perplexity app: cited, not named</span></td><td data-s="Codex"><span class="tm miss mk" data-mark="dash" data-tone="instead" aria-hidden="true"></span><span class="sr-only">Codex CLI: not named</span></td><td data-s="Opus"><span class="tm cite mk" data-mark="tick" aria-hidden="true">c</span><span class="sr-only">Claude Code Opus 5.5: cited, not named</span></td><td data-s="Sonnet"><span class="tm miss mk" data-mark="dash" data-tone="instead" aria-hidden="true"></span><span class="sr-only">Claude Code Sonnet 5.5: not named</span></td><td class="q-s">0<small> of 6</small></td></tr>
+<tr><th scope="row"><div class="q-cell"><span class="q-n">1</span><span class="q-t">Where should a small team deploy a public API in 2026?</span></div></th><td data-s="ChatGPT"><span class="tm mk" data-mark="circle" aria-hidden="true">1</span><span class="sr-only">ChatGPT app: named #1</span></td><td data-s="AI Overview"><span class="tm mk" data-mark="circle" aria-hidden="true">1</span><span class="sr-only">Google AI Overview: named #1</span></td><td data-s="Perplexity"><span class="tm mk" data-mark="circle" aria-hidden="true">2</span><span class="sr-only">Perplexity app: named #2</span></td><td data-s="Codex"><span class="tm mk" data-mark="circle" aria-hidden="true">2</span><span class="sr-only">Codex CLI: named #2</span></td><td data-s="Opus"><span class="tm mk" data-mark="circle" aria-hidden="true">2</span><span class="sr-only">Claude Code Opus 5.5: named #2</span></td><td data-s="Sonnet"><span class="tm mk" data-mark="circle" aria-hidden="true">2</span><span class="sr-only">Claude Code Sonnet 5.5: named #2</span></td><td class="q-s">6<small> of 6</small></td></tr>
+<tr><th scope="row"><div class="q-cell"><span class="q-n">2</span><span class="q-t">What is the easiest way to add API keys and rate limits to an existing API?</span></div></th><td data-s="ChatGPT"><span class="tm mk" data-mark="circle" aria-hidden="true">2</span><span class="sr-only">ChatGPT app: named #2</span></td><td data-s="AI Overview"><span class="tm mk" data-mark="circle" aria-hidden="true">1</span><span class="sr-only">Google AI Overview: named #1</span></td><td data-s="Perplexity"><span class="tm mk" data-mark="circle" aria-hidden="true">1</span><span class="sr-only">Perplexity app: named #1</span></td><td data-s="Codex"><span class="tm mk" data-mark="circle" aria-hidden="true">2</span><span class="sr-only">Codex CLI: named #2</span></td><td data-s="Opus"><span class="tm mk" data-mark="circle" aria-hidden="true">1</span><span class="sr-only">Claude Code Opus 5.5: named #1</span></td><td data-s="Sonnet"><span class="tm mk" data-mark="circle" aria-hidden="true">4</span><span class="sr-only">Claude Code Sonnet 5.5: named #4</span></td><td class="q-s">6<small> of 6</small></td></tr>
+<tr><th scope="row"><div class="q-cell"><span class="q-n">3</span><span class="q-t">Which API platform has the most predictable pricing for a startup?</span></div></th><td data-s="ChatGPT"><span class="tm miss mk" data-mark="dash" data-tone="instead" aria-hidden="true"></span><span class="sr-only">ChatGPT app: not named</span></td><td data-s="AI Overview"><span class="tm mk" data-mark="circle" aria-hidden="true">2</span><span class="sr-only">Google AI Overview: named #2</span></td><td data-s="Perplexity"><span class="tm mk" data-mark="circle" aria-hidden="true">3</span><span class="sr-only">Perplexity app: named #3</span></td><td data-s="Codex"><span class="tm mk" data-mark="circle" aria-hidden="true">1</span><span class="sr-only">Codex CLI: named #1</span></td><td data-s="Opus"><span class="tm mk" data-mark="circle" aria-hidden="true">3</span><span class="sr-only">Claude Code Opus 5.5: named #3</span></td><td data-s="Sonnet"><span class="tm mk" data-mark="circle" aria-hidden="true">4</span><span class="sr-only">Claude Code Sonnet 5.5: named #4</span></td><td class="q-s">5<small> of 6</small></td></tr>
+<tr><th scope="row"><div class="q-cell"><span class="q-n">4</span><span class="q-t">How do I move an API off a single VPS without downtime?</span></div></th><td data-s="ChatGPT"><span class="tm mk" data-mark="circle" aria-hidden="true">2</span><span class="sr-only">ChatGPT app: named #2</span></td><td data-s="AI Overview"><span class="tm mk" data-mark="circle" aria-hidden="true">3</span><span class="sr-only">Google AI Overview: named #3</span></td><td data-s="Perplexity"><span class="tm mk" data-mark="circle" aria-hidden="true">2</span><span class="sr-only">Perplexity app: named #2</span></td><td data-s="Codex"><span class="tm mk" data-mark="circle" aria-hidden="true">1</span><span class="sr-only">Codex CLI: named #1</span></td><td data-s="Opus"><span class="tm mk" data-mark="circle" aria-hidden="true">1</span><span class="sr-only">Claude Code Opus 5.5: named #1</span></td><td data-s="Sonnet"><span class="tm mk" data-mark="circle" aria-hidden="true">1</span><span class="sr-only">Claude Code Sonnet 5.5: named #1</span></td><td class="q-s">6<small> of 6</small></td></tr>
+<tr><th scope="row"><div class="q-cell"><span class="q-n">5</span><span class="q-t">What are good alternatives to running my own API gateway?</span></div></th><td data-s="ChatGPT"><span class="tm mk" data-mark="circle" aria-hidden="true">3</span><span class="sr-only">ChatGPT app: named #3</span></td><td data-s="AI Overview"><span class="tm mk" data-mark="circle" aria-hidden="true">2</span><span class="sr-only">Google AI Overview: named #2</span></td><td data-s="Perplexity"><span class="tm mk" data-mark="circle" aria-hidden="true">5</span><span class="sr-only">Perplexity app: named #5</span></td><td data-s="Codex"><span class="tm mk" data-mark="circle" aria-hidden="true">3</span><span class="sr-only">Codex CLI: named #3</span></td><td data-s="Opus"><span class="tm mk" data-mark="circle" aria-hidden="true">1</span><span class="sr-only">Claude Code Opus 5.5: named #1</span></td><td data-s="Sonnet"><span class="tm mk" data-mark="circle" aria-hidden="true">1</span><span class="sr-only">Claude Code Sonnet 5.5: named #1</span></td><td class="q-s">6<small> of 6</small></td></tr>
+<tr><th scope="row"><div class="q-cell"><span class="q-n">6</span><span class="q-t">Which platform is best for hosting a Postgres-backed API close to European users?</span></div></th><td data-s="ChatGPT"><span class="tm miss mk" data-mark="dash" data-tone="instead" aria-hidden="true"></span><span class="sr-only">ChatGPT app: not named</span></td><td data-s="AI Overview"><span class="tm miss mk" data-mark="dash" data-tone="instead" aria-hidden="true"></span><span class="sr-only">Google AI Overview: not named</span></td><td data-s="Perplexity"><span class="tm cite mk" data-mark="tick" aria-hidden="true"></span><span class="sr-only">Perplexity app: linked, not named</span></td><td data-s="Codex"><span class="tm miss mk" data-mark="dash" data-tone="instead" aria-hidden="true"></span><span class="sr-only">Codex CLI: not named</span></td><td data-s="Opus"><span class="tm cite mk" data-mark="tick" aria-hidden="true"></span><span class="sr-only">Claude Code Opus 5.5: linked, not named</span></td><td data-s="Sonnet"><span class="tm miss mk" data-mark="dash" data-tone="instead" aria-hidden="true"></span><span class="sr-only">Claude Code Sonnet 5.5: not named</span></td><td class="q-s">0<small> of 6</small></td></tr>
 </tbody>
 <!-- /contents -->
         </table>
       </div>
       <figcaption class="legend">
         <span><span class="tm mk" data-mark="circle" aria-hidden="true">2</span> named, at position 2</span>
-        <span><span class="tm cite mk" data-mark="tick" aria-hidden="true">c</span> cited, not named</span>
+        <span><span class="tm cite mk" data-mark="tick" aria-hidden="true"></span> linked, not named</span>
         <span><span class="tm miss mk" data-mark="dash" data-tone="instead" aria-hidden="true"></span> named someone else</span>
-        <span class="legend-src">Check #8 · Northwind Cloud, an example brand · 29 of 36 named</span>
+        <span class="legend-src">Check #8 · Unkey, example data · 29 of 36 named</span>
       </figcaption>
     </figure>
   </section>
@@ -164,11 +164,11 @@
         <p class="kicker"><span>2</span>The record</p>
         <h2 id="record-title">Every answer, kept. <em>With what it cost.</em></h2>
       </div>
-      <p class="sec-lede">Each check stores the raw answer, who it named and cited, and what the call cost. A call that reports no cost is flagged, never counted as $0.00. Pick any two checks to see what you gained, lost and moved.</p>
+      <p class="sec-lede">Each check stores the raw answer, who it named and linked to, and what the call cost. A call that reports no cost is flagged, never counted as $0.00. Pick any two checks to see what you gained, lost and moved.</p>
     </div>
     <figure class="ledger sheet" data-reveal>
       <table class="ltable">
-        <caption class="sr-only">Eight checks for the example brand Northwind Cloud, each with 36 answers: how many named it, what changed since the check before, and the spend.</caption>
+        <caption class="sr-only">Eight checks for Unkey, with example data, each with 36 answers: how many named it, what changed since the check before, and the spend.</caption>
         <thead><tr><th scope="col">Check</th><th scope="col">Named</th><th scope="col" class="l-strip-h">Its 36 answers</th><th scope="col">Gained</th><th scope="col">Lost</th><th scope="col">Moved</th><th scope="col">Spend</th></tr></thead>
         <tbody>
 <!-- ledger -->
@@ -189,7 +189,7 @@
         <p class="lnote you" data-for="8"><span class="mk" data-mark="underline">Check #8</span>: back to 29 of 36, the best yet.</p>
       </figcaption>
     </figure>
-    <p class="strip-key" aria-hidden="true"><svg viewBox="0 0 12 22"><path class="t-n" d="M6 4v14" /></svg>named <svg viewBox="0 0 12 22"><path class="t-c" d="M6 11v7" /></svg>cited only <svg viewBox="0 0 12 22"><path class="t-m" d="M6 15v3" /></svg>not named <svg viewBox="0 0 12 22"><path class="t-x" d="M4.5 13.5l3 3m0-3l-3 3" /></svg>failed</p>
+    <p class="strip-key" aria-hidden="true"><svg viewBox="0 0 12 22"><path class="t-n" d="M6 4v14" /></svg>named <svg viewBox="0 0 12 22"><path class="t-c" d="M6 11v7" /></svg>linked only <svg viewBox="0 0 12 22"><path class="t-m" d="M6 15v3" /></svg>not named <svg viewBox="0 0 12 22"><path class="t-x" d="M4.5 13.5l3 3m0-3l-3 3" /></svg>failed</p>
   </section>
 
   <section class="sec wrap" id="lost" aria-labelledby="lost-title">
@@ -201,28 +201,28 @@
     <div class="story" data-reveal>
       <figure class="sheet clip" aria-labelledby="c6-cap">
         <header class="sheet-head"><span id="c6-cap"><b>Check #6</b> · ChatGPT app</span><span>App answer</span></header>
-        <p class="q">Which cloud platform has the most predictable pricing for a startup?</p>
+        <p class="q">Which API platform has the most predictable pricing for a startup?</p>
         <ol class="mini">
-          <li><b>Litware Cloud</b></li>
-          <li><b class="mk" data-mark="circle">Northwind</b><span class="note you">you, #2 · cited</span></li>
-          <li><b>Contoso Edge</b></li>
-          <li><b>Tailspin Hosting</b></li>
-          <li><b>Fabrikam Deploy</b></li>
+          <li><b>AWS</b></li>
+          <li><b class="mk" data-mark="circle">Unkey</b><span class="note you">you, #2 · linked</span></li>
+          <li><b>Cloudflare</b></li>
+          <li><b>Fly.io</b></li>
+          <li><b>Zuplo</b></li>
         </ol>
-        <footer class="sheet-foot"><span>Cited: northwind.example and 3 more</span><span class="cost">under $0.01</span></footer>
+        <footer class="sheet-foot"><span>Linked: unkey.com and 3 more</span><span class="cost">under $0.01</span></footer>
       </figure>
       <svg class="story-arrow" viewBox="0 0 80 40" aria-hidden="true"><path class="draw" pathLength="1" d="M4 24 C 22 10, 46 10, 70 20 M61 13 L71 20 L60 25" /></svg>
       <figure class="sheet clip" aria-labelledby="c7-cap">
         <header class="sheet-head"><span id="c7-cap"><b>Check #7</b> · ChatGPT app</span><span>App answer</span></header>
-        <p class="q">Which cloud platform has the most predictable pricing for a startup?</p>
+        <p class="q">Which API platform has the most predictable pricing for a startup?</p>
         <ol class="mini">
-          <li><b class="mk" data-mark="underline" data-tone="instead">Tailspin Hosting</b><span class="note instead">named first</span></li>
-          <li><b>Contoso Edge</b></li>
-          <li><b>Fabrikam Deploy</b></li>
-          <li><b>Litware Cloud</b></li>
+          <li><b class="mk" data-mark="underline" data-tone="instead">Fly.io</b><span class="note instead">named first</span></li>
+          <li><b>Cloudflare</b></li>
+          <li><b>Zuplo</b></li>
+          <li><b>AWS</b></li>
         </ol>
-        <p class="gone"><span class="mk caret" data-mark="caret" data-tone="instead" aria-hidden="true"></span><span class="note instead">Northwind: not named, and northwind.example no longer cited</span></p>
-        <footer class="sheet-foot"><span>Cited: tailspin.example and 3 more</span><span class="cost">under $0.01</span></footer>
+        <p class="gone"><span class="mk caret" data-mark="caret" data-tone="instead" aria-hidden="true"></span><span class="note instead">Unkey: not named, and unkey.com no longer linked</span></p>
+        <footer class="sheet-foot"><span>Linked: fly.io and 3 more</span><span class="cost">under $0.01</span></footer>
       </figure>
       <svg class="story-arrow" viewBox="0 0 80 40" aria-hidden="true"><path class="draw" pathLength="1" d="M4 22 C 24 30, 48 28, 70 18 M60 15 L71 18 L64 27" style="--d:.5s" /></svg>
       <figure class="sheet alert" aria-labelledby="alert-cap">
@@ -231,21 +231,21 @@
         <p>Named in 24 of 36 answers.</p>
         <p>Since check #6: 1 gained, 6 lost, 17 moved, net -5.</p>
         <ul>
-          <li>1 gained, 1 lost, 4 moved: What is the easiest way to get preview environments for every pull request?</li>
-          <li><span class="mk" data-mark="underline" data-tone="instead">3 lost</span>, 3 moved: Which cloud platform has the most predictable pricing for a startup?</li>
-          <li>1 lost, 5 moved: How do I move a Node.js app off a single VPS without downtime?</li>
+          <li>1 gained, 1 lost, 4 moved: What is the easiest way to add API keys and rate limits to an existing API?</li>
+          <li><span class="mk" data-mark="underline" data-tone="instead">3 lost</span>, 3 moved: Which API platform has the most predictable pricing for a startup?</li>
+          <li>1 lost, 5 moved: How do I move an API off a single VPS without downtime?</li>
         </ul>
         <p class="alert-link">Open in Byname</p>
       </figure>
     </div>
     <div class="proof">
-      <p class="proof-note">The same two checks in Byname's Compare view, filtered to what was lost. <span>A real screenshot of the app, with example data.</span></p>
+      <p class="proof-note">The same two checks in Byname's What changed view, filtered to what was lost. <span>A real screenshot of the app, with example data.</span></p>
       <figure class="sheet shot">
         <picture>
-          <source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="/screens/compare-lost-sm-dark.webp" width="788" height="490" />
-          <source media="(max-width: 600px)" srcset="/screens/compare-lost-sm.webp" width="788" height="490" />
-          <source media="(prefers-color-scheme: dark)" srcset="/screens/compare-lost-dark.webp" width="1848" height="1066" />
-          <img src="/screens/compare-lost.webp" width="1848" height="1066" loading="lazy" decoding="async" alt="Byname's Compare view for check #6 against check #7, showing the 6 lost pairs. The pricing question lost Claude Code with claude-sonnet-5-5 (#2, then cited but not named), Codex CLI (#3, then not named) and the ChatGPT app (#2, then not named)." />
+          <source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="/screens/compare-lost-sm-dark.webp" width="758" height="490" />
+          <source media="(max-width: 600px)" srcset="/screens/compare-lost-sm.webp" width="758" height="490" />
+          <source media="(prefers-color-scheme: dark)" srcset="/screens/compare-lost-dark.webp" width="1818" height="1066" />
+          <img src="/screens/compare-lost.webp" width="1818" height="1066" loading="lazy" decoding="async" alt="Byname's What changed view for check #6 against check #7, showing the 6 lost answers. The pricing question lost Claude Code with claude-sonnet-5-5 (#2, then linked but not named), Codex CLI (#3, then not named) and the ChatGPT app (#2, then not named)." />
         </picture>
       </figure>
     </div>
@@ -300,15 +300,15 @@
         <p class="kicker"><span>5</span>Search and site changes</p>
         <h2 id="search-title">Search Console, <em>on the same timeline.</em></h2>
       </div>
-      <p class="sec-lede">Byname reads Search Console every day with read-only access: clicks, impressions, CTR and position, and brand against non-brand. Merged pull requests and changes you log by hand mark the chart. After Google recrawls a changed page, Byname compares it with control pages you left alone.</p>
+      <p class="sec-lede">Byname reads Search Console every day with read-only access: clicks, impressions, CTR and position, and brand against non-brand. Merged pull requests and changes you log by hand mark the chart. After Google recrawls a changed page, Byname compares it with pages you left alone.</p>
     </div>
     <div class="chart-block" data-reveal>
       <figure class="chart sheet">
-        <figcaption class="chart-cap"><span>Clicks per day · northwind.example</span><span>Aug 23 to Nov 20, 2026</span></figcaption>
+        <figcaption class="chart-cap"><span>Clicks per day · unkey.com, example data</span><span>Aug 23 to Nov 20, 2026</span></figcaption>
         <div class="chart-wide">
 <!-- chart-wide -->
 <svg class="chart-svg" viewBox="0 0 1000 360" role="img" aria-labelledby="chart-t-1000" style="--fs:12px">
-<title id="chart-t-1000">Search Console clicks per day for the example site, August 23 to November 20, 2026, between about 50 and 120 a day. Five site changes are marked. The change logged on October 7 to /docs/preview-environments is circled, with brackets over the 31 days before it and the 31 days after Google's first crawl, October 10 to November 9.</title>
+<title id="chart-t-1000">Search Console clicks per day for the example site, August 23 to November 20, 2026, between about 50 and 120 a day. Five site changes are marked. The change logged on October 7 to /docs/ratelimiting is circled, with brackets over the 31 days before it and the 31 days after Google's first crawl, October 10 to November 9.</title>
 <path class="c-grid" d="M40 216.15384615384616H988"/><text class="c-y" x="32" y="220.35384615384615" text-anchor="end">50</text><path class="c-grid" d="M40 102.30769230769229H988"/><text class="c-y" x="32" y="106.5076923076923" text-anchor="end">100</text><text class="c-x" x="135.86516853932585" y="351.6" text-anchor="middle">Sep</text><path class="c-tick" d="M135.86516853932585 330v5"/><text class="c-x" x="455.4157303370787" y="351.6" text-anchor="middle">Oct</text><path class="c-tick" d="M455.4157303370787 330v5"/><text class="c-x" x="785.6179775280899" y="351.6" text-anchor="middle">Nov</text><path class="c-tick" d="M785.6179775280899 330v5"/>
 <path class="c-area" d="M40.0 218.4L50.7 152.4L61.3 154.7L72.0 161.5L82.6 157.0L93.3 166.1L103.9 213.9L114.6 211.6L125.2 154.7L135.9 168.3L146.5 157.0L157.2 152.4L167.8 154.7L178.5 202.5L189.1 204.8L199.8 157.0L210.4 152.4L221.1 141.0L231.7 161.5L242.4 154.7L253.0 202.5L263.7 209.3L274.3 145.6L285.0 150.1L295.6 154.7L306.3 138.7L316.9 154.7L327.6 218.4L338.2 213.9L348.9 150.1L359.6 129.6L370.2 152.4L380.9 154.7L391.5 141.0L402.2 211.6L412.8 197.9L423.5 145.6L434.1 159.2L444.8 163.8L455.4 166.1L466.1 172.9L476.7 223.0L487.4 211.6L498.0 150.1L508.7 129.6L519.3 145.6L530.0 131.9L540.6 159.2L551.3 168.3L561.9 188.8L572.6 118.2L583.2 93.2L593.9 129.6L604.5 100.0L615.2 111.4L625.8 166.1L636.5 182.0L647.1 127.4L657.8 106.9L668.4 111.4L679.1 93.2L689.8 116.0L700.4 172.9L711.1 163.8L721.7 88.6L732.4 134.2L743.0 109.1L753.7 93.2L764.3 97.8L775.0 161.5L785.6 184.3L796.3 122.8L806.9 72.7L817.6 113.7L828.2 61.3L838.9 97.8L849.5 172.9L860.2 188.8L870.8 104.6L881.5 90.9L892.1 97.8L902.8 97.8L913.4 90.9L924.1 161.5L934.7 154.7L945.4 104.6L956.0 77.3L966.7 68.2L977.3 72.7L988.0 79.5L988.0 330L40.0 330Z"/><path class="c-line" d="M40.0 218.4L50.7 152.4L61.3 154.7L72.0 161.5L82.6 157.0L93.3 166.1L103.9 213.9L114.6 211.6L125.2 154.7L135.9 168.3L146.5 157.0L157.2 152.4L167.8 154.7L178.5 202.5L189.1 204.8L199.8 157.0L210.4 152.4L221.1 141.0L231.7 161.5L242.4 154.7L253.0 202.5L263.7 209.3L274.3 145.6L285.0 150.1L295.6 154.7L306.3 138.7L316.9 154.7L327.6 218.4L338.2 213.9L348.9 150.1L359.6 129.6L370.2 152.4L380.9 154.7L391.5 141.0L402.2 211.6L412.8 197.9L423.5 145.6L434.1 159.2L444.8 163.8L455.4 166.1L466.1 172.9L476.7 223.0L487.4 211.6L498.0 150.1L508.7 129.6L519.3 145.6L530.0 131.9L540.6 159.2L551.3 168.3L561.9 188.8L572.6 118.2L583.2 93.2L593.9 129.6L604.5 100.0L615.2 111.4L625.8 166.1L636.5 182.0L647.1 127.4L657.8 106.9L668.4 111.4L679.1 93.2L689.8 116.0L700.4 172.9L711.1 163.8L721.7 88.6L732.4 134.2L743.0 109.1L753.7 93.2L764.3 97.8L775.0 161.5L785.6 184.3L796.3 122.8L806.9 72.7L817.6 113.7L828.2 61.3L838.9 97.8L849.5 172.9L860.2 188.8L870.8 104.6L881.5 90.9L892.1 97.8L902.8 97.8L913.4 90.9L924.1 161.5L934.7 154.7L945.4 104.6L956.0 77.3L966.7 68.2L977.3 72.7L988.0 79.5"/>
 <path class="c-pr" d="M732.3595505617977 38V330"/><text class="c-prl" x="732.3595505617977" y="30" text-anchor="middle">#21</text><path class="c-pr" d="M902.7865168539325 38V330"/><text class="c-prl" x="902.7865168539325" y="30" text-anchor="middle">#27</text><path class="c-pr" d="M945.3932584269663 38V330"/><text class="c-prl" x="945.3932584269663" y="30" text-anchor="middle">#24</text><path class="c-pr" d="M988 38V330"/><text class="c-prl" x="988" y="30" text-anchor="middle">#26</text>
@@ -325,7 +325,7 @@
         <div class="chart-narrow">
 <!-- chart-narrow -->
 <svg class="chart-svg" viewBox="0 0 360 300" role="img" aria-labelledby="chart-t-360" style="--fs:10px">
-<title id="chart-t-360">Search Console clicks per day for the example site, August 23 to November 20, 2026, between about 50 and 120 a day. Five site changes are marked. The change logged on October 7 to /docs/preview-environments is circled, with brackets over the 31 days before it and the 31 days after Google's first crawl, October 10 to November 9.</title>
+<title id="chart-t-360">Search Console clicks per day for the example site, August 23 to November 20, 2026, between about 50 and 120 a day. Five site changes are marked. The change logged on October 7 to /docs/ratelimiting is circled, with brackets over the 31 days before it and the 31 days after Google's first crawl, October 10 to November 9.</title>
 <path class="c-grid" d="M26 180.15384615384616H354"/><text class="c-y" x="18" y="183.65384615384616" text-anchor="end">50</text><path class="c-grid" d="M26 86.30769230769229H354"/><text class="c-y" x="18" y="89.80769230769229" text-anchor="end">100</text><text class="c-x" x="59.168539325842694" y="292" text-anchor="middle">Sep</text><path class="c-tick" d="M59.168539325842694 274v5"/><text class="c-x" x="169.7303370786517" y="292" text-anchor="middle">Oct</text><path class="c-tick" d="M169.7303370786517 274v5"/><text class="c-x" x="283.97752808988764" y="292" text-anchor="middle">Nov</text><path class="c-tick" d="M283.97752808988764 274v5"/>
 <path class="c-area" d="M26.0 182.0L29.7 127.6L33.4 129.5L37.1 135.1L40.7 131.4L44.4 138.9L48.1 178.3L51.8 176.4L55.5 129.5L59.2 140.7L62.9 131.4L66.5 127.6L70.2 129.5L73.9 168.9L77.6 170.8L81.3 131.4L85.0 127.6L88.7 118.2L92.3 135.1L96.0 129.5L99.7 168.9L103.4 174.5L107.1 122.0L110.8 125.7L114.4 129.5L118.1 116.3L121.8 129.5L125.5 182.0L129.2 178.3L132.9 125.7L136.6 108.8L140.2 127.6L143.9 129.5L147.6 118.2L151.3 176.4L155.0 165.1L158.7 122.0L162.4 133.2L166.0 137.0L169.7 138.9L173.4 144.5L177.1 185.8L180.8 176.4L184.5 125.7L188.2 108.8L191.8 122.0L195.5 110.7L199.2 133.2L202.9 140.7L206.6 157.6L210.3 99.4L214.0 78.8L217.6 108.8L221.3 84.4L225.0 93.8L228.7 138.9L232.4 152.0L236.1 107.0L239.8 90.1L243.4 93.8L247.1 78.8L250.8 97.6L254.5 144.5L258.2 137.0L261.9 75.0L265.6 112.6L269.2 91.9L272.9 78.8L276.6 82.6L280.3 135.1L284.0 153.9L287.7 103.2L291.3 61.9L295.0 95.7L298.7 52.5L302.4 82.6L306.1 144.5L309.8 157.6L313.5 88.2L317.1 76.9L320.8 82.6L324.5 82.6L328.2 76.9L331.9 135.1L335.6 129.5L339.3 88.2L342.9 65.7L346.6 58.2L350.3 61.9L354.0 67.5L354.0 274L26.0 274Z"/><path class="c-line" d="M26.0 182.0L29.7 127.6L33.4 129.5L37.1 135.1L40.7 131.4L44.4 138.9L48.1 178.3L51.8 176.4L55.5 129.5L59.2 140.7L62.9 131.4L66.5 127.6L70.2 129.5L73.9 168.9L77.6 170.8L81.3 131.4L85.0 127.6L88.7 118.2L92.3 135.1L96.0 129.5L99.7 168.9L103.4 174.5L107.1 122.0L110.8 125.7L114.4 129.5L118.1 116.3L121.8 129.5L125.5 182.0L129.2 178.3L132.9 125.7L136.6 108.8L140.2 127.6L143.9 129.5L147.6 118.2L151.3 176.4L155.0 165.1L158.7 122.0L162.4 133.2L166.0 137.0L169.7 138.9L173.4 144.5L177.1 185.8L180.8 176.4L184.5 125.7L188.2 108.8L191.8 122.0L195.5 110.7L199.2 133.2L202.9 140.7L206.6 157.6L210.3 99.4L214.0 78.8L217.6 108.8L221.3 84.4L225.0 93.8L228.7 138.9L232.4 152.0L236.1 107.0L239.8 90.1L243.4 93.8L247.1 78.8L250.8 97.6L254.5 144.5L258.2 137.0L261.9 75.0L265.6 112.6L269.2 91.9L272.9 78.8L276.6 82.6L280.3 135.1L284.0 153.9L287.7 103.2L291.3 61.9L295.0 95.7L298.7 52.5L302.4 82.6L306.1 144.5L309.8 157.6L313.5 88.2L317.1 76.9L320.8 82.6L324.5 82.6L328.2 76.9L331.9 135.1L335.6 129.5L339.3 88.2L342.9 65.7L346.6 58.2L350.3 61.9L354.0 67.5"/>
 <path class="c-pr" d="M265.55056179775283 34V274"/><path class="c-pr" d="M324.5168539325843 34V274"/><path class="c-pr" d="M339.2584269662921 34V274"/><path class="c-pr" d="M354 34V274"/>
@@ -342,17 +342,17 @@
       </figure>
       <div class="verdict">
         <div class="verdict-text">
-          <p class="verdict-k">/docs/preview-environments</p>
-          <p class="verdict-v"><span class="mk" data-mark="circle" data-pad="12 6">Improved</span> <span class="exp">experimental</span></p>
-          <p>Logged by hand on Oct 7. Over the 31 days after Google recrawled it, against 2 control pages: position up 4.07 places and CTR up 0.97 points.</p>
-          <p class="verdict-how">Each read subtracts what the control pages did over the same days, so a swing in demand that moved every page cancels out.</p>
+          <p class="verdict-k">/docs/ratelimiting</p>
+          <p class="verdict-v"><span class="mk" data-mark="circle" data-pad="12 6">Helped</span> <span class="exp">experimental</span></p>
+          <p>Logged by hand on Oct 7. Over the 31 days after Google recrawled it, compared with 2 pages left alone: average position up 4.07 places and click rate up 0.97 points.</p>
+          <p class="verdict-how">Each result subtracts what the comparison pages did over the same days, so a swing in demand that moved every page cancels out.</p>
         </div>
         <figure class="sheet shot">
           <picture>
-            <source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="/screens/verdict-sm-dark.webp" width="706" height="578" />
-            <source media="(max-width: 600px)" srcset="/screens/verdict-sm.webp" width="706" height="578" />
-            <source media="(prefers-color-scheme: dark)" srcset="/screens/verdict-dark.webp" width="1510" height="1052" />
-            <img src="/screens/verdict.webp" width="1510" height="1052" loading="lazy" decoding="async" alt="The final read for the change to /docs/preview-environments in Byname, marked Improved and Experimental. Against the control pages, position moved -4.07 places and CTR rose 0.97 points, both past their thresholds. Impressions rose by a factor of 1.43, under the threshold." />
+            <source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="/screens/verdict-sm-dark.webp" width="676" height="674" />
+            <source media="(max-width: 600px)" srcset="/screens/verdict-sm.webp" width="676" height="674" />
+            <source media="(prefers-color-scheme: dark)" srcset="/screens/verdict-dark.webp" width="1480" height="1180" />
+            <img src="/screens/verdict.webp" width="1480" height="1180" loading="lazy" decoding="async" alt="The final result for the change to /docs/ratelimiting in Byname, marked Helped and Experimental. Compared with the comparison pages, average position moved -4.07 places and click rate rose 0.97 points, both past their margins. Appearances rose by a factor of 1.43, within margin." />
           </picture>
         </figure>
       </div>
@@ -369,7 +369,7 @@
     </div>
     <div class="agents">
       <figure class="sheet transcript" data-reveal aria-label="A coding agent asks Byname which questions were lost in check #7 and answers from compare_runs.">
-        <p class="t-head"><span>~/northwind-site</span><span>claude</span></p>
+        <p class="t-head"><span>~/unkey/www</span><span>claude</span></p>
         <div class="t-body">
           <p class="t-user"><span aria-hidden="true">&gt;</span> Which questions did we lose in check #7?</p>
           <p class="t-call"><b>byname</b> compare_runs <span>before=6 after=7</span></p>
@@ -377,12 +377,12 @@
           <div class="t-say">
             <p>Check #7 lost 6 answers that check #6 had:</p>
             <ul>
-              <li><q>Which cloud platform has the most predictable pricing for a startup?</q> on Claude Code with Sonnet, Codex CLI and the ChatGPT app.</li>
-              <li><q>What is the easiest way to get preview environments for every pull request?</q> on the ChatGPT app.</li>
-              <li><q>How do I move a Node.js app off a single VPS without downtime?</q> on Google AI Overview.</li>
-              <li><q>What are good alternatives to managing my own container cluster?</q> on the Perplexity app.</li>
+              <li><q>Which API platform has the most predictable pricing for a startup?</q> on Claude Code with Sonnet, Codex CLI and the ChatGPT app.</li>
+              <li><q>What is the easiest way to add API keys and rate limits to an existing API?</q> on the ChatGPT app.</li>
+              <li><q>How do I move an API off a single VPS without downtime?</q> on Google AI Overview.</li>
+              <li><q>What are good alternatives to running my own API gateway?</q> on the Perplexity app.</li>
             </ul>
-            <p>On the ChatGPT app, the pricing question now names Tailspin Hosting first.</p>
+            <p>On the ChatGPT app, the pricing question now names Fly.io first.</p>
           </div>
         </div>
       </figure>
