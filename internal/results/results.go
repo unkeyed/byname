@@ -1,7 +1,7 @@
 // Package results reads what checks recorded, shaped for the screens and
 // for agents: runs with their spend and success rates, answers, run
 // compare, a question's history, mention and citation rates, share of
-// mentions, and gaps.
+// mentions, gaps, and a content brief per question.
 //
 // Everything is plotted by run, not by day. A series is one surface and
 // model pair on one endpoint at one fidelity: changing the endpoint or the
