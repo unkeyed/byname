@@ -40,7 +40,8 @@ type env struct {
 
 func setup(t *testing.T, o notify.Options) *env {
 	t.Helper()
-	e := &env{db: testdb.New(t), clock: &clock{t: time.Now()}}
+	// Postgres keeps microseconds, so a clock with nanoseconds would not survive a round trip on Linux.
+	e := &env{db: testdb.New(t), clock: &clock{t: time.Now().Truncate(time.Microsecond)}}
 	o.Secrets = secretbox.ForTest()
 	o.PublicURL = &url.URL{Scheme: "https", Host: "byname.example"}
 	o.Now = e.clock.now
