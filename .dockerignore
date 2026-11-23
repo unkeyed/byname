@@ -4,3 +4,9 @@ web/node_modules
 web/dist
 docker-compose.yml
 Dockerfile
+.env
+.env.*
+.byname-dev-key
+*.pem
+*.key
+.claude/

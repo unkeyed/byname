@@ -2,7 +2,13 @@
 *.test
 *.out
 .env
+.env.*
+!.env.example
 .byname-dev-key
+*.pem
+*.key
+.claude/
+CLAUDE.local.md
 .DS_Store
 
 web/node_modules/
