@@ -13,6 +13,7 @@ package sources
 
 import (
 	"context"
+	"github.com/unkeyed/byname/internal/db"
 	"log/slog"
 	"net/url"
 	"sort"
@@ -20,7 +21,6 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/unkeyed/byname/internal/config"
 )
@@ -68,13 +68,13 @@ type Options struct {
 }
 
 type Service struct {
-	db     *pgxpool.Pool
+	db     db.Pool
 	config *config.Service
 	fetch  *fetcher
 	o      Options
 }
 
-func New(db *pgxpool.Pool, cfg *config.Service, o Options) *Service {
+func New(db db.Pool, cfg *config.Service, o Options) *Service {
 	if o.RefetchAfter == 0 {
 		o.RefetchAfter = 7 * 24 * time.Hour
 	}

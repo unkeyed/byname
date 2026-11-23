@@ -12,10 +12,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/unkeyed/byname/internal/db"
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/unkeyed/byname/internal/core"
 	"github.com/unkeyed/byname/internal/engines"
@@ -23,10 +23,10 @@ import (
 )
 
 type Service struct {
-	db *pgxpool.Pool
+	db db.Pool
 }
 
-func New(db *pgxpool.Pool) *Service { return &Service{db: db} }
+func New(db db.Pool) *Service { return &Service{db: db} }
 
 // Run is one check with what it cost and how each endpoint did.
 type Run struct {

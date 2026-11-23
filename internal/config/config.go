@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/unkeyed/byname/internal/db"
 	"net/http"
 	"regexp"
 	"slices"
@@ -16,7 +17,6 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/unkeyed/byname/internal/core"
 	"github.com/unkeyed/byname/internal/engines"
@@ -24,7 +24,7 @@ import (
 )
 
 type Service struct {
-	db       *pgxpool.Pool
+	db       db.Pool
 	secrets  *secretbox.Box
 	client   *http.Client
 	resolve  engines.Resolver
@@ -55,7 +55,7 @@ type Options struct {
 	Alerts Alerts
 }
 
-func New(db *pgxpool.Pool, o Options) *Service {
+func New(db db.Pool, o Options) *Service {
 	if o.Now == nil {
 		o.Now = time.Now
 	}

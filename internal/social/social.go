@@ -12,13 +12,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/unkeyed/byname/internal/db"
 	"net/http"
 	"slices"
 	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/unkeyed/byname/internal/core"
 	"github.com/unkeyed/byname/internal/engines"
@@ -38,7 +38,7 @@ type Alerts interface {
 }
 
 type Service struct {
-	db       *pgxpool.Pool
+	db       db.Pool
 	keys     Keys
 	alerts   Alerts
 	client   *http.Client
@@ -57,7 +57,7 @@ type Options struct {
 	Now        func() time.Time
 }
 
-func New(db *pgxpool.Pool, keys Keys, o Options) *Service {
+func New(db db.Pool, keys Keys, o Options) *Service {
 	if o.Now == nil {
 		o.Now = time.Now
 	}

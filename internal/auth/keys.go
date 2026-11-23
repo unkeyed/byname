@@ -12,12 +12,12 @@ import (
 	"encoding/base32"
 	"errors"
 	"fmt"
+	"github.com/unkeyed/byname/internal/db"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/unkeyed/byname/internal/core"
 )
 
@@ -116,7 +116,7 @@ type UnkeyConfig struct {
 // NewKeyStore picks Unkey when both UNKEY_ROOT_KEY and UNKEY_API_ID are set,
 // otherwise the built-in Postgres store. Setting only one of the two is a
 // config error raised by main before this is called.
-func NewKeyStore(db *pgxpool.Pool, unkey UnkeyConfig) KeyStore {
+func NewKeyStore(db db.Pool, unkey UnkeyConfig) KeyStore {
 	if unkey.RootKey != "" {
 		return newUnkeyKeys(unkey, unkeyBaseURL)
 	}
@@ -172,7 +172,7 @@ func hashToken(token string) []byte {
 // dbKeys stores SHA-256(token) in api_keys. Verify looks a key up by its
 // hash alone, so no secret byte is ever compared in Go.
 type dbKeys struct {
-	db *pgxpool.Pool
+	db db.Pool
 }
 
 func (k *dbKeys) Verify(ctx context.Context, token string) (VerifiedKey, error) {

@@ -4,12 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/unkeyed/byname/internal/db"
 	"net/url"
 	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/unkeyed/byname/internal/core"
 )
 
@@ -122,7 +122,7 @@ func (u *Users) checkSetup(ctx context.Context, db dbtx, tokenHash []byte) (setu
 // IssueRecovery returns a one-time link that lets the user with email
 // register a new passkey, for `byname recover`. Whoever runs it holds the
 // database credentials, which already control every account.
-func IssueRecovery(ctx context.Context, db *pgxpool.Pool, publicURL *url.URL, email string) (string, error) {
+func IssueRecovery(ctx context.Context, db db.Pool, publicURL *url.URL, email string) (string, error) {
 	email = normalizeEmail(email)
 	var id int64
 	err := db.QueryRow(ctx, `SELECT id FROM users WHERE email = $1`, email).Scan(&id)

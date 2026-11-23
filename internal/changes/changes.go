@@ -11,13 +11,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/unkeyed/byname/internal/db"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/unkeyed/byname/internal/core"
 	"github.com/unkeyed/byname/internal/gsc"
@@ -39,7 +39,7 @@ type Alerts interface {
 }
 
 type Service struct {
-	db      *pgxpool.Pool
+	db      db.Pool
 	search  Search
 	alerts  Alerts
 	secrets *secretbox.Box
@@ -64,7 +64,7 @@ type Options struct {
 	InspectionsPerDay int
 }
 
-func New(db *pgxpool.Pool, search Search, o Options) *Service {
+func New(db db.Pool, search Search, o Options) *Service {
 	if o.GitHubBaseURL == "" {
 		o.GitHubBaseURL = "https://api.github.com"
 	}

@@ -15,6 +15,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/unkeyed/byname/internal/db"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -22,7 +23,6 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/unkeyed/byname/internal/core"
 	"github.com/unkeyed/byname/internal/engines"
@@ -46,7 +46,7 @@ const (
 func backoff(attempt int) time.Duration { return 30 * time.Second << (2 * (attempt - 1)) }
 
 type Service struct {
-	db      *pgxpool.Pool
+	db      db.Pool
 	results *results.Service
 	secrets *secretbox.Box
 	public  *url.URL
@@ -74,7 +74,7 @@ type Options struct {
 	Log         *slog.Logger
 }
 
-func New(db *pgxpool.Pool, res *results.Service, o Options) *Service {
+func New(db db.Pool, res *results.Service, o Options) *Service {
 	if o.HTTPClient == nil {
 		o.HTTPClient = &http.Client{}
 	}

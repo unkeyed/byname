@@ -9,6 +9,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"github.com/unkeyed/byname/internal/db"
 	"net/url"
 	"strconv"
 	"strings"
@@ -19,7 +20,6 @@ import (
 	"github.com/go-webauthn/webauthn/webauthn"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/unkeyed/byname/internal/core"
 )
 
@@ -51,7 +51,7 @@ import (
 // alone decides expiry. CSRF: httpapi wraps cookie routes in
 // http.CrossOriginProtection.
 type Users struct {
-	db        *pgxpool.Pool
+	db        db.Pool
 	cfg       Config
 	webauthn  *webauthn.WebAuthn
 	providers map[string]provider
@@ -94,7 +94,7 @@ type User struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
-func NewUsers(db *pgxpool.Pool, cfg Config) (*Users, error) {
+func NewUsers(db db.Pool, cfg Config) (*Users, error) {
 	if cfg.Secrets == nil {
 		return nil, errors.New("auth: Config.Secrets is required to seal TOTP seeds")
 	}

@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"github.com/unkeyed/byname/internal/db"
 	"net/url"
 	"slices"
 	"strconv"
@@ -15,7 +16,6 @@ import (
 	"unicode/utf8"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/modelcontextprotocol/go-sdk/oauthex"
 
 	"github.com/unkeyed/byname/internal/core"
@@ -32,7 +32,7 @@ import (
 // consent page shows the redirect target for that reason, and a person can
 // revoke a connection from Settings at any time.
 type OAuthServer struct {
-	db       *pgxpool.Pool
+	db       db.Pool
 	issuer   string
 	resource string
 }
@@ -69,7 +69,7 @@ func oauthErr(code, description string) *OAuthError {
 	return &OAuthError{Code: code, Description: description}
 }
 
-func NewOAuthServer(db *pgxpool.Pool, publicURL *url.URL) *OAuthServer {
+func NewOAuthServer(db db.Pool, publicURL *url.URL) *OAuthServer {
 	o := origin(publicURL)
 	return &OAuthServer{db: db, issuer: o, resource: o + "/mcp"}
 }

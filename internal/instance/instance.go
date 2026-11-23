@@ -5,9 +5,8 @@ package instance
 
 import (
 	"context"
+	"github.com/unkeyed/byname/internal/db"
 	"time"
-
-	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/unkeyed/byname/internal/config"
 	"github.com/unkeyed/byname/internal/discovery"
@@ -45,13 +44,13 @@ type OtherBrands interface {
 
 type Service struct {
 	version string
-	db      *pgxpool.Pool
+	db      db.Pool
 	config  Config
 	social  Social
 	brands  OtherBrands
 }
 
-func New(version string, db *pgxpool.Pool, cfg Config, soc Social, brands OtherBrands) *Service {
+func New(version string, db db.Pool, cfg Config, soc Social, brands OtherBrands) *Service {
 	return &Service{version: version, db: db, config: cfg, social: soc, brands: brands}
 }
 

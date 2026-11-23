@@ -134,9 +134,28 @@ func loadSecrets() (*secretbox.Box, error) {
 
 // loadConfig reads and validates the environment. Every config error is
 // reported here, before anything connects, with the variable's name.
-// defaultPoolSize is the database pool's size when DATABASE_URL does not set
-// pool_max_conns.
+// defaultPoolSize is how many connections Byname opens in all when
+// DATABASE_URL does not set pool_max_conns. openLanes splits them.
 const defaultPoolSize = 20
+
+// openLanes opens the two pools Lanes routes between, splitting the
+// connection budget: half, rounded up, for requests, the rest for
+// background work, and at least 2 each.
+func openLanes(ctx context.Context, cfg *pgxpool.Config) (db.Lanes, error) {
+	web, jobs := cfg.Copy(), cfg.Copy()
+	web.MaxConns = max(2, (cfg.MaxConns+1)/2)
+	jobs.MaxConns = max(2, cfg.MaxConns-web.MaxConns)
+	webPool, err := pgxpool.NewWithConfig(ctx, web)
+	if err != nil {
+		return db.Lanes{}, err
+	}
+	jobsPool, err := pgxpool.NewWithConfig(ctx, jobs)
+	if err != nil {
+		webPool.Close()
+		return db.Lanes{}, err
+	}
+	return db.Lanes{Web: webPool, Jobs: jobsPool}, nil
+}
 
 func loadConfig() (config, error) {
 	c := config{
@@ -153,9 +172,9 @@ func loadConfig() (config, error) {
 		// pgx's message can echo the URL, password included, so it is not logged.
 		return c, errors.New("DATABASE_URL is not a Postgres connection string; want postgres://user:pass@host:5432/byname")
 	}
-	// pgx sizes the pool from the CPU count, 4 on a small instance. A check
-	// storing answers in parallel fills that on its own, and every page then
-	// waits for a connection, so the pool is larger unless the URL sets it.
+	// pgx sizes the pool from the CPU count, 4 on a small instance, too few
+	// to split between requests and background work, so the budget is
+	// larger unless the URL sets it.
 	if !strings.Contains(dbURL, "pool_max_conns") {
 		db.MaxConns = defaultPoolSize
 	}
@@ -383,12 +402,13 @@ func run(log *slog.Logger) error {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, os.Interrupt)
 	defer stop()
 
-	pool, err := pgxpool.NewWithConfig(ctx, cfg.DB)
+	pool, err := openLanes(ctx, cfg.DB)
 	if err != nil {
 		return err
 	}
-	defer pool.Close()
-	if err := migrate(ctx, pool, cfg.MigrateDB); err != nil {
+	defer pool.Web.Close()
+	defer pool.Jobs.Close()
+	if err := migrate(ctx, pool.Web, cfg.MigrateDB); err != nil {
 		return err
 	}
 
@@ -461,12 +481,12 @@ func run(log *slog.Logger) error {
 	cited := sources.New(pool, settings, sources.Options{AllowPrivate: cfg.SourcesAllowPrivate, UserAgent: "Byname/" + version, Log: log})
 	jobs.Go(func() {
 		scheduler.New(runs, settings, scheduler.Options{Log: log, Sources: cited, Search: search, Changes: site, Social: mentions,
-			OtherBrands: []scheduler.Ticker{brands, logoLookups}}).Run(ctx)
+			OtherBrands: []scheduler.Ticker{brands, logoLookups}}).Run(db.Background(ctx))
 	})
-	jobs.Go(func() { alerts.Run(ctx) })
+	jobs.Go(func() { alerts.Run(db.Background(ctx)) })
 	log.Info("Byname listening", "port", cfg.Port, "version", version, "keys", authn.Keys.Mode(),
 		"public_url", cfg.Auth.PublicURL.String(), "password_login", cfg.Auth.PasswordLogin, "providers", len(cfg.Auth.Providers),
-		"db_pool", pool.Config().MaxConns)
+		"db_pool_web", pool.Web.Config().MaxConns, "db_pool_jobs", pool.Jobs.Config().MaxConns)
 
 	select {
 	case err := <-served:

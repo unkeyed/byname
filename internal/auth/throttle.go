@@ -2,11 +2,11 @@ package auth
 
 import (
 	"context"
+	"github.com/unkeyed/byname/internal/db"
 	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // Throttling counts failed attempts per key in login_failures, so every
@@ -49,7 +49,7 @@ func freeFor(key string) int {
 // transaction, so an attempt holds one connection however many queue. A
 // check error that failed reports true counts against every key; success
 // clears onSuccess.
-func guarded(ctx context.Context, db *pgxpool.Pool, keys, onSuccess []string, failed func(error) bool, check func(tx pgx.Tx) error) error {
+func guarded(ctx context.Context, db db.Pool, keys, onSuccess []string, failed func(error) bool, check func(tx pgx.Tx) error) error {
 	tx, err := db.Begin(ctx)
 	if err != nil {
 		return err

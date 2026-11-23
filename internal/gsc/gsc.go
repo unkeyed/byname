@@ -6,18 +6,17 @@ package gsc
 
 import (
 	"fmt"
+	"github.com/unkeyed/byname/internal/db"
 	"net/http"
 	"net/url"
 	"time"
-
-	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/unkeyed/byname/internal/core"
 	"github.com/unkeyed/byname/internal/secretbox"
 )
 
 type Service struct {
-	db        *pgxpool.Pool
+	db        db.Pool
 	secrets   *secretbox.Box
 	endpoints Endpoints
 	client    OAuthClient
@@ -56,7 +55,7 @@ type Options struct {
 	Now    func() time.Time
 }
 
-func New(db *pgxpool.Pool, o Options) *Service {
+func New(db db.Pool, o Options) *Service {
 	if o.Endpoints == (Endpoints{}) {
 		o.Endpoints = GoogleEndpoints("")
 	}

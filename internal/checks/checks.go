@@ -14,11 +14,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/unkeyed/byname/internal/db"
 	"log/slog"
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/unkeyed/byname/internal/config"
 	"github.com/unkeyed/byname/internal/core"
@@ -55,7 +55,7 @@ type Run struct {
 }
 
 type Service struct {
-	db     *pgxpool.Pool
+	db     db.Pool
 	config *config.Service
 	now    func() time.Time
 	sleep  func(context.Context, time.Duration) error
@@ -90,7 +90,7 @@ type Options struct {
 	Finder Finder
 }
 
-func New(db *pgxpool.Pool, cfg *config.Service, o Options) *Service {
+func New(db db.Pool, cfg *config.Service, o Options) *Service {
 	if o.Now == nil {
 		o.Now = time.Now
 	}

@@ -16,12 +16,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/unkeyed/byname/internal/db"
 	"log/slog"
 	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/unkeyed/byname/internal/config"
 	"github.com/unkeyed/byname/internal/core"
@@ -40,7 +40,7 @@ type Config interface {
 }
 
 type Service struct {
-	db     *pgxpool.Pool
+	db     db.Pool
 	config Config
 	now    func() time.Time
 	log    *slog.Logger
@@ -51,7 +51,7 @@ type Options struct {
 	Log *slog.Logger
 }
 
-func New(db *pgxpool.Pool, cfg Config, o Options) *Service {
+func New(db db.Pool, cfg Config, o Options) *Service {
 	if o.Now == nil {
 		o.Now = time.Now
 	}
