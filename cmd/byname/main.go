@@ -134,6 +134,10 @@ func loadSecrets() (*secretbox.Box, error) {
 
 // loadConfig reads and validates the environment. Every config error is
 // reported here, before anything connects, with the variable's name.
+// defaultPoolSize is the database pool's size when DATABASE_URL does not set
+// pool_max_conns.
+const defaultPoolSize = 20
+
 func loadConfig() (config, error) {
 	c := config{
 		Port:       os.Getenv("PORT"),
@@ -148,6 +152,12 @@ func loadConfig() (config, error) {
 	if err != nil {
 		// pgx's message can echo the URL, password included, so it is not logged.
 		return c, errors.New("DATABASE_URL is not a Postgres connection string; want postgres://user:pass@host:5432/byname")
+	}
+	// pgx sizes the pool from the CPU count, 4 on a small instance. A check
+	// storing answers in parallel fills that on its own, and every page then
+	// waits for a connection, so the pool is larger unless the URL sets it.
+	if !strings.Contains(dbURL, "pool_max_conns") {
+		db.MaxConns = defaultPoolSize
 	}
 	c.DB = db
 	if migrateURL := os.Getenv("MIGRATION_DATABASE_URL"); migrateURL != "" {
@@ -455,7 +465,8 @@ func run(log *slog.Logger) error {
 	})
 	jobs.Go(func() { alerts.Run(ctx) })
 	log.Info("Byname listening", "port", cfg.Port, "version", version, "keys", authn.Keys.Mode(),
-		"public_url", cfg.Auth.PublicURL.String(), "password_login", cfg.Auth.PasswordLogin, "providers", len(cfg.Auth.Providers))
+		"public_url", cfg.Auth.PublicURL.String(), "password_login", cfg.Auth.PasswordLogin, "providers", len(cfg.Auth.Providers),
+		"db_pool", pool.Config().MaxConns)
 
 	select {
 	case err := <-served:
