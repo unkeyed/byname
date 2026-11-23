@@ -226,6 +226,9 @@ type Gap struct {
 	Demand      *int      `json:"demand" jsonschema:"monthly searches; null until a demand source is configured"`
 	NamedOnMiss []string  `json:"named_on_miss" jsonschema:"competitors named by the answers that did not name you, most often first"`
 	Pairs       []GapPair `json:"pairs" jsonschema:"each pair's answer, in pair order"`
+	// Pages are the pages marked as answering the question, under any
+	// version of it, so a row shows it is already handled.
+	Pages []MarkedPage `json:"pages" jsonschema:"pages marked as answering this question, most recently marked first"`
 }
 
 // GapPair is one pair's answer to a gap's question.
@@ -298,10 +301,15 @@ func (s *Service) Gaps(ctx context.Context, runID int64, sc Scope) (Gaps, error)
 	if err != nil {
 		return Gaps{}, err
 	}
+	marked, err := s.markedFor(ctx)
+	if err != nil {
+		return Gaps{}, err
+	}
 	out := Gaps{RunID: runID, Gaps: []Gap{}}
 	for _, g := range panel.RankGaps(gaps) {
 		row := Gap{Question: questions[g.Question], Engines: g.Engines, Named: g.Named, Competitors: g.Competitors,
-			Opportunity: g.Opportunity(), Demand: g.Demand, NamedOnMiss: namedInstead(byQuestion[g.Question], brands), Pairs: []GapPair{}}
+			Opportunity: g.Opportunity(), Demand: g.Demand, NamedOnMiss: namedInstead(byQuestion[g.Question], brands), Pairs: []GapPair{},
+			Pages: append([]MarkedPage{}, marked[g.Question]...)}
 		for _, a := range byQuestion[g.Question] {
 			row.Pairs = append(row.Pairs, GapPair{Series: a.series, AnswerID: a.id, Status: a.scored.Status, Named: a.scored.Mentioned,
 				Position: nullPosition(a.scored.Position), FanOut: a.fanOut, Links: append([]string{}, links[a.id]...)})
