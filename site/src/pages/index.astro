@@ -77,7 +77,6 @@ import { repo, summary, title } from "../lib/site";
   <section class="sec wrap" id="questions" aria-labelledby="questions-title">
     <div class="sec-head">
       <h2 id="questions-title">Every question your buyers ask.</h2>
-      <p class="sec-lede">Asked in twelve AI apps, the same way every time.</p>
     </div>
     <figure class="contents sheet" data-reveal>
       <div class="contents-scroll">
@@ -98,7 +97,7 @@ import { repo, summary, title } from "../lib/site";
   <section class="sec wrap" id="lost" aria-labelledby="lost-title">
     <div class="sec-head">
       <h2 id="lost-title">Know the day you drop out.</h2>
-      <p class="sec-lede">A Slack message when an AI app stops naming you.</p>
+      <p class="sec-lede">Get notified when an AI app stops naming you.</p>
     </div>
     <div class="story" data-reveal>
       <figure class="sheet clip" aria-labelledby="c6-cap">
@@ -128,7 +127,7 @@ import { repo, summary, title } from "../lib/site";
       </figure>
       <svg class="story-arrow" viewBox="0 0 80 40" aria-hidden="true"><path class="draw" pathLength="1" d="M4 22 C 24 30, 48 28, 70 18 M60 15 L71 18 L64 27" style="--d:.5s" /></svg>
       <figure class="sheet alert" aria-labelledby="alert-cap">
-        <header class="alert-head"><span class="alert-av" aria-hidden="true">b</span><span><b id="alert-cap">Byname</b><small>#visibility in Slack</small></span></header>
+        <header class="alert-head"><span class="alert-av" aria-hidden="true">b</span><span><b id="alert-cap">Byname</b><small>Notification</small></span></header>
         <p class="alert-title">Check #7: 1 gained, 6 lost</p>
         <p>Named in 24 of 36 answers.</p>
         <p>Since check #6: 1 gained, 6 lost, 17 moved, net -5.</p>
@@ -152,10 +151,35 @@ import { repo, summary, title } from "../lib/site";
     </div>
   </section>
 
+  <section class="sec wrap" id="fix" aria-labelledby="fix-title">
+    <div class="sec-head">
+      <h2 id="fix-title">Close the gap. <em>Then see if it worked.</em></h2>
+    </div>
+    <div class="story story-2" data-reveal>
+      <figure class="sheet clip" aria-labelledby="fix-cap">
+        <header class="sheet-head"><span id="fix-cap"><b>Missed in 6 of 6</b></span><span>Missed question</span></header>
+        <p class="q">Which platform is best for hosting a Postgres-backed API close to European users?</p>
+        <p class="fix-what"><b>What to do:</b> AI named <span class="mk" data-mark="underline" data-tone="instead">Fly.io</span>, Cloudflare and AWS instead. Write a page on your site that answers this question.</p>
+        <p class="fix-act"><span class="fix-btn">Prompt for your agent</span><span class="note">a brief your coding agent writes the page from</span></p>
+      </figure>
+      <svg class="story-arrow" viewBox="0 0 80 40" aria-hidden="true"><path class="draw" pathLength="1" d="M4 24 C 22 10, 46 10, 70 20 M61 13 L71 20 L60 25" /></svg>
+      <figure class="sheet clip" aria-labelledby="handled-cap">
+        <header class="sheet-head"><span id="handled-cap"><b>Handled</b> · unkey.com/blog/eu-postgres-apis</span><span>Two checks later</span></header>
+        <p class="q">Which platform is best for hosting a Postgres-backed API close to European users?</p>
+        <p class="fix-linked"><span class="mk" data-mark="circle" data-pad="8 5">Linked in 3 answers</span></p>
+        <ol class="mini">
+          <li><b>ChatGPT app</b></li>
+          <li><b>Claude Code</b><span class="note">Sonnet 5.5</span></li>
+          <li><b>Perplexity app</b></li>
+        </ol>
+        <footer class="sheet-foot"><span>Named you: before 0 of 6, now <b class="you-now">4 of 6</b></span><span>Example data</span></footer>
+      </figure>
+    </div>
+  </section>
+
   <section class="sec wrap" id="apps" aria-labelledby="apps-title">
     <div class="sec-head">
       <h2 id="apps-title">What buyers see. <em>Not what an API says.</em></h2>
-      <p class="sec-lede">Read from the real apps wherever possible.</p>
     </div>
     <div class="register sheet" data-reveal>
       <article class="grade">
@@ -194,7 +218,7 @@ import { repo, summary, title } from "../lib/site";
   <section class="sec wrap" id="search" aria-labelledby="search-title">
     <div class="sec-head">
       <h2 id="search-title">Did that page change help?</h2>
-      <p class="sec-lede">Search Console and every page change on one chart, with a verdict a month later.</p>
+      <p class="sec-lede">See what each page change did to your Google traffic.</p>
     </div>
     <div class="chart-block" data-reveal>
       <figure class="chart sheet">
@@ -219,10 +243,27 @@ import { repo, summary, title } from "../lib/site";
     </div>
   </section>
 
+  <section class="sec wrap" id="social" aria-labelledby="social-title">
+    <div class="sec-head">
+      <h2 id="social-title">What people say about you. <em>Not just what AI says.</em></h2>
+      <p class="sec-lede">Posts that name you on seven networks, in one weekly digest.</p>
+    </div>
+    <figure class="sheet alert social-digest" data-reveal aria-labelledby="digest-cap">
+      <header class="alert-head"><span class="alert-av" aria-hidden="true">b</span><span><b id="digest-cap">Byname</b><small>Weekly social digest</small></span></header>
+      <p class="alert-title">23 posts named Unkey this week</p>
+      <p>X 9 · Reddit 6 · Hacker News 3 · Bluesky 3 · LinkedIn 2. Your team's own accounts are left out.</p>
+      <ul>
+        <li><b>Hacker News</b> · “Show HN: we moved our API keys to Unkey and deleted 2,000 lines” · 184 points</li>
+        <li><b>Reddit</b> · r/webdev · “Unkey vs rolling your own rate limiter?” · 41 comments</li>
+        <li><b>X</b> · “rate limits per customer in one call with unkey, finally” · 96 likes</li>
+      </ul>
+      <p class="alert-link">Open Social <span class="digest-note">· example data</span></p>
+    </figure>
+  </section>
+
   <section class="sec wrap" id="agents" aria-labelledby="agents-title">
     <div class="sec-head">
       <h2 id="agents-title">Ask your agent <em>what you lost.</em></h2>
-      <p class="sec-lede">Byname has an MCP server. Your agent signs in as you.</p>
     </div>
     <div class="agents">
       <figure class="sheet transcript" data-reveal aria-label="A coding agent asks Byname which questions were lost in check #7 and answers from compare_runs.">

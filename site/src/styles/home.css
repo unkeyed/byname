@@ -162,6 +162,18 @@
   .shot { padding: 6px; }
 }
 
+/* Close the gap: a missed question and the page that handled it. */
+.story-2 { grid-template-columns: minmax(0, 1fr) 64px minmax(0, 1fr); }
+.fix-what { margin: 0 0 14px; font-size: 15px; line-height: 1.55; color: var(--ink-2); }
+.fix-what b { color: var(--ink); }
+.fix-act { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin: 0; }
+.fix-btn { display: inline-flex; align-items: center; height: 34px; padding: 0 14px; border: 1px solid var(--rule-2); border-radius: 9px; background: var(--sheet); font-size: 14px; font-weight: 500; }
+.fix-linked { margin: 0 0 8px; font-weight: 600; color: var(--you); }
+.social-digest { max-width: 720px; }
+.you-now { color: var(--you); font-weight: 600; }
+.digest-note { color: var(--ink-3); font-weight: 400; }
+@media (max-width: 760px) { .story-2 { grid-template-columns: minmax(0, 1fr); } }
+
 /* 3. The real apps, filed in one register. */
 .register { padding: 6px 34px; }
 .grade { display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); gap: 16px 56px; padding: 30px 0; }
