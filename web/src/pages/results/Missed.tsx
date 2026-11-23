@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api, type Gap, type GapPair, type PageCheck, type ResultsFilter, type SourcePage } from "../../api";
-import { useLabels } from "../../lines";
+import { andList, shortUrl, useLabels } from "../../lines";
 import { keys, useAnsweredRuns, useSettings, useSurfaces } from "../../queries";
 import { Badge, Button, Card, CardHeader, cx, EmptyState, ErrorNote, Icon, Pending, scrollArea, ScrollX, useLoading } from "../../ui";
 import { useFilter, useView } from "../../view";
 import { AgentPromptButton } from "./AgentPrompt";
+import { HandledList, MarkedPages, MarkHandled } from "./Handled";
 import { ViewHeader } from "./Header";
 import { Instead } from "./Questions";
 import { LeftOutBadge } from "./Scoring";
@@ -13,6 +14,7 @@ import { Tabs, useTab } from "./Tabs";
 
 const tabs = [
   { id: "questions", label: "Missed questions" },
+  { id: "handled", label: "Handled" },
   { id: "sources", label: "Pages AI links to" },
 ] as const;
 
@@ -35,6 +37,7 @@ export function Missed() {
       </EmptyState>
     );
   else if (tab === "questions") body = <MissedQuestions filter={filter} />;
+  else if (tab === "handled") body = <HandledList />;
   else body = <LinkedPages filter={filter} />;
 
   return (
@@ -72,7 +75,7 @@ function WhoNamedYou({ gap }: { gap: Gap }) {
   const labels = useLabels(surfaces.data);
   const named = gap.pairs.filter((p) => p.named);
   const missed = gap.pairs.filter((p) => !p.named);
-  const names = (ps: GapPair[]) => list(ps.map((p) => labels.line(p.pair)));
+  const names = (ps: GapPair[]) => andList(ps.map((p) => labels.line(p.pair)));
   if (named.length === 0) return <p className="text-xs text-danger">No AI app named you.</p>;
   if (named.length <= missed.length)
     return (
@@ -86,8 +89,6 @@ function WhoNamedYou({ gap }: { gap: Gap }) {
     </p>
   );
 }
-
-const shortUrl = (u: string) => u.replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, "");
 
 /**
  * Pages to pitch that name each competitor, most linked first: the pages AI
@@ -116,7 +117,7 @@ function WhatToDo({ gap, pitch, run, filter }: { gap: Gap; pitch: Map<string, So
       <span className="font-medium">What to do: </span>
       {names.length > 0 ? (
         <>
-          AI named {list(names.slice(0, 3))} instead.{" "}
+          AI named {andList(names.slice(0, 3))} instead.{" "}
           {pages.length > 0 ? (
             <>
               Its answers link to{" "}
@@ -137,14 +138,13 @@ function WhatToDo({ gap, pitch, run, filter }: { gap: Gap; pitch: Map<string, So
       ) : (
         "Write a page on your site that answers this question directly, so AI has something of yours to read and link to."
       )}
-      <div className="mt-2">
+      <div className="mt-2 flex flex-wrap items-center gap-2">
         <AgentPromptButton question={gap.question.id} run={run} filter={filter} />
+        <MarkHandled question={gap.question.id} marked={gap.pages.length > 0} />
       </div>
     </div>
   );
 }
-
-const list = (xs: string[]) => (xs.length <= 1 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`);
 
 function MissedQuestions({ filter }: { filter: ResultsFilter }) {
   const view = useView();
@@ -192,6 +192,7 @@ function MissedQuestions({ filter }: { filter: ResultsFilter }) {
                       </div>
                     </div>
                     <WhoNamedYou gap={g} />
+                    <MarkedPages pages={g.pages} />
                     <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted tabular-nums">
                       {hasDemand && (
                         <span>
@@ -231,7 +232,7 @@ function Searches({ pairs }: { pairs: GapPair[] }) {
       <div className="mb-1 flex flex-wrap items-center gap-x-1.5 text-muted">
         <Icon name="search" className="size-3.5" />
         What the AI searched Google for
-        <span className="text-faint">(only {list(apps)} {apps.length === 1 ? "shows" : "show"} this)</span>
+        <span className="text-faint">(only {andList(apps)} {apps.length === 1 ? "shows" : "show"} this)</span>
       </div>
       <ul className="space-y-1">
         {searched.map((p) => (

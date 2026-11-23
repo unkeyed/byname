@@ -40,6 +40,9 @@ export const keys = {
   compare: (before: number, after: number) => ["results", "compare", before, after] as const,
   brief: (question: number, run: number, f: ResultsFilter = {}) => ["results", "brief", question, run, f.surface, f.model] as const,
   gaps: (run: number, f: ResultsFilter = {}) => ["results", "gaps", run, f.surface, f.model] as const,
+  /** Every gaps query, whatever its run and filter. */
+  allGaps: ["results", "gaps"] as const,
+  handled: ["results", "handled"] as const,
   prompts: (f: ResultsFilter) => ["results", "prompts", f] as const,
   sources: (f: ResultsFilter) => ["results", "sources", f] as const,
   answers: (run: number) => ["results", "answers", run] as const,

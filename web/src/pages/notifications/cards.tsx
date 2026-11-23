@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router";
 import type { Alert, EventKindName, EventPayloads, GoalMetric, Run, SocialDigestPayload, SocialNetwork, Surface } from "../../api";
-import { pct } from "../../lines";
+import { andList, pct } from "../../lines";
 import { cx, Icon, RelativeTime, type IconName } from "../../ui";
 import { formatCount, NetworkMark, networks } from "../social/model";
 
@@ -122,6 +122,14 @@ const cards: Cards = {
     lines: [],
     extra: (onOpen) => <DigestBody p={p} onOpen={onOpen} />,
     action: p.mentions > 0 ? "See all posts on Social" : "Open Social",
+  }),
+  page_linked: (p) => ({
+    icon: "link",
+    tone: "success",
+    about: "Handled questions",
+    title: `${andList(p.apps)} linked to ${shortURL(p.url)}`,
+    lines: [`${p.answers} ${p.answers === 1 ? "answer" : "answers"} linked to it, the first since you marked it as answering “${p.question_text}”.`],
+    action: "Open handled questions",
   }),
 };
 

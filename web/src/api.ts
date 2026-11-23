@@ -883,6 +883,43 @@ export interface Gap {
   demand: number | null;
   named_on_miss: string[];
   pairs: GapPair[];
+  /** Pages marked as answering this question, under any version of it, most recently marked first. */
+  pages: MarkedPage[];
+}
+
+/** A page marked as answering a question, as its missed question row shows it. */
+export interface MarkedPage {
+  id: number;
+  url: string;
+  added_at: Timestamp;
+  /** Answers since it was marked that link to it, to any question. */
+  linked: number;
+}
+
+/** How one check's answers to a question named you. */
+export interface Naming {
+  run_id: number;
+  run_started_at: Timestamp;
+  /** Answers that did not fail. */
+  answered: number;
+  named: number;
+}
+
+/** A marked page and what happened since it was marked. */
+export interface HandledPage {
+  id: number;
+  url: string;
+  /** The question it answers, as it reads now. */
+  question: QuestionRef;
+  added_at: Timestamp;
+  /** Who marked it; empty for an API key or a person since removed. */
+  added_by: string;
+  /** Every answer since it was marked that links to it, to any question, from any AI app. */
+  linked: { answers: number; questions: number; pairs: PairRef[]; first_run_id: number | null; first_at: Timestamp | null; latest_run_id: number | null };
+  /** The question's last check before the mark; null when there was none. */
+  before: Naming | null;
+  /** The question's latest check since the mark; null until one runs. */
+  now: Naming | null;
 }
 
 export type LineState = "named_linked" | "named" | "linked" | "missed";
@@ -1571,6 +1608,16 @@ export interface SocialDigestPayload {
   spend_missing_calls: number;
 }
 
+export interface PageLinkedPayload {
+  page_id: number;
+  url: string;
+  question_text: string;
+  /** The AI apps whose answers linked to it, by name. */
+  apps: string[];
+  /** That check's answers that linked to it, to any question. */
+  answers: number;
+}
+
 /** Each event kind in internal/notify's registry and the payload it carries. */
 export interface EventPayloads {
   check_completed: CheckCompletedPayload;
@@ -1583,6 +1630,7 @@ export interface EventPayloads {
   change_verdict: ChangeVerdictPayload;
   token_expiring: TokenExpiringPayload;
   social_digest: SocialDigestPayload;
+  page_linked: PageLinkedPayload;
 }
 
 export type EventKindName = keyof EventPayloads;
@@ -1871,6 +1919,12 @@ export const api = {
   history: (question: number, since?: Timestamp) => request<History>("GET", `/v1/questions/${question}/history${qs({ since })}`),
   brief: (question: number, run?: number, f: ResultsFilter = {}) => request<Brief>("GET", `/v1/questions/${question}/brief${qs({ run, surface: f.surface, model: f.model })}`),
   gaps: (run?: number, f: ResultsFilter = {}) => request<{ run_id: number; gaps: Gap[] }>("GET", `/v1/gaps${qs({ run, surface: f.surface, model: f.model })}`),
+  handled: {
+    list: () => request<{ pages: HandledPage[] }>("GET", "/v1/handled"),
+    /** Marking the same page again keeps the first mark. */
+    mark: (question: number, url: string) => request<{ id: number; question_id: number; url: string; added_at: Timestamp }>("POST", `/v1/questions/${question}/pages`, { body: { url } }),
+    unmark: (id: number) => request<void>("DELETE", `/v1/question-pages/${id}`),
+  },
   prompts: (f: ResultsFilter) => request<Prompts>("GET", `/v1/prompts${qs({ ...f })}`),
   sources: (f: ResultsFilter) => request<Sources>("GET", `/v1/sources${qs({ ...f })}`),
   engine: (l: Line, since?: Timestamp) =>

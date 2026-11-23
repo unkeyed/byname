@@ -40,3 +40,9 @@ export const pct = (v: number | null | undefined) => (v == null ? "–" : v > 0 
 
 const dayFmt = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" });
 export const shortDay = (iso: string) => dayFmt.format(new Date(iso));
+
+/** A page's address without its scheme, www. or trailing slash, such as northwind.example/blog/x. */
+export const shortUrl = (u: string) => u.replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, "");
+
+/** Names joined as a sentence does: "a", "a and b", "a, b and c". */
+export const andList = (xs: string[]) => (xs.length <= 1 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`);

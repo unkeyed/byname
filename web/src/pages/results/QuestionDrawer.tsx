@@ -10,6 +10,7 @@ import { Markdown } from "../../markdown";
 import { Badge, Button, cx, ErrorNote, Icon, LoadBoundary, Pending, scrollArea, ScrollX, selectClass, useModal } from "../../ui";
 import { useFilter, useView } from "../../view";
 import { AgentPromptButton } from "./AgentPrompt";
+import { MarkedPages, MarkHandled, useMarkedPages } from "./Handled";
 import { PageMark } from "./Missed";
 import { Segmented } from "./Header";
 import { CountAnyway, LeftOutBadge, leftOutWhy } from "./Scoring";
@@ -71,6 +72,7 @@ function Body({ question, onClose }: { question: number; onClose: () => void }) 
   const surfaces = useSurfaces();
   const labels = useLabels(surfaces.data);
   const history = useQuery({ queryKey: keys.history(question, filter.since), queryFn: () => api.history(question, filter.since) });
+  const marked = useMarkedPages(question);
 
   if (history.isPending) return <Pending />;
   if (history.isError)
@@ -94,9 +96,13 @@ function Body({ question, onClose }: { question: number; onClose: () => void }) 
         <div className="min-w-0 flex-1">
           <div className="text-xs text-muted">{history.data.question.group || "Question"}</div>
           <h2 className="text-base font-semibold">{history.data.question.text}</h2>
-          {selPoint && (
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            {selPoint && <AgentPromptButton question={selPoint.question_id} run={selPoint.run_id} filter={filter} />}
+            <MarkHandled question={question} marked={marked.length > 0} />
+          </div>
+          {marked.length > 0 && (
             <div className="mt-2">
-              <AgentPromptButton question={selPoint.question_id} run={selPoint.run_id} filter={filter} />
+              <MarkedPages pages={marked} />
             </div>
           )}
           {!history.data.question.counts_in_scores && (
