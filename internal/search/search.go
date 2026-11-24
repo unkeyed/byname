@@ -39,7 +39,10 @@ type providerSpec struct {
 	zone *time.Location
 	// keyMethod is what a pasted key connects as.
 	keyMethod Method
-	build     func(o Options) adapter
+	// seal prefixes the label its credentials are sealed under. Stored
+	// ciphertexts carry it, so it never changes once shipped.
+	seal  string
+	build func(o Options) adapter
 }
 
 // Info is what a provider is and how it reports, the same on every

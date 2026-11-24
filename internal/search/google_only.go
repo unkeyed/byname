@@ -49,7 +49,9 @@ type oauthState struct {
 	Return   Return `json:"r,omitempty"`
 }
 
-const stateSeal = "search:google:oauth-state"
+// stateSeal is Search Console's own label from before Bing joined, so a
+// sign-in started before an upgrade still finishes after it.
+const stateSeal = "gsc:oauth-state"
 
 // StartGoogleOAuth returns Google's consent page URL for the admin a,
 // asking for read-only Search Console access with offline access, so

@@ -34,7 +34,7 @@ var bingSpec = providerSpec{
 			"Days are UTC days, as Bing counts them.",
 		},
 	},
-	zone: time.UTC, keyMethod: MethodAPIKey,
+	zone: time.UTC, keyMethod: MethodAPIKey, seal: "search:bing",
 	build: func(o Options) adapter {
 		base := strings.TrimSuffix(o.BaseURLs[Bing], "/")
 		if base == "" {

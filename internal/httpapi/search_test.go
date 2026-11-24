@@ -202,7 +202,7 @@ func TestSearchOverHTTP(t *testing.T) {
 	if err := c.db.QueryRow(context.Background(), `SELECT ciphertext FROM search_connection`).Scan(&sealed); err != nil {
 		t.Fatal(err)
 	}
-	refresh, err := secretbox.ForTest().Open(sealed, "search:google:oauth")
+	refresh, err := secretbox.ForTest().Open(sealed, "gsc:oauth")
 	if err != nil || refresh == "" {
 		t.Fatalf("open the stored refresh token: %v", err)
 	}

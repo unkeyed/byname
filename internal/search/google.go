@@ -39,6 +39,8 @@ var googleSpec = providerSpec{
 		},
 	},
 	zone: pacific, keyMethod: MethodServiceAccount,
+	// Search Console's own label from before Bing joined.
+	seal: "gsc",
 	build: func(o Options) adapter {
 		return &google{http: o.HTTPClient, endpoints: googleEndpoints(o.BaseURLs[Google]), client: o.GoogleClient, publicURL: o.PublicURL}
 	},

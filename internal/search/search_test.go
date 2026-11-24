@@ -171,7 +171,7 @@ func TestOAuthStoresTheRefreshTokenSealed(t *testing.T) {
 	if err := e.db.QueryRow(e.ctx, `SELECT ciphertext FROM search_connection WHERE method = 'oauth'`).Scan(&sealed); err != nil {
 		t.Fatal(err)
 	}
-	refresh, err := secretbox.ForTest().Open(sealed, "search:google:oauth")
+	refresh, err := secretbox.ForTest().Open(sealed, "gsc:oauth")
 	if err != nil || !strings.HasPrefix(refresh, "1//") {
 		t.Fatalf("stored credential opens to %q, %v; want the refresh token Google issued", refresh, err)
 	}

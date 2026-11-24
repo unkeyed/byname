@@ -139,13 +139,17 @@ func (s *Service) ConnectKey(ctx context.Context, p Provider, key string) (Statu
 }
 
 // sealLabel binds a sealed credential to its provider and method.
-func sealLabel(p Provider, m Method) string { return "search:" + string(p) + ":" + string(m) }
+func sealLabel(sp providerSpec, m Method) string { return sp.seal + ":" + string(m) }
 
 func (s *Service) store(ctx context.Context, p Provider, m Method, account, secret string) error {
-	_, err := s.db.Exec(ctx, `INSERT INTO search_connection (provider, method, account, ciphertext, connected_at) VALUES ($1, $2, $3, $4, $5)
+	sp, err := lookup(p)
+	if err != nil {
+		return err
+	}
+	_, err = s.db.Exec(ctx, `INSERT INTO search_connection (provider, method, account, ciphertext, connected_at) VALUES ($1, $2, $3, $4, $5)
 		ON CONFLICT (provider) DO UPDATE SET method = excluded.method, account = excluded.account, ciphertext = excluded.ciphertext,
 			connected_at = excluded.connected_at, last_sync_error = NULL`,
-		p, m, account, s.secrets.Seal(secret, sealLabel(p, m)), s.now())
+		p, m, account, s.secrets.Seal(secret, sealLabel(sp, m)), s.now())
 	return err
 }
 
@@ -176,7 +180,7 @@ func (s *Service) connection(ctx context.Context, p Provider) (conn, error) {
 	if site != nil {
 		c.site = *site
 	}
-	if c.cred.secret, err = s.secrets.Open(sealed, sealLabel(p, c.cred.method)); err != nil {
+	if c.cred.secret, err = s.secrets.Open(sealed, sealLabel(sp, c.cred.method)); err != nil {
 		return c, fmt.Errorf("open the %s credential: %w; was ENCRYPTION_KEY changed without ENCRYPTION_KEY_PREVIOUS?", sp.Title, err)
 	}
 	return c, nil
@@ -303,7 +307,11 @@ func (s *Service) SealSecrets(ctx context.Context) (int, error) {
 	}
 	n := 0
 	for _, c := range all {
-		resealed, changed, err := s.secrets.Reseal(c.sealed, sealLabel(c.provider, c.method))
+		sp, err := lookup(c.provider)
+		if err != nil {
+			return n, err
+		}
+		resealed, changed, err := s.secrets.Reseal(c.sealed, sealLabel(sp, c.method))
 		if err != nil {
 			return n, err
 		}
