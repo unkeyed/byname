@@ -44,7 +44,13 @@ type env struct {
 
 func newEnv(t *testing.T) *env {
 	t.Helper()
-	pool := testdb.New(t)
+	return newEnvOn(t, testdb.New(t))
+}
+
+// newEnvOn is newEnv on pool, which may hold an earlier release's schema:
+// it writes nothing but the settings.
+func newEnvOn(t *testing.T, pool *pgxpool.Pool) *env {
+	t.Helper()
 	fake := searchtest.NewGoogle(t)
 	fake.AddSite(domainProperty, "siteOwner")
 	fake.AddSite(prefixProperty, "siteFullUser")
