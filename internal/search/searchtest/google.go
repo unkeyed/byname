@@ -1,10 +1,12 @@
-// Package gsctest is a fake of the Google endpoints Byname's Search
-// Console connection calls: the OAuth consent page and token endpoint
-// (authorization code with PKCE, refresh token, and the service account's
-// JWT bearer grant), sites.list, searchAnalytics.query with startRow paging
-// and firstIncompleteDate, and urlInspection.index.inspect. Response shapes
-// follow Google's API reference. fake.go uses only the standard library.
-package gsctest
+// Package searchtest fakes the search engines internal/search reads.
+//
+// GoogleFake is the Google endpoints the Search Console connection calls:
+// the OAuth consent page and token endpoint (authorization code with PKCE,
+// refresh token, and the service account's JWT bearer grant), sites.list,
+// searchAnalytics.query with startRow paging and firstIncompleteDate, and
+// urlInspection.index.inspect. Response shapes follow Google's API
+// reference. The fakes use only the standard library.
+package searchtest
 
 import (
 	"cmp"
@@ -66,9 +68,9 @@ type Query struct {
 	Rows       int
 }
 
-// Fake is the fake Google. Set its fields before serving; change data
+// GoogleFake is the fake Google. Set its fields before serving; change data
 // between calls with the methods, which lock.
-type Fake struct {
+type GoogleFake struct {
 	ClientID     string
 	ClientSecret string
 	// ServiceAccounts maps a service account email to its public key.
@@ -96,9 +98,9 @@ type grant struct {
 	offline             bool
 }
 
-// NewFake returns a fake whose OAuth client is id and secret.
-func NewFake(id, secret string) *Fake {
-	return &Fake{
+// NewGoogleFake returns a fake whose OAuth client is id and secret.
+func NewGoogleFake(id, secret string) *GoogleFake {
+	return &GoogleFake{
 		ClientID: id, ClientSecret: secret, ServiceAccounts: map[string]*rsa.PublicKey{},
 		rows: map[string][]Row{}, inspections: map[string]Inspection{},
 		codes: map[string]grant{}, refresh: map[string]bool{}, access: map[string]bool{},
@@ -107,14 +109,14 @@ func NewFake(id, secret string) *Fake {
 
 // AddSite lets the account see site with Google's permission level, such
 // as siteOwner.
-func (f *Fake) AddSite(site, permission string) {
+func (f *GoogleFake) AddSite(site, permission string) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.sites = append(f.sites, Site{site, permission})
 }
 
 // SetRows replaces site's rows for every date the given rows cover.
-func (f *Fake) SetRows(site string, rows ...Row) {
+func (f *GoogleFake) SetRows(site string, rows ...Row) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	dates := map[string]bool{}
@@ -127,14 +129,14 @@ func (f *Fake) SetRows(site string, rows ...Row) {
 
 // SetFirstIncomplete sets the first day Google still revises; "" marks
 // every day final.
-func (f *Fake) SetFirstIncomplete(day string) {
+func (f *GoogleFake) SetFirstIncomplete(day string) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.firstIncomplete = day
 }
 
 // SetInspection sets what urlInspection reports for pageURL.
-func (f *Fake) SetInspection(pageURL string, in Inspection) {
+func (f *GoogleFake) SetInspection(pageURL string, in Inspection) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.inspections[pageURL] = in
@@ -142,21 +144,21 @@ func (f *Fake) SetInspection(pageURL string, in Inspection) {
 
 // FailQueriesFrom makes searchAnalytics.query answer 500 for any range
 // ending on or after day; "" stops it.
-func (f *Fake) FailQueriesFrom(day string) {
+func (f *GoogleFake) FailQueriesFrom(day string) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.failFrom = day
 }
 
 // Queries returns every searchAnalytics.query request served so far.
-func (f *Fake) Queries() []Query {
+func (f *GoogleFake) Queries() []Query {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return slices.Clone(f.queries)
 }
 
 // TokenCalls returns the form of every token request so far.
-func (f *Fake) TokenCalls() []url.Values {
+func (f *GoogleFake) TokenCalls() []url.Values {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return slices.Clone(f.tokenCalls)
@@ -165,7 +167,7 @@ func (f *Fake) TokenCalls() []url.Values {
 // Handler serves Google's paths: /o/oauth2/v2/auth, /token,
 // /webmasters/v3/sites, /webmasters/v3/sites/{site}/searchAnalytics/query
 // and /v1/urlInspection/index:inspect.
-func (f *Fake) Handler() http.Handler {
+func (f *GoogleFake) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /o/oauth2/v2/auth", f.consent)
 	mux.HandleFunc("POST /token", f.token)
@@ -183,7 +185,7 @@ func random() string {
 
 // consent stands in for Google's consent page: it approves at once and
 // sends the browser back with a code, as a person clicking Allow would.
-func (f *Fake) consent(w http.ResponseWriter, r *http.Request) {
+func (f *GoogleFake) consent(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	redirect, err := url.Parse(q.Get("redirect_uri"))
 	if err != nil || redirect.Scheme == "" || q.Get("client_id") != f.ClientID {
@@ -215,7 +217,7 @@ func tokenError(w http.ResponseWriter, code, desc string) {
 	_ = json.NewEncoder(w).Encode(map[string]string{"error": code, "error_description": desc})
 }
 
-func (f *Fake) token(w http.ResponseWriter, r *http.Request) {
+func (f *GoogleFake) token(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		tokenError(w, "invalid_request", "bad form")
 		return
@@ -291,7 +293,7 @@ func (f *Fake) token(w http.ResponseWriter, r *http.Request) {
 // checkAssertion verifies a service account's RS256-signed JWT the way
 // Google's token endpoint does: a known issuer, its signature, the scope,
 // the audience and the expiry.
-func (f *Fake) checkAssertion(assertion, aud string) error {
+func (f *GoogleFake) checkAssertion(assertion, aud string) error {
 	parts := strings.Split(assertion, ".")
 	if len(parts) != 3 {
 		return fmt.Errorf("Invalid JWT: malformed")
@@ -336,7 +338,7 @@ func googleError(w http.ResponseWriter, code int, status, msg string) {
 	_ = json.NewEncoder(w).Encode(map[string]any{"error": map[string]any{"code": code, "message": msg, "status": status}})
 }
 
-func (f *Fake) authed(next http.HandlerFunc) http.HandlerFunc {
+func (f *GoogleFake) authed(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		token, _ := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
 		f.mu.Lock()
@@ -350,7 +352,7 @@ func (f *Fake) authed(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-func (f *Fake) listSites(w http.ResponseWriter, r *http.Request) {
+func (f *GoogleFake) listSites(w http.ResponseWriter, r *http.Request) {
 	f.mu.Lock()
 	out := map[string]any{}
 	if len(f.sites) > 0 {
@@ -361,7 +363,7 @@ func (f *Fake) listSites(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(out)
 }
 
-func (f *Fake) canRead(site string) bool {
+func (f *GoogleFake) canRead(site string) bool {
 	return slices.ContainsFunc(f.sites, func(s Site) bool { return s.URL == site && s.Permission != "siteUnverifiedUser" })
 }
 
@@ -371,7 +373,7 @@ type aggregate struct {
 	weighted            float64
 }
 
-func (f *Fake) query(w http.ResponseWriter, r *http.Request) {
+func (f *GoogleFake) query(w http.ResponseWriter, r *http.Request) {
 	site := r.PathValue("site")
 	var req struct {
 		StartDate  string   `json:"startDate"`
@@ -476,7 +478,7 @@ func (f *Fake) query(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(resp)
 }
 
-func (f *Fake) inspect(w http.ResponseWriter, r *http.Request) {
+func (f *GoogleFake) inspect(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		InspectionURL string `json:"inspectionUrl"`
 		SiteURL       string `json:"siteUrl"`

@@ -45,7 +45,7 @@ type Options struct {
 	Log   *slog.Logger
 	// Sources fetches the pages answers cite; nil skips it.
 	Sources *sources.Service
-	// Search is the daily Search Console sync, nil when not wired.
+	// Search is the daily search engine sync, nil when not wired.
 	Search SearchSync
 	// Changes is site changes, nil when not wired.
 	Changes SiteChanges
@@ -62,14 +62,14 @@ type Ticker interface {
 	Tick(ctx context.Context) error
 }
 
-// SearchSync is internal/gsc's daily sync: it does nothing until it is due
-// and holds its own advisory lock.
+// SearchSync is internal/search's daily sync: it does nothing until a
+// provider is due and holds its own advisory lock.
 type SearchSync interface {
 	SyncIfDue(ctx context.Context) error
 }
 
 // SiteChanges is internal/changes: the hourly GitHub poll, and recrawl
-// watch and verdicts once a Search Console sync has completed. It decides
+// watch and verdicts once a Google sync has completed. It decides
 // itself what is due and holds its own advisory locks.
 type SiteChanges interface {
 	Tick(ctx context.Context) error
@@ -96,7 +96,7 @@ func New(c *checks.Service, cfg *config.Service, o Options) *Scheduler {
 // running and catches up a check missed while nothing was running, then on
 // every tick and whenever Run now queues a run, until ctx ends. A run in
 // progress when ctx ends stays running for the next start to resume, and
-// Run returns once a Search Console sync in flight has stopped.
+// Run returns once a search sync in flight has stopped.
 func (s *Scheduler) Run(ctx context.Context) {
 	defer s.searching.Wait()
 	defer s.socialing.Wait()
@@ -134,14 +134,14 @@ func (s *Scheduler) Tick(ctx context.Context) {
 			s.log.Info("pruned raw responses past their retention", "answers", n)
 		}
 	}
-	// Search Console: the daily sync, then site changes, which follow it,
+	// Search engines: the daily sync, then site changes, which follow it,
 	// on their own goroutine so a long backfill never holds up checks.
 	if (s.search != nil || s.changes != nil) && s.busy.CompareAndSwap(false, true) {
 		s.searching.Go(func() {
 			defer s.busy.Store(false)
 			if s.search != nil {
 				if err := s.search.SyncIfDue(ctx); err != nil && ctx.Err() == nil {
-					s.log.Warn("Search Console sync failed", "err", err)
+					s.log.Warn("search sync failed", "err", err)
 				}
 			}
 			if s.changes != nil {

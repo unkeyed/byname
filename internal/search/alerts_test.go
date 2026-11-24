@@ -1,13 +1,13 @@
-package gsc_test
+package search_test
 
 import (
 	"net/url"
 	"testing"
 	"time"
 
-	"github.com/unkeyed/byname/internal/gsc"
 	"github.com/unkeyed/byname/internal/notify"
 	"github.com/unkeyed/byname/internal/results"
+	"github.com/unkeyed/byname/internal/search"
 	"github.com/unkeyed/byname/internal/secretbox"
 )
 
@@ -15,8 +15,8 @@ import (
 func (e *env) withAlerts() {
 	u, _ := url.Parse("http://localhost:8080")
 	alerts := notify.New(e.db, results.New(e.db), notify.Options{Now: func() time.Time { return e.now }})
-	e.svc = gsc.New(e.db, gsc.Options{
-		Secrets: secretbox.ForTest(), Endpoints: gsc.GoogleEndpoints(e.fake.URL), PublicURL: u,
+	e.svc = search.New(e.db, search.Options{
+		Secrets: secretbox.ForTest(), BaseURLs: map[search.Provider]string{search.Google: e.fake.URL}, PublicURL: u,
 		Terms: e.cfg, Alerts: alerts, Now: func() time.Time { return e.now },
 	})
 }
@@ -40,11 +40,11 @@ func TestSearchAlertsFireOncePerGoalAndWindow(t *testing.T) {
 	e.withAlerts()
 	e.seedHistory()
 	e.connectServiceAccount(prefixProperty)
-	reached, err := e.svc.UpsertGoal(e.ctx, gsc.GoalInput{Metric: gsc.MetricClicks, WindowDays: 28, Target: 500, DueOn: "2028-03-15"})
+	reached, err := e.svc.UpsertGoal(e.ctx, search.GoalInput{Provider: search.Google, Metric: search.MetricClicks, WindowDays: 28, Target: 500, DueOn: "2028-03-15"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := e.svc.UpsertGoal(e.ctx, gsc.GoalInput{Metric: gsc.MetricNonBrandClicks, WindowDays: 28, Target: 5000, DueOn: "2028-03-15"}); err != nil {
+	if _, err := e.svc.UpsertGoal(e.ctx, search.GoalInput{Provider: search.Google, Metric: search.MetricNonBrandClicks, WindowDays: 28, Target: 5000, DueOn: "2028-03-15"}); err != nil {
 		t.Fatal(err)
 	}
 

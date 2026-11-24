@@ -24,4 +24,4 @@ CREATE INDEX source_page_fetched ON source_page (fetched_at);
 CREATE INDEX citation_url ON citation (url);
 
 ALTER TABLE job_run DROP CONSTRAINT job_run_job_check,
-    ADD CONSTRAINT job_run_job_check CHECK (job IN ('ai_check', 'model_refresh', 'gsc_sync', 'source_fetch'));
+    ADD CONSTRAINT job_run_job_check CHECK (job IN ('ai_check', 'model_refresh', 'search_sync', 'source_fetch'));

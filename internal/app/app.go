@@ -7,11 +7,11 @@ import (
 	"github.com/unkeyed/byname/internal/checks"
 	"github.com/unkeyed/byname/internal/config"
 	"github.com/unkeyed/byname/internal/discovery"
-	"github.com/unkeyed/byname/internal/gsc"
 	"github.com/unkeyed/byname/internal/instance"
 	"github.com/unkeyed/byname/internal/logos"
 	"github.com/unkeyed/byname/internal/notify"
 	"github.com/unkeyed/byname/internal/results"
+	"github.com/unkeyed/byname/internal/search"
 	"github.com/unkeyed/byname/internal/social"
 )
 
@@ -21,7 +21,7 @@ type Services struct {
 	Checks    *checks.Service
 	Results   *results.Service
 	Notify    *notify.Service
-	GSC       *gsc.Service
+	Search    *search.Service
 	Changes   *changes.Service
 	Social    *social.Service
 	Discovery *discovery.Service

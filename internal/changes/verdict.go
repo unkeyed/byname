@@ -4,7 +4,7 @@ import (
 	"math"
 	"time"
 
-	"github.com/unkeyed/byname/internal/gsc"
+	"github.com/unkeyed/byname/internal/search"
 )
 
 // Outcome is what a read concluded.
@@ -37,11 +37,11 @@ type Thresholds struct {
 // Window is one side of a read: the changed page's numbers and the control
 // set's, summed over the same final days.
 type Window struct {
-	From    string     `json:"from"`
-	To      string     `json:"to"`
-	Days    int        `json:"days"`
-	Page    gsc.Totals `json:"page"`
-	Control gsc.Totals `json:"control"`
+	From    string        `json:"from"`
+	To      string        `json:"to"`
+	Days    int           `json:"days"`
+	Page    search.Totals `json:"page"`
+	Control search.Totals `json:"control"`
 }
 
 // Deltas are the differences in differences: how the page moved minus how
@@ -109,8 +109,8 @@ func windows(mergedAt, crawledAt time.Time, length int, latestFinal time.Time) (
 
 // sum totals the final days among days that fall in w. Partial days never
 // count, and a day without a row had no impressions.
-func sum(days []gsc.Day, w [2]time.Time) gsc.Totals {
-	var t gsc.Totals
+func sum(days []search.Day, w [2]time.Time) search.Totals {
+	var t search.Totals
 	var weighted float64
 	from, to := w[0].Format(time.DateOnly), w[1].Format(time.DateOnly)
 	for _, d := range days {

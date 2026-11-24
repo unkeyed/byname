@@ -1,4 +1,4 @@
-package gsc
+package search
 
 import (
 	"context"
@@ -32,13 +32,13 @@ func moved(before, after int64) bool {
 // movers are the 28-day metrics search_moved watches.
 var movers = []Metric{MetricClicks, MetricNonBrandClicks}
 
-// searchAlerts runs after each sync that succeeded. It raises goal_reached
-// once per goal and target, when the goal's progress first meets its
-// target, and search_moved once per metric and window end day, when 28-day
-// clicks or non-brand clicks moved against the 28 days before. Both windows
-// must be complete, so a short history never compares a part against a
-// whole.
-func (s *Service) searchAlerts(ctx context.Context) error {
+// searchAlerts runs after each of p's syncs that succeeded. It raises
+// goal_reached once per goal and target, when one of p's goals first
+// meets its target, and search_moved once per provider, metric and window
+// end day, when 28-day clicks or non-brand clicks moved against the 28
+// days before. Both windows must be complete, so a short history never
+// compares a part against a whole.
+func (s *Service) searchAlerts(ctx context.Context, p Provider) error {
 	if s.alerts == nil {
 		return nil
 	}
@@ -48,7 +48,7 @@ func (s *Service) searchAlerts(ctx context.Context) error {
 	}
 	var errs []error
 	for _, g := range goals {
-		if g.Progress == nil || !g.Progress.Reached {
+		if g.Provider != p || g.Progress == nil || !g.Progress.Reached {
 			continue
 		}
 		errs = append(errs, s.alerts.Emit(ctx, notify.Event{
@@ -57,12 +57,12 @@ func (s *Service) searchAlerts(ctx context.Context) error {
 				Target: float64(g.Target), Value: float64(g.Progress.Value), DueOn: g.DueOn},
 		}))
 	}
-	sum, err := s.Summary(ctx)
+	sum, err := s.Summary(ctx, p)
 	if err != nil {
 		return errors.Join(append(errs, err)...)
 	}
 	cur, prev := sum.Current, sum.Previous
-	if cur == nil || prev == nil || cur.DaysWithData < HeadlineDays || prev.DaysWithData < HeadlineDays {
+	if cur == nil || prev == nil || cur.DaysWithData < cur.Days || prev.DaysWithData < prev.Days {
 		return errors.Join(errs...)
 	}
 	for _, m := range movers {
@@ -71,8 +71,8 @@ func (s *Service) searchAlerts(ctx context.Context) error {
 			continue
 		}
 		errs = append(errs, s.alerts.Emit(ctx, notify.Event{
-			Subject: fmt.Sprintf("search/%s/%s", m, cur.To),
-			Payload: notify.SearchMovedPayload{Metric: string(m), WindowDays: HeadlineDays, Before: float64(before), After: float64(after)},
+			Subject: fmt.Sprintf("search/%s/%s/%s", p, m, cur.To),
+			Payload: notify.SearchMovedPayload{Metric: string(m), WindowDays: cur.Days, Before: float64(before), After: float64(after)},
 		}))
 	}
 	return errors.Join(errs...)

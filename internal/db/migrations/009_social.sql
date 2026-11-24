@@ -99,5 +99,5 @@ CREATE TABLE social_left_out (
 -- Every job name the code writes. TestJobCheckCoversEveryJob fails when
 -- one is missing.
 ALTER TABLE job_run DROP CONSTRAINT job_run_job_check,
-    ADD CONSTRAINT job_run_job_check CHECK (job IN ('ai_check', 'model_refresh', 'gsc_sync', 'source_fetch',
+    ADD CONSTRAINT job_run_job_check CHECK (job IN ('ai_check', 'model_refresh', 'search_sync', 'source_fetch',
         'site_changes', 'recrawl_watch', 'verdicts', 'social_fetch'));

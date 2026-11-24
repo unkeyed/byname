@@ -75,7 +75,7 @@ func (s *Service) watchIfDue(ctx context.Context) error {
 	return s.locked(ctx, watchLock, []string{"recrawl_watch", "verdicts"}, func() error {
 		var due bool
 		if err := s.db.QueryRow(ctx, `SELECT coalesce(
-			(SELECT max(finished_at) FROM job_run WHERE job = 'gsc_sync' AND status = 'completed')
+			(SELECT max(finished_at) FROM job_run WHERE job = 'search_sync' AND provider = 'google' AND status = 'completed')
 				> coalesce((SELECT max(started_at) FROM job_run WHERE job = 'recrawl_watch'), '-infinity'), false)`).Scan(&due); err != nil || !due {
 			return err
 		}

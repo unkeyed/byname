@@ -8,8 +8,8 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"github.com/unkeyed/byname/internal/gsc"
 	"github.com/unkeyed/byname/internal/notify"
+	"github.com/unkeyed/byname/internal/search"
 )
 
 // recrawl inspects each page with a change Google has not crawled since,
@@ -19,8 +19,8 @@ import (
 // date in the instance's time zone. Google reports only the latest crawl,
 // so a page inspected daily gets its first crawl to within a day.
 func (s *Service) recrawl(ctx context.Context, st instanceSettings) error {
-	status, err := s.search.Status(ctx)
-	if err != nil || status.Property == "" {
+	status, err := s.search.Status(ctx, search.Google)
+	if err != nil || status.Site == "" {
 		return err
 	}
 	var used int
@@ -81,7 +81,7 @@ type searchData struct {
 }
 
 func (s *Service) searchData(ctx context.Context) (searchData, bool, error) {
-	status, err := s.search.Status(ctx)
+	status, err := s.search.Status(ctx, search.Google)
 	if err != nil || status.LatestFinal == "" {
 		return searchData{}, false, err
 	}
@@ -167,7 +167,7 @@ func (s *Service) fillBefore(ctx context.Context, st instanceSettings, data sear
 			continue
 		}
 		from := to.AddDate(0, 0, 1-st.VerdictDays)
-		days, err := s.search.PageDaily(ctx, p.URL, from, to)
+		days, err := s.search.GooglePageDaily(ctx, p.URL, from, to)
 		if err != nil {
 			return err
 		}
@@ -185,17 +185,17 @@ func (s *Service) fillBefore(ctx context.Context, st instanceSettings, data sear
 // read takes one difference-in-differences read of c (see assess).
 func (s *Service) read(ctx context.Context, c Change, kind ReadKind, length int, controls []string, st instanceSettings, data searchData, today string) (Read, error) {
 	before, after, n := windows(c.MergedAt, *c.FirstCrawlAt, length, data.latestFinal)
-	pageDays, err := s.search.PageDaily(ctx, c.URL, before[0], after[1])
+	pageDays, err := s.search.GooglePageDaily(ctx, c.URL, before[0], after[1])
 	if err != nil {
 		return Read{}, err
 	}
 	used := []string{}
-	var controlDays []gsc.Day
+	var controlDays []search.Day
 	for _, u := range controls {
 		if u == c.URL {
 			continue
 		}
-		days, err := s.search.PageDaily(ctx, u, before[0], after[1])
+		days, err := s.search.GooglePageDaily(ctx, u, before[0], after[1])
 		if err != nil {
 			return Read{}, err
 		}

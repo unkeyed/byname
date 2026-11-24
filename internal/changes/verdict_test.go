@@ -4,21 +4,21 @@ import (
 	"testing"
 	"time"
 
-	"github.com/unkeyed/byname/internal/gsc"
+	"github.com/unkeyed/byname/internal/search"
 )
 
 var defaults = Thresholds{Position: 2.5, CTRPoints: 0.8, ImpressionsRatio: 2.7}
 
 // side builds a window's totals from clicks, impressions and position.
-func side(clicks, impressions int64, position float64) gsc.Totals {
-	t := gsc.Totals{Clicks: clicks, Impressions: impressions, Position: position}
+func side(clicks, impressions int64, position float64) search.Totals {
+	t := search.Totals{Clicks: clicks, Impressions: impressions, Position: position}
 	if impressions > 0 {
 		t.CTR = float64(clicks) / float64(impressions)
 	}
 	return t
 }
 
-func sampleOf(pageBefore, pageAfter, ctlBefore, ctlAfter gsc.Totals) sample {
+func sampleOf(pageBefore, pageAfter, ctlBefore, ctlAfter search.Totals) sample {
 	return sample{
 		before:   Window{From: "2026-09-01", To: "2026-09-28", Days: 28, Page: pageBefore, Control: ctlBefore},
 		after:    Window{From: "2026-10-05", To: "2026-11-01", Days: 28, Page: pageAfter, Control: ctlAfter},
@@ -95,7 +95,7 @@ func TestAssess(t *testing.T) {
 }
 
 func TestSumCountsFinalDaysInTheWindowOnly(t *testing.T) {
-	days := []gsc.Day{
+	days := []search.Day{
 		{Date: "2026-10-31", Totals: side(99, 9900, 1), Final: true}, // before the window
 		{Date: "2026-11-01", Totals: side(10, 100, 4), Final: true},
 		{Date: "2026-11-02", Totals: side(30, 300, 8), Final: true},

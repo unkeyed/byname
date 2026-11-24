@@ -14,22 +14,23 @@ import (
 	"github.com/unkeyed/byname/internal/auth"
 	"github.com/unkeyed/byname/internal/checks/checkstest"
 	"github.com/unkeyed/byname/internal/core"
-	"github.com/unkeyed/byname/internal/gsc/gsctest"
+	"github.com/unkeyed/byname/internal/search"
+	"github.com/unkeyed/byname/internal/search/searchtest"
 	"github.com/unkeyed/byname/internal/secretbox"
 )
 
 // seedGoogle gives the fake Google two properties for Northwind and 40
 // days of numbers, the last two still partial.
-func seedGoogle(g *gsctest.Server) {
+func seedGoogle(g *searchtest.Google) {
 	g.AddSite("sc-domain:northwind.example", "siteOwner")
 	g.AddSite("https://www.northwind.example/", "siteFullUser")
 	today := time.Now().In(time.FixedZone("PT", -8*3600))
 	for n := 1; n <= 40; n++ {
 		d := today.AddDate(0, 0, -n).Format(time.DateOnly)
 		g.SetRows("sc-domain:northwind.example",
-			gsctest.Row{Date: d, Query: "northwind pricing", Page: "https://www.northwind.example/pricing", Clicks: 6, Impressions: 60, Position: 1.4},
-			gsctest.Row{Date: d, Query: "go api hosting", Page: "https://www.northwind.example/docs", Clicks: 3, Impressions: 200, Position: 8.2},
-			gsctest.Row{Date: d, Page: "https://www.northwind.example/docs", Clicks: 1, Impressions: 30, Position: 11})
+			searchtest.Row{Date: d, Query: "northwind pricing", Page: "https://www.northwind.example/pricing", Clicks: 6, Impressions: 60, Position: 1.4},
+			searchtest.Row{Date: d, Query: "go api hosting", Page: "https://www.northwind.example/docs", Clicks: 3, Impressions: 200, Position: 8.2},
+			searchtest.Row{Date: d, Page: "https://www.northwind.example/docs", Clicks: 1, Impressions: 30, Position: 11})
 	}
 	g.SetFirstIncomplete(today.AddDate(0, 0, -2).Format(time.DateOnly))
 }
@@ -108,15 +109,15 @@ func TestSearchConsoleOverHTTP(t *testing.T) {
 	}
 
 	var props []struct {
-		SiteURL   string `json:"site_url"`
+		SiteURL   string `json:"url"`
 		Suggested bool   `json:"suggested"`
 	}
 	keep(person.call("GET", "/v1/gsc/properties", nil, http.StatusOK, &props))
 	if len(props) != 2 || props[0].SiteURL != "sc-domain:northwind.example" || !props[0].Suggested {
 		t.Fatalf("properties = %+v", props)
 	}
-	keep(person.call("PUT", "/v1/gsc/property", map[string]any{"property": "sc-domain:northwind.example"}, http.StatusOK, nil))
-	if err := c.svc.GSC.Sync(context.Background()); err != nil {
+	keep(person.call("PUT", "/v1/gsc/property", map[string]any{"site": "sc-domain:northwind.example"}, http.StatusOK, nil))
+	if err := c.svc.Search.Sync(context.Background(), search.Google); err != nil {
 		t.Fatal(err)
 	}
 
@@ -147,7 +148,7 @@ func TestSearchConsoleOverHTTP(t *testing.T) {
 	reader.call("GET", "/v1/search/queries?non_brand=maybe", nil, http.StatusBadRequest, nil)
 	reader.call("GET", "/v1/search/daily?from=yesterday", nil, http.StatusBadRequest, nil)
 
-	goal := map[string]any{"metric": "non_brand_clicks", "window_days": 28, "target": 240, "due_on": "2028-03-15"}
+	goal := map[string]any{"provider": "google", "metric": "non_brand_clicks", "window_days": 28, "target": 240, "due_on": "2028-03-15"}
 	reader.call("POST", "/v1/goals", goal, http.StatusForbidden, nil)
 	var g struct {
 		ID       int64 `json:"id"`
@@ -167,10 +168,10 @@ func TestSearchConsoleOverHTTP(t *testing.T) {
 	agent.call("DELETE", "/v1/goals/"+itoa(g.ID), nil, http.StatusNotFound, nil)
 
 	var sealed string
-	if err := c.db.QueryRow(context.Background(), `SELECT ciphertext FROM gsc_connection`).Scan(&sealed); err != nil {
+	if err := c.db.QueryRow(context.Background(), `SELECT ciphertext FROM search_connection`).Scan(&sealed); err != nil {
 		t.Fatal(err)
 	}
-	refresh, err := secretbox.ForTest().Open(sealed, "gsc:oauth")
+	refresh, err := secretbox.ForTest().Open(sealed, "search:google:oauth")
 	if err != nil || refresh == "" {
 		t.Fatalf("open the stored refresh token: %v", err)
 	}
@@ -218,12 +219,12 @@ func TestSearchToolsOverMCP(t *testing.T) {
 	}
 
 	person.call("PUT", "/v1/gsc/service-account", map[string]string{"key": anon.google.ServiceAccountKey(t, "byname@northwind-search.iam.gserviceaccount.com")}, http.StatusOK, nil)
-	person.call("PUT", "/v1/gsc/property", map[string]any{"property": "https://www.northwind.example/", "backfill": false}, http.StatusOK, nil)
-	anon.google.SetRows("https://www.northwind.example/", gsctest.Row{Date: time.Now().AddDate(0, 0, -5).Format(time.DateOnly), Query: "northwind", Page: "https://www.northwind.example/", Clicks: 2, Impressions: 9, Position: 1})
-	if err := anon.svc.GSC.Sync(context.Background()); err != nil {
+	person.call("PUT", "/v1/gsc/property", map[string]any{"site": "https://www.northwind.example/", "backfill": false}, http.StatusOK, nil)
+	anon.google.SetRows("https://www.northwind.example/", searchtest.Row{Date: time.Now().AddDate(0, 0, -5).Format(time.DateOnly), Query: "northwind", Page: "https://www.northwind.example/", Clicks: 2, Impressions: 9, Position: 1})
+	if err := anon.svc.Search.Sync(context.Background(), search.Google); err != nil {
 		t.Fatal(err)
 	}
-	editor.call("POST", "/v1/goals", map[string]any{"metric": "clicks", "window_days": 90, "target": 5, "due_on": "2028-03-15"}, http.StatusOK, nil)
+	editor.call("POST", "/v1/goals", map[string]any{"provider": "google", "metric": "clicks", "window_days": 90, "target": 5, "due_on": "2028-03-15"}, http.StatusOK, nil)
 	for name, args := range reads {
 		call(name, args)
 	}
