@@ -42,6 +42,10 @@ func (s *Service) searchAlerts(ctx context.Context, p Provider) error {
 	if s.alerts == nil {
 		return nil
 	}
+	sp, err := lookup(p)
+	if err != nil {
+		return err
+	}
 	goals, err := s.Goals(ctx)
 	if err != nil {
 		return err
@@ -53,7 +57,7 @@ func (s *Service) searchAlerts(ctx context.Context, p Provider) error {
 		}
 		errs = append(errs, s.alerts.Emit(ctx, notify.Event{
 			Subject: fmt.Sprintf("goal/%d/%d", g.ID, g.Target),
-			Payload: notify.GoalReachedPayload{GoalID: g.ID, Metric: string(g.Metric), WindowDays: g.WindowDays,
+			Payload: notify.GoalReachedPayload{GoalID: g.ID, Provider: string(p), Engine: sp.Title, Metric: string(g.Metric), WindowDays: g.WindowDays,
 				Target: float64(g.Target), Value: float64(g.Progress.Value), DueOn: g.DueOn},
 		}))
 	}
@@ -72,7 +76,7 @@ func (s *Service) searchAlerts(ctx context.Context, p Provider) error {
 		}
 		errs = append(errs, s.alerts.Emit(ctx, notify.Event{
 			Subject: fmt.Sprintf("search/%s/%s/%s", p, m, cur.To),
-			Payload: notify.SearchMovedPayload{Metric: string(m), WindowDays: cur.Days, Before: float64(before), After: float64(after)},
+			Payload: notify.SearchMovedPayload{Provider: string(p), Engine: sp.Title, Metric: string(m), WindowDays: cur.Days, Before: float64(before), After: float64(after)},
 		}))
 	}
 	return errors.Join(errs...)

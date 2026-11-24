@@ -116,7 +116,7 @@ func TestNotificationsReadAsSentences(t *testing.T) {
 	for _, e := range []notify.Event{
 		{Subject: "week/2026-11-09", Payload: digest},
 		{Subject: "change/7/final", Payload: notify.ChangeVerdictPayload{ChangeID: 7, URL: "https://northwind.example/pricing", Verdict: "improved"}},
-		{Subject: "search/non_brand_clicks", Payload: notify.SearchMovedPayload{Metric: "non_brand_clicks", WindowDays: 28, Before: 120, After: 80}},
+		{Subject: "search/bing/non_brand_clicks", Payload: notify.SearchMovedPayload{Provider: "bing", Engine: "Bing", Metric: "non_brand_clicks", WindowDays: 28, Before: 120, After: 80}},
 	} {
 		if err := alerts.Emit(ctx, e); err != nil {
 			t.Fatal(err)
@@ -146,10 +146,10 @@ func TestNotificationsReadAsSentences(t *testing.T) {
 		t.Errorf("digest lines:\n%s\nwant:\n%s", strings.Join(social.Lines, "\n"), strings.Join(want, "\n"))
 	}
 
-	if change.Title != "Change result: helped" || change.Path != "/google/site-changes?chg=7" {
+	if change.Title != "Change result: helped" || change.Path != "/search/site-changes?chg=7" {
 		t.Errorf("change notification %q at %q", change.Title, change.Path)
 	}
-	if moved.Title != "Clicks from searches without your name fell over the last 28 days" || moved.Path != "/google/traffic" {
+	if moved.Title != "Clicks from Bing searches without your name fell over the last 28 days" || moved.Path != "/search/traffic?provider=bing" {
 		t.Errorf("search notification %q at %q", moved.Title, moved.Path)
 	}
 }

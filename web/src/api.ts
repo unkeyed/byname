@@ -1580,6 +1580,10 @@ export interface PairPausedPayload {
 
 export interface GoalReachedPayload {
   goal_id: number;
+  /** The search engine, such as google or bing. */
+  provider: string;
+  /** The search engine as people say it, such as Bing. */
+  engine: string;
   metric: GoalMetric;
   window_days: number;
   target: number;
@@ -1588,6 +1592,8 @@ export interface GoalReachedPayload {
 }
 
 export interface SearchMovedPayload {
+  provider: string;
+  engine: string;
   metric: GoalMetric;
   window_days: number;
   before: number;

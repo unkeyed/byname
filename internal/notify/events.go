@@ -96,8 +96,8 @@ var registry = []KindInfo{
 	kind[CheckFailedPayload](CheckFailed, "Check failed", "A check could not start, or could not save its answers.", Readers),
 	kind[SpendCapReachedPayload](SpendCapReached, "Spend cap reached", "A check stopped asking questions when it reached the spend cap for one check or for the month.", Readers),
 	kind[PairPausedPayload](PairPaused, "Model paused", "An AI app stopped offering a model you picked, so Byname stopped asking it.", Readers),
-	kind[GoalReachedPayload](GoalReached, "Goal reached", "A Google search goal reached its target.", Readers),
-	kind[SearchMovedPayload](SearchMoved, "Google clicks moved", "Google clicks, or clicks from searches without your name, over the last 28 days moved by at least a quarter and by at least 20 clicks against the 28 days before.", Readers),
+	kind[GoalReachedPayload](GoalReached, "Goal reached", "A search goal on Google or Bing reached its target.", Readers),
+	kind[SearchMovedPayload](SearchMoved, "Search clicks moved", "Clicks from Google or Bing, or clicks from searches without your name, over the last 28 days moved by at least a quarter and by at least 20 clicks against the 28 days before.", Readers),
 	kind[ChangeVerdictPayload](ChangeVerdict, "Change result", "A site change got its final result, compared with your comparison pages.", Readers),
 	kind[TokenExpiringPayload](TokenExpiring, "Token expiring", "The GitHub token for site changes expires soon.", Admins),
 	kind[SocialDigestPayload](SocialDigest, "Social digest", "The day's or week's posts that name you on social networks, without the accounts, topics and subreddits you left out.", Readers),
@@ -251,20 +251,30 @@ func (p PairPausedPayload) message() Message {
 	return Message{Title: fmt.Sprintf("Paused %s on %s", p.Model, title), Lines: []string{p.Reason}, Path: "/settings/ai-apps", Action: "Open AI apps settings"}
 }
 
-// metricLabels names Search Console metrics in messages.
-var metricLabels = map[string]string{"clicks": "Google clicks", "impressions": "Appearances in Google results", "non_brand_clicks": "Clicks from searches without your name"}
-
-func metricLabel(m string) string {
-	if l, ok := metricLabels[m]; ok {
-		return l
+// metricLabel names a search metric on engine, such as Google or Bing, in
+// messages.
+func metricLabel(engine, m string) string {
+	switch m {
+	case "clicks":
+		return engine + " clicks"
+	case "impressions":
+		return "Appearances in " + engine + " results"
+	case "non_brand_clicks":
+		return "Clicks from " + engine + " searches without your name"
 	}
 	return m
 }
 
+// trafficPath is the Search page's Traffic tab showing provider.
+func trafficPath(provider string) string { return "/search/traffic?provider=" + provider }
+
 // GoalReachedPayload is a search goal whose progress first met its target
-// (internal/gsc).
+// (internal/search). Provider names the search engine, such as bing, and
+// Engine says it, such as Bing.
 type GoalReachedPayload struct {
 	GoalID     int64   `json:"goal_id"`
+	Provider   string  `json:"provider"`
+	Engine     string  `json:"engine"`
 	Metric     string  `json:"metric"`
 	WindowDays int     `json:"window_days"`
 	Target     float64 `json:"target"`
@@ -275,17 +285,20 @@ type GoalReachedPayload struct {
 func (GoalReachedPayload) Kind() Kind { return GoalReached }
 
 func (p GoalReachedPayload) message() Message {
+	label := metricLabel(p.Engine, p.Metric)
 	return Message{
-		Title:  fmt.Sprintf("Goal reached: %s", metricLabel(p.Metric)),
-		Lines:  []string{fmt.Sprintf("%s reached %g over the last %d days, against a target of %g by %s.", metricLabel(p.Metric), p.Value, p.WindowDays, p.Target, p.DueOn)},
-		Path:   "/google/traffic",
-		Action: "Open Google traffic",
+		Title:  fmt.Sprintf("Goal reached: %s", label),
+		Lines:  []string{fmt.Sprintf("%s reached %g over the last %d days, against a target of %g by %s.", label, p.Value, p.WindowDays, p.Target, p.DueOn)},
+		Path:   trafficPath(p.Provider),
+		Action: "Open " + p.Engine + " traffic",
 	}
 }
 
-// SearchMovedPayload is a 28-day Search Console metric that moved against
-// the 28 days before (internal/gsc).
+// SearchMovedPayload is a 28-day search metric on one search engine that
+// moved against the 28 days before (internal/search).
 type SearchMovedPayload struct {
+	Provider   string  `json:"provider"`
+	Engine     string  `json:"engine"`
 	Metric     string  `json:"metric"`
 	WindowDays int     `json:"window_days"`
 	Before     float64 `json:"before"`
@@ -300,10 +313,10 @@ func (p SearchMovedPayload) message() Message {
 		way = "fell"
 	}
 	return Message{
-		Title:  fmt.Sprintf("%s %s over the last %d days", metricLabel(p.Metric), way, p.WindowDays),
+		Title:  fmt.Sprintf("%s %s over the last %d days", metricLabel(p.Engine, p.Metric), way, p.WindowDays),
 		Lines:  []string{fmt.Sprintf("%g, against %g in the %d days before.", p.After, p.Before, p.WindowDays)},
-		Path:   "/google/traffic",
-		Action: "Open Google traffic",
+		Path:   trafficPath(p.Provider),
+		Action: "Open " + p.Engine + " traffic",
 	}
 }
 
@@ -327,7 +340,7 @@ func (p ChangeVerdictPayload) message() Message {
 	if !ok {
 		label = strings.ReplaceAll(p.Verdict, "_", " ")
 	}
-	return Message{Title: "Change result: " + label, Lines: lines, Path: fmt.Sprintf("/google/site-changes?chg=%d", p.ChangeID), Action: "Open the change"}
+	return Message{Title: "Change result: " + label, Lines: lines, Path: fmt.Sprintf("/search/site-changes?chg=%d", p.ChangeID), Action: "Open the change"}
 }
 
 // verdictLabels says each final result (internal/changes' Outcome) in plain words.

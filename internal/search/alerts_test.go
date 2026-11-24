@@ -128,4 +128,7 @@ func TestSearchMovedIsPerProvider(t *testing.T) {
 	if n := e.count(`SELECT count(*) FROM alert WHERE kind = 'search_moved'`); n != 4 {
 		t.Fatalf("%d search_moved alerts, want clicks and non-brand clicks once for each engine", n)
 	}
+	if n := e.count(`SELECT count(*) FROM alert WHERE kind = 'search_moved' AND payload->>'provider' = 'bing' AND payload->>'engine' = 'Bing'`); n != 2 {
+		t.Fatalf("%d search_moved alerts name Bing, want 2", n)
+	}
 }

@@ -15,7 +15,7 @@ import (
 func addNotifyTools(srv *mcp.Server, svc app.Services) {
 	n := svc.Notify
 	addTool(srv, core.ResultsRead, &mcp.Tool{Name: "list_alerts", Annotations: readOnly(),
-		Description: "Notifications newest first, the ones the app shows under the bell: finished checks with what was gained and lost, refused or failed checks, spend caps reached, paused models, Google search goals reached, Google clicks that moved, change results, an expiring GitHub token and social digests, each with whether the person this connection acts for has read it, and the unread count. GET /v1/alerts."},
+		Description: "Notifications newest first, the ones the app shows under the bell: finished checks with what was gained and lost, refused or failed checks, spend caps reached, paused models, search goals reached and search clicks that moved on Google or Bing, change results, an expiring GitHub token and social digests, each with whether the person this connection acts for has read it, and the unread count. GET /v1/alerts."},
 		func(ctx context.Context, a core.Actor, in notify.AlertQuery) (notify.AlertList, error) {
 			return n.Alerts(ctx, a, in)
 		})

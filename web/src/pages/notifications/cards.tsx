@@ -81,10 +81,10 @@ const cards: Cards = {
   goal_reached: (p) => ({
     icon: "check",
     tone: "success",
-    about: "Google search",
-    title: `Goal reached: ${formatCount(p.value)} ${metricWords[p.metric]} in ${p.window_days} days`,
+    about: `${p.engine} search`,
+    title: `Goal reached: ${formatCount(p.value)} ${metricWords(p.engine, p.metric)} in ${p.window_days} days`,
     lines: [`Your target was ${formatCount(p.target)} by ${dayLabel(p.due_on)}.`],
-    action: "Open Google traffic",
+    action: `Open ${p.engine} traffic`,
   }),
   search_moved: (p) => {
     const change = p.before > 0 ? Math.round((Math.abs(p.after - p.before) / p.before) * 100) : null;
@@ -92,10 +92,10 @@ const cards: Cards = {
     return {
       icon: "search",
       tone: fell ? "warn" : "success",
-      about: "Google search",
-      title: `${capitalize(metricWords[p.metric])} ${fell ? "fell" : "rose"}${change === null ? "" : ` ${change}%`} over the last ${p.window_days} days`,
+      about: `${p.engine} search`,
+      title: `${capitalize(metricWords(p.engine, p.metric))} ${fell ? "fell" : "rose"}${change === null ? "" : ` ${change}%`} over the last ${p.window_days} days`,
       lines: [`${formatCount(p.after)}, against ${formatCount(p.before)} in the ${p.window_days} days before.`],
-      action: "Open Google traffic",
+      action: `Open ${p.engine} traffic`,
     };
   },
   change_verdict: (p) => ({
@@ -279,11 +279,9 @@ function changeLine(gained: number, lost: number): string {
   return `${parts.join(", ")}.`;
 }
 
-const metricWords: Record<GoalMetric, string> = {
-  clicks: "Google clicks",
-  impressions: "appearances in Google results",
-  non_brand_clicks: "clicks from searches without your name",
-};
+/** A search metric on one engine, such as "Bing clicks". */
+const metricWords = (engine: string, m: GoalMetric) =>
+  ({ clicks: `${engine} clicks`, impressions: `appearances in ${engine} results`, non_brand_clicks: `clicks from ${engine} searches without your name` })[m];
 
 const verdictTitles: Record<EventPayloads["change_verdict"]["verdict"], string> = {
   improved: "A site change helped",
