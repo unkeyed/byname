@@ -84,7 +84,7 @@ func normalizeFilter(kind FilterKind, raw string) (value, pattern string, err er
 			return "", "", fmt.Errorf("a topic is 2 to 100 characters, got %q", raw)
 		}
 		// A whole word: what is around it is no letter, digit or _, so
-		// india matches "India," and "#india" but not "Indiana".
+		// weather matches "Weather," and "#weather" but not "weatherproof".
 		return value, `(^|\W)` + regexp.QuoteMeta(value) + `($|\W)`, nil
 	case Subreddit:
 		value = strings.ToLower(raw)

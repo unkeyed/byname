@@ -640,8 +640,8 @@ func TestFiltersHideTopicsAndSubredditsAtReadTime(t *testing.T) {
 	for _, bad := range []social.FilterInput{
 		{Kind: social.Topic, Mode: social.LeaveOut, Value: "a"},
 		{Kind: social.Subreddit, Mode: social.LeaveOut, Value: "not a subreddit"},
-		{Kind: "hashtag", Mode: social.LeaveOut, Value: "india"},
-		{Kind: social.Topic, Mode: "hide", Value: "india"},
+		{Kind: "hashtag", Mode: social.LeaveOut, Value: "weather"},
+		{Kind: social.Topic, Mode: "hide", Value: "weather"},
 	} {
 		if _, err := e.svc.AddFilter(e.ctx, bad); !errors.Is(err, core.ErrInvalid) {
 			t.Errorf("AddFilter(%+v) = %v, want invalid", bad, err)
@@ -653,20 +653,20 @@ func TestFiltersHideTopicsAndSubredditsAtReadTime(t *testing.T) {
 }
 
 // A topic is matched as a whole word, so a regular expression's special
-// characters in it are plain text and india does not match Indiana.
+// characters in it are plain text and weather does not match weatherproof.
 func TestTopicIsAWholeWord(t *testing.T) {
 	e := newEnv(t, true)
 	at := e.now
 	if _, err := e.db.Exec(e.ctx, `INSERT INTO social_mention (network, post_id, url, author_handle, text, posted_at, term, first_seen_at, last_seen_at)
-		VALUES ('x', '1', 'https://x.com/a/status/1', 'a', 'Northwind Cloud in India!', $1, 'Northwind Cloud', $1, $1),
-			('x', '2', 'https://x.com/b/status/2', 'b', 'Northwind Cloud in Indiana', $1, 'Northwind Cloud', $1, $1),
-			('x', '3', 'https://x.com/c/status/3', 'c', 'Northwind Cloud loves c++ and #India', $1, 'Northwind Cloud', $1, $1)`, at); err != nil {
+		VALUES ('x', '1', 'https://x.com/a/status/1', 'a', 'Northwind Cloud weather says rain!', $1, 'Northwind Cloud', $1, $1),
+			('x', '2', 'https://x.com/b/status/2', 'b', 'Northwind Cloud is weatherproof', $1, 'Northwind Cloud', $1, $1),
+			('x', '3', 'https://x.com/c/status/3', 'c', 'Northwind Cloud loves c++ and #Weather', $1, 'Northwind Cloud', $1, $1)`, at); err != nil {
 		t.Fatal(err)
 	}
 	for _, c := range []struct {
 		topic string
 		want  int
-	}{{"india", 2}, {"#india", 1}, {"c++", 1}, {"ind", 0}, {"in india", 1}} {
+	}{{"weather", 2}, {"#weather", 1}, {"c++", 1}, {"wea", 0}, {"weather says", 1}} {
 		f, err := e.svc.AddFilter(e.ctx, social.FilterInput{Kind: social.Topic, Mode: social.LeaveOut, Value: c.topic})
 		if err != nil || f.Mentions != c.want {
 			t.Errorf("topic %q matches %d, %v; want %d", c.topic, f.Mentions, err, c.want)

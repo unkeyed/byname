@@ -7935,7 +7935,7 @@ components:
           description: The label that hides its author, empty when the author is not left out.
         filtered_by:
           type: string
-          description: Why a filter hides it, such as "topic india", "r/india", "not in your subreddits" or "none of your topics". Empty when no filter does.
+          description: Why a filter hides it, such as "topic weather", "r/weather", "not in your subreddits" or "none of your topics". Empty when no filter does.
         call:
           oneOf:
             - $ref: "#/components/schemas/SocialCall"

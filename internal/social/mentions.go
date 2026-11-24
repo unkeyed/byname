@@ -42,7 +42,7 @@ type Mention struct {
 	Subreddit    string     `json:"subreddit" jsonschema:"the subreddit a Reddit post is in, lowercase, without r/; empty on other networks"`
 	Hidden       bool       `json:"hidden" jsonschema:"true when its author is left out or a topic or subreddit filter hides it"`
 	LeftOutAs    string     `json:"left_out_as" jsonschema:"the left-out label that hides its author, empty when the author is not left out"`
-	FilteredBy   string     `json:"filtered_by" jsonschema:"why a filter hides it, such as topic india, r/india, not in your subreddits or none of your topics; empty when no filter does"`
+	FilteredBy   string     `json:"filtered_by" jsonschema:"why a filter hides it, such as topic weather, r/weather, not in your subreddits or none of your topics; empty when no filter does"`
 	Call         *Call      `json:"call" jsonschema:"the Treg call that first found it"`
 }
 

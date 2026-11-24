@@ -1404,7 +1404,7 @@ export interface SocialMention {
   hidden: boolean;
   /** The left-out label hiding its author, empty when the author is not left out. */
   left_out_as: string;
-  /** Why a filter hides it, such as "topic india" or "r/india"; empty when no filter does. */
+  /** Why a filter hides it, such as "topic weather" or "r/weather"; empty when no filter does. */
   filtered_by: string;
   call: SocialCall | null;
 }

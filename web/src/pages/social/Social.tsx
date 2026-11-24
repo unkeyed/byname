@@ -406,7 +406,7 @@ function HideLikeThis({ m, initial, onClose }: { m: SocialMention; initial: stri
           autoFocus
           spellCheck={false}
           onChange={(e) => setTopic(e.target.value)}
-          placeholder="a word or phrase from this post, such as india"
+          placeholder="a word or phrase from this post, such as weather"
         />
         <Button type="submit" size="sm" disabled={add.isPending || !topic.trim()}>
           Leave out topic

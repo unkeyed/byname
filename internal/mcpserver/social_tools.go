@@ -64,7 +64,7 @@ func addSocialTools(srv *mcp.Server, svc app.Services) {
 			return deleted{in.ID}, svc.Social.RemoveLeftOut(ctx, in.ID)
 		})
 	addTool(srv, core.ConfigWrite, &mcp.Tool{Name: "add_social_filter", Annotations: mutates(false, true),
-		Description: "Leave a topic or subreddit out of social mentions (mode leave_out), or show only the posts that match it (mode only), such as leaving out the topic india when the brand's name means something else there; it applies to past mentions too, and setting one already set changes its mode. POST /v1/social/filters."},
+		Description: "Leave a topic or subreddit out of social mentions (mode leave_out), or show only the posts that match it (mode only), such as leaving out the topic weather when the brand's name means something else there; it applies to past mentions too, and setting one already set changes its mode. POST /v1/social/filters."},
 		func(ctx context.Context, _ core.Actor, in social.FilterInput) (social.Filter, error) {
 			return svc.Social.AddFilter(ctx, in)
 		})

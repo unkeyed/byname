@@ -17,7 +17,7 @@ export function useAddFilter(onAdded?: () => void) {
   });
 }
 
-/** "india", or "r/india" for a subreddit. */
+/** "weather", or "r/weather" for a subreddit. */
 export const filterName = (kind: SocialFilterKind, value: string) => (kind === "subreddit" ? `r/${value}` : value);
 
 const groups: { kind: SocialFilterKind; mode: SocialFilterMode; title: string; note: string }[] = [
@@ -115,7 +115,7 @@ function AddFilter() {
             autoCapitalize="none"
             spellCheck={false}
             onChange={(e) => setValue(e.target.value)}
-            placeholder={kind === "topic" ? "india" : "r/india"}
+            placeholder={kind === "topic" ? "weather" : "r/weather"}
           />
         </Field>
         <Button type="submit" disabled={add.isPending}>
@@ -126,7 +126,7 @@ function AddFilter() {
       <NoteSlot>{tried && missing ? <FieldNote tone="error">{missing}</FieldNote> : add.error ? <FieldNote tone="error">{errorMessage(add.error)}</FieldNote> : null}</NoteSlot>
       <p className="text-xs text-muted">
         {kind === "topic"
-          ? "A topic matches as a whole word in any case, so india matches “India” and “#india” but not “Indiana”."
+          ? "A topic matches as a whole word in any case, so weather matches “Weather” and “#weather” but not “weatherproof”."
           : "Give the subreddit's name, r/name or a link to it. Posts on other networks are not affected."}
       </p>
     </form>
