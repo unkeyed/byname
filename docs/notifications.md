@@ -15,6 +15,17 @@ For each place, you pick which notifications go there. Byname encrypts each plac
 
 Webhook and Slack URLs must use `https`, or `http` to `localhost` for a receiver on the same machine. Email uses plain text, with the notification's title as the subject. It ends with a link to the page in Byname, such as **See what changed**, and a link to the notifications page, both built from `PUBLIC_URL`. Slack shows the same two links. Email, Slack and the webhook carry the same title and lines.
 
+### Get a Slack webhook URL
+
+Byname only posts to the URL, so the Slack app needs no bot token and no permissions beyond the `incoming-webhook` scope, which Slack adds for you.
+
+1. At [api.slack.com/apps](https://api.slack.com/apps), click **Create New App**, then **From scratch**. Name it Byname and pick your workspace.
+2. Under **Basic Information > Display Information**, upload [Byname's icon](https://byname.dev/slack-icon.png) (512 by 512 pixels).
+3. Open **Incoming Webhooks**, turn them on, click **Add New Webhook to Workspace**, and pick the channel.
+4. Copy the URL, which starts with `https://hooks.slack.com/services/`, and paste it into a Slack place in Byname.
+
+If your workspace only lets admins install apps, Slack asks an admin to approve it first. Each webhook posts to one channel, so add another webhook and another Slack place for a second channel.
+
 ## Events
 
 `internal/notify/events.go` is the one list of events. **Settings > Notifications** lists them in this order.
