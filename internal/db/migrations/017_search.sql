@@ -1,12 +1,10 @@
--- Search traffic from each search engine's webmaster tools: the
--- connections, the numbers each sync stores, and goals. Everything here is
--- written by internal/search. Provider names (google, bing) come from its
--- registry, the one list of them, so no CHECK repeats it.
-
--- The terms that make a search query branded, lowercased. A query that
--- contains any of them is brand; NULL means the brand's name and aliases.
-ALTER TABLE instance_settings ADD COLUMN branded_terms text[]
-    CHECK (branded_terms IS NULL OR cardinality(branded_terms) BETWEEN 1 AND 50);
+-- Search traffic from each search engine's webmaster tools, where 004 kept
+-- Google's alone: the connections, the numbers each sync stores, goals and
+-- the sync's jobs, each naming its provider. Everything here is written by
+-- internal/search. Provider names (google, bing) come from its registry,
+-- the one list of them, so no CHECK repeats it. What Search Console stored
+-- moves over as provider google, so an upgrade keeps the connection and
+-- the history.
 
 -- At most one row per provider: how Byname reads it. ciphertext is the
 -- credential (Google's refresh token or service account JSON key, Bing's
@@ -81,23 +79,52 @@ CREATE TABLE search_page_stats (
 );
 CREATE INDEX search_page_stats_page ON search_page_stats (provider, site, page, first_day);
 
+-- The ciphertext moves as it is: internal/search opens Google's under the
+-- labels Search Console sealed it with.
+INSERT INTO search_connection (provider, method, account, ciphertext, site, site_kind, backfill, connected_at, last_sync_at, last_sync_error)
+SELECT 'google', method, account, ciphertext, property, property_kind, backfill, connected_at, last_sync_at, last_sync_error
+FROM gsc_connection;
+
+INSERT INTO search_site_daily (provider, site, day, clicks, impressions, position, is_final)
+SELECT 'google', property, date, clicks, impressions, position, is_final FROM gsc_site_daily;
+
+INSERT INTO search_query_stats (provider, site, first_day, last_day, query, clicks, impressions, position, is_final)
+SELECT 'google', property, date, date, query, clicks, impressions, position, is_final FROM gsc_query_daily;
+
+INSERT INTO search_page_stats (provider, site, first_day, last_day, page, clicks, impressions, position, is_final)
+SELECT 'google', property, date, date, page, clicks, impressions, position, is_final FROM gsc_page_daily;
+
+-- gsc_query_page_daily goes without a successor: nothing ever read it.
+DROP TABLE gsc_connection, gsc_site_daily, gsc_query_daily, gsc_page_daily, gsc_query_page_daily;
+
 -- Search goals: reach target on metric over a trailing window by due_on,
 -- on one provider. One goal per provider, metric, window and due date, so
--- adding the same goal again replaces its target.
-CREATE TABLE goal (
-    id          bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    provider    text NOT NULL,
-    metric      text NOT NULL CHECK (metric IN ('clicks', 'impressions', 'non_brand_clicks')),
-    window_days int NOT NULL CHECK (window_days IN (28, 90)),
-    target      bigint NOT NULL CHECK (target > 0),
-    due_on      date NOT NULL,
-    created_at  timestamptz NOT NULL DEFAULT now(),
-    updated_at  timestamptz NOT NULL DEFAULT now(),
-    UNIQUE (provider, metric, window_days, due_on)
-);
+-- adding the same goal again replaces its target. Every goal so far was
+-- Google's.
+ALTER TABLE goal ADD COLUMN provider text NOT NULL DEFAULT 'google';
+ALTER TABLE goal ALTER COLUMN provider DROP DEFAULT;
+ALTER TABLE goal DROP CONSTRAINT goal_metric_window_days_due_on_key;
+ALTER TABLE goal ADD UNIQUE (provider, metric, window_days, due_on);
 
--- The daily sync joins the jobs log, one search_sync per provider synced.
+-- The daily sync logs one search_sync per provider synced. The job CHECK
+-- lists every job name the code writes; TestJobCheckCoversEveryJob fails
+-- when one is missing.
 ALTER TABLE job_run ADD COLUMN provider text;
 ALTER TABLE job_run DROP CONSTRAINT job_run_job_check;
-ALTER TABLE job_run ADD CONSTRAINT job_run_job_check CHECK (job IN ('ai_check', 'model_refresh', 'search_sync'));
+UPDATE job_run SET job = 'search_sync', provider = 'google' WHERE job = 'gsc_sync';
+ALTER TABLE job_run ADD CONSTRAINT job_run_job_check CHECK (job IN ('ai_check', 'model_refresh', 'search_sync', 'source_fetch',
+    'site_changes', 'recrawl_watch', 'verdicts', 'social_fetch', 'other_brands', 'brand_logos'));
 ALTER TABLE job_run ADD CONSTRAINT job_run_provider_check CHECK ((job = 'search_sync') = (provider IS NOT NULL));
+
+-- Onboarding's Search Console step became the search engines step.
+UPDATE instance_settings SET onboarding_steps = array_replace(onboarding_steps, 'search_console', 'search')
+WHERE 'search_console' = ANY (onboarding_steps);
+
+-- Search alerts raised so far were Google's. Their messages and links read
+-- the provider and engine from the payload, and search_moved's subject
+-- names the provider, so the first sync after the upgrade finds the move
+-- it already raised instead of raising it again.
+UPDATE alert SET payload = payload || '{"provider": "google", "engine": "Google"}'
+WHERE kind IN ('goal_reached', 'search_moved') AND NOT payload ? 'provider';
+UPDATE alert SET subject = 'search/google/' || substr(subject, length('search/') + 1)
+WHERE kind = 'search_moved' AND subject ~ '^search/[a-z_]+/\d{4}-\d{2}-\d{2}$';

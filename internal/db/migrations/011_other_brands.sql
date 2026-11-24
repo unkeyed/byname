@@ -90,5 +90,5 @@ CREATE VIEW spend AS
     SELECT 'brands', run_id, called_at, cost_usd FROM brand_call WHERE cost_usd IS NOT NULL;
 
 ALTER TABLE job_run DROP CONSTRAINT job_run_job_check,
-    ADD CONSTRAINT job_run_job_check CHECK (job IN ('ai_check', 'model_refresh', 'search_sync', 'source_fetch',
+    ADD CONSTRAINT job_run_job_check CHECK (job IN ('ai_check', 'model_refresh', 'gsc_sync', 'source_fetch',
         'site_changes', 'recrawl_watch', 'verdicts', 'social_fetch', 'other_brands', 'brand_logos'));
