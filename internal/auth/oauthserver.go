@@ -109,9 +109,8 @@ func (o *OAuthServer) Register(ctx context.Context, c Client, m *oauthex.ClientR
 	}
 	id := newToken()
 	var created time.Time
-	keys := []string{"register:" + c.IP}
 	err = pgx.BeginFunc(ctx, o.db, func(tx pgx.Tx) error {
-		if err := countAttempt(ctx, tx, keys); err != nil {
+		if err := countRequest(ctx, tx, "register", c.IP); err != nil {
 			return err
 		}
 		if _, err := tx.Exec(ctx, `
@@ -230,11 +229,9 @@ func requestedScopes(raw string) []core.Scope {
 // Byname an open redirector (RFC 9700 section 4.11.2).
 //
 // Each request writes a row, and anyone can register a client, so every
-// request counts against the caller's address under "authorize:<addr>".
+// request counts against the caller's address.
 func (o *OAuthServer) Authorize(ctx context.Context, c Client, q AuthorizeRequest) (string, error) {
-	if err := pgx.BeginFunc(ctx, o.db, func(tx pgx.Tx) error {
-		return countAttempt(ctx, tx, []string{"authorize:" + c.IP})
-	}); err != nil {
+	if err := countRequest(ctx, o.db, "authorize", c.IP); err != nil {
 		return "", err
 	}
 	var uris []string

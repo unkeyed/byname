@@ -107,11 +107,14 @@ func (s *server) authorize(w http.ResponseWriter, r *http.Request) {
 		State: q.Get("state"), Resource: q.Get("resource"), Scope: q.Get("scope"),
 	})
 	var refused *auth.OAuthError
+	var throttled *auth.ThrottledError
 	switch {
 	case err == nil:
 		http.Redirect(w, r, "/oauth/consent?request="+url.QueryEscape(handle), http.StatusFound)
 	case errors.As(err, &refused):
 		http.Redirect(w, r, "/oauth/consent?error="+url.QueryEscape(refused.Code), http.StatusFound)
+	case errors.As(err, &throttled):
+		http.Redirect(w, r, "/oauth/consent?error=temporarily_unavailable", http.StatusFound)
 	default:
 		s.writeError(w, r, err)
 	}
@@ -165,7 +168,7 @@ func (s *server) oauthFailed(w http.ResponseWriter, r *http.Request, err error) 
 		writeOAuthError(w, http.StatusBadRequest, refused.Code, refused.Description)
 	case errors.As(err, &throttled):
 		w.Header().Set("Retry-After", strconv.Itoa(int(throttled.RetryAfter.Seconds())))
-		writeOAuthError(w, http.StatusTooManyRequests, "invalid_request", throttled.Error())
+		writeOAuthError(w, http.StatusTooManyRequests, "temporarily_unavailable", throttled.Error())
 	default:
 		s.writeError(w, r, err)
 	}

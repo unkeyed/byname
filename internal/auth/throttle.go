@@ -14,16 +14,11 @@ import (
 // "user:<id>" for second-factor and re-verification codes, and "ip:<addr>"
 // for both. A key's row exists for unknown emails too, so throttling never
 // reveals whether an account exists. The OAuth server counts refused token
-// requests under "token:<addr>" and every client registration under
-// "register:<addr>". Every authorization request counts under
-// "authorize:<addr>".
+// requests under "token:<addr>".
 
 // freeAttempts is how many failures a key gets before backoff starts. An IP
 // gets more, because an office or a carrier NAT puts many people behind one.
-var freeAttempts = map[string]int{
-	"email": 5, "user": 5, "ip": 30, "token": 30, "register": 20,
-	"authorize": 30,
-}
+var freeAttempts = map[string]int{"email": 5, "user": 5, "ip": 30, "token": 30}
 
 const (
 	maxLoginBackoff    = 15 * time.Minute
@@ -131,14 +126,33 @@ func clearKeys(ctx context.Context, db dbtx, keys []string) error {
 	return err
 }
 
-// countAttempt refuses the attempt when keys are throttled and otherwise
-// counts it, for requests that cost something whether or not they succeed.
-func countAttempt(ctx context.Context, tx pgx.Tx, keys []string) error {
-	if err := lockKeys(ctx, tx, keys); err != nil {
+// requestLimits caps the requests per address in each requestWindow for
+// endpoints that write a row whether or not they succeed: client
+// registration and authorization requests. Connecting an MCP client takes
+// one of each, and a team behind one NAT shares the cap.
+var requestLimits = map[string]int{"register": 20, "authorize": 30}
+
+const requestWindow = 10 * time.Minute
+
+// countRequest counts one request from addr against kind's limit, and
+// refuses it until the window ends once the limit is reached.
+func countRequest(ctx context.Context, db dbtx, kind, addr string) error {
+	var requests int
+	var left float64
+	if err := db.QueryRow(ctx, `
+		INSERT INTO request_counts AS c (key, window_start, requests) VALUES ($1, now(), 1)
+		ON CONFLICT (key) DO UPDATE SET
+			window_start = CASE WHEN c.window_start <= now() - make_interval(secs => $2) THEN now() ELSE c.window_start END,
+			requests = CASE WHEN c.window_start <= now() - make_interval(secs => $2) THEN 1 ELSE c.requests + 1 END
+		RETURNING requests, extract(epoch FROM window_start + make_interval(secs => $2) - now())::float8`,
+		kind+":"+addr, requestWindow.Seconds()).Scan(&requests, &left); err != nil {
 		return err
 	}
-	if err := throttled(ctx, tx, keys); err != nil {
+	if _, err := db.Exec(ctx, `DELETE FROM request_counts WHERE window_start < now() - interval '1 day'`); err != nil {
 		return err
 	}
-	return fail(ctx, tx, keys)
+	if requests > requestLimits[kind] {
+		return &ThrottledError{RetryAfter: time.Duration(left*float64(time.Second)).Truncate(time.Second) + time.Second}
+	}
+	return nil
 }

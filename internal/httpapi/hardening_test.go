@@ -6,6 +6,8 @@ import (
 	"io"
 	"net/http"
 	"slices"
+	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -152,16 +154,38 @@ func TestKeysExpire(t *testing.T) {
 	}
 }
 
-func TestAuthorizeIsThrottledPerAddress(t *testing.T) {
+// A person whose network has used up the window is sent to the consent
+// page to read why, never shown a bare error.
+func TestAuthorizeIsLimitedPerAddress(t *testing.T) {
 	c := newServer(t)
 	path := "/oauth/authorize?client_id=nope&response_type=code"
 	for i := range 30 {
-		if r := c.raw("GET", path, nil, nil); r.code != http.StatusFound {
-			t.Fatalf("authorize %d = %d %s, want a redirect to the consent page", i+1, r.code, r.body)
+		if r := c.raw("GET", path, nil, nil); r.code != http.StatusFound || strings.Contains(r.header.Get("Location"), "temporarily_unavailable") {
+			t.Fatalf("authorize %d = %d to %q, want the consent page's usual refusal", i+1, r.code, r.header.Get("Location"))
 		}
 	}
-	if r := c.raw("GET", path, nil, nil); r.code != http.StatusTooManyRequests {
-		t.Fatalf("31st authorize = %d %s, want 429", r.code, r.body)
+	r := c.raw("GET", path, nil, nil)
+	if r.code != http.StatusFound || r.header.Get("Location") != "/oauth/consent?error=temporarily_unavailable" {
+		t.Fatalf("31st authorize = %d to %q, want the consent page saying to wait", r.code, r.header.Get("Location"))
+	}
+}
+
+// Registrations are a fixed window, not failures: registering more than
+// the limit never makes the wait longer than the window.
+func TestRegisterIsLimitedPerAddressWithoutEscalating(t *testing.T) {
+	c := newServer(t)
+	body := map[string]any{"client_name": "Claude Code", "redirect_uris": []string{loopbackRedirect}}
+	for i := range 20 {
+		if r := c.do("POST", "/oauth/register", body); r.code != http.StatusCreated {
+			t.Fatalf("register %d = %d %s, want 201", i+1, r.code, r.body)
+		}
+	}
+	for i := range 40 {
+		r := c.do("POST", "/oauth/register", body)
+		wait, _ := strconv.Atoi(r.header.Get("Retry-After"))
+		if r.code != http.StatusTooManyRequests || !strings.Contains(string(r.body), `"temporarily_unavailable"`) || wait < 1 || wait > 600 {
+			t.Fatalf("register %d = %d Retry-After %q %s, want 429 temporarily_unavailable within the 10-minute window", 21+i, r.code, r.header.Get("Retry-After"), r.body)
+		}
 	}
 }
 
