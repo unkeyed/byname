@@ -6,10 +6,10 @@ This page covers running Byname from source, the checks a change has to pass, th
 
 - One Go binary, `cmd/byname`, serves the React UI, the REST API under `/v1`, the MCP server at `/mcp` and `/healthz`, and runs the scheduler. `byname migrate` and `byname recover` are subcommands of the same binary.
 - Postgres holds all state. Byname applies its migrations from `internal/db/migrations` when it starts.
-- The service packages do every read and write: `internal/config` (settings, brands, questions, surfaces, credentials, onboarding), `internal/checks` (queueing and running checks), `internal/results` (everything the result pages read), `internal/discovery` (brands answers name that you don't track), `internal/logos` (brand logos), `internal/gsc` (Search Console), `internal/changes` (site changes, recrawl watch and verdicts), `internal/social` (social mentions and digests), `internal/notify` (alerts and channels), `internal/sources` (cited pages), `internal/instance` (whether the instance is set up, and what it costs) and `internal/auth` (people, keys and OAuth).
+- The service packages do every read and write: `internal/config` (settings, brands, questions, surfaces, credentials, onboarding), `internal/checks` (queueing and running checks), `internal/results` (everything the result pages read), `internal/discovery` (brands answers name that you don't track), `internal/logos` (brand logos), `internal/search` (Google Search Console and Bing Webmaster Tools), `internal/changes` (site changes, recrawl watch and verdicts), `internal/social` (social mentions and digests), `internal/notify` (alerts and channels), `internal/sources` (cited pages), `internal/instance` (whether the instance is set up, and what it costs) and `internal/auth` (people, keys and OAuth).
 - `internal/httpapi/server.go` holds the one route table. `internal/mcpserver` registers each MCP tool. Both call the same service methods, so REST, MCP and the UI see the same thing.
 - `internal/engines` asks one question on one surface. `registry.go` is the one list of surfaces and their pinned endpoints, and `routes.go` the one list of routes and adapters.
-- `internal/scheduler` runs every minute: due checks, the daily Search Console sync with the site changes follow-up after it, the hourly GitHub poll, the daily model list refresh, social searches, reading answers for other brands, logo lookups, raw response pruning and cited-source fetching.
+- `internal/scheduler` runs every minute: due checks, the daily search engine sync with the site changes follow-up after it, the hourly GitHub poll, the daily model list refresh, social searches, reading answers for other brands, logo lookups, raw response pruning and cited-source fetching.
 
 ## Run Byname from source
 
@@ -92,6 +92,15 @@ A surface is a row in a table, so adding one touches a few known places and noth
 4. Document it: add the surface to the table in `docs/engines/surfaces.md`, or a page under `docs/engines/` for a new route family, and add that page to the sidebar in `site/src/lib/site.ts`.
 
 A direct model provider or gateway is a row in `adapters` in `internal/engines/routes.go` plus its own file, with fixtures under `testdata/<provider>/`.
+
+## Add a search engine
+
+A search engine is one adapter file and one entry in a registry. Connecting, the daily sync, storage, goals, notifications, the REST API and MCP read the registry, so they need no change.
+
+1. Write `internal/search/<engine>.go`, with `google.go` and `bing.go` as examples. Its `providerSpec` gives the title, the ways to connect, the engine's calendar, how many days one row of searches covers (`StepDays`) and `Notes` on how its numbers differ. Its adapter has three methods: `verify` checks a pasted key, `sites` lists the sites the key can read, and `pull` parses the engine's API into reports. The adapter never touches SQL.
+2. Add a `Provider` value and the spec to `registry` in `internal/search/search.go`. The value is stored in every row, so it never changes once released.
+3. Add a fake of the engine's API to `internal/search/searchtest`, built from its documented response shapes, and test the sync against it. Add a `*_BASE_URL` override in `cmd/byname/main.go` that points the adapter at the fake, with a warning at start.
+4. Document the engine in `docs/search.md`, and the override in `docs/configuration.md`.
 
 ## Release
 

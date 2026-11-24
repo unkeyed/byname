@@ -15,7 +15,7 @@ export const sections = [
     title: "AI apps",
     pages: ["engines/surfaces", "scores", "other-brands", "handled", "engines/treg", "engines/scraping-providers", "engines/model-providers", "engines/gateways"],
   },
-  { title: "Connect", pages: ["search-console", "agents", "notifications", "changes", "social"] },
+  { title: "Connect", pages: ["search", "agents", "notifications", "changes", "social"] },
 ];
 
 // Short sidebar labels where a page's title is long.

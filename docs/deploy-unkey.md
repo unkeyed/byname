@@ -10,7 +10,7 @@ You need:
 - A Postgres database. Unkey has no managed database and no persistent disk, and Byname keeps nothing on disk.
 - A GitHub account for your fork of `unkeyed/byname`.
 
-Provider keys, the Treg token and Search Console are not part of the deployment. You enter them in Byname's onboarding after step 9, so neither the agent nor Unkey's environment ever holds them.
+Provider keys, the Treg token and search engine connections are not part of the deployment. You enter them in Byname's onboarding after step 9, so neither the agent nor Unkey's environment ever holds them.
 
 ## 1. Connect to Unkey's MCP server
 
@@ -92,7 +92,7 @@ Optional variables, also write-only where secret:
 
 | Variable | When |
 |---|---|
-| `GSC_GOOGLE_CLIENT_ID`, `GSC_GOOGLE_CLIENT_SECRET` | To connect Search Console with Sign in with Google. See [Search Console](search-console.md). |
+| `GSC_GOOGLE_CLIENT_ID`, `GSC_GOOGLE_CLIENT_SECRET` | To connect Google Search Console with Sign in with Google. See [Search engines](search.md#create-the-google-oauth-client). |
 | `GOOGLE_*`, `GITHUB_*`, `OIDC_*`, `ALLOWED_EMAIL_DOMAINS` | To let teammates sign in with a provider. See [Sign-in](sign-in.md). |
 | `UNKEY_ROOT_KEY`, `UNKEY_API_ID` | To store API keys in Unkey. See [Store API keys in Unkey](#store-api-keys-in-unkey). |
 
@@ -139,7 +139,7 @@ Check three URLs:
 
 Open `PUBLIC_URL/setup/SETUP_TOKEN`. Enter your name and email and register a passkey. You are the first user and an Admin, and the link stops working. The deployment logs print the same link. Add a second passkey under **Settings > Account**, so losing one device does not lock you out.
 
-The next stop is onboarding, which opens on its own: your brand and domain, competitors, questions, the AI apps to ask with a Treg token or your own keys, Search Console, social mentions, and the schedule with spend caps. Nothing runs until you finish it.
+The next stop is onboarding, which opens on its own: your brand and domain, competitors, questions, the AI apps to ask with a Treg token or your own keys, the search engines to read, social mentions, and the schedule with spend caps. Nothing runs until you finish it.
 
 ## Deploy the prebuilt image instead
 

@@ -2,12 +2,12 @@
 
 Byname reads its configuration from environment variables when it starts. `cmd/byname/main.go` reads them all in `loadConfig`, and this page lists every one. A change takes effect on the next start.
 
-Environment variables hold only secrets and infrastructure. Everything about your brand, questions, AI apps, schedule, provider keys, Search Console, site changes and notifications lives in Postgres. You set those in onboarding, in **Settings**, or through the REST API and MCP, so there are no schedule or provider-key variables.
+Environment variables hold only secrets and infrastructure. Everything about your brand, questions, AI apps, schedule, provider keys, search engines, site changes and notifications lives in Postgres. You set those in onboarding, in **Settings**, or through the REST API and MCP, so there are no schedule or provider-key variables.
 
 | Variable | Required | Default | What it does |
 |---|---|---|---|
 | `DATABASE_URL` | Yes | none | The Postgres connection URL, for example `postgres://user:pass@host:5432/byname`. Byname opens up to 20 connections, and no more than a quarter of what the database allows its role, so the copies running side by side during a deploy and other apps on the database still get connections. A database that allows 25, such as a small PlanetScale cluster, gets 5. Up to 4 only hold locks, and the rest are split between pages, the REST API and MCP on one side and checks and other background work on the other, so a running check never makes a page wait. A connection idle for a minute is closed, and each is named `byname` in `pg_stat_activity`. To set the total yourself, add `pool_max_conns`, as in `...?sslmode=verify-full&pool_max_conns=12`. Below 5 it still opens 5. |
-| `ENCRYPTION_KEY` | Yes | none | 32 random bytes as base64 or hex, from `openssl rand -base64 32`. Encrypts provider keys, the Search Console credential, the GitHub token for site changes, the secrets of the places notifications go and TOTP seeds in the database. |
+| `ENCRYPTION_KEY` | Yes | none | 32 random bytes as base64 or hex, from `openssl rand -base64 32`. Encrypts provider keys, the search engine credentials, the GitHub token for site changes, the secrets of the places notifications go and TOTP seeds in the database. |
 | `ENCRYPTION_KEY_PREVIOUS` | No | none | The key you are rotating away from. Set it for one restart after changing `ENCRYPTION_KEY`. |
 | `MIGRATION_DATABASE_URL` | No | `DATABASE_URL` | A connection URL for a role that can create tables. Byname applies migrations through it, so `DATABASE_URL` can be a role that only reads and writes data. |
 | `PORT` | No | `8080` | The port the HTTP server listens on. |
@@ -25,7 +25,7 @@ Environment variables hold only secrets and infrastructure. Everything about you
 | `OIDC_CLIENT_ID` | No | none | The OIDC client ID. |
 | `OIDC_CLIENT_SECRET` | No | none | The OIDC client secret. |
 | `OIDC_NAME` | No | `SSO` | The OIDC provider's name on the sign-in button, such as `Okta`. |
-| `GSC_GOOGLE_CLIENT_ID` | No | none | A Google OAuth client ID for the Search Console connection. Set it with `GSC_GOOGLE_CLIENT_SECRET` to offer **Sign in with Google** in Search Console settings. Without it, Search Console connects only through a service account. |
+| `GSC_GOOGLE_CLIENT_ID` | No | none | A Google OAuth client ID for the Search Console connection. Set it with `GSC_GOOGLE_CLIENT_SECRET` to offer **Sign in with Google** on the Google card under **Settings > Search engines**. Without it, Google connects only through a service account. |
 | `GSC_GOOGLE_CLIENT_SECRET` | No | none | The Google OAuth client secret for the Search Console connection. |
 | `UNKEY_ROOT_KEY` | No | none | An Unkey root key. Set it together with `UNKEY_API_ID` to store API keys in Unkey. |
 | `UNKEY_API_ID` | No | none | The Unkey API that holds Byname's keys, for example `api_123`. |
@@ -73,7 +73,7 @@ MIGRATION_DATABASE_URL='postgres://admin:pass@host:5432/byname' byname migrate
 Byname hashes the tokens it only compares, such as session cookies, API keys, OAuth tokens and recovery codes. It must read some secrets back, so it encrypts those with AES-256-GCM under `ENCRYPTION_KEY`:
 
 - the Treg token under **Settings > Treg** and every key under **Settings > Provider keys**
-- the Search Console credential: the Google refresh token or the service account key
+- the Google refresh token or service account key, and the Bing API key, under **Settings > Search engines**
 - the GitHub token for site changes
 - the secret of each place notifications go: an SMTP password, an email API key, a Slack webhook URL or a webhook signing secret
 - each person's TOTP seed
@@ -86,11 +86,11 @@ Generate the key once and store it with your other secrets:
 openssl rand -base64 32
 ```
 
-If you lose the key, Byname cannot read those secrets and exits at start, naming the first one it could not read. To start again without them, delete the encrypted rows, then re-enter the Treg token under **Settings > Treg** and the keys under **Settings > Provider keys**, reconnect Search Console and the GitHub repository under **Settings > Site changes**, add where notifications go again under **Settings > Notifications**, and have each person set up their authenticator app again:
+If you lose the key, Byname cannot read those secrets and exits at start, naming the first one it could not read. To start again without them, delete the encrypted rows, then re-enter the Treg token under **Settings > Treg** and the keys under **Settings > Provider keys**, reconnect each search engine under **Settings > Search engines** and the GitHub repository under **Settings > Site changes**, add where notifications go again under **Settings > Notifications**, and have each person set up their authenticator app again:
 
 ```sql
 DELETE FROM credential;
-DELETE FROM gsc_connection;
+DELETE FROM search_connection;
 UPDATE repo_connection SET ciphertext = NULL, token_expires_at = NULL;
 DELETE FROM notification_channel;
 DELETE FROM totp;
@@ -120,7 +120,7 @@ When it is unset, Byname uses `http://localhost:$PORT`, which suits `make dev`. 
 
 ## `GSC_GOOGLE_CLIENT_ID` and `GSC_GOOGLE_CLIENT_SECRET`
 
-The Google OAuth client that Search Console's **Sign in with Google** uses. It is separate from `GOOGLE_CLIENT_ID`, which signs people in to Byname, because it asks Google for a different scope: `https://www.googleapis.com/auth/webmasters.readonly`, read-only Search Console. You can use the same Google Cloud project for both. [Search Console](search-console.md) shows how to create the client.
+The Google OAuth client that Search Console's **Sign in with Google** uses. It is separate from `GOOGLE_CLIENT_ID`, which signs people in to Byname, because it asks Google for a different scope: `https://www.googleapis.com/auth/webmasters.readonly`, read-only Search Console. You can use the same Google Cloud project for both. [Search engines](search.md#create-the-google-oauth-client) shows how to create the client.
 
 ## `UNKEY_ROOT_KEY` and `UNKEY_API_ID`
 
@@ -150,6 +150,7 @@ Never set these in production. Each one sends Byname's outbound calls, or lets i
 | `CLORO_BASE_URL` | Sends calls with your own cloro key to this URL instead of `https://api.cloro.dev`. |
 | `SERPAPI_BASE_URL` | Sends calls with your own SerpApi key to this URL instead of `https://serpapi.com`. |
 | `GSC_GOOGLE_BASE_URL` | Sends every Google call the Search Console connection makes, sign-in included, to this URL. |
+| `SEARCH_BING_BASE_URL` | Sends every Bing Webmaster Tools call to this URL instead of `https://ssl.bing.com/webmaster/api.svc/json`, such as a fake on localhost. |
 | `GITHUB_API_BASE_URL` | Sends every GitHub call that site changes make to this URL instead of `https://api.github.com`, such as a fake GitHub on localhost. |
 | `BLUESKY_BASE_URL` | Sends social search on Bluesky to this URL instead of `https://api.bsky.app`, such as a fake on localhost. |
 | `RESEND_BASE_URL` | Sends notifications that go by email through Resend to this URL instead of `https://api.resend.com`. |

@@ -11,7 +11,7 @@
 
 Your buyers ask ChatGPT, Google AI Mode and Claude Code which product to use. Each answer names a few brands and links a few sites. When yours is not one of them, nothing tells you, and nothing tells you who was named instead.
 
-Byname is an open source app you run yourself that asks those questions for you. It asks them where your buyers ask, on a schedule you set, keeps every answer with its cost, and counts who was named and whose site was linked. Your Search Console numbers sit on the same timeline, and your agents read it all over MCP and REST.
+Byname is an open source app you run yourself that asks those questions for you. It asks them where your buyers ask, on a schedule you set, keeps every answer with its cost, and counts who was named and whose site was linked. Your Google and Bing search numbers sit on the same timeline, and your agents read it all over MCP and REST.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/this-week-dark.webp" />
@@ -71,7 +71,7 @@ docker compose up -d --build --wait
 docker compose logs app | grep -A2 'Open this link'
 ```
 
-Open the link Byname prints and register a passkey. Onboarding then asks for your brand and domain, competitors, questions, the AI apps to ask, Search Console, social mentions, and the schedule and spend caps, then shows a review. Nothing runs until you finish it. Keep `.env`. The `ENCRYPTION_KEY` in it protects the provider keys and secrets Byname stores. To run it on your own server, see [Self-host Byname](docs/self-hosting.md).
+Open the link Byname prints and register a passkey. Onboarding then asks for your brand and domain, competitors, questions, the AI apps to ask, the search engines to read, social mentions, and the schedule and spend caps, then shows a review. Nothing runs until you finish it. Keep `.env`. The `ENCRYPTION_KEY` in it protects the provider keys and secrets Byname stores. To run it on your own server, see [Self-host Byname](docs/self-hosting.md).
 
 ## Choose your AI apps
 
@@ -81,9 +81,9 @@ Pick AI apps in onboarding, or later under **Settings > AI apps**. Tick the AI a
 
 Not using Treg? Any AI app can call its endpoint at DataForSEO, cloro or SerpApi with your own key, and keeps its accuracy label. An AI app can also call OpenAI, Anthropic, Gemini or Perplexity directly, or an OpenAI-compatible gateway. On those routes an app becomes a Stand-in.
 
-## Connect Search Console
+## Connect Google and Bing
 
-In onboarding's **Search Console** step, or later under **Settings > Search Console**, click **Sign in with Google**, or paste a service account's JSON key. Byname asks Google for read-only access, syncs once a day, and backfills about 16 months on the first sync. Sign in with Google needs your own Google OAuth client in `GSC_GOOGLE_CLIENT_ID` and `GSC_GOOGLE_CLIENT_SECRET`. [Search Console](docs/search-console.md) shows how to create one, and covers branded search terms and goals.
+In onboarding's **Search engines** step, or later under **Settings > Search engines**, connect Google Search Console, Bing Webmaster Tools or both. For Google, click **Sign in with Google**, or paste a service account's JSON key. Byname asks Google for read-only access and backfills about 16 months on the first sync. Sign in with Google needs your own Google OAuth client in `GSC_GOOGLE_CLIENT_ID` and `GSC_GOOGLE_CLIENT_SECRET`. For Bing, paste the API key from Bing Webmaster Tools and pick the site. Byname syncs each engine once a day and shows one engine at a time, since their days and what they count differ. [Search engines](docs/search.md) shows how to create the Google OAuth client and how Bing's weekly numbers differ from Google's, and covers branded search terms and goals.
 
 ## Connect your agents
 
@@ -105,7 +105,7 @@ There is no key to copy. Run `/mcp` in Claude Code, pick `byname`, and choose **
 | [How answers are scored](docs/scores.md) | Named you, questions that name your brand, and aliases that are everyday words |
 | [Other brands](docs/other-brands.md) | The brands answers offer instead of you, how many questions it takes to list one, and logos |
 | [Handled questions](docs/handled.md) | Marking a missed question as handled by a page, and tracking the answers that link to it |
-| [Search Console](docs/search-console.md) | The Google OAuth client, service accounts, the sync, branded terms and goals |
+| [Search engines](docs/search.md) | Google Search Console and Bing Webmaster Tools, the Google OAuth client, the sync, how the two engines differ, branded terms and goals |
 | [Agents](docs/agents.md) | MCP over OAuth, the REST API, API keys and scopes |
 | [Notifications](docs/notifications.md) | The bell, where notifications go (email, Slack and webhooks), each kind, and webhook signatures |
 | [Site changes](docs/changes.md) | Site changes from GitHub, when Google sees them, and results against comparison pages |
