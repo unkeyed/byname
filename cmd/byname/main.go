@@ -510,7 +510,11 @@ func run(log *slog.Logger) error {
 	mux.Handle("/mcp", mcpserver.Handler(services, authn.OAuth, version))
 	mux.Handle("/", web.Handler())
 
-	srv := &http.Server{Addr: ":" + cfg.Port, Handler: httpapi.SecurityHeaders(cfg.Auth.PublicURL, mux), ReadHeaderTimeout: 10 * time.Second}
+	// ReadTimeout bounds a slow request body without a proxy in front. There
+	// is no WriteTimeout: an MCP tool call can outlast any fixed limit, and
+	// ReadTimeout does not cancel a handler that has read its body.
+	srv := &http.Server{Addr: ":" + cfg.Port, Handler: httpapi.SecurityHeaders(cfg.Auth.PublicURL, mux),
+		ReadHeaderTimeout: 10 * time.Second, ReadTimeout: 30 * time.Second, IdleTimeout: 2 * time.Minute}
 	served := make(chan error, 1)
 	go func() { served <- srv.ListenAndServe() }()
 	if cfg.TregBaseURL != "" {
