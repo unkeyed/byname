@@ -116,6 +116,8 @@ Nothing that costs money runs before onboarding is finished: no AI check and no 
 
 Pull or build the new image and restart the container. Byname applies new migrations when it starts and has no command to undo them, so back up the database before you upgrade.
 
+Upgrading from v0.2.0 or earlier, when Search Console was the only search engine, keeps what it stored. The Search Console connection shows on the Google card under **Settings > Search engines**, with the same property and credential. Its synced days, goals and syncs in the jobs log carry over as Google's. You don't connect again, and the first sync after the upgrade does not repeat a notification already sent. Links in notifications sent before the upgrade still open the right page.
+
 With Docker Compose:
 
 ```sh

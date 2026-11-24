@@ -22,6 +22,8 @@ Google's two methods feed the same tables, and you can switch later. Without a G
 
 Byname encrypts each credential, the Google refresh token, the service account key or the Bing API key, with `ENCRYPTION_KEY` and never returns it.
 
+A Search Console connection made before Bing joined stays connected after an upgrade, as Google's, with its numbers and goals. See [Upgrade](self-hosting.md#upgrade).
+
 ## Create the Google OAuth client
 
 Each Byname instance uses its own Google OAuth client, which you create once in Google Cloud. It is separate from the client in `GOOGLE_CLIENT_ID` that signs people in, because it asks for a different scope. One Google Cloud project can hold both.
