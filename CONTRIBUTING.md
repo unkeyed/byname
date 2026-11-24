@@ -6,10 +6,10 @@ This page covers running Byname from source, the checks a change has to pass, th
 
 - One Go binary, `cmd/byname`, serves the React UI, the REST API under `/v1`, the MCP server at `/mcp` and `/healthz`, and runs the scheduler. `byname migrate` and `byname recover` are subcommands of the same binary.
 - Postgres holds all state. Byname applies its migrations from `internal/db/migrations` when it starts.
-- The service packages do every read and write: `internal/config` (settings, brands, questions, surfaces, credentials, onboarding), `internal/checks` (queueing and running checks), `internal/results` (everything the result pages read), `internal/gsc` (Search Console), `internal/changes` (site changes, recrawl watch and verdicts), `internal/notify` (alerts and channels), `internal/sources` (cited pages) and `internal/auth` (people, keys and OAuth).
+- The service packages do every read and write: `internal/config` (settings, brands, questions, surfaces, credentials, onboarding), `internal/checks` (queueing and running checks), `internal/results` (everything the result pages read), `internal/discovery` (brands answers name that you don't track), `internal/logos` (brand logos), `internal/gsc` (Search Console), `internal/changes` (site changes, recrawl watch and verdicts), `internal/social` (social mentions and digests), `internal/notify` (alerts and channels), `internal/sources` (cited pages), `internal/instance` (whether the instance is set up, and what it costs) and `internal/auth` (people, keys and OAuth).
 - `internal/httpapi/server.go` holds the one route table. `internal/mcpserver` registers each MCP tool. Both call the same service methods, so REST, MCP and the UI see the same thing.
 - `internal/engines` asks one question on one surface. `registry.go` is the one list of surfaces and their pinned endpoints, and `routes.go` the one list of routes and adapters.
-- `internal/scheduler` runs every minute: due checks, the daily Search Console sync with the site changes follow-up after it, the hourly GitHub poll, the daily model list refresh, raw response pruning and cited-source fetching.
+- `internal/scheduler` runs every minute: due checks, the daily Search Console sync with the site changes follow-up after it, the hourly GitHub poll, the daily model list refresh, social searches, reading answers for other brands, logo lookups, raw response pruning and cited-source fetching.
 
 ## Run Byname from source
 
@@ -40,7 +40,7 @@ To try checks without paying for calls, point Byname at a fake Treg with `TREG_B
 CI runs these on every pull request:
 
 ```sh
-make lint                 # gofmt, go vet, and go vet on the e2e package
+make lint                 # gofmt, go vet (also on the e2e package), the web unit tests and the repo's grep rules
 make test                 # unit tests and Postgres tests
 cd web && npm run build   # TypeScript check and production build
 ```
@@ -73,7 +73,7 @@ npm run build   # or npm run dev to preview at localhost:4321
 
 ## Follow the house rules
 
-- Keep SQL in the service packages: `internal/config`, `internal/checks`, `internal/results`, `internal/gsc`, `internal/notify`, `internal/sources`, `internal/auth` and `internal/db`.
+- Keep SQL in the service packages named in [How the code fits together](#how-the-code-fits-together), and in `internal/db`.
 - Make each HTTP handler and each MCP tool call one service method. A handler decodes, calls, and encodes. Any logic beyond that belongs in the service.
 - Make every write an upsert on a natural key, so a retry, a replay or a second replica ends in the same state.
 - Never edit a migration that has been released. Add a new numbered file in `internal/db/migrations`.
@@ -84,7 +84,7 @@ npm run build   # or npm run dev to preview at localhost:4321
 
 ## Add a surface or a provider
 
-A surface is a row in a table, so adding one touches a few known places and nothing else. Onboarding, **Settings > Where people ask**, the REST API and MCP all read the registry.
+A surface is a row in a table, so adding one touches a few known places and nothing else. Onboarding, **Settings > AI apps**, the REST API and MCP all read the registry.
 
 1. Add the surface key to `internal/engines/engines.go`, and a row to `registry` in `internal/engines/registry.go` with its title, pinned endpoint and default fidelity. A new provider family gets its own file, such as `internal/engines/serpapi.go`, with the request builder and the parser for its native response.
 2. Add a migration that allows the new key in the `surface` table's `CHECK` constraint. Released migrations stay untouched, so this is a new file.
