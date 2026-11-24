@@ -7,8 +7,8 @@ import (
 	"github.com/unkeyed/byname/internal/social"
 )
 
-// Social mentions: results:read reads mentions, digests, the settings and
-// the left-out list; config:write edits the settings and the list.
+// Social mentions: results:read reads mentions, digests, the settings, the
+// left-out list and the filters; config:write edits them.
 
 // listMentions query ?network=&since=&include_hidden=true&limit=N.
 func (s *server) listMentions(w http.ResponseWriter, r *http.Request, _ core.Actor) error {
@@ -63,4 +63,26 @@ func (s *server) removeLeftOut(w http.ResponseWriter, r *http.Request, _ core.Ac
 		return err
 	}
 	return noContent(w, s.svc.Social.RemoveLeftOut(r.Context(), id))
+}
+
+func (s *server) listSocialFilters(w http.ResponseWriter, r *http.Request, _ core.Actor) error {
+	v, err := s.svc.Social.Filters(r.Context())
+	return respond(w, http.StatusOK, v, err)
+}
+
+func (s *server) addSocialFilter(w http.ResponseWriter, r *http.Request, _ core.Actor) error {
+	var b social.FilterInput
+	if err := readJSON(r, &b); err != nil {
+		return err
+	}
+	v, err := s.svc.Social.AddFilter(r.Context(), b)
+	return respond(w, http.StatusOK, v, err)
+}
+
+func (s *server) removeSocialFilter(w http.ResponseWriter, r *http.Request, _ core.Actor) error {
+	id, err := pathID(r, "social filter")
+	if err != nil {
+		return err
+	}
+	return noContent(w, s.svc.Social.RemoveFilter(r.Context(), id))
 }

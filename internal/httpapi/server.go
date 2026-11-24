@@ -157,6 +157,9 @@ var routes = []route{
 	{"GET /v1/social/left-out", needs(core.ResultsRead), (*server).listLeftOut},
 	{"POST /v1/social/left-out", needs(core.ConfigWrite), (*server).leaveOut},
 	{"DELETE /v1/social/left-out/{id}", needs(core.ConfigWrite), (*server).removeLeftOut},
+	{"GET /v1/social/filters", needs(core.ResultsRead), (*server).listSocialFilters},
+	{"POST /v1/social/filters", needs(core.ConfigWrite), (*server).addSocialFilter},
+	{"DELETE /v1/social/filters/{id}", needs(core.ConfigWrite), (*server).removeSocialFilter},
 
 	// Other brands: the brands answers name that you don't track, and
 	// logos (internal/discovery, internal/logos).

@@ -78,8 +78,9 @@ tags:
       Social mentions. Posts that name you on X, Reddit, Hacker News,
       LinkedIn, YouTube, Threads and Bluesky, found through Treg (Bluesky
       through its own public API), with the accounts you left out hidden at
-      read time. results:read reads mentions, digests, settings and the
-      left-out list; config:write changes the settings and the list.
+      read time, and the topics and subreddits you filter by. results:read
+      reads mentions, digests, settings, the left-out list and the filters;
+      config:write changes them.
   - name: other-brands
     description: >-
       The brands AI answers name that you don't track, found by a small model
@@ -2417,7 +2418,7 @@ paths:
     get:
       tags: [social]
       operationId: listMentions
-      summary: Stored posts that mention you, newest first, without those by left-out accounts unless asked.
+      summary: Stored posts that mention you, newest first, without those by left-out accounts or hidden by a filter unless asked.
       security:
         - apiKey: [results:read]
         - session: [results:read]
@@ -2433,7 +2434,7 @@ paths:
             type: string
         - name: include_hidden
           in: query
-          description: Also return mentions by left-out accounts, marked hidden.
+          description: Also return mentions by left-out accounts or hidden by a filter, marked hidden.
           schema:
             type: boolean
         - name: limit
@@ -2596,6 +2597,78 @@ paths:
       tags: [social]
       operationId: removeLeftOut
       summary: Take an account off the list, so its mentions show again.
+      security:
+        - apiKey: [config:write]
+        - session: [config:write]
+      responses:
+        "204":
+          description: Removed.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /v1/social/filters:
+    get:
+      tags: [social]
+      operationId: listSocialFilters
+      summary: The topics and subreddits that mentions are filtered by, topics first.
+      security:
+        - apiKey: [results:read]
+        - session: [results:read]
+      responses:
+        "200":
+          description: The filters.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SocialFilter"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+    post:
+      tags: [social]
+      operationId: addSocialFilter
+      summary: Leave a topic or subreddit out, or show only the posts that match it. Setting one already set changes its mode. It applies to past mentions too.
+      security:
+        - apiKey: [config:write]
+        - session: [config:write]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SocialFilterInput"
+      responses:
+        "200":
+          description: The filter.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SocialFilter"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /v1/social/filters/{id}:
+    parameters:
+      - $ref: "#/components/parameters/id"
+    delete:
+      tags: [social]
+      operationId: removeSocialFilter
+      summary: Take a filter off, so the posts it hid show again.
       security:
         - apiKey: [config:write]
         - session: [config:write]
@@ -4626,7 +4699,7 @@ components:
           type: integer
         hidden:
           type: integer
-          description: Posts by left-out accounts, not counted in mentions.
+          description: Posts by left-out accounts or hidden by a filter, not counted in mentions.
         networks:
           type: array
           items:
@@ -7821,7 +7894,7 @@ components:
           type: boolean
     SocialMention:
       type: object
-      required: [id, network, post_id, url, author_handle, author_name, text, posted_at, posted_approx, engagement, term, first_seen_at, hidden, left_out_as, call]
+      required: [id, network, post_id, url, author_handle, author_name, text, posted_at, posted_approx, engagement, term, first_seen_at, subreddit, hidden, left_out_as, filtered_by, call]
       properties:
         id:
           type: integer
@@ -7851,12 +7924,18 @@ components:
         first_seen_at:
           type: string
           format: date-time
+        subreddit:
+          type: string
+          description: The subreddit a Reddit post is in, lowercase, without r/. Empty on other networks.
         hidden:
           type: boolean
-          description: Its author is on the left-out list.
+          description: Its author is on the left-out list, or a topic or subreddit filter hides it.
         left_out_as:
           type: string
-          description: The label that hides it, empty when shown.
+          description: The label that hides its author, empty when the author is not left out.
+        filtered_by:
+          type: string
+          description: Why a filter hides it, such as "topic india", "r/india", "not in your subreddits" or "none of your topics". Empty when no filter does.
         call:
           oneOf:
             - $ref: "#/components/schemas/SocialCall"
@@ -7874,7 +7953,7 @@ components:
           description: Mentions that match and are shown, which can be more than returned.
         hidden:
           type: integer
-          description: Mentions that match but are by left-out accounts.
+          description: Mentions that match but are by left-out accounts or hidden by a filter.
     SocialDigest:
       type: object
       required: [cadence, from, to, starts_at, ends_at, finished, mentions, hidden, networks, new_authors, calls, spend_usd, spend_missing_calls]
@@ -8244,6 +8323,39 @@ components:
         mentions:
           type: integer
           description: Stored mentions it hides.
+    SocialFilter:
+      type: object
+      required: [id, kind, mode, value, mentions]
+      properties:
+        id:
+          type: integer
+        kind:
+          type: string
+          enum: [topic, subreddit]
+        mode:
+          type: string
+          enum: [leave_out, only]
+          description: leave_out hides the posts it matches. only hides the posts of its kind that match no only filter of that kind.
+        value:
+          type: string
+          description: The topic, lowercase, or the subreddit's name without r/.
+        mentions:
+          type: integer
+          description: Stored mentions it matches.
+    SocialFilterInput:
+      type: object
+      required: [kind, mode, value]
+      additionalProperties: false
+      properties:
+        kind:
+          type: string
+          enum: [topic, subreddit]
+        mode:
+          type: string
+          enum: [leave_out, only]
+        value:
+          type: string
+          description: A topic is a word or phrase, matched as a whole word in any case. A subreddit is its name, r/name or a link to it.
     LeftOutInput:
       type: object
       required: [network, handle, label]

@@ -19,6 +19,7 @@ export const networkOrder = Object.keys(networks) as SocialNetwork[];
 
 export const settingsPath = "/settings/social";
 export const leftOutPath = `${settingsPath}#left-out`;
+export const filtersPath = `${settingsPath}#filters`;
 export const tregPath = "/settings/treg";
 
 /** Saves Settings > Social, and refreshes what it changes: the social reads and the cost estimate. */

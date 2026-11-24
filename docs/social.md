@@ -49,7 +49,20 @@ The Treg token is set by an Admin under **Settings > Treg**. Treg is the service
 
 Byname stores the handle in lowercase, without `@` and without Reddit's `u/`. A profile link works for every network, such as `https://x.com/name`, `https://www.reddit.com/user/name`, `https://www.linkedin.com/in/name` or `https://bsky.app/profile/name.bsky.social`. A LinkedIn author is known by the slug in their profile link. YouTube search shows only a channel's name, so a YouTube channel is matched by that name with the spaces taken out. A YouTube `@handle` or channel id matches only when it is the same as that name.
 
-Leaving out hides, it does not delete. Byname stores every post it finds and hides the left-out ones each time it reads, so a new entry hides that account's past posts too, and removing an entry brings them back. The **Social** page has a **Show N hidden from people you left out** toggle that shows them, marked with their label.
+Leaving out hides, it does not delete. Byname stores every post it finds and hides the left-out ones each time it reads, so a new entry hides that account's past posts too, and removing an entry brings them back. The **Social** page has a **Show N hidden** toggle that shows them, marked with their label.
+
+## Filter by topic and subreddit
+
+Your name can mean something else to other people, in another place or another language, and those posts are not about you. **Topics and subreddits** under **Settings > Social** hides them, or keeps the page to what is.
+
+- **Leave out a topic.** Posts that mention it are hidden. A topic is a word or phrase, matched as a whole word in any case: `india` matches "India", "#india" and "India," but not "Indiana".
+- **Show only these topics.** Posts that mention none of them are hidden, on every network.
+- **Leave out a subreddit.** Reddit posts in it are hidden. Give its name, `r/name` or a link to it.
+- **Show only these subreddits.** Reddit posts in other subreddits are hidden. Posts on other networks are not affected.
+
+Setting a topic or subreddit that is already set changes what it does. On the **Social** page, **Hide posts like this** under a post leaves out a topic from it, with the words you selected in the post filled in, or the post's subreddit.
+
+Filters hide like the left-out list: at read time, past posts included, and removing a filter brings its posts back. A hidden post shows under **Show N hidden** marked with why, such as **Filtered: topic india** or **Filtered: r/india**. The digest leaves them out of its counts.
 
 ## The search
 
@@ -66,13 +79,13 @@ Bluesky can start asking for sign-in at any time. When it answers `401` or `403`
 
 ## The digest
 
-When a day or week ends, Byname raises the **Social digest** notification, once per period. It covers the posts first seen in the period, without the accounts left out at that moment. In the app it is a card with the count, each network's share, how many people posted about you for the first time and the top three posts. By email or in Slack it reads as a few sentences, then the top five posts, for example:
+When a day or week ends, Byname raises the **Social digest** notification, once per period. It covers the posts first seen in the period, without the accounts, topics and subreddits left out at that moment. In the app it is a card with the count, each network's share, how many people posted about you for the first time and the top three posts. By email or in Slack it reads as a few sentences, then the top five posts, for example:
 
 > 12 new posts named you, Nov 16 to 22
 >
 > 5 were on X, 4 on Reddit and 3 on Hacker News.
 > 9 people posted about you for the first time, among them @dana, u/ledgerfan and @lee.
-> 10 posts from accounts you left out are not counted.
+> 10 posts you left out are not counted.
 > The posts people engaged with most:
 > u/ledgerfan on Reddit, 120 upvotes and comments: “Northwind is the one” https://reddit.com/r/invoicing/1
 > @dana on X, 40 likes, replies and reposts: “Northwind sorted our invoices” https://x.com/dana/status/1
@@ -99,10 +112,13 @@ The digest is data only. Byname does not write a summary of it with a model.
 | `GET /v1/social/left-out` | `list_left_out_accounts` | `results:read` |
 | `POST /v1/social/left-out` | `leave_out_account` | `config:write` |
 | `DELETE /v1/social/left-out/{id}` | `remove_left_out_account` | `config:write` |
+| `GET /v1/social/filters` | `list_social_filters` | `results:read` |
+| `POST /v1/social/filters` | `add_social_filter` | `config:write` |
+| `DELETE /v1/social/filters/{id}` | `remove_social_filter` | `config:write` |
 
 `PUT /v1/social/settings` takes `enabled` to turn social on or off. Leave it out to keep the current setting. `next_fetch_at` is null while nothing will be searched: social is off, onboarding is not finished, there is no term, or no network that is on can run without a Treg token.
 
-`GET /v1/social/mentions` takes `network`, `since` (a day or a time), `include_hidden=true` and `limit` (1 to 500, default 100). `GET /v1/social/digest` takes `day`, any day in the period, and without it returns the latest period that has ended. See [Agents](agents.md) for keys and scopes.
+`GET /v1/social/mentions` takes `network`, `since` (a day or a time), `include_hidden=true` and `limit` (1 to 500, default 100). Each mention carries `left_out_as`, the label hiding its author, and `filtered_by`, why a filter hides it. `POST /v1/social/filters` takes `kind` (`topic` or `subreddit`), `mode` (`leave_out` or `only`) and `value`. `GET /v1/social/digest` takes `day`, any day in the period, and without it returns the latest period that has ended. See [Agents](agents.md) for keys and scopes.
 
 ## Known gaps
 

@@ -3,7 +3,8 @@
 // through one search per network (the registry in networks.go: a pinned
 // Treg tool, or Bluesky's own public API), stored once per
 // post, and read back without the accounts people chose to leave out,
-// such as their own team. The digest groups a period's mentions by
+// such as their own team, or the topics and subreddits they filtered out
+// (filters.go). The digest groups a period's mentions by
 // network for the social_digest event. The scheduler calls Tick each
 // minute; it fetches when due and emits the digest when a period ends.
 package social

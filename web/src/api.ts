@@ -1399,9 +1399,13 @@ export interface SocialMention {
   engagement: Engagement;
   term: string;
   first_seen_at: Timestamp;
+  /** The subreddit a Reddit post is in, lowercase, without r/; empty elsewhere. */
+  subreddit: string;
   hidden: boolean;
-  /** The left-out label hiding it, empty when shown. */
+  /** The left-out label hiding its author, empty when the author is not left out. */
   left_out_as: string;
+  /** Why a filter hides it, such as "topic india" or "r/india"; empty when no filter does. */
+  filtered_by: string;
   call: SocialCall | null;
 }
 
@@ -1409,7 +1413,7 @@ export interface SocialMentionList {
   mentions: SocialMention[];
   /** Shown mentions that match, which can be more than returned. */
   total: number;
-  /** Matching mentions by left-out accounts. */
+  /** Matching mentions by left-out accounts or hidden by a filter. */
   hidden: number;
 }
 
@@ -1485,6 +1489,26 @@ export interface LeftOut {
   label: string;
   profile: string;
   mentions: number;
+}
+
+export type SocialFilterKind = "topic" | "subreddit";
+/** leave_out hides what it matches; only hides what matches no only filter of its kind. */
+export type SocialFilterMode = "leave_out" | "only";
+
+export interface SocialFilter {
+  id: number;
+  kind: SocialFilterKind;
+  mode: SocialFilterMode;
+  /** The topic, lowercase, or the subreddit's name without r/. */
+  value: string;
+  /** Stored mentions it matches. */
+  mentions: number;
+}
+
+export interface SocialFilterInput {
+  kind: SocialFilterKind;
+  mode: SocialFilterMode;
+  value: string;
 }
 
 export interface LeftOutInput {
@@ -2025,6 +2049,9 @@ export const api = {
     /** Upserts on network and handle. */
     leaveOut: (body: LeftOutInput) => request<LeftOut>("POST", "/v1/social/left-out", { body }),
     removeLeftOut: (id: number) => request<void>("DELETE", `/v1/social/left-out/${id}`),
+    filters: () => request<SocialFilter[]>("GET", "/v1/social/filters"),
+    addFilter: (body: SocialFilterInput) => request<SocialFilter>("POST", "/v1/social/filters", { body }),
+    removeFilter: (id: number) => request<void>("DELETE", `/v1/social/filters/${id}`),
   },
 
   invites: {

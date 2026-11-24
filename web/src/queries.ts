@@ -72,12 +72,13 @@ export const keys = {
   changeSettings: ["changes", "settings"] as const,
   controlPages: ["changes", "control-pages"] as const,
   repo: ["changes", "repo"] as const,
-  /** Social mentions, digests, settings and the left-out list sit under this prefix. */
+  /** Social mentions, digests, settings, the left-out list and the filters sit under this prefix. */
   social: ["social"] as const,
   socialMentions: (q: SocialMentionQuery) => ["social", "mentions", q] as const,
   socialDigest: (day?: string) => ["social", "digest", day] as const,
   socialSettings: ["social", "settings"] as const,
   leftOut: ["social", "left-out"] as const,
+  socialFilters: ["social", "filters"] as const,
   /** Under results, so a finished check refreshes the list. */
   otherBrands: (f: ResultsFilter) => ["results", "other-brands", f] as const,
   hiddenBrands: ["results", "other-brands", "hidden"] as const,
@@ -112,6 +113,7 @@ export const useSocialMentions = (q: SocialMentionQuery) => useQuery({ queryKey:
 export const useSocialDigest = (day?: string) => useQuery({ queryKey: keys.socialDigest(day), queryFn: () => api.social.digest(day), placeholderData: keepPreviousData });
 export const useSocialSettings = () => useQuery({ queryKey: keys.socialSettings, queryFn: api.social.settings });
 export const useLeftOut = () => useQuery({ queryKey: keys.leftOut, queryFn: api.social.leftOut });
+export const useSocialFilters = () => useQuery({ queryKey: keys.socialFilters, queryFn: api.social.filters });
 
 /** Keeps the previous range's list while a new range loads, so the page never collapses and regrows. */
 export const useOtherBrands = (f: ResultsFilter, enabled = true) =>

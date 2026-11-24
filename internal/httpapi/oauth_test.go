@@ -658,6 +658,9 @@ var mcpTools = map[string]string{
 	"GET /v1/social/left-out":         "list_left_out_accounts",
 	"POST /v1/social/left-out":        "leave_out_account",
 	"DELETE /v1/social/left-out/{id}": "remove_left_out_account",
+	"GET /v1/social/filters":          "list_social_filters",
+	"POST /v1/social/filters":         "add_social_filter",
+	"DELETE /v1/social/filters/{id}":  "remove_social_filter",
 	// Other brands and logos.
 	"GET /v1/other-brands":              "list_other_brands",
 	"GET /v1/other-brands/hidden":       "list_hidden_brands",

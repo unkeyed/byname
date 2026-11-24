@@ -3,10 +3,11 @@ import { Link, useSearchParams } from "react-router";
 import type { Costs, LeftOut, SocialDigest, SocialMention, SocialNetwork, SocialSettings } from "../../api";
 import { money } from "../../money";
 import { useCan, useCosts, useIsAdmin, useLeftOut, useSocialDigest, useSocialMentions, useSocialSettings } from "../../queries";
-import { Badge, Button, buttonClass, Card, CardHeader, cx, EmptyState, ErrorNote, Icon, Pending, RelativeTime, scrollArea, selectClass, useLoading } from "../../ui";
+import { Badge, Button, buttonClass, Card, CardHeader, cx, EmptyState, ErrorNote, Icon, inputClass, Pending, RelativeTime, scrollArea, selectClass, useLoading } from "../../ui";
 import { ViewHeader } from "../results/Header";
 import { Note } from "../search/Search";
-import { authorLabel, engagementParts, formatCount, leftOutPath, NetworkMark, networkOrder, networks, periodLabel, postLink, settingsPath, socialCost, tregPath, useSaveSocial } from "./model";
+import { useAddFilter } from "./Filters";
+import { authorLabel, engagementParts, filtersPath, formatCount, leftOutPath, NetworkMark, networkOrder, networks, periodLabel, postLink, settingsPath, socialCost, tregPath, useSaveSocial } from "./model";
 
 const shown = 100;
 
@@ -218,6 +219,7 @@ function Stat({ value, label, muted }: { value: number; label: string; muted?: b
 }
 
 function MentionsCard({ s }: { s: SocialSettings }) {
+  const canEdit = useCan("config:write");
   const [network, setNetwork] = useState<SocialNetwork | "">("");
   const [showHidden, setShowHidden] = useState(false);
   const mentions = useSocialMentions({ network: network || undefined, include_hidden: showHidden, limit: shown });
@@ -232,8 +234,8 @@ function MentionsCard({ s }: { s: SocialSettings }) {
   else if (l!.mentions.length === 0)
     body = (
       <div className="px-4 pb-4">
-        <EmptyState icon="users" title="Every mention here is by someone you left out">
-          Turn on the toggle above to see them.
+        <EmptyState icon="users" title="Every mention here is hidden">
+          They are by people you left out, or about topics or subreddits you filtered out. Turn on the toggle above to see them.
         </EmptyState>
       </div>
     );
@@ -242,7 +244,7 @@ function MentionsCard({ s }: { s: SocialSettings }) {
       <ul aria-label="Mentions" className="divide-y divide-line border-t border-line">
         {l!.mentions.map((m) => (
           <li key={m.id} className={cx("px-4 py-3", m.hidden && "bg-subtle/50")}>
-            <MentionLine m={m} full />
+            <MentionLine m={m} full canFilter={canEdit} />
           </li>
         ))}
       </ul>
@@ -269,8 +271,13 @@ function MentionsCard({ s }: { s: SocialSettings }) {
         {l && (l.hidden > 0 || showHidden) && (
           <label className="flex h-11 items-center gap-1.5 text-xs text-muted md:h-8">
             <input type="checkbox" checked={showHidden} onChange={(e) => setShowHidden(e.target.checked)} className="size-3.5 accent-[var(--fg)]" />
-            {showHidden ? "Showing" : "Show"} {l.hidden} hidden from people you left out
+            {showHidden ? "Showing" : "Show"} {l.hidden} hidden
           </label>
+        )}
+        {canEdit && (
+          <Link to={filtersPath} className={buttonClass({ size: "sm" })}>
+            Filters
+          </Link>
         )}
       </CardHeader>
       {body}
@@ -327,9 +334,10 @@ function Empty({ s, filtered, runnable, on }: { s: SocialSettings; filtered: boo
   );
 }
 
-function MentionLine({ m, full }: { m: SocialMention; full?: boolean }) {
+function MentionLine({ m, full, canFilter }: { m: SocialMention; full?: boolean; canFilter?: boolean }) {
   const link = postLink(m);
   const parts = engagementParts(m.network, m.engagement);
+  const [filtering, setFiltering] = useState<string | null>(null);
   return (
     <div className="flex items-start gap-3">
       <NetworkMark network={m.network} className="mt-0.5" />
@@ -341,7 +349,9 @@ function MentionLine({ m, full }: { m: SocialMention; full?: boolean }) {
             <RelativeTime iso={m.posted_at} />
             {m.posted_approx && ", roughly"}
           </span>
-          {m.hidden && <Badge tone="outline">Left out: {m.left_out_as}</Badge>}
+          {m.left_out_as && <Badge tone="outline">Left out: {m.left_out_as}</Badge>}
+          {m.filtered_by && <Badge tone="outline">Filtered: {m.filtered_by}</Badge>}
+          {m.subreddit && <span className="text-faint">r/{m.subreddit}</span>}
         </div>
         <p className={cx("mt-1 text-sm whitespace-pre-line [overflow-wrap:anywhere]", full ? "line-clamp-4" : "line-clamp-2", m.hidden && "text-muted")}>{m.text || "(no text)"}</p>
         <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
@@ -350,8 +360,68 @@ function MentionLine({ m, full }: { m: SocialMention; full?: boolean }) {
             {link.label}
             <Icon name="external" className="size-3" />
           </a>
+          {canFilter && !m.hidden && filtering === null && (
+            <button
+              type="button"
+              className="inline-flex h-11 items-center gap-1 hover:text-fg hover:underline md:h-auto"
+              onClick={() => setFiltering(selectedText())}
+            >
+              <Icon name="filter" className="size-3" />
+              Hide posts like this
+            </button>
+          )}
         </div>
+        {filtering !== null && <HideLikeThis m={m} initial={filtering} onClose={() => setFiltering(null)} />}
       </div>
     </div>
+  );
+}
+
+/** The words selected on the page, as the first guess at a topic to leave out. */
+function selectedText(): string {
+  return (window.getSelection()?.toString() ?? "").replace(/\s+/g, " ").trim().slice(0, 100);
+}
+
+/** Leaves out a topic from this post, or its subreddit, so posts like it are hidden from now on and back. */
+function HideLikeThis({ m, initial, onClose }: { m: SocialMention; initial: string; onClose: () => void }) {
+  const [topic, setTopic] = useState(initial);
+  const add = useAddFilter(onClose);
+  return (
+    <form
+      className="mt-2 space-y-2 rounded-surface border border-line p-3"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (topic.trim()) add.mutate({ kind: "topic", mode: "leave_out", value: topic.trim() });
+      }}
+    >
+      <label className="block text-xs font-medium text-muted" htmlFor={`hide-topic-${m.id}`}>
+        Leave out posts that mention
+      </label>
+      <div className="flex flex-wrap gap-2">
+        <input
+          id={`hide-topic-${m.id}`}
+          className={cx(inputClass, "min-w-40 flex-1")}
+          value={topic}
+          maxLength={100}
+          autoFocus
+          spellCheck={false}
+          onChange={(e) => setTopic(e.target.value)}
+          placeholder="a word or phrase from this post, such as india"
+        />
+        <Button type="submit" size="sm" disabled={add.isPending || !topic.trim()}>
+          Leave out topic
+        </Button>
+        {m.subreddit && (
+          <Button type="button" size="sm" disabled={add.isPending} onClick={() => add.mutate({ kind: "subreddit", mode: "leave_out", value: m.subreddit })}>
+            Leave out r/{m.subreddit}
+          </Button>
+        )}
+        <Button type="button" size="sm" variant="ghost" onClick={onClose}>
+          Cancel
+        </Button>
+      </div>
+      <p className="text-xs text-muted">Matches as a whole word in any case. Past posts are hidden too, and removing the filter in Settings brings them back.</p>
+      <ErrorNote error={add.error} />
+    </form>
   );
 }

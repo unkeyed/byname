@@ -14,15 +14,19 @@ type leftOutList struct {
 	Accounts []social.LeftOut `json:"accounts"`
 }
 
+type filterList struct {
+	Filters []social.Filter `json:"filters"`
+}
+
 // addSocialTools registers the social mentions tools.
 func addSocialTools(srv *mcp.Server, svc app.Services) {
 	addTool(srv, core.ResultsRead, &mcp.Tool{Name: "list_social_mentions", Annotations: readOnly(),
-		Description: "Posts that mention the brand on X, Reddit, Hacker News, LinkedIn, YouTube, Threads and Bluesky, newest first, each with its author, text, engagement and link, without those by left-out accounts unless include_hidden is set, with how many match and how many are hidden. GET /v1/social/mentions."},
+		Description: "Posts that mention the brand on X, Reddit, Hacker News, LinkedIn, YouTube, Threads and Bluesky, newest first, each with its author, text, engagement and link, without those by left-out accounts or hidden by a topic or subreddit filter unless include_hidden is set, with how many match and how many are hidden. GET /v1/social/mentions."},
 		func(ctx context.Context, _ core.Actor, in social.MentionQuery) (social.MentionList, error) {
 			return svc.Social.Mentions(ctx, in)
 		})
 	addTool(srv, core.ResultsRead, &mcp.Tool{Name: "get_social_digest", Annotations: readOnly(),
-		Description: "One day's or week's social mentions grouped by network with the most engaged first, the authors new in it, and what the searches cost, without left-out accounts; the latest period that has ended unless day names one. GET /v1/social/digest."},
+		Description: "One day's or week's social mentions grouped by network with the most engaged first, the authors new in it, and what the searches cost, without left-out accounts or filtered-out posts; the latest period that has ended unless day names one. GET /v1/social/digest."},
 		func(ctx context.Context, _ core.Actor, in social.DigestQuery) (social.Digest, error) {
 			return svc.Social.Digest(ctx, in)
 		})
@@ -36,6 +40,12 @@ func addSocialTools(srv *mcp.Server, svc app.Services) {
 		func(ctx context.Context, _ core.Actor, _ noInput) (leftOutList, error) {
 			v, err := svc.Social.LeftOutAccounts(ctx)
 			return leftOutList{v}, err
+		})
+	addTool(srv, core.ResultsRead, &mcp.Tool{Name: "list_social_filters", Annotations: readOnly(),
+		Description: "The topics and subreddits that social mentions are filtered by: each one left out (its posts are hidden) or kept to (only posts matching one are shown), with how many stored mentions it matches. GET /v1/social/filters."},
+		func(ctx context.Context, _ core.Actor, _ noInput) (filterList, error) {
+			v, err := svc.Social.Filters(ctx)
+			return filterList{v}, err
 		})
 
 	addTool(srv, core.ConfigWrite, &mcp.Tool{Name: "update_social_settings", Annotations: mutates(false, true),
@@ -52,5 +62,15 @@ func addSocialTools(srv *mcp.Server, svc app.Services) {
 		Description: "Take an account off the left-out list, so its mentions show again. DELETE /v1/social/left-out/{id}."},
 		func(ctx context.Context, _ core.Actor, in byID) (deleted, error) {
 			return deleted{in.ID}, svc.Social.RemoveLeftOut(ctx, in.ID)
+		})
+	addTool(srv, core.ConfigWrite, &mcp.Tool{Name: "add_social_filter", Annotations: mutates(false, true),
+		Description: "Leave a topic or subreddit out of social mentions (mode leave_out), or show only the posts that match it (mode only), such as leaving out the topic india when the brand's name means something else there; it applies to past mentions too, and setting one already set changes its mode. POST /v1/social/filters."},
+		func(ctx context.Context, _ core.Actor, in social.FilterInput) (social.Filter, error) {
+			return svc.Social.AddFilter(ctx, in)
+		})
+	addTool(srv, core.ConfigWrite, &mcp.Tool{Name: "remove_social_filter", Annotations: mutates(true, true),
+		Description: "Take a topic or subreddit filter off, so the posts it hid show again. DELETE /v1/social/filters/{id}."},
+		func(ctx context.Context, _ core.Actor, in byID) (deleted, error) {
+			return deleted{in.ID}, svc.Social.RemoveFilter(ctx, in.ID)
 		})
 }
