@@ -100,7 +100,7 @@ var registry = []KindInfo{
 	kind[SearchMovedPayload](SearchMoved, "Google clicks moved", "Google clicks, or clicks from searches without your name, over the last 28 days moved by at least a quarter and by at least 20 clicks against the 28 days before.", Readers),
 	kind[ChangeVerdictPayload](ChangeVerdict, "Change result", "A site change got its final result, compared with your comparison pages.", Readers),
 	kind[TokenExpiringPayload](TokenExpiring, "Token expiring", "The GitHub token for site changes expires soon.", Admins),
-	kind[SocialDigestPayload](SocialDigest, "Social digest", "The day's or week's posts that name you on social networks, without the accounts you left out.", Readers),
+	kind[SocialDigestPayload](SocialDigest, "Social digest", "The day's or week's posts that name you on social networks, without the accounts, topics and subreddits you left out.", Readers),
 	kind[PageLinkedPayload](PageLinked, "Your page was linked", "An AI answer linked for the first time to a page you marked as answering a missed question.", Readers),
 }
 
@@ -392,13 +392,14 @@ type SocialNetworkDigest struct {
 }
 
 // SocialDigestPayload is one finished period's social mentions
-// (internal/social), without the accounts left out when it was sent.
+// (internal/social), without the accounts and the topics and subreddits
+// left out when it was sent.
 type SocialDigestPayload struct {
 	Cadence  string                `json:"cadence" jsonschema:"daily or weekly"`
 	From     string                `json:"from" jsonschema:"the period's first day"`
 	To       string                `json:"to" jsonschema:"the period's last day"`
 	Mentions int                   `json:"mentions"`
-	Hidden   int                   `json:"hidden" jsonschema:"mentions by left-out accounts, not counted in mentions"`
+	Hidden   int                   `json:"hidden" jsonschema:"mentions by left-out accounts or hidden by a topic or subreddit filter, not counted in mentions"`
 	Networks []SocialNetworkDigest `json:"networks"`
 	// NewAuthors names, at most ten, the accounts whose first mention fell in the period.
 	NewAuthors      []string `json:"new_authors"`
@@ -438,9 +439,9 @@ func (p SocialDigestPayload) message() Message {
 		m.Lines = append(m.Lines, who+".")
 	}
 	if p.Hidden == 1 {
-		m.Lines = append(m.Lines, "1 post from an account you left out is not counted.")
+		m.Lines = append(m.Lines, "1 post you left out is not counted.")
 	} else if p.Hidden > 1 {
-		m.Lines = append(m.Lines, fmt.Sprintf("%d posts from accounts you left out are not counted.", p.Hidden))
+		m.Lines = append(m.Lines, fmt.Sprintf("%d posts you left out are not counted.", p.Hidden))
 	}
 	if top := p.top(digestPosts); len(top) > 0 {
 		m.Lines = append(m.Lines, "The posts people engaged with most:")

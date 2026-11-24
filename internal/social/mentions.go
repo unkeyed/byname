@@ -24,7 +24,8 @@ type Call struct {
 	CostMissing bool     `json:"cost_missing" jsonschema:"true when Treg reported no cost for the call, which is not the same as free"`
 }
 
-// Mention is one stored post, with whether the left-out list hides it now.
+// Mention is one stored post, with whether the left-out list or a filter
+// hides it now.
 type Mention struct {
 	ID           int64      `json:"id"`
 	Network      Network    `json:"network" jsonschema:"x, reddit, hackernews, linkedin, youtube, threads or bluesky"`
@@ -38,21 +39,28 @@ type Mention struct {
 	Engagement   Engagement `json:"engagement"`
 	Term         string     `json:"term" jsonschema:"the search term that found it"`
 	FirstSeenAt  time.Time  `json:"first_seen_at"`
-	Hidden       bool       `json:"hidden" jsonschema:"true when its author is on the left-out list"`
-	LeftOutAs    string     `json:"left_out_as" jsonschema:"the left-out label that hides it, empty when shown"`
+	Subreddit    string     `json:"subreddit" jsonschema:"the subreddit a Reddit post is in, lowercase, without r/; empty on other networks"`
+	Hidden       bool       `json:"hidden" jsonschema:"true when its author is left out or a topic or subreddit filter hides it"`
+	LeftOutAs    string     `json:"left_out_as" jsonschema:"the left-out label that hides its author, empty when the author is not left out"`
+	FilteredBy   string     `json:"filtered_by" jsonschema:"why a filter hides it, such as topic india, r/india, not in your subreddits or none of your topics; empty when no filter does"`
 	Call         *Call      `json:"call" jsonschema:"the Treg call that first found it"`
 }
 
 // mentionFrom is every read's FROM: each mention, the left-out entry that
-// hides it now if any, and the call that found it. Leaving out is decided
-// here, at read time, so the list applies to past mentions as well.
+// hides it now if any, why a topic or subreddit filter hides it if one
+// does, and the call that found it. Hiding is decided here, at read time,
+// so the left-out list and the filters apply to past mentions as well.
 const mentionFrom = ` FROM social_mention m
 	LEFT JOIN social_left_out l ON l.network = m.network AND l.handle = m.author_handle
+	CROSS JOIN LATERAL (SELECT ` + filterReason + ` AS reason) fr
 	LEFT JOIN social_call c ON c.id = m.call_id `
 
+// mentionHidden is the SQL, over mentionFrom, for a mention that reads hide.
+const mentionHidden = `(l.id IS NOT NULL OR fr.reason <> '')`
+
 const mentionColumns = `m.id, m.network, m.post_id, m.url, m.author_handle, m.author_name, m.text, m.posted_at, m.posted_approx,
-	m.likes, m.replies, m.reposts, m.score, m.views, m.engagement, m.term, m.first_seen_at,
-	coalesce(l.label, ''), c.id, coalesce(c.route, ''), coalesce(c.treg_call_id, ''), c.cost_usd::float8`
+	m.likes, m.replies, m.reposts, m.score, m.views, m.engagement, m.term, m.first_seen_at, m.subreddit,
+	coalesce(l.label, ''), fr.reason, c.id, coalesce(c.route, ''), coalesce(c.treg_call_id, ''), c.cost_usd::float8`
 
 func scanMention(r pgx.CollectableRow) (Mention, error) {
 	var m Mention
@@ -62,10 +70,10 @@ func scanMention(r pgx.CollectableRow) (Mention, error) {
 	var cost *float64
 	e := &m.Engagement
 	if err := r.Scan(&m.ID, &m.Network, &m.PostID, &m.URL, &m.AuthorHandle, &m.AuthorName, &m.Text, &m.PostedAt, &m.PostedApprox,
-		&e.Likes, &e.Replies, &e.Reposts, &e.Score, &e.Views, &e.Total, &m.Term, &m.FirstSeenAt, &m.LeftOutAs, &callID, &route, &tregID, &cost); err != nil {
+		&e.Likes, &e.Replies, &e.Reposts, &e.Score, &e.Views, &e.Total, &m.Term, &m.FirstSeenAt, &m.Subreddit, &m.LeftOutAs, &m.FilteredBy, &callID, &route, &tregID, &cost); err != nil {
 		return m, err
 	}
-	m.Hidden = m.LeftOutAs != ""
+	m.Hidden = m.LeftOutAs != "" || m.FilteredBy != ""
 	if callID != nil {
 		m.Call = &Call{ID: *callID, Route: route, TregCallID: tregID, CostUSD: cost, CostMissing: cost == nil}
 	}
@@ -76,7 +84,7 @@ func scanMention(r pgx.CollectableRow) (Mention, error) {
 type MentionQuery struct {
 	Network       Network `json:"network,omitempty" jsonschema:"only this network: x, reddit, hackernews, linkedin, youtube, threads or bluesky"`
 	Since         string  `json:"since,omitempty" jsonschema:"only posts from then on: a day such as 2026-11-01 (midnight in the instance's time zone) or a time such as 2026-11-01T09:00:00Z"`
-	IncludeHidden bool    `json:"include_hidden,omitempty" jsonschema:"also return mentions by left-out accounts, marked hidden"`
+	IncludeHidden bool    `json:"include_hidden,omitempty" jsonschema:"also return mentions by left-out accounts or hidden by a topic or subreddit filter, marked hidden"`
 	Limit         int     `json:"limit,omitempty" jsonschema:"at most this many, 1 to 500, default 100"`
 }
 
@@ -84,11 +92,11 @@ type MentionQuery struct {
 type MentionList struct {
 	Mentions []Mention `json:"mentions" jsonschema:"newest post first"`
 	Total    int       `json:"total" jsonschema:"mentions that match and are shown, which can be more than returned"`
-	Hidden   int       `json:"hidden" jsonschema:"mentions that match but are by left-out accounts"`
+	Hidden   int       `json:"hidden" jsonschema:"mentions that match but are by left-out accounts or hidden by a filter"`
 }
 
 // Mentions lists stored mentions newest first, hiding those by left-out
-// accounts unless asked.
+// accounts or hidden by a filter unless asked.
 func (s *Service) Mentions(ctx context.Context, q MentionQuery) (MentionList, error) {
 	if q.Limit == 0 {
 		q.Limit = 100
@@ -115,11 +123,11 @@ func (s *Service) Mentions(ctx context.Context, q MentionQuery) (MentionList, er
 	}
 	const where = ` WHERE ($1 = '' OR m.network = $1) AND ($2::timestamptz IS NULL OR m.posted_at >= $2)`
 	out := MentionList{Mentions: []Mention{}}
-	if err := s.db.QueryRow(ctx, `SELECT count(*) FILTER (WHERE l.id IS NULL), count(*) FILTER (WHERE l.id IS NOT NULL)`+mentionFrom+where,
+	if err := s.db.QueryRow(ctx, `SELECT count(*) FILTER (WHERE NOT `+mentionHidden+`), count(*) FILTER (WHERE `+mentionHidden+`)`+mentionFrom+where,
 		q.Network, since).Scan(&out.Total, &out.Hidden); err != nil {
 		return out, err
 	}
-	rows, err := s.db.Query(ctx, `SELECT `+mentionColumns+mentionFrom+where+` AND ($3 OR l.id IS NULL)
+	rows, err := s.db.Query(ctx, `SELECT `+mentionColumns+mentionFrom+where+` AND ($3 OR NOT `+mentionHidden+`)
 		ORDER BY m.posted_at DESC, m.id DESC LIMIT $4`, q.Network, since, q.IncludeHidden, q.Limit)
 	if err != nil {
 		return out, err
@@ -202,7 +210,7 @@ type Author struct {
 }
 
 // Digest is one period's mentions first seen in it, without the accounts
-// left out now. It is data only: a written summary, when one comes, reads
+// left out and the posts filtered out now. It is data only: a written summary, when one comes, reads
 // this.
 type Digest struct {
 	Cadence  Cadence   `json:"cadence" jsonschema:"daily or weekly"`
@@ -212,7 +220,7 @@ type Digest struct {
 	EndsAt   time.Time `json:"ends_at"`
 	Finished bool      `json:"finished" jsonschema:"false while the period is still running"`
 	Mentions int       `json:"mentions" jsonschema:"mentions first seen in the period, shown"`
-	Hidden   int       `json:"hidden" jsonschema:"mentions first seen in the period by left-out accounts"`
+	Hidden   int       `json:"hidden" jsonschema:"mentions first seen in the period by left-out accounts or hidden by a filter"`
 	// Networks has each network with a mention, most mentions first.
 	Networks          []NetworkDigest `json:"networks"`
 	NewAuthors        []Author        `json:"new_authors" jsonschema:"accounts whose first shown mention fell in the period, most mentions first"`
@@ -253,9 +261,8 @@ func (s *Service) digest(ctx context.Context, p period) (Digest, error) {
 	if err != nil {
 		return d, err
 	}
-	rows, err = s.db.Query(ctx, `SELECT m.network, m.author_handle, max(m.author_name), count(*)
-		FROM social_mention m LEFT JOIN social_left_out l ON l.network = m.network AND l.handle = m.author_handle
-		WHERE l.id IS NULL AND m.author_handle <> '' AND m.first_seen_at >= $1 AND m.first_seen_at < $2
+	rows, err = s.db.Query(ctx, `SELECT m.network, m.author_handle, max(m.author_name), count(*)`+mentionFrom+`
+		WHERE NOT `+mentionHidden+` AND m.author_handle <> '' AND m.first_seen_at >= $1 AND m.first_seen_at < $2
 			AND NOT EXISTS (SELECT 1 FROM social_mention e WHERE e.network = m.network AND e.author_handle = m.author_handle AND e.first_seen_at < $1)
 		GROUP BY m.network, m.author_handle ORDER BY count(*) DESC, m.author_handle`, p.start, p.end)
 	if err != nil {

@@ -106,6 +106,26 @@ func TestSocialOverHTTP(t *testing.T) {
 	agent.call("DELETE", fmt.Sprintf("/v1/social/left-out/%d", left.ID), nil, http.StatusNoContent, nil)
 	agent.call("DELETE", fmt.Sprintf("/v1/social/left-out/%d", left.ID), nil, http.StatusNotFound, nil)
 
+	topic := map[string]string{"kind": "subreddit", "mode": "leave_out", "value": "r/rust"}
+	reader.call("POST", "/v1/social/filters", topic, http.StatusForbidden, nil)
+	agent.call("POST", "/v1/social/filters", map[string]string{"kind": "subreddit", "mode": "leave_out", "value": "r/"}, http.StatusBadRequest, nil)
+	var filter struct {
+		ID       int64  `json:"id"`
+		Value    string `json:"value"`
+		Mentions int    `json:"mentions"`
+	}
+	agent.call("POST", "/v1/social/filters", topic, http.StatusOK, &filter)
+	if filter.Value != "rust" || filter.Mentions != 1 {
+		t.Fatalf("filter = %+v, want r/rust matching 1 mention", filter)
+	}
+	reader.call("GET", "/v1/social/filters", nil, http.StatusOK, nil)
+	reader.call("GET", "/v1/social/mentions", nil, http.StatusOK, &list)
+	if list.Total != 13 || list.Hidden != 1 {
+		t.Fatalf("with r/rust left out: total %d hidden %d, want 13 and 1", list.Total, list.Hidden)
+	}
+	reader.call("DELETE", fmt.Sprintf("/v1/social/filters/%d", filter.ID), nil, http.StatusForbidden, nil)
+	agent.call("DELETE", fmt.Sprintf("/v1/social/filters/%d", filter.ID), nil, http.StatusNoContent, nil)
+
 	var st struct {
 		Enabled         bool   `json:"enabled"`
 		FetchEveryHours int    `json:"fetch_every_hours"`

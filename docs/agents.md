@@ -12,7 +12,7 @@ Every API key and every MCP connection carries one or more of three scopes. Each
 
 | Scope | Allows |
 |---|---|
-| `results:read` | Read checks, answers, raw responses, questions, brands, Search Console data, goals, site changes, comparison pages, the repo connection, social mentions and digests, the left-out list, notifications and settings. Never a secret. |
+| `results:read` | Read checks, answers, raw responses, questions, brands, Search Console data, goals, site changes, comparison pages, the repo connection, social mentions and digests, the left-out list and filters, notifications and settings. Never a secret. |
 | `runs:write` | Queue a check, pause and resume scheduled checks, and read past answers for other brands. |
 | `config:write` | Edit the brand, competitors, questions and question sets, AI apps and models, the schedule and limits, goals, branded search terms, site changes logged by hand, comparison pages, path rules, when change results fall and what counts as a move, the social search settings, the people left out of social mentions, which brands answers name are tracked or hidden, and the settings for finding other brands and their logos. |
 
@@ -119,7 +119,7 @@ Keys live in Postgres by default, or in Unkey when `UNKEY_ROOT_KEY` and `UNKEY_A
 
 ## MCP tools
 
-Byname's MCP server has 87 tools. Every REST route an API key can call has one with the same scope, except `DELETE /v1/keys/current`, since MCP clients sign in with OAuth instead of a key, and `GET /v1/brands/{id}/logo`, an image for the browser. A test keeps the two in step. Read tools are marked read-only, and `delete_brand`, `delete_goal`, `delete_change`, `delete_control_page`, `remove_left_out_account` and `unmark_question_page` are marked destructive, so a client can ask before it runs them.
+Byname's MCP server has 90 tools. Every REST route an API key can call has one with the same scope, except `DELETE /v1/keys/current`, since MCP clients sign in with OAuth instead of a key, and `GET /v1/brands/{id}/logo`, an image for the browser. A test keeps the two in step. Read tools are marked read-only, and `delete_brand`, `delete_goal`, `delete_change`, `delete_control_page`, `remove_left_out_account`, `remove_social_filter` and `unmark_question_page` are marked destructive, so a client can ask before it runs them.
 
 | Tool | Scope | REST | What it does |
 |---|---|---|---|
@@ -135,13 +135,16 @@ Byname's MCP server has 87 tools. Every REST route an API key can call has one w
 | `upsert_control_page` | `config:write` | `POST /v1/control-pages` | Add a comparison page, or change the hold date and note of the one with the same URL. |
 | `delete_control_page` | `config:write` | `DELETE /v1/control-pages/{id}` | Remove a comparison page. |
 | `update_path_rules` | `config:write` | `PUT /v1/repo/rules` | Replace the rules that map a pull request's changed files to page URLs. |
-| `list_social_mentions` | `results:read` | `GET /v1/social/mentions` | Posts that mention the brand on X, Reddit, Hacker News, LinkedIn, YouTube, Threads and Bluesky, newest first, each with its author, text, engagement and link, without those by left-out accounts unless include_hidden is set, with how many match and how many are hidden. |
-| `get_social_digest` | `results:read` | `GET /v1/social/digest` | One day's or week's social mentions grouped by network with the most engaged first, the authors new in it, and what the searches cost, without left-out accounts; the latest period that has ended unless day names one. |
+| `list_social_mentions` | `results:read` | `GET /v1/social/mentions` | Posts that mention the brand on X, Reddit, Hacker News, LinkedIn, YouTube, Threads and Bluesky, newest first, each with its author, text, engagement and link, without those by left-out accounts or hidden by a topic or subreddit filter unless include_hidden is set, with how many match and how many are hidden. |
+| `get_social_digest` | `results:read` | `GET /v1/social/digest` | One day's or week's social mentions grouped by network with the most engaged first, the authors new in it, and what the searches cost, without left-out accounts or filtered-out posts; the latest period that has ended unless day names one. |
 | `get_social_settings` | `results:read` | `GET /v1/social/settings` | Whether social searches are on (they start off), the social search terms, each network with whether it is on, its route (Treg or direct) and its latest call, how often searches run and when the digest goes out. |
 | `list_left_out_accounts` | `results:read` | `GET /v1/social/left-out` | The accounts whose mentions are hidden, such as teammates and the company's own accounts, each with its label and how many stored mentions it hides. |
 | `update_social_settings` | `config:write` | `PUT /v1/social/settings` | Turn social searches on or off, replace the social search terms, the fetch period and the digest schedule, and turn networks on or off (read them with get_social_settings first). |
 | `leave_out_account` | `config:write` | `POST /v1/social/left-out` | Leave an account out of social mentions, or relabel one already left out; its past mentions are hidden too. |
 | `remove_left_out_account` | `config:write` | `DELETE /v1/social/left-out/{id}` | Take an account off the left-out list, so its mentions show again. |
+| `list_social_filters` | `results:read` | `GET /v1/social/filters` | The topics and subreddits that social mentions are filtered by: each one left out (its posts are hidden) or kept to (only posts matching one are shown), with how many stored mentions it matches. |
+| `add_social_filter` | `config:write` | `POST /v1/social/filters` | Leave a topic or subreddit out of social mentions (mode leave_out), or show only the posts that match it (mode only), such as leaving out the topic india when the brand's name means something else there; it applies to past mentions too, and setting one already set changes its mode. |
+| `remove_social_filter` | `config:write` | `DELETE /v1/social/filters/{id}` | Take a topic or subreddit filter off, so the posts it hid show again. |
 | `list_other_brands` | `results:read` | `GET /v1/other-brands` | The brands AI answers named that you don't track, most named first: how many answers in range named each, the questions it was named for most, and the change since the check before. They count in no score. |
 | `list_hidden_brands` | `results:read` | `GET /v1/other-brands/hidden` | The brands someone marked as not a competitor, with how many answers named each. |
 | `get_other_brands_settings` | `results:read` | `GET /v1/other-brands/settings` | Whether each new answer is read for other brands and what reading one costs, and whether logos are looked up, what one new brand costs and the monthly limit on new lookups. |

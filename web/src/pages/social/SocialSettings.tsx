@@ -6,6 +6,7 @@ import { money } from "../../money";
 import { useCan, useCosts, useIsAdmin, useLeftOut, useSocialSettings } from "../../queries";
 import { Badge, Button, cx, EmptyState, ErrorNote, Field, Icon, inputClass, Pending, RelativeTime, selectClass } from "../../ui";
 import { SettingsHeader, SettingsSubhead } from "../settings/Settings";
+import { FiltersEditor } from "./Filters";
 import { LeftOutEditor } from "./LeftOut";
 import { NetworkMark, socialCost, tregPath, useSaveSocial, weekdays } from "./model";
 
@@ -18,10 +19,10 @@ export function SocialSettings() {
   const leftOut = useLeftOut();
   const canEdit = useCan("config:write");
   const { hash } = useLocation();
-  const linked = hash === "#left-out" && !settings.isPending && !costs.isPending && !leftOut.isPending;
+  const linked = (hash === "#left-out" || hash === "#filters") && !settings.isPending && !costs.isPending && !leftOut.isPending;
   useEffect(() => {
-    if (linked) document.getElementById("left-out")?.scrollIntoView({ block: "start" });
-  }, [linked]);
+    if (linked) document.getElementById(hash.slice(1))?.scrollIntoView({ block: "start" });
+  }, [linked, hash]);
   return (
     <>
       <SettingsHeader title="Social" />
@@ -35,6 +36,7 @@ export function SocialSettings() {
           <SearchForm key={JSON.stringify(settings.data)} s={settings.data} costs={costs.data?.social} canEdit={canEdit} />
         )}
         <LeftOutSection canEdit={canEdit} />
+        <FiltersSection canEdit={canEdit} />
       </div>
     </>
   );
@@ -238,6 +240,19 @@ function LeftOutSection({ canEdit }: { canEdit: boolean }) {
           </EmptyState>
         }
       />
+    </section>
+  );
+}
+
+function FiltersSection({ canEdit }: { canEdit: boolean }) {
+  return (
+    <section id="filters" className="scroll-mt-4">
+      <SettingsSubhead>Topics and subreddits</SettingsSubhead>
+      <p className="mb-3 text-sm text-muted">
+        Hide the posts about things that aren&apos;t you, such as a place where your name means something else, or keep Reddit to the subreddits you care about. Hidden posts leave the Social page and the
+        digest, past posts included, and come back when you remove the filter. You can also add one from a post on the Social page.
+      </p>
+      <FiltersEditor canEdit={canEdit} />
     </section>
   );
 }

@@ -2,12 +2,14 @@ package social_test
 
 import (
 	"context"
+	"errors"
 	"github.com/unkeyed/byname/internal/social/socialtest"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -19,6 +21,7 @@ import (
 
 	"github.com/unkeyed/byname/internal/checks/checkstest"
 	"github.com/unkeyed/byname/internal/config"
+	"github.com/unkeyed/byname/internal/core"
 	"github.com/unkeyed/byname/internal/engines/tregtest"
 	"github.com/unkeyed/byname/internal/notify"
 	"github.com/unkeyed/byname/internal/results"
@@ -543,5 +546,133 @@ func TestPostsThatDoNotNameTheTermAreLeftOut(t *testing.T) {
 	}
 	if raw == 0 {
 		t.Fatal("the LinkedIn recording, which names Northwind Cloud in every post here, kept nothing")
+	}
+}
+
+// Topic and subreddit filters hide posts at read time like the left-out
+// list: a topic as a whole word in any case, a subreddit by the post's
+// link, and an only filter hides what matches none of its kind.
+func TestFiltersHideTopicsAndSubredditsAtReadTime(t *testing.T) {
+	e := newEnv(t, true)
+	e.fetch()
+	all := e.mentions(social.MentionQuery{IncludeHidden: true, Limit: 500})
+	if len(all.Mentions) != 14 {
+		t.Fatalf("%d mentions, want 14", len(all.Mentions))
+	}
+	word := regexp.MustCompile(`(?i)(^|\W)async($|\W)`)
+	async := 0
+	for _, m := range all.Mentions {
+		if word.MatchString(m.Text) {
+			async++
+		}
+		if want := map[string]bool{"dotnet": true, "rust": true}; m.Network == social.Reddit && !want[m.Subreddit] || m.Network != social.Reddit && m.Subreddit != "" {
+			t.Fatalf("%s post %s has subreddit %q", m.Network, m.PostID, m.Subreddit)
+		}
+	}
+	if async < 2 {
+		t.Fatalf("%d posts say async, want both Reddit posts at least", async)
+	}
+
+	topic, err := e.svc.AddFilter(e.ctx, social.FilterInput{Kind: social.Topic, Mode: social.LeaveOut, Value: "  ASYNC "})
+	if err != nil || topic.Value != "async" || topic.Mentions != async {
+		t.Fatalf("leave out topic async = %+v, %v; want async matching %d", topic, err, async)
+	}
+	l := e.mentions(social.MentionQuery{})
+	if l.Total != 14-async || l.Hidden != async {
+		t.Fatalf("with async left out: total %d hidden %d, want %d and %d", l.Total, l.Hidden, 14-async, async)
+	}
+	hidden := e.mentions(social.MentionQuery{IncludeHidden: true, Network: social.Reddit})
+	for _, m := range hidden.Mentions {
+		if !m.Hidden || m.FilteredBy != "topic async" || m.LeftOutAs != "" {
+			t.Fatalf("reddit post %s = hidden %v filtered_by %q, want hidden by topic async", m.PostID, m.Hidden, m.FilteredBy)
+		}
+	}
+	if err := e.svc.RemoveFilter(e.ctx, topic.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.svc.RemoveFilter(e.ctx, topic.ID); !errors.Is(err, core.ErrNotFound) {
+		t.Fatalf("removing it twice = %v, want not found", err)
+	}
+
+	rust, err := e.svc.AddFilter(e.ctx, social.FilterInput{Kind: social.Subreddit, Mode: social.LeaveOut, Value: "https://www.reddit.com/r/Rust/"})
+	if err != nil || rust.Value != "rust" || rust.Mentions != 1 {
+		t.Fatalf("leave out r/rust = %+v, %v", rust, err)
+	}
+	if l := e.mentions(social.MentionQuery{}); l.Total != 13 || l.Hidden != 1 {
+		t.Fatalf("with r/rust left out: total %d hidden %d, want 13 and 1", l.Total, l.Hidden)
+	}
+	// Setting it again as only keeps Reddit to r/rust: the r/dotnet post
+	// is hidden instead, and other networks are untouched.
+	if f, err := e.svc.AddFilter(e.ctx, social.FilterInput{Kind: social.Subreddit, Mode: social.Only, Value: "r/rust"}); err != nil || f.ID != rust.ID || f.Mode != social.Only {
+		t.Fatalf("r/rust as only = %+v, %v; want the same filter with its mode changed", f, err)
+	}
+	reddit := e.mentions(social.MentionQuery{IncludeHidden: true, Network: social.Reddit})
+	for _, m := range reddit.Mentions {
+		if want := map[string]string{"rust": "", "dotnet": "not in your subreddits"}[m.Subreddit]; m.FilteredBy != want {
+			t.Fatalf("r/%s post filtered_by %q, want %q", m.Subreddit, m.FilteredBy, want)
+		}
+	}
+	if l := e.mentions(social.MentionQuery{}); l.Total != 13 || l.Hidden != 1 {
+		t.Fatalf("with only r/rust: total %d hidden %d, want 13 and 1", l.Total, l.Hidden)
+	}
+	if err := e.svc.RemoveFilter(e.ctx, rust.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	// An only topic shows just the posts that name it, on every network.
+	if _, err := e.svc.AddFilter(e.ctx, social.FilterInput{Kind: social.Topic, Mode: social.Only, Value: "async"}); err != nil {
+		t.Fatal(err)
+	}
+	l = e.mentions(social.MentionQuery{IncludeHidden: true, Limit: 500})
+	if l.Total != async || l.Hidden != 14-async {
+		t.Fatalf("with only async: total %d hidden %d, want %d and %d", l.Total, l.Hidden, async, 14-async)
+	}
+	for _, m := range l.Mentions {
+		if m.Hidden != !word.MatchString(m.Text) || m.Hidden && m.FilteredBy != "none of your topics" {
+			t.Fatalf("post %s hidden %v filtered_by %q with text %q", m.PostID, m.Hidden, m.FilteredBy, m.Text)
+		}
+	}
+	d, err := e.svc.Digest(e.ctx, social.DigestQuery{Day: "2026-11-18"})
+	if err != nil || d.Mentions != async || d.Hidden != 14-async {
+		t.Fatalf("digest = %d mentions, %d hidden, %v; want %d and %d", d.Mentions, d.Hidden, err, async, 14-async)
+	}
+
+	for _, bad := range []social.FilterInput{
+		{Kind: social.Topic, Mode: social.LeaveOut, Value: "a"},
+		{Kind: social.Subreddit, Mode: social.LeaveOut, Value: "not a subreddit"},
+		{Kind: "hashtag", Mode: social.LeaveOut, Value: "india"},
+		{Kind: social.Topic, Mode: "hide", Value: "india"},
+	} {
+		if _, err := e.svc.AddFilter(e.ctx, bad); !errors.Is(err, core.ErrInvalid) {
+			t.Errorf("AddFilter(%+v) = %v, want invalid", bad, err)
+		}
+	}
+	if n := e.count(`SELECT count(*) FROM social_mention`); n != 14 {
+		t.Fatalf("%d mentions stored, want all 14 kept", n)
+	}
+}
+
+// A topic is matched as a whole word, so a regular expression's special
+// characters in it are plain text and india does not match Indiana.
+func TestTopicIsAWholeWord(t *testing.T) {
+	e := newEnv(t, true)
+	at := e.now
+	if _, err := e.db.Exec(e.ctx, `INSERT INTO social_mention (network, post_id, url, author_handle, text, posted_at, term, first_seen_at, last_seen_at)
+		VALUES ('x', '1', 'https://x.com/a/status/1', 'a', 'Northwind Cloud in India!', $1, 'Northwind Cloud', $1, $1),
+			('x', '2', 'https://x.com/b/status/2', 'b', 'Northwind Cloud in Indiana', $1, 'Northwind Cloud', $1, $1),
+			('x', '3', 'https://x.com/c/status/3', 'c', 'Northwind Cloud loves c++ and #India', $1, 'Northwind Cloud', $1, $1)`, at); err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range []struct {
+		topic string
+		want  int
+	}{{"india", 2}, {"#india", 1}, {"c++", 1}, {"ind", 0}, {"in india", 1}} {
+		f, err := e.svc.AddFilter(e.ctx, social.FilterInput{Kind: social.Topic, Mode: social.LeaveOut, Value: c.topic})
+		if err != nil || f.Mentions != c.want {
+			t.Errorf("topic %q matches %d, %v; want %d", c.topic, f.Mentions, err, c.want)
+		}
+		if err == nil {
+			_ = e.svc.RemoveFilter(e.ctx, f.ID)
+		}
 	}
 }

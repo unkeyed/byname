@@ -134,7 +134,7 @@ func TestNotificationsReadAsSentences(t *testing.T) {
 	want := []string{
 		"5 were on X, 4 on Reddit and 3 on Hacker News.",
 		"9 people posted about you for the first time, among them @dana, u/ledgerfan and @lee.",
-		"10 posts from accounts you left out are not counted.",
+		"10 posts you left out are not counted.",
 		"The posts people engaged with most:",
 		"u/ledgerfan on Reddit, 120 upvotes and comments: “Northwind is the one” https://reddit.example/1",
 		"@dana on X, 40 likes, replies and reposts: “Northwind sorted our invoices” https://x.example/1",
