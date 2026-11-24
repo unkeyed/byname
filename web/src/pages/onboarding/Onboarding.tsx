@@ -10,7 +10,7 @@ import { BrandForm } from "../../config/BrandForm";
 import { BrandTable } from "../../config/BrandTable";
 import { QuestionEditor } from "../../config/QuestionEditor";
 import { RunSettingsForm } from "../../config/RunSettings";
-import { SearchConsoleStep } from "../../config/SearchConsoleStep";
+import { SearchStep } from "../../config/SearchStep";
 import { SocialStep } from "../../config/SocialStep";
 import { WherePeopleAsk } from "../../config/WherePeopleAsk";
 import { ReauthProvider } from "../settings/Reauth";
@@ -79,12 +79,11 @@ const views: Record<StepKey, { intro: string; render: (nav: StepNav) => ReactNod
       "Pick where your buyers ask AI. Byname asks each one your questions and records exactly what a person would see. A label on each app says how close Byname gets to the real thing.",
     render: (nav) => <WherePeopleAsk prefillDefaults={!nav.step.saved} onContinue={nav.done} footer={(primary) => <StepFooter nav={nav}>{primary}</StepFooter>} />,
   },
-  search_console: {
+  search: {
     intro:
-      "Search Console is Google's free report of how often your site shows up in Google results and how many people click. Connect it to see that next to your AI results. It's optional, and you can connect it later.",
+      "Google Search Console and Bing Webmaster Tools are free reports of how often your site shows up in their results and how many people click. Connect one or both to see that next to your AI results. It's optional, and you can connect them later.",
     render: (nav) => (
-      <SearchConsoleStep
-        onPicked={nav.done}
+      <SearchStep
         footer={(picked) => (
           <StepFooter nav={nav} skip={!picked}>
             {picked && (

@@ -5284,7 +5284,7 @@ components:
       enum: [treg, openai, anthropic, perplexity, google, dataforseo, cloro, serpapi, gateway]
     StepKey:
       type: string
-      enum: [brand, competitors, questions, surfaces, search_console, social, schedule, review]
+      enum: [brand, competitors, questions, surfaces, search, social, schedule, review]
     AnswerStatus:
       type: string
       enum: [ok, no_answer, failed]

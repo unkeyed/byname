@@ -29,8 +29,8 @@ export const nav: NavItem[] = [
     ],
   },
   {
-    to: "/google",
-    label: "Google search",
+    to: "/search",
+    label: "Search",
     icon: "search",
     tabs: [
       { path: "traffic", label: "Traffic" },

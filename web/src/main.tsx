@@ -47,10 +47,10 @@ const router = createBrowserRouter([
         ],
       },
       {
-        path: "google",
-        element: <Section item={section("/google")} />,
+        path: "search",
+        element: <Section item={section("/search")} />,
         children: [
-          { index: true, element: <FirstTab item={section("/google")} /> },
+          { index: true, element: <FirstTab item={section("/search")} /> },
           { path: "traffic", element: <Search /> },
           { path: "site-changes", element: <Changes /> },
         ],

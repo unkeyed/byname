@@ -1,18 +1,18 @@
 import type { ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router";
-import { api, type Change, type Competitors, type Costs, type Gap, type Grouping, type LeftOut, type OtherBrands, type QuestionSet, type ResultsFilter, type RunSummary, type Series, type SettingsView, type SocialSettings, type Sources } from "../../api";
+import { api, type Change, type Competitors, type Costs, type Gap, type Grouping, type LeftOut, type OtherBrands, type QuestionSet, type ResultsFilter, type RunSummary, type SearchStatus, type Series, type SettingsView, type SocialSettings, type Sources } from "../../api";
 import { BrandMark } from "../../brandmark";
 import { LineChart, LineKey, Sparkline, type ChartLine } from "../../charts";
 import { nextCheckDay, nextCheckPhrase } from "../../checks";
 import { money } from "../../money";
 import { fidelityInfo, lineKey, palette, pct, shortDay, useLabels } from "../../lines";
-import { keys, useAnsweredRuns, useChanges, useCosts, useGsc, useLeftOut, useMe, useOtherBrands, useQuestions, useRuns, useSettings, useSocialSettings, useSurfaces } from "../../queries";
+import { keys, useAnsweredRuns, useChanges, useCosts, useLeftOut, useMe, useOtherBrands, useQuestions, useRuns, useSearchProviders, useSettings, useSocialSettings, useSurfaces } from "../../queries";
 import { Card, CardHeader, cx, EmptyState, ErrorNote, Icon, Pending, scrollArea, ScrollX, useLoading, type IconName } from "../../ui";
 import { runTime, useFilter, useView, type RangeID } from "../../view";
 import { DailyChart } from "../search/DailyChart";
-import { day, figureInfo, searchState, spanFrom, useSearchDaily, type SearchState } from "../search/model";
-import { NotReady, settingsPath as searchConsoleSettings } from "../search/Search";
+import { day, figureInfo, readyEngines, spanFrom, useSearchDaily } from "../search/model";
+import { settingsPath as searchEnginesSettings } from "../search/Search";
 import { useBrandActions } from "./AlsoNamed";
 import { useOpenEngine } from "./EngineDrawer";
 import { Segmented, ViewHeader } from "./Header";
@@ -93,7 +93,8 @@ type WeekData = {
   leftOut: LeftOut[] | undefined;
   questions: QuestionSet | null | undefined;
   costs: Costs | undefined;
-  searchConnected: boolean;
+  /** The search engines whose numbers are in, each with its own card. */
+  searchEngines: SearchStatus[];
   admin: boolean;
   canEdit: boolean;
 };
@@ -119,8 +120,8 @@ function Week() {
   const leftOut = useLeftOut();
   const questions = useQuestions();
   const costs = useCosts();
-  const gsc = useGsc();
-  const pending = [summary, gaps, sources, latest, others, changes, social, leftOut, questions, costs, gsc].some((q) => q.isPending) || (!!prevStart && lastTwo.isPending) || (!!social.data?.enabled && socialNew.isPending);
+  const engines = useSearchProviders();
+  const pending = [summary, gaps, sources, latest, others, changes, social, leftOut, questions, costs, engines].some((q) => q.isPending) || (!!prevStart && lastTwo.isPending) || (!!social.data?.enabled && socialNew.isPending);
   useLoading(pending);
   if (pending || !settings.data) return null;
   if (summary.isError) return <ErrorNote error={summary.error} />;
@@ -139,7 +140,7 @@ function Week() {
     leftOut: leftOut.data,
     questions: questions.data,
     costs: costs.data,
-    searchConnected: !!gsc.data && searchState(gsc.data) === "ready",
+    searchEngines: readyEngines(engines.data ?? []),
     admin: me.data?.role === "admin",
     canEdit: me.data?.scopes.includes("config:write") ?? false,
   };
@@ -156,9 +157,11 @@ function Week() {
       </div>
       <Footer d={d} />
       <RatesCard filter={filter} by={by} />
-      <div className={cx("grid grid-cols-1 gap-4", d.searchConnected && "lg:grid-cols-2")}>
+      <div className={cx("grid grid-cols-1 gap-4", d.searchEngines.length > 0 && "lg:grid-cols-2")}>
         <ShareCard filter={filter} />
-        {d.searchConnected && <SearchConsoleCard />}
+        {d.searchEngines.map((s) => (
+          <SearchClicksCard key={s.provider} s={s} />
+        ))}
       </div>
       <Card>
         <CardHeader title="Questions" description="Each question in each AI app in the latest check. Open one to see its history and read the answers." />
@@ -335,7 +338,7 @@ const todoRules: ((d: WeekData) => Item[])[] = [
     const weekAgo = new Date(Date.now() - 7 * 86_400_000).toISOString().slice(0, 10);
     const page = (c: Change) => c.url.replace(/^https?:\/\/[^/]+/, "") || "/";
     return d.changes.flatMap((c): Item[] => {
-      const to = `/google/site-changes?chg=${c.id}`;
+      const to = `/search/site-changes?chg=${c.id}`;
       if (c.final && c.final.read_on >= weekAgo) return [{ key: `chg-${c.id}`, icon: "pencil", text: `The final result for your change to ${page(c)} is in.`, to, action: "See the result" }];
       if (c.interim && c.interim.read_on >= weekAgo) return [{ key: `chg-${c.id}`, icon: "pencil", text: `The first result for your change to ${page(c)} is in.`, to, action: "See the result" }];
       if (!c.verdict && c.verdict_on && c.verdict_on >= today && c.verdict_on <= soon) return [{ key: `chg-${c.id}`, icon: "pencil", text: `The final result for your change to ${page(c)} is due ${shortDay(c.verdict_on)}.`, to, action: "See the change" }];
@@ -351,8 +354,16 @@ const todoRules: ((d: WeekData) => Item[])[] = [
 /** Setup that makes the numbers better, shown until each is done. */
 const setupRules: ((d: WeekData) => Item[])[] = [
   (d) =>
-    !d.searchConnected && d.admin
-      ? [{ key: "gsc", icon: "plug", text: "Connect Search Console, Google's free report of how often your site shows up in Google and how many people click, to see it next to your AI results.", to: searchConsoleSettings, action: "Connect it" }]
+    d.searchEngines.length === 0 && d.admin
+      ? [
+          {
+            key: "search",
+            icon: "plug",
+            text: "Connect a search engine. Google Search Console and Bing Webmaster Tools are free reports of how often your site shows up in their results and how many people click, to see next to your AI results.",
+            to: searchEnginesSettings,
+            action: "Connect one",
+          },
+        ]
       : [],
   (d) =>
     d.social?.enabled && d.leftOut?.length === 0 && d.canEdit
@@ -461,34 +472,26 @@ function Footer({ d }: { d: WeekData }) {
 /** Spans for the date range presets; the newest check alone maps to the 28-day headline window. */
 const searchSpan: Record<RangeID, number> = { latest: 28, "7d": 7, "14d": 14, "30d": 30, "90d": 90, all: 480 };
 
-function SearchConsoleCard() {
-  const gsc = useGsc();
-  const me = useMe();
+/** One search engine's clicks per day over the page's range, for an engine whose numbers are in. */
+function SearchClicksCard({ s }: { s: SearchStatus }) {
   const { range } = useFilter();
-  const s = gsc.data;
-  const from = s?.first_day ? spanFrom(s, searchSpan[range]) : undefined;
+  const from = spanFrom(s, searchSpan[range]);
   const daily = useSearchDaily(s, from);
+  const clicks = figureInfo(s.title).clicks.hint;
   let body;
-  if (gsc.isPending) body = <Pending />;
-  else if (gsc.isError) body = <div className="px-4 pb-4"><ErrorNote error={gsc.error} /></div>;
-  else if (searchState(gsc.data) !== "ready")
-    body = (
-      <div className="px-4 pb-4">
-        <NotReady state={searchState(gsc.data) as Exclude<SearchState, "ready">} status={gsc.data} admin={me.data?.role === "admin"} />
-      </div>
-    );
-  else if (daily.isPending) body = <Pending />;
+  if (daily.isPending) body = <Pending />;
   else if (daily.isError) body = <div className="px-4 pb-4"><ErrorNote error={daily.error} /></div>;
   else
     body = (
       <div className={cx(daily.isPlaceholderData && "opacity-60")}>
-        <DailyChart days={daily.data.days} from={from!} latestFinal={daily.data.latest_final_day} show={["clicks"]} height={200} />
+        <DailyChart engine={s.title} days={daily.data.days} from={from} latestFinal={daily.data.latest_final_day} show={["clicks"]} height={200} />
       </div>
     );
+  const partial = s.partial_days.length > 0 ? ` Days after ${day(daily.data?.latest_final_day ?? s.latest_final_day)} are still being counted by ${s.title}.` : "";
   return (
     <Card className="min-w-0">
-      <CardHeader title="Google clicks" description={s?.latest_final_day ? `${figureInfo.clicks.hint} Per day, about 3 days late. Days after ${day(s.latest_final_day)} are still being counted by Google.` : `${figureInfo.clicks.hint} Per day, about 3 days late.`}>
-        <Link to="/google/traffic" className="inline-flex h-11 shrink-0 items-center gap-1 text-xs font-medium text-muted hover:text-fg md:h-auto">
+      <CardHeader title={`${s.title} clicks`} description={`${clicks} Per day, a few days late.${partial}`}>
+        <Link to={`/search/traffic?provider=${s.provider}`} className="inline-flex h-11 shrink-0 items-center gap-1 text-xs font-medium text-muted hover:text-fg md:h-auto">
           Traffic <Icon name="right" className="size-3" />
         </Link>
       </CardHeader>

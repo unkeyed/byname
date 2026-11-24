@@ -28,7 +28,7 @@ func configure(t *testing.T, person, editor client) {
 	editor.call("PUT", "/v1/questions", map[string]any{"questions": checkstest.Questions}, http.StatusOK, nil)
 	editor.call("PUT", "/v1/surfaces/claude_code", map[string]any{"enabled": true, "models": []map[string]string{{"model": "claude-sonnet-5-5"}}}, http.StatusOK, nil)
 	editor.call("PUT", "/v1/surfaces/google_ai_overview", map[string]any{"enabled": true}, http.StatusOK, nil)
-	for _, step := range []string{"brand", "competitors", "questions", "surfaces", "search_console", "schedule"} {
+	for _, step := range []string{"brand", "competitors", "questions", "surfaces", "search", "schedule"} {
 		editor.call("PUT", "/v1/onboarding/steps/"+step, nil, http.StatusOK, nil)
 	}
 	if r := editor.do("POST", "/v1/runs", nil); r.code != http.StatusBadRequest && r.code != http.StatusForbidden {

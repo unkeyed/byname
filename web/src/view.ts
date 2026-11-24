@@ -46,6 +46,8 @@ const params = {
   chg: "",
   /** The Search page's chart span, in days or "all". */
   span: "90",
+  /** The Search page's search engine, such as bing; empty is the first one shown. */
+  provider: "",
 } as const;
 export type ViewParam = keyof typeof params;
 export const filterParams: ViewParam[] = ["range", "surface", "by", "model"];

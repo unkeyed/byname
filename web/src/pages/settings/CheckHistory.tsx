@@ -1,8 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
-import { api, type Run, type RunStatus } from "../../api";
+import { api, type Job, type Run, type RunStatus, type SearchStatus } from "../../api";
 import { pct } from "../../lines";
 import { money } from "../../money";
-import { keys, useRuns, useSurfaces } from "../../queries";
+import { keys, useRuns, useSearchProviders, useSurfaces } from "../../queries";
 import { Badge, Card, cx, EmptyState, ErrorNote, Icon, Pending, RelativeTime, type Tone } from "../../ui";
 import { runTime } from "../../view";
 import { RunNowButton, runStatus, RunStatusBadge, useCanRun } from "../results/RunNow";
@@ -23,13 +23,19 @@ const jobNames: Record<string, string> = {
   ai_check: "AI check",
   model_refresh: "Model list refresh",
   source_fetch: "Reading linked pages",
-  gsc_sync: "Search Console sync",
+  search_sync: "Search sync",
   social_fetch: "Social search",
   other_brands: "Reading answers for other brands",
   brand_logos: "Looking up logos",
   site_changes: "Site changes from GitHub",
   recrawl_watch: "Waiting for Google to see site changes",
   verdicts: "Site change results",
+};
+
+/** A search sync names its engine, such as "Search sync (Bing)". */
+const jobName = (j: Job, engines: SearchStatus[] | undefined) => {
+  const name = jobNames[j.job] ?? j.job;
+  return j.provider ? `${name} (${engines?.find((e) => e.provider === j.provider)?.title ?? j.provider})` : name;
 };
 
 /** A job's status in the same words and tones as a check's; only a job can be skipped. */
@@ -175,20 +181,21 @@ export function CheckHistory() {
 
 function Jobs() {
   const jobs = useQuery({ queryKey: keys.jobs, queryFn: () => api.jobs(20) });
+  const engines = useSearchProviders();
   if (jobs.isPending) return <Pending />;
   if (jobs.isError) return <ErrorNote error={jobs.error} />;
   if (jobs.data.length === 0) return null;
   return (
     <section>
       <SettingsSubhead>Background jobs</SettingsSubhead>
-      <p className="-mt-2 mb-3 text-xs text-muted">Besides checks, Byname refreshes model lists, reads the pages AI linked to, syncs Search Console and searches social networks.</p>
+      <p className="-mt-2 mb-3 text-xs text-muted">Besides checks, Byname refreshes model lists, reads the pages AI linked to, syncs search engines and searches social networks.</p>
       <Card>
         <ul className="divide-y divide-line text-sm">
           {jobs.data.map((j) => {
             const st = jobStatus(j.status);
             return (
               <li key={j.id} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 px-4 py-2 md:grid-cols-[15rem_8.5rem_minmax(0,1fr)_6rem]">
-                <span className="font-medium">{jobNames[j.job] ?? j.job}</span>
+                <span className="font-medium">{jobName(j, engines.data)}</span>
                 <span className="justify-self-end md:justify-self-start">
                   <Badge tone={st.tone}>{st.label}</Badge>
                 </span>

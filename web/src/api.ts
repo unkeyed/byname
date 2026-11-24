@@ -16,7 +16,7 @@ export const scopes = ["results:read", "runs:write", "config:write"] as const;
 export type Scope = (typeof scopes)[number];
 
 export const scopeInfo: Record<Scope, { title: string; detail: string }> = {
-  "results:read": { title: "Read results", detail: "Checks, answers, questions, brands, Search Console data and settings. Never secrets." },
+  "results:read": { title: "Read results", detail: "Checks, answers, questions, brands, search engine data and settings. Never secrets." },
   "runs:write": { title: "Start checks", detail: "Start a check, and pause or resume the schedule." },
   "config:write": { title: "Change setup", detail: "Edit the brand, competitors, questions, AI apps and schedule." },
 };
@@ -258,7 +258,7 @@ export interface SettingsView extends Settings {
   next_check: UpcomingCheck | null;
   updated_at: Timestamp;
   onboarded_at: Timestamp | null;
-  /** Lowercased; a Search Console query containing one is brand. */
+  /** Lowercased; a search query containing one is brand, on every search engine. */
   branded_terms: string[];
   /** True while the terms are the brand's name and aliases. */
   branded_terms_default: boolean;
@@ -430,7 +430,7 @@ export interface Credential {
   used_by: SurfaceKey[];
 }
 
-export type StepKey = "brand" | "competitors" | "questions" | "surfaces" | "search_console" | "social" | "schedule" | "review";
+export type StepKey = "brand" | "competitors" | "questions" | "surfaces" | "search" | "social" | "schedule" | "review";
 
 export interface OnboardingStep {
   key: StepKey;
@@ -571,6 +571,8 @@ export interface Run {
 export interface Job {
   id: number;
   job: string;
+  /** The search engine a search_sync synced, such as bing; empty for other jobs. */
+  provider: string;
   trigger: string;
   run_id: number | null;
   status: string;
@@ -1061,35 +1063,40 @@ export interface SearchTotals {
   impressions: number;
   /** Clicks over impressions, 0 to 1. */
   ctr: number;
-  /** Average position, weighted by impressions; 0 with no impressions. */
+  /** Average position, weighted by impressions; 0 when there is none, as for Bing's site totals. */
   position: number;
 }
 
 export interface SearchPeriod extends SearchTotals {
   from: Day;
   to: Day;
+  /** The window's length, a whole number of the provider's step_days. */
+  days: number;
   brand_clicks: number;
-  /** Anonymized queries are never non-brand. */
+  /** Unlisted searches are never non-brand. */
   non_brand_clicks: number;
-  anonymized_clicks: number;
+  /** Clicks on no listed search: Google hides rare ones, Bing lists only its weekly top searches. */
+  unlisted_clicks: number;
   days_with_data: number;
 }
 
-/** The latest 28 days, ending on the latest final day, and the 28 before. */
+/** One engine's latest 28 days, ending on its latest final day, and the 28 before. */
 export interface SearchSummary {
-  property: string;
+  provider: string;
+  site: string;
   current: SearchPeriod | null;
   previous: SearchPeriod | null;
 }
 
 export interface SearchDay extends SearchTotals {
   date: Day;
-  /** False while Google still revises the day. */
+  /** False while the engine still revises the day. */
   final: boolean;
 }
 
 export interface SearchDaily {
-  property: string;
+  provider: string;
+  site: string;
   latest_final_day: Day;
   /** Oldest first; a day with no row had no impressions. */
   days: SearchDay[];
@@ -1101,11 +1108,12 @@ export interface BrandPoint {
   clicks: number;
   brand_clicks: number;
   non_brand_clicks: number;
-  anonymized_clicks: number;
+  unlisted_clicks: number;
 }
 
 export interface BrandSeries {
-  property: string;
+  provider: string;
+  site: string;
   terms: string[];
   points: BrandPoint[];
 }
@@ -1120,7 +1128,8 @@ export interface QueryRow extends SearchTotals {
 }
 
 export interface TopList {
-  property: string;
+  provider: string;
+  site: string;
   from: Day;
   to: Day;
 }
@@ -1131,6 +1140,8 @@ export const goalWindows = [28, 90] as const;
 export type GoalWindow = (typeof goalWindows)[number];
 
 export interface GoalInput {
+  /** The search engine the goal counts, such as google or bing. */
+  provider: string;
   metric: GoalMetric;
   window_days: GoalWindow;
   target: number;
@@ -1149,41 +1160,70 @@ export interface GoalProgress {
 
 export interface Goal extends GoalInput {
   id: number;
-  /** Null until Search Console data is synced. */
+  /** Null until the engine's data is synced. */
   progress: GoalProgress | null;
 }
 
-export type GscMethod = "oauth" | "service_account";
-export type PropertyKind = "domain" | "url_prefix";
+export type SearchMethod = "oauth" | "service_account" | "api_key";
+export type SiteKind = "domain" | "url_prefix";
 
-/** GET /v1/gsc: the connection and the data stored. Data can outlive a disconnect. */
-export interface GscStatus {
+/** One way to connect a search engine. */
+export interface SearchMethodInfo {
+  method: SearchMethod;
+  label: string;
+  /** False for Google sign-in on an instance without GSC_GOOGLE_CLIENT_ID. */
+  available: boolean;
+  /** For a pasted key: how to get one. */
+  steps?: string[];
+}
+
+/**
+ * One search engine from GET /v1/search/providers: what it is and how it
+ * reports, the connection, and the data stored. Data can outlive a
+ * disconnect. Never the credential.
+ */
+export interface SearchStatus {
+  provider: string;
+  /** Such as Google or Bing. */
+  title: string;
+  /** Its webmaster tools, such as Search Console. */
+  product: string;
+  methods: SearchMethodInfo[];
+  /** Days one stored row of searches or pages covers: 1, or 7 for Bing's weeks. Every window is a whole number of them. */
+  step_days: number;
+  /** Whether it reports the whole site's average position. */
+  site_position: boolean;
+  /** How far back a first sync reaches with backfill on; 0 when every sync reads all the engine keeps. */
+  backfill_months: number;
+  /** How its numbers differ from a plain daily count, in plain words. */
+  notes: string[];
   connected: boolean;
-  /** The instance has GSC_GOOGLE_CLIENT_ID, which Sign in with Google needs. */
-  oauth_available: boolean;
-  method: GscMethod | "";
-  /** The service account's email; empty for a Google sign-in. */
+  method: SearchMethod | "";
+  /** The service account's email; empty for a Google sign-in and for Bing. */
   account: string;
-  property: string;
-  property_kind: PropertyKind | "";
+  site: string;
+  /** Google's property type; empty for Bing. */
+  site_kind: SiteKind | "";
   backfill: boolean;
   connected_at: Timestamp | null;
   last_sync_at: Timestamp | null;
   last_sync_error: string;
   syncing: boolean;
-  /** The property the stored numbers are for; empty when nothing is stored. */
-  data_property: string;
+  /** The site the stored numbers are for; empty when nothing is stored. */
+  data_site: string;
   first_day: Day;
-  /** The latest day Google has finalized, which every window ends on. */
+  /** The latest final day, which every window ends on; for Bing, the end of its latest final week. */
   latest_final_day: Day;
-  /** Stored days Google still revises. */
+  /** Stored days the engine still revises. */
   partial_days: Day[];
 }
 
-export interface GscProperty {
-  site_url: string;
-  permission_level: string;
-  kind: PropertyKind;
+export interface SearchSite {
+  url: string;
+  /** Google's property type; empty for Bing. */
+  kind: SiteKind | "";
+  /** Google's permission level; empty for Bing. */
+  permission: string;
   /** Matches the brand's primary domain. */
   suggested: boolean;
 }
@@ -1966,19 +2006,30 @@ export const api = {
     competitors: (f: ResultsFilter, by: Grouping) => request<Competitors>("GET", `/v1/metrics/competitors${qs({ ...f, by })}`),
   },
 
+  /** One search engine per call, named by provider, such as google or bing. Engines are never added together. */
   search: {
-    summary: () => request<SearchSummary>("GET", "/v1/search/summary"),
+    providers: () => request<{ providers: SearchStatus[] }>("GET", "/v1/search/providers"),
+    summary: (p: string) => request<SearchSummary>("GET", `/v1/search/${p}/summary`),
     /** Defaults to the 90 days up to the latest stored day. */
-    daily: (from?: Day) => request<SearchDaily>("GET", `/v1/search/daily${qs({ from })}`),
-    brand: (from?: Day) => request<BrandSeries>("GET", `/v1/search/brand${qs({ from })}`),
-    pages: (limit: number) => request<TopList & { pages: PageRow[] }>("GET", `/v1/search/pages${qs({ limit })}`),
-    queries: (limit: number, nonBrand: boolean) =>
-      request<TopList & { non_brand: boolean; queries: QueryRow[] }>("GET", `/v1/search/queries${qs({ limit, non_brand: nonBrand ? "true" : undefined })}`),
+    daily: (p: string, from?: Day) => request<SearchDaily>("GET", `/v1/search/${p}/daily${qs({ from })}`),
+    brand: (p: string, from?: Day) => request<BrandSeries>("GET", `/v1/search/${p}/brand${qs({ from })}`),
+    pages: (p: string, limit: number) => request<TopList & { pages: PageRow[] }>("GET", `/v1/search/${p}/pages${qs({ limit })}`),
+    queries: (p: string, limit: number, nonBrand: boolean) =>
+      request<TopList & { non_brand: boolean; queries: QueryRow[] }>("GET", `/v1/search/${p}/queries${qs({ limit, non_brand: nonBrand ? "true" : undefined })}`),
+    /** Admin only from here on; pasting a key can fail with reauth_required. */
+    sites: (p: string) => request<SearchSite[]>("GET", `/v1/search/${p}/sites`),
+    setSite: (p: string, site: string, backfill: boolean) => request<SearchStatus>("PUT", `/v1/search/${p}/site`, { body: { site, backfill } }),
+    /** Google's service account JSON key, or Bing's API key. */
+    connectKey: (p: string, key: string) => request<SearchStatus>("PUT", `/v1/search/${p}/key`, { body: { key } }),
+    /** Keeps the synced data. */
+    disconnect: (p: string) => request<void>("DELETE", `/v1/search/${p}`),
+    /** Google's consent page. The callback returns the browser to the page named by returnTo, with ?connected=google or ?error=. */
+    googleOAuthStart: (returnTo: "settings" | "onboarding" = "settings") => request<{ url: string }>("POST", "/v1/search/google/oauth/start", { body: { return_to: returnTo } }),
   },
 
   goals: {
     list: () => request<Goal[]>("GET", "/v1/goals"),
-    /** Upserts on metric, window and due date. */
+    /** Upserts on provider, metric, window and due date. */
     create: (body: GoalInput) => request<Goal>("POST", "/v1/goals", { body }),
     update: (id: number, body: GoalInput) => request<Goal>("PUT", `/v1/goals/${id}`, { body }),
     remove: (id: number) => request<void>("DELETE", `/v1/goals/${id}`),
@@ -1986,18 +2037,6 @@ export const api = {
 
   /** An empty list goes back to the brand's name and aliases. */
   setBrandedTerms: (terms: string[]) => request<SettingsView>("PUT", "/v1/settings/branded-terms", { body: { terms } }),
-
-  /** Everything but status is admin-only; connecting can fail with reauth_required. */
-  gsc: {
-    status: () => request<GscStatus>("GET", "/v1/gsc"),
-    properties: () => request<GscProperty[]>("GET", "/v1/gsc/properties"),
-    setProperty: (property: string, backfill: boolean) => request<GscStatus>("PUT", "/v1/gsc/property", { body: { property, backfill } }),
-    serviceAccount: (key: string) => request<GscStatus>("PUT", "/v1/gsc/service-account", { body: { key } }),
-    /** Google's consent page. The callback returns the browser to the page named by returnTo, with ?connected=google or ?error=. */
-    oauthStart: (returnTo: "settings" | "onboarding" = "settings") => request<{ url: string }>("POST", "/v1/gsc/oauth/start", { body: { return_to: returnTo } }),
-    /** Keeps the synced data. */
-    disconnect: () => request<void>("DELETE", "/v1/gsc"),
-  },
 
   changes: {
     /** The latest merge first. */

@@ -20,14 +20,14 @@ import (
 type StepKey string
 
 const (
-	StepBrand         StepKey = "brand"
-	StepCompetitors   StepKey = "competitors"
-	StepQuestions     StepKey = "questions"
-	StepSurfaces      StepKey = "surfaces"
-	StepSearchConsole StepKey = "search_console"
-	StepSocial        StepKey = "social"
-	StepSchedule      StepKey = "schedule"
-	StepReview        StepKey = "review"
+	StepBrand       StepKey = "brand"
+	StepCompetitors StepKey = "competitors"
+	StepQuestions   StepKey = "questions"
+	StepSurfaces    StepKey = "surfaces"
+	StepSearch      StepKey = "search"
+	StepSocial      StepKey = "social"
+	StepSchedule    StepKey = "schedule"
+	StepReview      StepKey = "review"
 )
 
 type stepSpec struct {
@@ -43,7 +43,7 @@ var steps = []stepSpec{
 	{StepCompetitors, "Competitors", false},
 	{StepQuestions, "Questions", true},
 	{StepSurfaces, "AI apps", true},
-	{StepSearchConsole, "Search Console", false},
+	{StepSearch, "Search engines", false},
 	{StepSocial, "Social mentions", false},
 	{StepSchedule, "Schedule and spend caps", true},
 	{StepReview, "Review", true},

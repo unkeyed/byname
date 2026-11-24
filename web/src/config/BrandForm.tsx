@@ -143,9 +143,9 @@ function BrandFormBody({ initial, retention, footer, onSaved, submitLabel }: { i
           )}
         </div>
 
-        <Disclosure summary="Google searches for your name (optional)" open={!following || !!termsError || undefined}>
+        <Disclosure summary="Searches for your name (optional)" open={!following || !!termsError || undefined}>
           <p className="text-xs text-muted">
-            If you connect Google Search Console in a later step, Byname splits the Google searches that find your site into people who typed your name and everyone else. A search
+            If you connect a search engine in a later step, Byname splits the searches that find your site on Google or Bing into people who typed your name and everyone else. A search
             containing one of these words counts as typing your name. They follow your name and other names until you change them.
           </p>
           <div>

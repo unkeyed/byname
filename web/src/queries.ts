@@ -1,6 +1,6 @@
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery, type QueryClient } from "@tanstack/react-query";
 import { useLoading } from "./ui";
-import { api, type Grouping, type GscStatus, type Line, type ResultsFilter, type Run, type Scope, type SocialMentionQuery } from "./api";
+import { api, type Grouping, type Line, type ResultsFilter, type Run, type Scope, type SearchStatus, type SocialMentionQuery } from "./api";
 
 /** Query keys in one place, so a mutation can invalidate exactly what it touched. */
 export const keys = {
@@ -52,17 +52,17 @@ export const keys = {
   channels: ["channels"] as const,
   deliveries: ["channels", "deliveries"] as const,
   /**
-   * Search Console reads sit under this prefix. Each carries the stored
-   * data's version, so a finished sync refetches them without a timer.
+   * Search engine reads sit under this prefix. Each carries its engine's
+   * stored data version, so a finished sync refetches them without a timer.
    */
   search: ["search"] as const,
-  gsc: ["search", "gsc"] as const,
-  gscProperties: ["search", "gsc", "properties"] as const,
-  searchSummary: (v: string) => ["search", "summary", v] as const,
-  searchDaily: (from: string | undefined, v: string) => ["search", "daily", from, v] as const,
-  searchBrand: (from: string | undefined, v: string) => ["search", "brand", from, v] as const,
-  searchPages: (limit: number, v: string) => ["search", "pages", limit, v] as const,
-  searchQueries: (limit: number, nonBrand: boolean, v: string) => ["search", "queries", limit, nonBrand, v] as const,
+  searchProviders: ["search", "providers"] as const,
+  searchSites: (p: string) => ["search", "providers", p, "sites"] as const,
+  searchSummary: (p: string, v: string) => ["search", p, "summary", v] as const,
+  searchDaily: (p: string, from: string | undefined, v: string) => ["search", p, "daily", from, v] as const,
+  searchBrand: (p: string, from: string | undefined, v: string) => ["search", p, "brand", from, v] as const,
+  searchPages: (p: string, limit: number, v: string) => ["search", p, "pages", limit, v] as const,
+  searchQueries: (p: string, limit: number, nonBrand: boolean, v: string) => ["search", p, "queries", limit, nonBrand, v] as const,
   goals: (v: string) => ["search", "goals", v] as const,
   /** Site changes, control pages, the repo and the read settings sit under this prefix. */
   changes: ["changes"] as const,
@@ -87,20 +87,26 @@ export const keys = {
   logos: ["logos"] as const,
 };
 
-export const useGscProperties = (enabled = true) => useQuery({ queryKey: keys.gscProperties, queryFn: api.gsc.properties, enabled });
+export const useSearchSites = (p: string, enabled = true) => useQuery({ queryKey: keys.searchSites(p), queryFn: () => api.search.sites(p), enabled });
 
-/** Changes whenever a sync or a disconnect changes what the read API returns. */
-export const dataVersion = (s: GscStatus) => [s.data_property, s.last_sync_at, s.latest_final_day, s.partial_days.join()].join("|");
+/** Changes whenever a sync or a disconnect changes what the engine's read API returns. */
+export const dataVersion = (s: SearchStatus) => [s.provider, s.data_site, s.last_sync_at, s.latest_final_day, s.partial_days.join()].join("|");
 
-/** A picked property waits for its first sync, which starts within a minute. */
-const awaitingSync = (s: GscStatus) => s.syncing || (s.connected && s.property !== "" && !s.last_sync_at && !s.last_sync_error);
+/** A picked site waits for its first sync, which starts within a minute. */
+const awaitingSync = (s: SearchStatus) => s.syncing || (s.connected && s.site !== "" && !s.last_sync_at && !s.last_sync_error);
 
-/** The Search Console connection. Polls while a sync is due or running. */
-export const useGsc = () =>
+/** Puts one engine's new status, as a connect or site change answers, into the providers list. */
+export function storeEngine(qc: QueryClient, st: SearchStatus) {
+  qc.setQueryData<{ providers: SearchStatus[] }>(keys.searchProviders, (old) => old && { providers: old.providers.map((p) => (p.provider === st.provider ? st : p)) });
+}
+
+/** Every search engine, connected or not, in the order to show them. Polls while a sync is due or running. */
+export const useSearchProviders = () =>
   useQuery({
-    queryKey: keys.gsc,
-    queryFn: api.gsc.status,
-    refetchInterval: (q) => (q.state.data && awaitingSync(q.state.data) ? 4000 : false),
+    queryKey: keys.searchProviders,
+    queryFn: api.search.providers,
+    select: (d) => d.providers,
+    refetchInterval: (q) => (q.state.data?.providers.some(awaitingSync) ? 4000 : false),
   });
 
 export const useChanges = () => useQuery({ queryKey: keys.changeList, queryFn: api.changes.list });

@@ -46,7 +46,7 @@ export const deltaMetrics: {
 }[] = [
   {
     metric: "position",
-    label: figureInfo.position.label,
+    label: figureInfo("Google").position.label,
     value: (d) => d.position,
     format: (v) => `${signedFmt.format(v)} places`,
     threshold: (t) => `${t.position} places either way`,
@@ -54,7 +54,7 @@ export const deltaMetrics: {
   },
   {
     metric: "ctr",
-    label: figureInfo.ctr.label,
+    label: figureInfo("Google").ctr.label,
     value: (d) => d.ctr_points,
     format: (v) => `${signedFmt.format(v)} points`,
     threshold: (t) => `${t.ctr_points} points either way`,
@@ -62,7 +62,7 @@ export const deltaMetrics: {
   },
   {
     metric: "impressions",
-    label: figureInfo.impressions.label,
+    label: figureInfo("Google").impressions.label,
     value: (d) => d.impressions_ratio,
     format: (v) => `×${ratioFmt.format(v)}`,
     threshold: (t) => `×${ratioFmt.format(t.impressions_ratio)} or ×${ratioFmt.format(1 / t.impressions_ratio)}`,
