@@ -12,13 +12,13 @@ Every API key and every MCP connection carries one or more of three scopes. Each
 
 | Scope | Allows |
 |---|---|
-| `results:read` | Read checks, answers, raw responses, questions, brands, Search Console data, goals, site changes, comparison pages, the repo connection, social mentions and digests, the left-out list and filters, notifications and settings. Never a secret. |
+| `results:read` | Read checks, answers, raw responses, questions, brands, search engine data (Google and Bing), goals, site changes, comparison pages, the repo connection, social mentions and digests, the left-out list and filters, notifications and settings. Never a secret. |
 | `runs:write` | Queue a check, pause and resume scheduled checks, and read past answers for other brands. |
 | `config:write` | Edit the brand, competitors, questions and question sets, AI apps and models, the schedule and limits, goals, branded search terms, site changes logged by hand, comparison pages, path rules, when change results fall and what counts as a move, the social search settings, the people left out of social mentions, which brands answers name are tracked or hidden, and the settings for finding other brands and their logos. |
 
 A key or connection never carries a scope its creator's role lacks. An Admin or Editor can grant all three. A Viewer can grant only `results:read`. If the creator's role later loses a scope, so do their keys and connections. [Sign-in](sign-in.md#roles-and-what-they-allow) describes the roles.
 
-Some things no key or MCP connection can do, whatever its scopes. The Treg token, provider keys, Search Console connections, the GitHub repo connection for site changes, where notifications go, API keys, connected apps and teammates are managed only by a signed-in Admin in the UI. A key that tries gets `403`.
+Some things no key or MCP connection can do, whatever its scopes. The Treg token, provider keys, search engine connections (Google Search Console and Bing Webmaster Tools), the GitHub repo connection for site changes, where notifications go, API keys, connected apps and teammates are managed only by a signed-in Admin in the UI. A key that tries gets `403`.
 
 ## Connect an MCP client
 
@@ -202,17 +202,17 @@ Byname's MCP server has 90 tools. Every REST route an API key can call has one w
 | `unmark_question_page` | `config:write` | `DELETE /v1/question-pages/{id}` | Remove a marked page and its tracking. |
 | `content_brief` | `results:read` | `GET /v1/questions/{id}/brief` | A prompt for an agent working on your site, to write the content that gets you named and linked to on one question: how each AI app answered on a check, the competitors named instead, the web searches the apps ran and the pages they linked to, with the markdown to follow in prompt. Works for any question, not only missed ones. Filter by AI app (surface) and model. |
 | `list_jobs` | `results:read` | `GET /v1/jobs` | The jobs log newest first: each AI check and model list refresh with its status, error and spend. |
-| `search_console_status` | `results:read` | `GET /v1/gsc` | Whether Search Console is connected, the property synced, the last sync and its error, the latest day Google has finalized and the partial days the next sync overwrites. |
-| `search_summary` | `results:read` | `GET /v1/search/summary` | The Search Console headline: clicks, appearances (impressions), click rate (CTR), average position, and clicks from searches with your name, without it (non-brand) and anonymized over the latest 28 days ending on the latest final day, with the 28 days before for the trend. |
-| `search_daily` | `results:read` | `GET /v1/search/daily` | The site's Search Console clicks, appearances, click rate and average position per day, partial days marked final false. |
-| `search_brand_split` | `results:read` | `GET /v1/search/brand` | Clicks from searches with your name against searches without it over trailing 28-day windows, one per day, ending on final days only. |
-| `top_pages` | `results:read` | `GET /v1/search/pages` | The top pages by Search Console clicks over a window ending on the latest final day. |
-| `top_queries` | `results:read` | `GET /v1/search/queries` | The top search queries by Search Console clicks over a window ending on the latest final day, each marked branded or not; non_brand leaves branded ones out. |
-| `list_goals` | `results:read` | `GET /v1/goals` | The search goals by due date, each with its progress over its trailing 28- or 90-day window ending on the latest final day. |
-| `upsert_goal` | `config:write` | `POST /v1/goals` | Add a search goal, or set the target of the goal with the same metric, window and due date. |
+| `search_status` | `results:read` | `GET /v1/search/providers` | Every search engine Byname reads, Google Search Console and Bing Webmaster Tools: whether each is connected, the site synced, the last sync and its error, the latest final day every window ends on, the partial days the next sync overwrites, how many days one row of searches covers (7 for Bing's weekly top lists) and how its numbers differ. |
+| `search_summary` | `results:read` | `GET /v1/search/{provider}/summary` | One search engine's headline: clicks, appearances (impressions), click rate (CTR), average position, and clicks from searches with your name, without it (non-brand) and unlisted, over the latest 28 days ending on the latest final day, with the 28 days before for the trend. Bing gives no average position for the whole site, and its windows are whole weeks. |
+| `search_daily` | `results:read` | `GET /v1/search/{provider}/daily` | One search engine's site clicks, appearances, click rate and average position per day, partial days marked final false. |
+| `search_brand_split` | `results:read` | `GET /v1/search/{provider}/brand` | Clicks from searches with your name against searches without it over trailing 28-day windows ending on final days only, one a day for Google and one a week for Bing. |
+| `top_pages` | `results:read` | `GET /v1/search/{provider}/pages` | One search engine's top pages by clicks over a window ending on the latest final day. For Bing, sums of its weekly top lists. |
+| `top_queries` | `results:read` | `GET /v1/search/{provider}/queries` | One search engine's top search queries by clicks over a window ending on the latest final day, each marked branded or not; non_brand leaves branded ones out. For Bing, sums of its weekly top lists. |
+| `list_goals` | `results:read` | `GET /v1/goals` | Every search engine's goals by due date, each with its provider and its progress over its trailing 28- or 90-day window ending on that provider's latest final day. |
+| `upsert_goal` | `config:write` | `POST /v1/goals` | Add a search goal for one provider, or set the target of the goal with the same provider, metric, window and due date. |
 | `update_goal` | `config:write` | `PUT /v1/goals/{id}` | Replace a search goal by id. |
 | `delete_goal` | `config:write` | `DELETE /v1/goals/{id}` | Delete a search goal. |
-| `update_branded_terms` | `config:write` | `PUT /v1/settings/branded-terms` | Replace the branded search terms. |
+| `update_branded_terms` | `config:write` | `PUT /v1/settings/branded-terms` | Replace the branded search terms, which decide brand against non-brand on every search engine. |
 
 The server's instructions tell an agent where to start: `list_runs`, then `compare_runs` for the answers that started or stopped naming you, `gaps` for missed questions, `content_brief` for a prompt that tells an agent working on your site what to write to win one, and `question_history` for one question over time. They also say that each AI app and model is its own line with its own accuracy label, never averaged with another, and that naming you and linking to your site are counted apart.
 

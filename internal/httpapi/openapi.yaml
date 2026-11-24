@@ -59,12 +59,15 @@ tags:
       citation (it links to one of your domains) are counted separately.
   - name: search
     description: >-
-      Google Search Console. results:read reads the synced clicks, impressions
-      and position, goals and the connection's status; config:write changes
-      goals and branded search terms; a signed-in admin connects Search
-      Console, picks the property and disconnects. Dates are Search Console's
-      Pacific Time days, and windows end on the latest day Google has
-      finalized.
+      Search engines: Google Search Console and Bing Webmaster Tools, each a
+      provider named in the path. results:read reads the synced clicks,
+      impressions and position, goals and each provider's status;
+      config:write changes goals and branded search terms; a signed-in admin
+      connects a provider, picks its site and disconnects. Days are each
+      provider's own (Google's Pacific Time, Bing's UTC), and windows end on
+      the provider's latest final day. Bing reports searches and pages a week
+      at a time, so its windows are whole weeks. No response adds two
+      engines together.
   - name: changes
     description: >-
       Site changes. Merged pull requests from a connected GitHub repo, or
@@ -1548,33 +1551,68 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "503":
           $ref: "#/components/responses/Unavailable"
-  /v1/search/summary:
+  /v1/search/providers:
     get:
       tags: [search]
-      operationId: getSearchSummary
-      summary: The Search Console headline over the latest 28 days, and the 28 days before for the trend.
-      description: Both windows end on the latest day Google has finalized. Non-brand clicks never include anonymized queries.
+      operationId: listSearchProviders
+      summary: Every search engine Byname reads, connected or not, with its sync state and the stored data's extent. Never a credential.
+      description: The list is Byname's registry of providers, in the order to show them. Each says how to connect it, how many days one stored row of searches or pages covers (step_days, 7 for Bing's weekly top lists) and how its numbers differ, in plain words (notes).
       security:
         - apiKey: [results:read]
         - session: [results:read]
       responses:
         "200":
-          description: The headline. current is null until something is synced.
+          description: The providers.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/SearchSummary"
+                type: object
+                required: [providers]
+                properties:
+                  providers:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/SearchStatus"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
         "503":
           $ref: "#/components/responses/Unavailable"
-  /v1/search/daily:
+  /v1/search/{provider}/summary:
+    parameters:
+      - $ref: "#/components/parameters/searchProvider"
+    get:
+      tags: [search]
+      operationId: getSearchSummary
+      summary: One search engine's headline over the latest 28 days, and the 28 days before for the trend.
+      description: Both windows end on the provider's latest final day and are a whole number of its step_days, so Bing's are 4 whole weeks; from and to say which days. Non-brand clicks never include unlisted searches. Engines are never added together.
+      security:
+        - apiKey: [results:read]
+        - session: [results:read]
+      responses:
+        "200":
+          description: The numbers.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchSummary"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /v1/search/{provider}/daily:
+    parameters:
+      - $ref: "#/components/parameters/searchProvider"
     get:
       tags: [search]
       operationId: getSearchDaily
-      summary: The site's clicks, impressions, CTR and position per day, partial days marked.
+      summary: One search engine's site clicks, impressions, CTR and position per day, partial days marked.
+      description: Every provider reports site totals by day. Bing gives no position for the whole site, so position is 0.
       security:
         - apiKey: [results:read]
         - session: [results:read]
@@ -1583,7 +1621,7 @@ paths:
         - $ref: "#/components/parameters/searchTo"
       responses:
         "200":
-          description: The days.
+          description: The numbers.
           content:
             application/json:
               schema:
@@ -1596,12 +1634,14 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "503":
           $ref: "#/components/responses/Unavailable"
-  /v1/search/brand:
+  /v1/search/{provider}/brand:
+    parameters:
+      - $ref: "#/components/parameters/searchProvider"
     get:
       tags: [search]
       operationId: getSearchBrand
-      summary: Brand against non-brand clicks over trailing 28-day windows, one window per day.
-      description: Windows end on final days only. A query is brand when it contains a branded search term; anonymized clicks are never non-brand.
+      summary: Brand against non-brand clicks over trailing 28-day windows, one window every step_days.
+      description: Windows end on final days only, every day for Google and every week end for Bing. A query is brand when it contains a branded search term; unlisted clicks are never non-brand.
       security:
         - apiKey: [results:read]
         - session: [results:read]
@@ -1610,7 +1650,7 @@ paths:
         - $ref: "#/components/parameters/searchTo"
       responses:
         "200":
-          description: The windows.
+          description: The numbers.
           content:
             application/json:
               schema:
@@ -1623,11 +1663,14 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "503":
           $ref: "#/components/responses/Unavailable"
-  /v1/search/pages:
+  /v1/search/{provider}/pages:
+    parameters:
+      - $ref: "#/components/parameters/searchProvider"
     get:
       tags: [search]
       operationId: getSearchPages
-      summary: The top pages by clicks over the window ending on the latest final day.
+      summary: One search engine's top pages by clicks over the window ending on the latest final day.
+      description: For Bing these are sums of its weekly top lists, and the window rounds to whole weeks.
       security:
         - apiKey: [results:read]
         - session: [results:read]
@@ -1636,7 +1679,7 @@ paths:
         - $ref: "#/components/parameters/searchLimit"
       responses:
         "200":
-          description: The pages.
+          description: The numbers.
           content:
             application/json:
               schema:
@@ -1649,12 +1692,14 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "503":
           $ref: "#/components/responses/Unavailable"
-  /v1/search/queries:
+  /v1/search/{provider}/queries:
+    parameters:
+      - $ref: "#/components/parameters/searchProvider"
     get:
       tags: [search]
       operationId: getSearchQueries
-      summary: The top search queries by clicks over the window ending on the latest final day.
-      description: Anonymized queries never appear. With non_brand=true, queries containing a branded search term are left out.
+      summary: One search engine's top search queries by clicks over the window ending on the latest final day.
+      description: Unlisted searches never appear. With non_brand=true, queries containing a branded search term are left out. For Bing these are sums of its weekly top lists, and the window rounds to whole weeks.
       security:
         - apiKey: [results:read]
         - session: [results:read]
@@ -1669,7 +1714,7 @@ paths:
             default: false
       responses:
         "200":
-          description: The queries.
+          description: The numbers.
           content:
             application/json:
               schema:
@@ -1686,8 +1731,8 @@ paths:
     get:
       tags: [search]
       operationId: listGoals
-      summary: The search goals by due date, each with its progress over its trailing window.
-      description: None exist until someone adds one. Progress counts the window ending on the latest final day.
+      summary: Every search engine's goals by due date, each with its progress over its trailing window.
+      description: None exist until someone adds one. Progress counts the window ending on the goal's provider's latest final day, a whole number of its step_days, so a 90-day Bing goal counts 91 days.
       security:
         - apiKey: [results:read]
         - session: [results:read]
@@ -1709,7 +1754,7 @@ paths:
     post:
       tags: [search]
       operationId: upsertGoal
-      summary: Add a goal, or set the target of the goal with the same metric, window and due date.
+      summary: Add a goal, or set the target of the goal with the same provider, metric, window and due date.
       security:
         - apiKey: [config:write]
         - session: [config:write]
@@ -1827,59 +1872,45 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "503":
           $ref: "#/components/responses/Unavailable"
-  /v1/gsc:
-    get:
-      tags: [search]
-      operationId: getSearchConsole
-      summary: The Search Console connection, its last sync and the stored days. Never the credential.
-      security:
-        - apiKey: [results:read]
-        - session: [results:read]
-      responses:
-        "200":
-          description: The connection.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/SearchConsoleStatus"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "403":
-          $ref: "#/components/responses/Forbidden"
-        "503":
-          $ref: "#/components/responses/Unavailable"
+  /v1/search/{provider}:
+    parameters:
+      - $ref: "#/components/parameters/searchProvider"
     delete:
       tags: [search]
-      operationId: disconnectSearchConsole
-      summary: Delete the connection and its credential. The synced numbers stay.
+      operationId: disconnectSearchProvider
+      summary: Delete one provider's connection and its credential. The synced numbers stay.
       security:
         - session: [admin]
       responses:
         "204":
           description: Disconnected.
+        "400":
+          $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
         "503":
           $ref: "#/components/responses/Unavailable"
-  /v1/gsc/properties:
+  /v1/search/{provider}/sites:
+    parameters:
+      - $ref: "#/components/parameters/searchProvider"
     get:
       tags: [search]
-      operationId: listSearchConsoleProperties
-      summary: The properties the connected account can read, from Google's sites.list.
-      description: The one matching your primary domain is marked suggested, preferring its domain property.
+      operationId: listSearchSites
+      summary: The sites the connected account can read, from Google's sites.list or Bing's GetUserSites.
+      description: Bing lists verified sites only. The one matching your primary domain is marked suggested, preferring Google's domain property.
       security:
         - session: [admin]
       responses:
         "200":
-          description: Properties.
+          description: Sites.
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/SearchConsoleProperty"
+                  $ref: "#/components/schemas/SearchSite"
         "400":
           $ref: "#/components/responses/BadRequest"
         "401":
@@ -1890,12 +1921,14 @@ paths:
           $ref: "#/components/responses/BadGateway"
         "503":
           $ref: "#/components/responses/Unavailable"
-  /v1/gsc/property:
+  /v1/search/{provider}/site:
+    parameters:
+      - $ref: "#/components/parameters/searchProvider"
     put:
       tags: [search]
-      operationId: setSearchConsoleProperty
-      summary: Pick the property to sync. The scheduler syncs it within a minute.
-      description: The property must be one the connected account can read. backfill (default true) makes the first sync pull every day Google keeps, about 16 months; without it the first sync pulls 28 days.
+      operationId: setSearchSite
+      summary: Pick the site to sync. The scheduler syncs it within a minute.
+      description: The site must be one the connected account can read, named exactly as the provider lists it. backfill (default true) makes Google's first sync pull every day it keeps, about 16 months; without it the first sync pulls 28 days. Bing returns all it keeps on every sync, so backfill means nothing for it.
       security:
         - session: [admin]
       requestBody:
@@ -1904,22 +1937,22 @@ paths:
           application/json:
             schema:
               type: object
-              required: [property]
+              required: [site]
               additionalProperties: false
               properties:
-                property:
+                site:
                   type: string
-                  description: A site_url from GET /v1/gsc/properties, such as sc-domain:example.com or https://www.example.com/.
+                  description: A url from GET /v1/search/{provider}/sites, such as sc-domain:example.com or https://www.example.com/.
                 backfill:
                   type: boolean
                   default: true
       responses:
         "200":
-          description: The connection.
+          description: The provider's status.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/SearchConsoleStatus"
+                $ref: "#/components/schemas/SearchStatus"
         "400":
           $ref: "#/components/responses/BadRequest"
         "401":
@@ -1930,12 +1963,14 @@ paths:
           $ref: "#/components/responses/BadGateway"
         "503":
           $ref: "#/components/responses/Unavailable"
-  /v1/gsc/service-account:
+  /v1/search/{provider}/key:
+    parameters:
+      - $ref: "#/components/parameters/searchProvider"
     put:
       tags: [search]
-      operationId: connectSearchConsoleServiceAccount
-      summary: Connect Search Console with a service account's JSON key, stored sealed with ENCRYPTION_KEY.
-      description: Needs a recent sign-in. Byname checks that Google accepts the key first. Add the service account's email as a user on the property in Search Console. The response never carries the key.
+      operationId: connectSearchKey
+      summary: Connect a provider with a pasted key, stored sealed with ENCRYPTION_KEY.
+      description: Needs a recent sign-in. For Google the key is a service account's JSON key file; add the service account's email as a user on the site in Search Console. For Bing it is the API key from Settings, API access in Bing Webmaster Tools. Byname checks that the provider accepts the key first, and keeps the site already picked. The response never carries the key.
       security:
         - session: [admin]
       requestBody:
@@ -1949,14 +1984,14 @@ paths:
               properties:
                 key:
                   type: string
-                  description: The JSON key file's contents, as Google downloads it.
+                  description: The JSON key file's contents for Google, or Bing's API key.
       responses:
         "200":
-          description: The connection.
+          description: The provider's status.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/SearchConsoleStatus"
+                $ref: "#/components/schemas/SearchStatus"
         "400":
           $ref: "#/components/responses/BadRequest"
         "401":
@@ -1967,12 +2002,12 @@ paths:
           $ref: "#/components/responses/BadGateway"
         "503":
           $ref: "#/components/responses/Unavailable"
-  /v1/gsc/oauth/start:
+  /v1/search/google/oauth/start:
     post:
       tags: [search]
-      operationId: startSearchConsoleOAuth
-      summary: Start connecting Search Console with Google sign-in, read-only.
-      description: Needs a recent sign-in and GSC_GOOGLE_CLIENT_ID. Open the returned URL in the browser; Google sends it back to /auth/gsc/callback, which stores the refresh token sealed and redirects to the page return_to names, Settings > Search Console by default.
+      operationId: startGoogleOAuth
+      summary: Start connecting Google Search Console with Google sign-in, read-only.
+      description: Google only. Needs a recent sign-in and GSC_GOOGLE_CLIENT_ID. Open the returned URL in the browser; Google sends it back to /auth/gsc/callback, which stores the refresh token sealed and redirects to the page return_to names, Settings > Search engines by default.
       security:
         - session: [admin]
       requestBody:
@@ -4199,9 +4234,9 @@ paths:
   /auth/gsc/callback:
     get:
       tags: [search]
-      operationId: finishSearchConsoleOAuth
+      operationId: finishGoogleOAuth
       summary: Where Google sends the browser back after Search Console consent.
-      description: Only the admin who started the sign-in can finish it, with their session. Always redirects to /settings/search-console, with ?connected=google, or ?error= saying what went wrong, including a missing or non-admin session.
+      description: Only the admin who started the sign-in can finish it, with their session. Always redirects to /settings/search-engines, or /onboarding/search when the sign-in started there, with ?connected=google, or ?error= saying what went wrong, including a missing or non-admin session.
       security: []
       parameters:
         - name: state
@@ -4218,7 +4253,7 @@ paths:
             type: string
       responses:
         "303":
-          description: Back to Settings > Search Console.
+          description: Back to Settings > Search engines, or onboarding.
   /auth/setup/{token}:
     parameters:
       - name: token
@@ -4408,6 +4443,13 @@ components:
         type: string
         enum: [pair, surface]
         default: pair
+    searchProvider:
+      name: provider
+      in: path
+      required: true
+      description: The search engine, one of those GET /v1/search/providers lists, such as google or bing.
+      schema:
+        type: string
     searchFrom:
       name: from
       in: query
@@ -4425,7 +4467,7 @@ components:
     searchDays:
       name: days
       in: query
-      description: The window in days, ending on the latest final day.
+      description: The window in days, ending on the latest final day. Rounded to a whole number of the provider's step_days, so whole weeks for Bing.
       schema:
         type: integer
         minimum: 1
@@ -6899,13 +6941,16 @@ components:
     Job:
       type: object
       description: One entry of the jobs log.
-      required: [id, job, trigger, run_id, status, started_at, finished_at, error, spend_usd]
+      required: [id, job, provider, trigger, run_id, status, started_at, finished_at, error, spend_usd]
       properties:
         id:
           type: integer
         job:
           type: string
-          enum: [ai_check, model_refresh, source_fetch, gsc_sync, site_changes, recrawl_watch, verdicts, social_fetch, other_brands, brand_logos]
+          enum: [ai_check, model_refresh, source_fetch, search_sync, site_changes, recrawl_watch, verdicts, social_fetch, other_brands, brand_logos]
+        provider:
+          type: string
+          description: The search engine a search_sync synced, such as google or bing. Empty for other jobs.
         trigger:
           $ref: "#/components/schemas/Trigger"
         run_id:
@@ -6939,13 +6984,13 @@ components:
           description: Clicks over impressions, 0 to 1.
         position:
           type: number
-          description: Average position, weighted by impressions. 0 with no impressions.
+          description: Average position, weighted by impressions over the rows that have one. 0 when there is none, as for Bing's site totals.
     SearchPeriod:
       description: The site's numbers over from to to, inclusive.
       allOf:
         - $ref: "#/components/schemas/SearchTotals"
         - type: object
-          required: [from, to, brand_clicks, non_brand_clicks, anonymized_clicks, days_with_data]
+          required: [from, to, days, brand_clicks, non_brand_clicks, unlisted_clicks, days_with_data]
           properties:
             from:
               type: string
@@ -6953,22 +6998,27 @@ components:
             to:
               type: string
               format: date
+            days:
+              type: integer
+              description: The window's length, a whole number of the provider's step_days.
             brand_clicks:
               type: integer
               description: Clicks on queries containing a branded search term.
             non_brand_clicks:
               type: integer
-              description: Clicks on named queries without a branded term. Anonymized queries are never non-brand.
-            anonymized_clicks:
+              description: Clicks on listed queries without a branded term. Unlisted searches are never non-brand.
+            unlisted_clicks:
               type: integer
-              description: Clicks Google counts for the site but on no query, because it hides rare queries.
+              description: Clicks the provider counts for the site but on no search it lists. Google hides rare searches; Bing lists only its top searches each week.
             days_with_data:
               type: integer
     SearchSummary:
       type: object
-      required: [property, current, previous]
+      required: [provider, site, current, previous]
       properties:
-        property:
+        provider:
+          type: string
+        site:
           type: string
           description: Empty until something is synced.
         current:
@@ -6980,7 +7030,7 @@ components:
           oneOf:
             - $ref: "#/components/schemas/SearchPeriod"
             - type: "null"
-          description: The 28 days before current. Null without data there.
+          description: The window before current. Null without data there.
     SearchDay:
       allOf:
         - $ref: "#/components/schemas/SearchTotals"
@@ -6992,23 +7042,26 @@ components:
               format: date
             final:
               type: boolean
-              description: False while Google still revises the day.
+              description: False while the provider still revises the day.
     SearchDaily:
       type: object
-      required: [property, latest_final_day, days]
+      required: [provider, site, latest_final_day, days]
       properties:
-        property:
+        provider:
+          type: string
+        site:
           type: string
         latest_final_day:
           type: string
+          description: The latest day the provider has finalized.
         days:
           type: array
-          description: Days Google reported, oldest first. A day with no entry had no impressions.
+          description: Days the provider reported, oldest first. A day with no entry had no impressions.
           items:
             $ref: "#/components/schemas/SearchDay"
     SearchBrandPoint:
       type: object
-      required: [date, clicks, brand_clicks, non_brand_clicks, anonymized_clicks]
+      required: [date, clicks, brand_clicks, non_brand_clicks, unlisted_clicks]
       properties:
         date:
           type: string
@@ -7020,13 +7073,15 @@ components:
           type: integer
         non_brand_clicks:
           type: integer
-        anonymized_clicks:
+        unlisted_clicks:
           type: integer
     SearchBrand:
       type: object
-      required: [property, terms, points]
+      required: [provider, site, terms, points]
       properties:
-        property:
+        provider:
+          type: string
+        site:
           type: string
         terms:
           type: array
@@ -7039,9 +7094,11 @@ components:
             $ref: "#/components/schemas/SearchBrandPoint"
     SearchPages:
       type: object
-      required: [property, from, to, pages]
+      required: [provider, site, from, to, pages]
       properties:
-        property:
+        provider:
+          type: string
+        site:
           type: string
         from:
           type: string
@@ -7059,9 +7116,11 @@ components:
                     type: string
     SearchQueries:
       type: object
-      required: [property, from, to, non_brand, queries]
+      required: [provider, site, from, to, non_brand, queries]
       properties:
-        property:
+        provider:
+          type: string
+        site:
           type: string
         from:
           type: string
@@ -7083,16 +7142,19 @@ components:
                     type: boolean
     GoalInput:
       type: object
-      required: [metric, window_days, target, due_on]
+      required: [provider, metric, window_days, target, due_on]
       additionalProperties: false
       properties:
+        provider:
+          type: string
+          description: The search engine the goal counts, one GET /v1/search/providers lists, such as google or bing.
         metric:
           type: string
           enum: [clicks, impressions, non_brand_clicks]
         window_days:
           type: integer
           enum: [28, 90]
-          description: The trailing window the metric is summed over.
+          description: The trailing window the metric is summed over, rounded to whole weeks for Bing, so 90 counts 91.
         target:
           type: integer
           minimum: 1
@@ -7108,7 +7170,7 @@ components:
             id:
               type: integer
             progress:
-              description: The metric over the window ending on the latest final day. Null until Search Console data is synced.
+              description: The metric over the window ending on the provider's latest final day. Null until its data is synced.
               oneOf:
                 - type: "null"
                 - type: object
@@ -7130,28 +7192,69 @@ components:
                     days_with_data:
                       type: integer
                       description: Less than the window while history is short.
-    SearchConsoleStatus:
+    SearchStatus:
       type: object
-      description: The connection as anyone with results:read sees it. Never the credential.
-      required: [connected, oauth_available, method, account, property, property_kind, backfill, connected_at, last_sync_at, last_sync_error, syncing, data_property, first_day, latest_final_day, partial_days]
+      description: One search engine as anyone with results:read sees it, its connection and the data stored. Never the credential.
+      required: [provider, title, product, methods, step_days, site_position, backfill_months, notes, connected, method, account, site, site_kind, backfill, connected_at, last_sync_at, last_sync_error, syncing, data_site, first_day, latest_final_day, partial_days]
       properties:
+        provider:
+          type: string
+          description: Its name in paths and goals, such as google or bing.
+        title:
+          type: string
+          description: The search engine, such as Google or Bing.
+        product:
+          type: string
+          description: Its webmaster tools, such as Search Console or Bing Webmaster Tools.
+        methods:
+          type: array
+          description: The ways to connect it, in the order to offer them.
+          items:
+            type: object
+            required: [method, label, available]
+            properties:
+              method:
+                type: string
+                enum: [oauth, service_account, api_key]
+              label:
+                type: string
+              available:
+                type: boolean
+                description: False for Google sign-in on an instance without GSC_GOOGLE_CLIENT_ID.
+              steps:
+                type: array
+                items:
+                  type: string
+                description: For a pasted key, how to get one.
+        step_days:
+          type: integer
+          description: The days one stored row of searches or pages covers, 1 for Google and 7 for Bing's weeks. Every window is a whole number of them.
+        site_position:
+          type: boolean
+          description: Whether it reports the whole site's average position. Bing does not.
+        backfill_months:
+          type: integer
+          description: How far back a first sync reaches with backfill on. 0 when every sync reads all the provider keeps.
+        notes:
+          type: array
+          items:
+            type: string
+          description: How its numbers differ from a plain daily count, in plain words.
         connected:
           type: boolean
-        oauth_available:
-          type: boolean
-          description: The instance has a Google OAuth client (GSC_GOOGLE_CLIENT_ID), which Sign in with Google needs.
         method:
           type: string
-          enum: ["", oauth, service_account]
+          enum: ["", oauth, service_account, api_key]
         account:
           type: string
-          description: The service account's email. Empty for a Google sign-in.
-        property:
+          description: The service account's email. Empty for a Google sign-in and for Bing.
+        site:
           type: string
-          description: The property synced. Empty until one is picked.
-        property_kind:
+          description: The site synced. Empty until one is picked.
+        site_kind:
           type: string
           enum: ["", domain, url_prefix]
+          description: Google's property type. Empty for Bing.
         backfill:
           type: boolean
         connected_at:
@@ -7160,40 +7263,42 @@ components:
         last_sync_at:
           type: [string, "null"]
           format: date-time
-          description: When the last sync finished. Null before the first, and after another property is picked.
+          description: When the last sync finished. Null before the first, and after another site is picked.
         last_sync_error:
           type: string
           description: Why the last sync failed. Empty when it did not.
         syncing:
           type: boolean
-        data_property:
+        data_site:
           type: string
-          description: The property the stored numbers are for, which the Search page shows. Empty when nothing is stored.
+          description: The site the stored numbers are for, which the Search page shows. Empty when nothing is stored.
         first_day:
           type: string
         latest_final_day:
           type: string
-          description: The latest day Google has finalized. Every window ends on it.
+          description: The latest final day, which every window ends on; for Bing, the end of its latest final week.
         partial_days:
           type: array
           items:
             type: string
-          description: Stored days Google still revises. The next sync overwrites them.
-    SearchConsoleProperty:
+          description: Stored days the provider still revises. The next sync overwrites them.
+    SearchSite:
       type: object
-      required: [site_url, permission_level, kind, suggested]
+      required: [url, kind, permission, suggested]
       properties:
-        site_url:
+        url:
           type: string
-        permission_level:
-          type: string
-          description: Google's permission level, such as siteOwner.
+          description: The site as the provider names it.
         kind:
           type: string
-          enum: [domain, url_prefix]
+          enum: ["", domain, url_prefix]
+          description: Google's property type. Empty for Bing.
+        permission:
+          type: string
+          description: Google's permission level, such as siteOwner. Empty for Bing.
         suggested:
           type: boolean
-          description: The property matching your primary domain.
+          description: The site matching your primary domain.
     GapPair:
       description: One pair's answer to a gap's question.
       allOf:

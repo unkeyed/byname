@@ -61,6 +61,7 @@ type client struct {
 	treg       *tregtest.Server
 	resend     *notifytest.Resend
 	google     *searchtest.Google
+	bing       *searchtest.Bing
 	github     *githubtest.Server
 }
 
@@ -189,7 +190,8 @@ func serve(t *testing.T, srv *httptest.Server, publicURL string, mod ...func(*au
 	resend, resendSrv := notifytest.NewResend(t, resendKey)
 	alerts := notify.New(pool, res, notify.Options{Secrets: cfg.Secrets, PublicURL: u, ResendBaseURL: resendSrv.URL})
 	google := searchtest.NewGoogle(t)
-	traffic := search.New(pool, search.Options{Secrets: cfg.Secrets, BaseURLs: map[search.Provider]string{search.Google: google.URL},
+	bing := searchtest.NewBing(t, bingKey)
+	traffic := search.New(pool, search.Options{Secrets: cfg.Secrets, BaseURLs: map[search.Provider]string{search.Google: google.URL, search.Bing: bing.URL},
 		GoogleClient: search.OAuthClient{ID: "test-client", Secret: "test-secret"}, PublicURL: u, Terms: settings})
 	github := githubtest.New(t, "northwind", "site", githubToken)
 	site := changes.New(pool, traffic, changes.Options{Secrets: cfg.Secrets, Alerts: alerts, GitHubBaseURL: github.URL})
@@ -203,7 +205,7 @@ func serve(t *testing.T, srv *httptest.Server, publicURL string, mod ...func(*au
 	srv.Config.Handler = mux
 	srv.Start()
 	t.Cleanup(srv.Close)
-	return client{t: t, base: srv.URL, origin: publicURL, setupToken: token, db: pool, svc: svc, treg: treg, resend: resend, google: google, github: github}
+	return client{t: t, base: srv.URL, origin: publicURL, setupToken: token, db: pool, svc: svc, treg: treg, resend: resend, google: google, bing: bing, github: github}
 }
 
 func cookieValue(r reply, name string) string {
