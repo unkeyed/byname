@@ -55,14 +55,14 @@ Leaving out hides, it does not delete. Byname stores every post it finds and hid
 
 Your name can mean something else to other people, in another place or another language, and those posts are not about you. **Topics and subreddits** under **Settings > Social** hides them, or keeps the page to what is.
 
-- **Leave out a topic.** Posts that mention it are hidden. A topic is a word or phrase, matched as a whole word in any case: `india` matches "India", "#india" and "India," but not "Indiana".
+- **Leave out a topic.** Posts that mention it are hidden. A topic is a word or phrase, matched as a whole word in any case: `weather` matches "Weather", "#weather" and "Weather," but not "weatherproof".
 - **Show only these topics.** Posts that mention none of them are hidden, on every network.
 - **Leave out a subreddit.** Reddit posts in it are hidden. Give its name, `r/name` or a link to it.
 - **Show only these subreddits.** Reddit posts in other subreddits are hidden. Posts on other networks are not affected.
 
 Setting a topic or subreddit that is already set changes what it does. On the **Social** page, **Hide posts like this** under a post leaves out a topic from it, with the words you selected in the post filled in, or the post's subreddit.
 
-Filters hide like the left-out list: at read time, past posts included, and removing a filter brings its posts back. A hidden post shows under **Show N hidden** marked with why, such as **Filtered: topic india** or **Filtered: r/india**. The digest leaves them out of its counts.
+Filters hide like the left-out list: at read time, past posts included, and removing a filter brings its posts back. A hidden post shows under **Show N hidden** marked with why, such as **Filtered: topic weather** or **Filtered: r/weather**. The digest leaves them out of its counts.
 
 ## The search
 
