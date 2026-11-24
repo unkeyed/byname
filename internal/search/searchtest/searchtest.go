@@ -1,4 +1,4 @@
-package gsctest
+package searchtest
 
 import (
 	"crypto/rand"
@@ -10,25 +10,25 @@ import (
 	"testing"
 )
 
-// Server is a running Fake.
-type Server struct {
-	*Fake
+// Google is a running GoogleFake.
+type Google struct {
+	*GoogleFake
 	URL string
 }
 
-// New starts a fake Google for one test, with OAuth client "test-client"
-// and secret "test-secret".
-func New(t testing.TB) *Server {
+// NewGoogle starts a fake Google for one test, with OAuth client
+// "test-client" and secret "test-secret".
+func NewGoogle(t testing.TB) *Google {
 	t.Helper()
-	f := NewFake("test-client", "test-secret")
+	f := NewGoogleFake("test-client", "test-secret")
 	srv := httptest.NewServer(f.Handler())
 	t.Cleanup(srv.Close)
-	return &Server{Fake: f, URL: srv.URL}
+	return &Google{GoogleFake: f, URL: srv.URL}
 }
 
 // ServiceAccountKey makes a service account the fake accepts and returns
 // its JSON key in the format Google downloads.
-func (s *Server) ServiceAccountKey(t testing.TB, email string) string {
+func (s *Google) ServiceAccountKey(t testing.TB, email string) string {
 	t.Helper()
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {

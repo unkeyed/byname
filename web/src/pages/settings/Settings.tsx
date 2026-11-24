@@ -8,7 +8,7 @@ import { ApiKeys } from "./ApiKeys";
 import { CheckHistory } from "./CheckHistory";
 import { NotificationSettings } from "./Notifications";
 import { ReauthProvider } from "./Reauth";
-import { SearchConsole } from "./SearchConsole";
+import { SearchEngines } from "./SearchEngines";
 import { SiteChanges } from "./SiteChanges";
 import { SocialSettings } from "../social/SocialSettings";
 import { Team } from "./Team";
@@ -46,7 +46,7 @@ const sections: { label: string; pages: Page[] }[] = [
   {
     label: "Connections",
     pages: [
-      { path: "search-console", label: "Search Console", element: <SearchConsole />, admin: true },
+      { path: "search-engines", label: "Search engines", element: <SearchEngines />, admin: true },
       { path: "site-changes", label: "Site changes", element: <SiteChanges />, admin: true },
       { path: "social", label: "Social", element: <SocialSettings /> },
       { path: "notifications", label: "Notifications", element: <NotificationSettings />, admin: true },

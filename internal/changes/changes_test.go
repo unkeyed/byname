@@ -12,10 +12,10 @@ import (
 	"github.com/unkeyed/byname/internal/changes"
 	"github.com/unkeyed/byname/internal/changes/githubtest"
 	"github.com/unkeyed/byname/internal/config"
-	"github.com/unkeyed/byname/internal/gsc"
-	"github.com/unkeyed/byname/internal/gsc/gsctest"
 	"github.com/unkeyed/byname/internal/notify"
 	"github.com/unkeyed/byname/internal/results"
+	"github.com/unkeyed/byname/internal/search"
+	"github.com/unkeyed/byname/internal/search/searchtest"
 	"github.com/unkeyed/byname/internal/secretbox"
 	"github.com/unkeyed/byname/internal/testdb"
 )
@@ -31,8 +31,8 @@ type env struct {
 	ctx    context.Context
 	db     *pgxpool.Pool
 	svc    *changes.Service
-	search *gsc.Service
-	google *gsctest.Server
+	search *search.Service
+	google *searchtest.Google
 	gh     *githubtest.Server
 	now    time.Time
 }
@@ -43,7 +43,7 @@ func newEnv(t *testing.T, zone string) *env {
 	t.Helper()
 	pool := testdb.New(t)
 	e := &env{t: t, ctx: context.Background(), db: pool, now: time.Date(2026, 11, 21, 17, 0, 0, 0, time.UTC),
-		google: gsctest.New(t), gh: githubtest.New(t, "northwind", "site", token)}
+		google: searchtest.NewGoogle(t), gh: githubtest.New(t, "northwind", "site", token)}
 	cfg := config.New(pool, config.Options{Secrets: secretbox.ForTest()})
 	if _, err := cfg.PutSettings(e.ctx, config.Settings{
 		Brand:  config.SelfBrand{Name: "Northwind", Domains: []string{"northwind.example"}},
@@ -54,12 +54,12 @@ func newEnv(t *testing.T, zone string) *env {
 	}
 	now := func() time.Time { return e.now }
 	u, _ := url.Parse("http://localhost:8080")
-	e.search = gsc.New(pool, gsc.Options{Secrets: secretbox.ForTest(), Endpoints: gsc.GoogleEndpoints(e.google.URL), PublicURL: u, Terms: cfg, Now: now})
+	e.search = search.New(pool, search.Options{Secrets: secretbox.ForTest(), BaseURLs: map[search.Provider]string{search.Google: e.google.URL}, PublicURL: u, Terms: cfg, Now: now})
 	e.google.AddSite(property, "siteOwner")
-	if _, err := e.search.ConnectServiceAccount(e.ctx, e.google.ServiceAccountKey(t, "byname@northwind.iam.gserviceaccount.com")); err != nil {
+	if _, err := e.search.ConnectKey(e.ctx, search.Google, e.google.ServiceAccountKey(t, "byname@northwind.iam.gserviceaccount.com")); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := e.search.SetProperty(e.ctx, gsc.PropertyInput{Property: property}); err != nil {
+	if _, err := e.search.SetSite(e.ctx, search.Google, search.SiteInput{Site: property}); err != nil {
 		t.Fatal(err)
 	}
 	alerts := notify.New(pool, results.New(pool), notify.Options{Now: now})
@@ -227,7 +227,7 @@ func (e *env) seedChange(page string, at time.Time) int64 {
 
 func (e *env) syncCompleted() {
 	e.t.Helper()
-	if _, err := e.db.Exec(e.ctx, `INSERT INTO job_run (job, trigger, status, started_at, finished_at) VALUES ('gsc_sync', 'scheduled', 'completed', $1, $1)`, e.now.Add(-time.Second)); err != nil {
+	if _, err := e.db.Exec(e.ctx, `INSERT INTO job_run (job, provider, trigger, status, started_at, finished_at) VALUES ('search_sync', 'google', 'scheduled', 'completed', $1, $1)`, e.now.Add(-time.Second)); err != nil {
 		e.t.Fatal(err)
 	}
 }
@@ -240,10 +240,10 @@ func TestRecrawlSetsTheDatesInTheInstanceTimeZone(t *testing.T) {
 	e.seedChange(blog, merged.Add(time.Hour))
 	e.seedChange(docs, merged.Add(2*time.Hour))
 	// 03:30 UTC on Nov 20 is 22:30 on Nov 19 in New York.
-	e.google.SetInspection(pricing, gsctest.Inspection{Verdict: "PASS", CoverageState: "Submitted and indexed", LastCrawl: time.Date(2026, 11, 20, 3, 30, 0, 0, time.UTC)})
+	e.google.SetInspection(pricing, searchtest.Inspection{Verdict: "PASS", CoverageState: "Submitted and indexed", LastCrawl: time.Date(2026, 11, 20, 3, 30, 0, 0, time.UTC)})
 	// Crawled before the merge: not the crawl that counts.
-	e.google.SetInspection(blog, gsctest.Inspection{Verdict: "PASS", CoverageState: "Submitted and indexed", LastCrawl: merged.Add(-24 * time.Hour)})
-	e.google.SetInspection(docs, gsctest.Inspection{Verdict: "PASS", CoverageState: "Submitted and indexed", LastCrawl: merged.Add(48 * time.Hour)})
+	e.google.SetInspection(blog, searchtest.Inspection{Verdict: "PASS", CoverageState: "Submitted and indexed", LastCrawl: merged.Add(-24 * time.Hour)})
+	e.google.SetInspection(docs, searchtest.Inspection{Verdict: "PASS", CoverageState: "Submitted and indexed", LastCrawl: merged.Add(48 * time.Hour)})
 
 	if err := e.svc.Tick(e.ctx); err != nil {
 		t.Fatal(err)
@@ -292,7 +292,7 @@ func (e *env) seedDays(page string, from, to int, clicks, impressions int, posit
 	e.t.Helper()
 	for n := from; n >= to; n-- {
 		day := e.now.AddDate(0, 0, -n).Format(time.DateOnly)
-		if _, err := e.db.Exec(e.ctx, `INSERT INTO gsc_page_daily (property, date, page, clicks, impressions, position, is_final) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+		if _, err := e.db.Exec(e.ctx, `INSERT INTO search_page_stats (provider, site, first_day, last_day, page, clicks, impressions, position, is_final) VALUES ('google', $1, $2, $2, $3, $4, $5, $6, $7)`,
 			property, day, page, clicks, impressions, position, n >= 3); err != nil {
 			e.t.Fatal(err)
 		}
@@ -303,7 +303,7 @@ func TestVerdictsAgainstTheControlsStillHeld(t *testing.T) {
 	e := newEnv(t, "UTC")
 	page, steady, released := site+"pricing", site+"docs", site+"about"
 	for n := 80; n >= 0; n-- {
-		if _, err := e.db.Exec(e.ctx, `INSERT INTO gsc_site_daily (property, date, clicks, impressions, position, is_final) VALUES ($1, $2, 100, 10000, 8, $3)`,
+		if _, err := e.db.Exec(e.ctx, `INSERT INTO search_site_daily (provider, site, day, clicks, impressions, position, is_final) VALUES ('google', $1, $2, 100, 10000, 8, $3)`,
 			property, e.now.AddDate(0, 0, -n).Format(time.DateOnly), n >= 3); err != nil {
 			t.Fatal(err)
 		}
@@ -311,7 +311,7 @@ func TestVerdictsAgainstTheControlsStillHeld(t *testing.T) {
 	// Merged 42 days ago, crawled 40 days ago: the interim and final reads are both due.
 	merged, crawled := e.now.AddDate(0, 0, -42), e.now.AddDate(0, 0, -40)
 	id := e.seedChange(page, merged)
-	e.google.SetInspection(page, gsctest.Inspection{Verdict: "PASS", CoverageState: "Submitted and indexed", LastCrawl: crawled})
+	e.google.SetInspection(page, searchtest.Inspection{Verdict: "PASS", CoverageState: "Submitted and indexed", LastCrawl: crawled})
 	// Before the merge the page sits at 12; after the crawl it climbs to 6
 	// and triples its impressions. Partial days at the end would sink it.
 	e.seedDays(page, 80, 42, 2, 100, 12)

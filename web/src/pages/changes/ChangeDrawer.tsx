@@ -6,6 +6,9 @@ import { Badge, Button, Card, ConfirmButton, cx, ErrorNote, Icon, LoadBoundary, 
 import { useView } from "../../view";
 import { count, ctr, dayRange, figureInfo, fullDay, position } from "../search/model";
 import { FigureLegend } from "../search/Search";
+
+/** Site changes read Google alone, so their figures are Google's. */
+const google = figureInfo("Google");
 import { changeStatus, deltaMetrics, kindInfo, outcomeInfo, stepInfo, useZone, type Zone } from "./model";
 
 /** Opens the drawer on a change, as a link that Back closes. */
@@ -167,10 +170,10 @@ function Before({ c }: { c: Change }) {
         <div className="space-y-2">
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             {[
-              [figureInfo.clicks.label, count(b.clicks)],
-              [figureInfo.impressions.label, count(b.impressions)],
-              [figureInfo.ctr.label, ctr(b.ctr)],
-              [figureInfo.position.label, position(b.position)],
+              [google.clicks.label, count(b.clicks)],
+              [google.impressions.label, count(b.impressions)],
+              [google.ctr.label, ctr(b.ctr)],
+              [google.position.label, position(b.position)],
             ].map(([label, value]) => (
               <Card key={label} className="px-3 py-2">
                 <div className="text-xs text-muted">{label}</div>
@@ -178,7 +181,7 @@ function Before({ c }: { c: Change }) {
               </Card>
             ))}
           </div>
-          <FigureLegend figures={["impressions", "ctr", "position"]} />
+          <FigureLegend engine="Google" figures={["impressions", "ctr", "position"]} />
         </div>
       ) : (
         <p className="text-sm text-muted">Shows once Google has finished counting the days before the change.</p>
@@ -263,10 +266,10 @@ function Windows({ before, after }: { before: ChangeWindow; after: ChangeWindow 
             <th className="py-1 pr-3 font-medium">
               <span className="sr-only">Pages</span>
             </th>
-            <th className="py-1 pr-3 text-right font-medium">{figureInfo.clicks.label}</th>
-            <th className="py-1 pr-3 text-right font-medium">{figureInfo.impressions.label}</th>
-            <th className="py-1 pr-3 text-right font-medium">{figureInfo.ctr.label}</th>
-            <th className="py-1 text-right font-medium">{figureInfo.position.label}</th>
+            <th className="py-1 pr-3 text-right font-medium">{google.clicks.label}</th>
+            <th className="py-1 pr-3 text-right font-medium">{google.impressions.label}</th>
+            <th className="py-1 pr-3 text-right font-medium">{google.ctr.label}</th>
+            <th className="py-1 text-right font-medium">{google.position.label}</th>
           </tr>
         </thead>
         {sides.map(([label, win]) => {

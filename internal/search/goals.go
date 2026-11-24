@@ -1,4 +1,4 @@
-package gsc
+package search
 
 import (
 	"context"
@@ -31,16 +31,20 @@ var metrics = map[Metric]func(Period) int64{
 // GoalWindows are the trailing windows a goal can count over, in days.
 var GoalWindows = []int{28, 90}
 
-// GoalInput is a goal: reach Target on Metric over a trailing WindowDays
-// window by DueOn.
+// GoalInput is a goal: reach Target on Metric from one provider over a
+// trailing WindowDays window by DueOn.
 type GoalInput struct {
-	Metric     Metric `json:"metric" jsonschema:"clicks, impressions or non_brand_clicks"`
-	WindowDays int    `json:"window_days" jsonschema:"the trailing window, 28 or 90 days"`
-	Target     int64  `json:"target" jsonschema:"the number to reach over the window"`
-	DueOn      string `json:"due_on" jsonschema:"the date to reach it by, such as 2028-03-15"`
+	Provider   Provider `json:"provider" jsonschema:"the search engine the goal counts, such as google or bing"`
+	Metric     Metric   `json:"metric" jsonschema:"clicks, impressions or non_brand_clicks"`
+	WindowDays int      `json:"window_days" jsonschema:"the trailing window, 28 or 90 days; whole weeks for Bing, so 90 counts 91"`
+	Target     int64    `json:"target" jsonschema:"the number to reach over the window"`
+	DueOn      string   `json:"due_on" jsonschema:"the date to reach it by, such as 2028-03-15"`
 }
 
 func (in GoalInput) validate() error {
+	if _, err := lookup(in.Provider); err != nil {
+		return err
+	}
 	if _, ok := metrics[in.Metric]; !ok {
 		return fmt.Errorf("%w: metric must be clicks, impressions or non_brand_clicks, got %q", core.ErrInvalid, in.Metric)
 	}
@@ -58,11 +62,11 @@ func (in GoalInput) validate() error {
 type Goal struct {
 	ID int64 `json:"id"`
 	GoalInput
-	Progress *Progress `json:"progress" jsonschema:"null until Search Console data is synced"`
+	Progress *Progress `json:"progress" jsonschema:"null until the provider's data is synced"`
 }
 
 // Progress is a goal's metric over the trailing window that ends on the
-// latest final day.
+// provider's latest final day.
 type Progress struct {
 	From     string  `json:"from"`
 	To       string  `json:"to"`
@@ -73,17 +77,17 @@ type Progress struct {
 	DaysWithData int `json:"days_with_data"`
 }
 
-// Goals lists the goals by due date with their progress. None exist until
-// someone adds one.
+// Goals lists every provider's goals by due date with their progress.
+// None exist until someone adds one.
 func (s *Service) Goals(ctx context.Context) ([]Goal, error) {
-	rows, err := s.db.Query(ctx, `SELECT id, metric, window_days, target, to_char(due_on, 'YYYY-MM-DD') FROM goal
-		ORDER BY due_on, window_days, array_position(ARRAY['impressions', 'clicks', 'non_brand_clicks'], metric), id`)
+	rows, err := s.db.Query(ctx, `SELECT id, provider, metric, window_days, target, to_char(due_on, 'YYYY-MM-DD') FROM goal
+		ORDER BY due_on, window_days, array_position(ARRAY['impressions', 'clicks', 'non_brand_clicks'], metric), provider, id`)
 	if err != nil {
 		return nil, err
 	}
 	goals, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (Goal, error) {
 		var g Goal
-		return g, r.Scan(&g.ID, &g.Metric, &g.WindowDays, &g.Target, &g.DueOn)
+		return g, r.Scan(&g.ID, &g.Provider, &g.Metric, &g.WindowDays, &g.Target, &g.DueOn)
 	})
 	if err != nil {
 		return nil, err
@@ -94,20 +98,38 @@ func (s *Service) Goals(ctx context.Context) ([]Goal, error) {
 	return goals, nil
 }
 
-// progress fills in each goal's progress, one period per window length.
+// progress fills in each goal's progress, one period per provider and
+// window length.
 func (s *Service) progress(ctx context.Context, goals []Goal) error {
-	sc, ok, err := s.scope(ctx)
-	if err != nil || !ok {
-		return err
+	type key struct {
+		p    Provider
+		days int
 	}
-	periods := map[int]Period{}
+	scopes := map[Provider]*scope{}
+	periods := map[key]Period{}
 	for i, g := range goals {
-		p, done := periods[g.WindowDays]
-		if !done {
-			if p, err = s.period(ctx, sc.property, sc.latestFinal.add(1-g.WindowDays), sc.latestFinal); err != nil {
+		sc, seen := scopes[g.Provider]
+		if !seen {
+			got, ok, err := s.scope(ctx, g.Provider)
+			if err != nil {
 				return err
 			}
-			periods[g.WindowDays] = p
+			if ok {
+				sc = &got
+			}
+			scopes[g.Provider] = sc
+		}
+		if sc == nil {
+			continue
+		}
+		k := key{g.Provider, g.WindowDays}
+		p, done := periods[k]
+		if !done {
+			var err error
+			if p, err = s.period(ctx, *sc, window(sc.anchor, g.WindowDays, sc.spec.StepDays)); err != nil {
+				return err
+			}
+			periods[k] = p
 		}
 		v := metrics[g.Metric](p)
 		goals[i].Progress = &Progress{From: p.From, To: p.To, Value: v, Fraction: float64(v) / float64(g.Target), Reached: v >= g.Target, DaysWithData: p.DaysWithData}
@@ -129,15 +151,15 @@ func (s *Service) goal(ctx context.Context, id int64) (Goal, error) {
 }
 
 // UpsertGoal adds a goal, or sets the target of the goal with the same
-// metric, window and due date.
+// provider, metric, window and due date.
 func (s *Service) UpsertGoal(ctx context.Context, in GoalInput) (Goal, error) {
 	if err := in.validate(); err != nil {
 		return Goal{}, err
 	}
 	var id int64
-	err := s.db.QueryRow(ctx, `INSERT INTO goal (metric, window_days, target, due_on) VALUES ($1, $2, $3, $4)
-		ON CONFLICT (metric, window_days, due_on) DO UPDATE SET target = excluded.target, updated_at = now()
-		RETURNING id`, in.Metric, in.WindowDays, in.Target, in.DueOn).Scan(&id)
+	err := s.db.QueryRow(ctx, `INSERT INTO goal (provider, metric, window_days, target, due_on) VALUES ($1, $2, $3, $4, $5)
+		ON CONFLICT (provider, metric, window_days, due_on) DO UPDATE SET target = excluded.target, updated_at = now()
+		RETURNING id`, in.Provider, in.Metric, in.WindowDays, in.Target, in.DueOn).Scan(&id)
 	if err != nil {
 		return Goal{}, err
 	}
@@ -149,10 +171,10 @@ func (s *Service) UpdateGoal(ctx context.Context, id int64, in GoalInput) (Goal,
 	if err := in.validate(); err != nil {
 		return Goal{}, err
 	}
-	tag, err := s.db.Exec(ctx, `UPDATE goal SET metric = $2, window_days = $3, target = $4, due_on = $5, updated_at = $6 WHERE id = $1`,
-		id, in.Metric, in.WindowDays, in.Target, in.DueOn, s.now())
+	tag, err := s.db.Exec(ctx, `UPDATE goal SET provider = $2, metric = $3, window_days = $4, target = $5, due_on = $6, updated_at = $7 WHERE id = $1`,
+		id, in.Provider, in.Metric, in.WindowDays, in.Target, in.DueOn, s.now())
 	if pg := (*pgconn.PgError)(nil); errors.As(err, &pg) && pg.Code == "23505" {
-		return Goal{}, fmt.Errorf("%w: a goal for %s over %d days due %s already exists", core.ErrConflict, in.Metric, in.WindowDays, in.DueOn)
+		return Goal{}, fmt.Errorf("%w: a %s goal for %s over %d days due %s already exists", core.ErrConflict, in.Provider, in.Metric, in.WindowDays, in.DueOn)
 	}
 	if err != nil {
 		return Goal{}, err

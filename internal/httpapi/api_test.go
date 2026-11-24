@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/unkeyed/byname/internal/search"
+	"github.com/unkeyed/byname/internal/search/searchtest"
 	"github.com/unkeyed/byname/internal/secretbox"
 	"io"
 	"log/slog"
@@ -28,8 +30,6 @@ import (
 	"github.com/unkeyed/byname/internal/core"
 	"github.com/unkeyed/byname/internal/discovery"
 	"github.com/unkeyed/byname/internal/engines/tregtest"
-	"github.com/unkeyed/byname/internal/gsc"
-	"github.com/unkeyed/byname/internal/gsc/gsctest"
 	"github.com/unkeyed/byname/internal/instance"
 	"github.com/unkeyed/byname/internal/logos"
 	"github.com/unkeyed/byname/internal/mcpserver"
@@ -60,7 +60,8 @@ type client struct {
 	svc        app.Services
 	treg       *tregtest.Server
 	resend     *notifytest.Resend
-	google     *gsctest.Server
+	google     *searchtest.Google
+	bing       *searchtest.Bing
 	github     *githubtest.Server
 }
 
@@ -188,22 +189,23 @@ func serve(t *testing.T, srv *httptest.Server, publicURL string, mod ...func(*au
 	res := results.New(pool)
 	resend, resendSrv := notifytest.NewResend(t, resendKey)
 	alerts := notify.New(pool, res, notify.Options{Secrets: cfg.Secrets, PublicURL: u, ResendBaseURL: resendSrv.URL})
-	google := gsctest.New(t)
-	search := gsc.New(pool, gsc.Options{Secrets: cfg.Secrets, Endpoints: gsc.GoogleEndpoints(google.URL),
-		Client: gsc.OAuthClient{ID: "test-client", Secret: "test-secret"}, PublicURL: u, Terms: settings})
+	google := searchtest.NewGoogle(t)
+	bing := searchtest.NewBing(t, bingKey)
+	traffic := search.New(pool, search.Options{Secrets: cfg.Secrets, BaseURLs: map[search.Provider]string{search.Google: google.URL, search.Bing: bing.URL},
+		GoogleClient: search.OAuthClient{ID: "test-client", Secret: "test-secret"}, PublicURL: u, Terms: settings})
 	github := githubtest.New(t, "northwind", "site", githubToken)
-	site := changes.New(pool, search, changes.Options{Secrets: cfg.Secrets, Alerts: alerts, GitHubBaseURL: github.URL})
+	site := changes.New(pool, traffic, changes.Options{Secrets: cfg.Secrets, Alerts: alerts, GitHubBaseURL: github.URL})
 	mentions := social.New(pool, settings, social.Options{Alerts: alerts, BaseURLs: map[social.Network]string{social.Bluesky: fakeBluesky(t)}})
 	found := discovery.New(pool, settings, discovery.Options{})
 	svc := app.Services{Instance: instance.New("test", pool, settings, mentions, found), Config: settings,
-		Checks: checks.New(pool, settings, checks.Options{Alerts: alerts, Finder: found}), Results: res, Notify: alerts, GSC: search, Changes: site, Social: mentions,
+		Checks: checks.New(pool, settings, checks.Options{Alerts: alerts, Finder: found}), Results: res, Notify: alerts, Search: traffic, Changes: site, Social: mentions,
 		Discovery: found, Logos: logos.New(pool, settings, logos.Options{})}
 	mux := NewMux(svc, authn, slog.New(slog.DiscardHandler))
 	mux.Handle("/mcp", mcpserver.Handler(svc, authn.OAuth, "test"))
 	srv.Config.Handler = mux
 	srv.Start()
 	t.Cleanup(srv.Close)
-	return client{t: t, base: srv.URL, origin: publicURL, setupToken: token, db: pool, svc: svc, treg: treg, resend: resend, google: google, github: github}
+	return client{t: t, base: srv.URL, origin: publicURL, setupToken: token, db: pool, svc: svc, treg: treg, resend: resend, google: google, bing: bing, github: github}
 }
 
 func cookieValue(r reply, name string) string {

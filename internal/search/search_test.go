@@ -1,4 +1,4 @@
-package gsc_test
+package search_test
 
 import (
 	"context"
@@ -15,8 +15,8 @@ import (
 
 	"github.com/unkeyed/byname/internal/config"
 	"github.com/unkeyed/byname/internal/core"
-	"github.com/unkeyed/byname/internal/gsc"
-	"github.com/unkeyed/byname/internal/gsc/gsctest"
+	"github.com/unkeyed/byname/internal/search"
+	"github.com/unkeyed/byname/internal/search/searchtest"
 	"github.com/unkeyed/byname/internal/secretbox"
 	"github.com/unkeyed/byname/internal/testdb"
 )
@@ -25,6 +25,8 @@ const (
 	domainProperty = "sc-domain:fernhollow.dev"
 	prefixProperty = "https://www.fernhollow.dev/"
 	saEmail        = "byname@fernhollow-search.iam.gserviceaccount.com"
+	bingSite       = "https://www.fernhollow.dev/"
+	bingKey        = "0f1e2d3c4b5a69788796a5b4c3d2e1f0"
 )
 
 var admin = core.Actor{Via: core.ViaSession, ID: "1", UserID: 1, Name: "admin@fernhollow.dev", Role: core.Admin, Scopes: core.Scopes}
@@ -33,22 +35,33 @@ type env struct {
 	t    *testing.T
 	ctx  context.Context
 	db   *pgxpool.Pool
-	svc  *gsc.Service
+	svc  *search.Service
 	cfg  *config.Service
-	fake *gsctest.Server
+	fake *searchtest.Google
+	bing *searchtest.Bing
 	now  time.Time
 }
 
 func newEnv(t *testing.T) *env {
 	t.Helper()
-	pool := testdb.New(t)
-	fake := gsctest.New(t)
+	return newEnvOn(t, testdb.New(t))
+}
+
+// newEnvOn is newEnv on pool, which may hold an earlier release's schema:
+// it writes nothing but the settings.
+func newEnvOn(t *testing.T, pool *pgxpool.Pool) *env {
+	t.Helper()
+	fake := searchtest.NewGoogle(t)
 	fake.AddSite(domainProperty, "siteOwner")
 	fake.AddSite(prefixProperty, "siteFullUser")
 	fake.AddSite("https://blog.otherproject.io/", "siteRestrictedUser")
 	fake.AddSite("https://unverified.example/", "siteUnverifiedUser")
+	bing := searchtest.NewBing(t, bingKey)
+	bing.AddSite(bingSite, true)
+	bing.AddSite("https://blog.otherproject.io/", true)
+	bing.AddSite("https://staging.fernhollow.dev/", false)
 	cfg := config.New(pool, config.Options{Secrets: secretbox.ForTest()})
-	e := &env{t: t, ctx: context.Background(), db: pool, cfg: cfg, fake: fake,
+	e := &env{t: t, ctx: context.Background(), db: pool, cfg: cfg, fake: fake, bing: bing,
 		now: time.Date(2026, 11, 21, 9, 0, 0, 0, time.UTC)}
 	_, err := cfg.PutSettings(e.ctx, config.Settings{
 		Brand:  config.SelfBrand{Name: "Fernhollow", Aliases: []string{"Fern Hollow"}, Domains: []string{"fernhollow.dev"}},
@@ -58,13 +71,19 @@ func newEnv(t *testing.T) *env {
 	if err != nil {
 		t.Fatal(err)
 	}
-	u, _ := url.Parse("http://localhost:8080")
-	e.svc = gsc.New(pool, gsc.Options{
-		Secrets: secretbox.ForTest(), Endpoints: gsc.GoogleEndpoints(fake.URL),
-		Client: gsc.OAuthClient{ID: "test-client", Secret: "test-secret"}, PublicURL: u,
-		Terms: cfg, Now: func() time.Time { return e.now },
-	})
+	e.svc = e.service(nil)
 	return e
+}
+
+// service is a search service on e's fakes, raising events into alerts
+// when it is set.
+func (e *env) service(alerts search.Alerts) *search.Service {
+	u, _ := url.Parse("http://localhost:8080")
+	return search.New(e.db, search.Options{
+		Secrets: secretbox.ForTest(), BaseURLs: map[search.Provider]string{search.Google: e.fake.URL, search.Bing: e.bing.URL},
+		GoogleClient: search.OAuthClient{ID: "test-client", Secret: "test-secret"}, PublicURL: u,
+		Terms: e.cfg, Alerts: alerts, Now: func() time.Time { return e.now },
+	})
 }
 
 // day is today (Nov 21 in Pacific Time at e.now) minus n days.
@@ -72,24 +91,24 @@ func (e *env) day(n int) string { return e.now.AddDate(0, 0, -n).Format(time.Dat
 
 func (e *env) connectServiceAccount(property string) {
 	e.t.Helper()
-	if _, err := e.svc.ConnectServiceAccount(e.ctx, e.fake.ServiceAccountKey(e.t, saEmail)); err != nil {
+	if _, err := e.svc.ConnectKey(e.ctx, search.Google, e.fake.ServiceAccountKey(e.t, saEmail)); err != nil {
 		e.t.Fatal(err)
 	}
-	if _, err := e.svc.SetProperty(e.ctx, gsc.PropertyInput{Property: property}); err != nil {
+	if _, err := e.svc.SetSite(e.ctx, search.Google, search.SiteInput{Site: property}); err != nil {
 		e.t.Fatal(err)
 	}
 }
 
 func (e *env) sync() {
 	e.t.Helper()
-	if err := e.svc.Sync(e.ctx); err != nil {
+	if err := e.svc.Sync(e.ctx, search.Google); err != nil {
 		e.t.Fatal(err)
 	}
 }
 
-func (e *env) status() gsc.Status {
+func (e *env) status() search.Status {
 	e.t.Helper()
-	st, err := e.svc.Status(e.ctx)
+	st, err := e.svc.Status(e.ctx, search.Google)
 	if err != nil {
 		e.t.Fatal(err)
 	}
@@ -97,8 +116,8 @@ func (e *env) status() gsc.Status {
 }
 
 // site is one day of site numbers spread over one page and one query.
-func site(date string, clicks, impressions int) gsctest.Row {
-	return gsctest.Row{Date: date, Query: "go api hosting", Page: prefixProperty + "docs", Clicks: clicks, Impressions: impressions, Position: 7.5}
+func site(date string, clicks, impressions int) searchtest.Row {
+	return searchtest.Row{Date: date, Query: "go api hosting", Page: prefixProperty + "docs", Clicks: clicks, Impressions: impressions, Position: 7.5}
 }
 
 func (e *env) count(sql string, args ...any) int64 {
@@ -129,12 +148,12 @@ func followConsent(t *testing.T, consent string) *url.URL {
 
 func TestOAuthStoresTheRefreshTokenSealed(t *testing.T) {
 	e := newEnv(t)
-	consent, err := e.svc.StartOAuth(admin, gsc.ReturnSettings)
+	consent, err := e.svc.StartGoogleOAuth(admin, search.ReturnSettings)
 	if err != nil {
 		t.Fatal(err)
 	}
 	q := must(url.Parse(consent)).Query()
-	for k, want := range map[string]string{"scope": gsc.Scope, "access_type": "offline", "prompt": "consent", "code_challenge_method": "S256",
+	for k, want := range map[string]string{"scope": search.GoogleScope, "access_type": "offline", "prompt": "consent", "code_challenge_method": "S256",
 		"redirect_uri": "http://localhost:8080/auth/gsc/callback", "client_id": "test-client"} {
 		if q.Get(k) != want {
 			t.Errorf("consent URL %s = %q, want %q", k, q.Get(k), want)
@@ -144,18 +163,18 @@ func TestOAuthStoresTheRefreshTokenSealed(t *testing.T) {
 	if back.Path != "/auth/gsc/callback" {
 		t.Fatalf("Google sent the browser to %s", back)
 	}
-	cb := gsc.OAuthCallback{State: back.Query().Get("state"), Code: back.Query().Get("code")}
+	cb := search.OAuthCallback{State: back.Query().Get("state"), Code: back.Query().Get("code")}
 
 	other := admin
 	other.UserID = 2
-	if err := e.svc.FinishOAuth(e.ctx, other, cb); !errors.Is(err, core.ErrInvalid) {
+	if err := e.svc.FinishGoogleOAuth(e.ctx, other, cb); !errors.Is(err, core.ErrInvalid) {
 		t.Fatalf("another admin finishing the sign-in: %v, want ErrInvalid", err)
 	}
-	if err := e.svc.FinishOAuth(e.ctx, admin, cb); err != nil {
+	if err := e.svc.FinishGoogleOAuth(e.ctx, admin, cb); err != nil {
 		t.Fatal(err)
 	}
 	var sealed string
-	if err := e.db.QueryRow(e.ctx, `SELECT ciphertext FROM gsc_connection WHERE method = 'oauth'`).Scan(&sealed); err != nil {
+	if err := e.db.QueryRow(e.ctx, `SELECT ciphertext FROM search_connection WHERE method = 'oauth'`).Scan(&sealed); err != nil {
 		t.Fatal(err)
 	}
 	refresh, err := secretbox.ForTest().Open(sealed, "gsc:oauth")
@@ -166,14 +185,14 @@ func TestOAuthStoresTheRefreshTokenSealed(t *testing.T) {
 		t.Fatal("the refresh token is stored in the clear")
 	}
 	st := e.status()
-	if !st.Connected || st.Method != gsc.MethodOAuth || st.Property != "" {
+	if !st.Connected || st.Method != search.MethodOAuth || st.Site != "" {
 		t.Fatalf("status after sign-in = %+v", st)
 	}
 	if strings.Contains(fmt.Sprintf("%+v", st), refresh) {
 		t.Fatal("the status carries the refresh token")
 	}
 
-	props, err := e.svc.Properties(e.ctx)
+	props, err := e.svc.Sites(e.ctx, search.Google)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -189,11 +208,11 @@ func TestOAuthStoresTheRefreshTokenSealed(t *testing.T) {
 		t.Fatalf("properties %v suggested %q; want the readable ones with the domain property suggested", urls, suggested)
 	}
 	e.fake.SetRows(prefixProperty, site(e.day(5), 3, 30))
-	if _, err := e.svc.SetProperty(e.ctx, gsc.PropertyInput{Property: prefixProperty}); err != nil {
+	if _, err := e.svc.SetSite(e.ctx, search.Google, search.SiteInput{Site: prefixProperty}); err != nil {
 		t.Fatal(err)
 	}
 	e.sync()
-	if st := e.status(); st.PropertyKind != gsc.URLPrefix || st.LatestFinal != e.day(5) {
+	if st := e.status(); st.SiteKind != search.URLPrefix || st.LatestFinal != e.day(5) {
 		t.Fatalf("after syncing the URL-prefix property: %+v", st)
 	}
 	var refreshed bool
@@ -208,54 +227,54 @@ func TestOAuthStoresTheRefreshTokenSealed(t *testing.T) {
 func TestOAuthRefusals(t *testing.T) {
 	e := newEnv(t)
 	e.fake.DenyConsent = true
-	back := followConsent(t, must(e.svc.StartOAuth(admin, gsc.ReturnSettings)))
-	err := e.svc.FinishOAuth(e.ctx, admin, gsc.OAuthCallback{State: back.Query().Get("state"), Error: back.Query().Get("error")})
+	back := followConsent(t, must(e.svc.StartGoogleOAuth(admin, search.ReturnSettings)))
+	err := e.svc.FinishGoogleOAuth(e.ctx, admin, search.OAuthCallback{State: back.Query().Get("state"), Error: back.Query().Get("error")})
 	if !errors.Is(err, core.ErrInvalid) || !strings.Contains(err.Error(), "access_denied") {
 		t.Fatalf("denied consent: %v", err)
 	}
 	e.fake.DenyConsent = false
 	e.fake.OmitRefreshToken = true
-	back = followConsent(t, must(e.svc.StartOAuth(admin, gsc.ReturnSettings)))
-	if err := e.svc.FinishOAuth(e.ctx, admin, gsc.OAuthCallback{State: back.Query().Get("state"), Code: back.Query().Get("code")}); err == nil {
+	back = followConsent(t, must(e.svc.StartGoogleOAuth(admin, search.ReturnSettings)))
+	if err := e.svc.FinishGoogleOAuth(e.ctx, admin, search.OAuthCallback{State: back.Query().Get("state"), Code: back.Query().Get("code")}); err == nil {
 		t.Fatal("a sign-in without a refresh token was accepted")
 	}
 	if e.status().Connected {
 		t.Fatal("a refused sign-in left a connection")
 	}
-	forged := gsc.OAuthCallback{State: "sb1:forged", Code: "4/abc"}
-	if err := e.svc.FinishOAuth(e.ctx, admin, forged); !errors.Is(err, core.ErrInvalid) {
+	forged := search.OAuthCallback{State: "sb1:forged", Code: "4/abc"}
+	if err := e.svc.FinishGoogleOAuth(e.ctx, admin, forged); !errors.Is(err, core.ErrInvalid) {
 		t.Fatalf("forged state: %v", err)
 	}
-	noClient := gsc.New(e.db, gsc.Options{Secrets: secretbox.ForTest(), Terms: e.cfg})
-	if _, err := noClient.StartOAuth(admin, gsc.ReturnSettings); !errors.Is(err, core.ErrInvalid) || !strings.Contains(err.Error(), "GSC_GOOGLE_CLIENT_ID") {
+	noClient := search.New(e.db, search.Options{Secrets: secretbox.ForTest(), Terms: e.cfg})
+	if _, err := noClient.StartGoogleOAuth(admin, search.ReturnSettings); !errors.Is(err, core.ErrInvalid) || !strings.Contains(err.Error(), "GSC_GOOGLE_CLIENT_ID") {
 		t.Fatalf("Sign in with Google without a client: %v", err)
 	}
 }
 
 func TestServiceAccount(t *testing.T) {
 	e := newEnv(t)
-	if _, err := e.svc.ConnectServiceAccount(e.ctx, `{"type":"authorized_user"}`); !errors.Is(err, core.ErrInvalid) {
+	if _, err := e.svc.ConnectKey(e.ctx, search.Google, `{"type":"authorized_user"}`); !errors.Is(err, core.ErrInvalid) {
 		t.Fatalf("not a service account key: %v", err)
 	}
-	stranger := gsctest.New(t).ServiceAccountKey(t, "stranger@elsewhere.iam.gserviceaccount.com")
-	if _, err := e.svc.ConnectServiceAccount(e.ctx, stranger); !errors.Is(err, core.ErrUpstream) {
+	stranger := searchtest.NewGoogle(t).ServiceAccountKey(t, "stranger@elsewhere.iam.gserviceaccount.com")
+	if _, err := e.svc.ConnectKey(e.ctx, search.Google, stranger); !errors.Is(err, core.ErrUpstream) {
 		t.Fatalf("a key Google does not know: %v, want ErrUpstream", err)
 	}
-	st, err := e.svc.ConnectServiceAccount(e.ctx, e.fake.ServiceAccountKey(t, saEmail))
+	st, err := e.svc.ConnectKey(e.ctx, search.Google, e.fake.ServiceAccountKey(t, saEmail))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if st.Method != gsc.MethodServiceAccount || st.Account != saEmail {
+	if st.Method != search.MethodServiceAccount || st.Account != saEmail {
 		t.Fatalf("status = %+v", st)
 	}
-	if _, err := e.svc.SetProperty(e.ctx, gsc.PropertyInput{Property: "https://unverified.example/"}); !errors.Is(err, core.ErrInvalid) {
+	if _, err := e.svc.SetSite(e.ctx, search.Google, search.SiteInput{Site: "https://unverified.example/"}); !errors.Is(err, core.ErrInvalid) {
 		t.Fatalf("a property the account cannot read: %v", err)
 	}
-	if _, err := e.svc.SetProperty(e.ctx, gsc.PropertyInput{Property: "fernhollow.dev"}); !errors.Is(err, core.ErrInvalid) {
+	if _, err := e.svc.SetSite(e.ctx, search.Google, search.SiteInput{Site: "fernhollow.dev"}); !errors.Is(err, core.ErrInvalid) {
 		t.Fatalf("a bare domain: %v", err)
 	}
-	st, err = e.svc.SetProperty(e.ctx, gsc.PropertyInput{Property: domainProperty})
-	if err != nil || st.PropertyKind != gsc.Domain || !st.Backfill {
+	st, err = e.svc.SetSite(e.ctx, search.Google, search.SiteInput{Site: domainProperty})
+	if err != nil || st.SiteKind != search.Domain || !st.Backfill {
 		t.Fatalf("pick the domain property: %+v, %v", st, err)
 	}
 	var grants []string
@@ -265,7 +284,7 @@ func TestServiceAccount(t *testing.T) {
 	if !slices.Contains(grants, "urn:ietf:params:oauth:grant-type:jwt-bearer") {
 		t.Fatalf("token grants %v, want the JWT bearer grant", grants)
 	}
-	if err := e.svc.Disconnect(e.ctx); err != nil || e.status().Connected {
+	if err := e.svc.Disconnect(e.ctx, search.Google); err != nil || e.status().Connected {
 		t.Fatalf("disconnect: %v", err)
 	}
 }
@@ -275,7 +294,7 @@ func TestFinalAndPartialDays(t *testing.T) {
 	for n := 6; n >= 1; n-- {
 		e.fake.SetRows(domainProperty, site(e.day(n), 10, 100))
 	}
-	e.fake.SetRows(domainProperty, site(e.day(2), 4, 40), gsctest.Row{Date: e.day(2), Query: "fernhollow outage", Page: prefixProperty, Clicks: 2, Impressions: 5, Position: 1})
+	e.fake.SetRows(domainProperty, site(e.day(2), 4, 40), searchtest.Row{Date: e.day(2), Query: "fernhollow outage", Page: prefixProperty, Clicks: 2, Impressions: 5, Position: 1})
 	e.fake.SetFirstIncomplete(e.day(2))
 	e.connectServiceAccount(domainProperty)
 	e.sync()
@@ -284,7 +303,7 @@ func TestFinalAndPartialDays(t *testing.T) {
 	if st.LatestFinal != e.day(3) || !slices.Equal(st.PartialDays, []string{e.day(2), e.day(1)}) || st.LastSyncAt == nil {
 		t.Fatalf("after the first sync: latest final %s, partial %v; want %s and the last two days", st.LatestFinal, st.PartialDays, e.day(3))
 	}
-	if n := e.count(`SELECT count(*) FROM gsc_query_daily WHERE query = 'fernhollow outage'`); n != 1 {
+	if n := e.count(`SELECT count(*) FROM search_query_stats WHERE query = 'fernhollow outage'`); n != 1 {
 		t.Fatalf("partial query rows = %d", n)
 	}
 
@@ -299,20 +318,20 @@ func TestFinalAndPartialDays(t *testing.T) {
 	}
 	var clicks int64
 	var final bool
-	if err := e.db.QueryRow(e.ctx, `SELECT clicks, is_final FROM gsc_site_daily WHERE date = $1`, e.day(3)).Scan(&clicks, &final); err != nil {
+	if err := e.db.QueryRow(e.ctx, `SELECT clicks, is_final FROM search_site_daily WHERE day = $1`, e.day(3)).Scan(&clicks, &final); err != nil {
 		t.Fatal(err)
 	}
 	if clicks != 9 || !final {
 		t.Fatalf("the once partial day: %d clicks final %v, want 9 and final", clicks, final)
 	}
-	if n := e.count(`SELECT count(*) FROM gsc_query_daily WHERE query = 'fernhollow outage'`); n != 0 {
+	if n := e.count(`SELECT count(*) FROM search_query_stats WHERE query = 'fernhollow outage'`); n != 0 {
 		t.Fatal("a partial day's row that Google dropped survived the next sync")
 	}
 	if st := e.status(); st.LatestFinal != e.day(3) || !slices.Equal(st.PartialDays, []string{e.day(2)}) {
 		t.Fatalf("after the second sync: latest final %s partial %v", st.LatestFinal, st.PartialDays)
 	}
-	if n := e.count(`SELECT count(*) FROM job_run WHERE job = 'gsc_sync' AND status = 'completed'`); n != 2 {
-		t.Fatalf("completed gsc_sync jobs = %d, want 2", n)
+	if n := e.count(`SELECT count(*) FROM job_run WHERE job = 'search_sync' AND status = 'completed'`); n != 2 {
+		t.Fatalf("completed search_sync jobs = %d, want 2", n)
 	}
 }
 
@@ -320,18 +339,17 @@ func TestResyncIsIdempotent(t *testing.T) {
 	e := newEnv(t)
 	for n := 40; n >= 1; n-- {
 		e.fake.SetRows(domainProperty, site(e.day(n), n, 10*n),
-			gsctest.Row{Date: e.day(n), Query: "fernhollow docs", Page: prefixProperty + "docs", Clicks: 2, Impressions: 9, Position: 1.2},
-			gsctest.Row{Date: e.day(n), Page: prefixProperty, Clicks: 1, Impressions: 3, Position: 4})
+			searchtest.Row{Date: e.day(n), Query: "fernhollow docs", Page: prefixProperty + "docs", Clicks: 2, Impressions: 9, Position: 1.2},
+			searchtest.Row{Date: e.day(n), Page: prefixProperty, Clicks: 1, Impressions: 3, Position: 4})
 	}
 	e.fake.SetFirstIncomplete(e.day(2))
 	e.connectServiceAccount(domainProperty)
 	snapshot := func() string {
 		var out string
 		err := e.db.QueryRow(e.ctx, `SELECT string_agg(t, '|' ORDER BY t) FROM (
-			SELECT concat_ws(',', 's', date, clicks, impressions, position, is_final) t FROM gsc_site_daily
-			UNION ALL SELECT concat_ws(',', 'q', date, query, clicks, impressions, position, is_final) FROM gsc_query_daily
-			UNION ALL SELECT concat_ws(',', 'p', date, page, clicks, impressions, position, is_final) FROM gsc_page_daily
-			UNION ALL SELECT concat_ws(',', 'qp', date, query, page, clicks, impressions, position, is_final) FROM gsc_query_page_daily) x`).Scan(&out)
+			SELECT concat_ws(',', 's', day, clicks, impressions, position, is_final) t FROM search_site_daily
+			UNION ALL SELECT concat_ws(',', 'q', first_day, last_day, query, clicks, impressions, position, is_final) FROM search_query_stats
+			UNION ALL SELECT concat_ws(',', 'p', first_day, last_day, page, clicks, impressions, position, is_final) FROM search_page_stats) x`).Scan(&out)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -349,22 +367,19 @@ func TestResyncIsIdempotent(t *testing.T) {
 func TestPagingPast25000Rows(t *testing.T) {
 	e := newEnv(t)
 	const n = 30001
-	rows := make([]gsctest.Row, n)
+	rows := make([]searchtest.Row, n)
 	for i := range rows {
-		rows[i] = gsctest.Row{Date: e.day(3), Query: fmt.Sprintf("query %d", i), Page: fmt.Sprintf("%spage/%d", prefixProperty, i%40), Clicks: i % 3, Impressions: 1 + i%7, Position: 9}
+		rows[i] = searchtest.Row{Date: e.day(3), Query: fmt.Sprintf("query %d", i), Page: fmt.Sprintf("%spage/%d", prefixProperty, i%40), Clicks: i % 3, Impressions: 1 + i%7, Position: 9}
 	}
 	e.fake.SetRows(domainProperty, rows...)
 	e.connectServiceAccount(domainProperty)
 	e.sync()
-	if got := e.count(`SELECT count(*) FROM gsc_query_page_daily`); got != n {
-		t.Fatalf("query and page rows stored = %d, want %d", got, n)
-	}
-	if got := e.count(`SELECT count(*) FROM gsc_query_daily`); got != n {
+	if got := e.count(`SELECT count(*) FROM search_query_stats`); got != n {
 		t.Fatalf("query rows stored = %d, want %d", got, n)
 	}
 	var starts []int
 	for _, q := range e.fake.Queries() {
-		if slices.Equal(q.Dimensions, []string{"date", "query", "page"}) && q.StartDate <= e.day(3) && q.EndDate >= e.day(3) {
+		if slices.Equal(q.Dimensions, []string{"date", "query"}) && q.StartDate <= e.day(3) && q.EndDate >= e.day(3) {
 			starts = append(starts, q.StartRow)
 			if q.RowLimit != 25000 || q.DataState != "all" {
 				t.Errorf("request asked rowLimit %d dataState %q, want 25000 and all", q.RowLimit, q.DataState)
@@ -380,15 +395,15 @@ func TestBrandAndNonBrand(t *testing.T) {
 	e := newEnv(t)
 	for n := 3; n <= 30; n++ {
 		e.fake.SetRows(domainProperty,
-			gsctest.Row{Date: e.day(n), Query: "fernhollow pricing", Page: prefixProperty + "pricing", Clicks: 10, Impressions: 100, Position: 1},
-			gsctest.Row{Date: e.day(n), Query: "Fern Hollow login", Page: prefixProperty, Clicks: 5, Impressions: 20, Position: 1},
-			gsctest.Row{Date: e.day(n), Query: "go api hosting", Page: prefixProperty + "docs", Clicks: 7, Impressions: 300, Position: 6},
-			gsctest.Row{Date: e.day(n), Query: "", Page: prefixProperty + "docs", Clicks: 4, Impressions: 80, Position: 9},
+			searchtest.Row{Date: e.day(n), Query: "fernhollow pricing", Page: prefixProperty + "pricing", Clicks: 10, Impressions: 100, Position: 1},
+			searchtest.Row{Date: e.day(n), Query: "Fern Hollow login", Page: prefixProperty, Clicks: 5, Impressions: 20, Position: 1},
+			searchtest.Row{Date: e.day(n), Query: "go api hosting", Page: prefixProperty + "docs", Clicks: 7, Impressions: 300, Position: 6},
+			searchtest.Row{Date: e.day(n), Query: "", Page: prefixProperty + "docs", Clicks: 4, Impressions: 80, Position: 9},
 		)
 	}
 	e.connectServiceAccount(domainProperty)
 	e.sync()
-	sum, err := e.svc.Summary(e.ctx)
+	sum, err := e.svc.Summary(e.ctx, search.Google)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -396,26 +411,26 @@ func TestBrandAndNonBrand(t *testing.T) {
 	if c == nil || c.From != e.day(30) || c.To != e.day(3) {
 		t.Fatalf("headline window = %+v", c)
 	}
-	if c.Clicks != 26*28 || c.BrandClicks != 15*28 || c.NonBrandClicks != 7*28 || c.AnonymizedClicks != 4*28 {
-		t.Fatalf("headline clicks %d brand %d non-brand %d anonymized %d; want per day 26, 15, 7 and 4 over 28 days",
-			c.Clicks, c.BrandClicks, c.NonBrandClicks, c.AnonymizedClicks)
+	if c.Clicks != 26*28 || c.BrandClicks != 15*28 || c.NonBrandClicks != 7*28 || c.UnlistedClicks != 4*28 {
+		t.Fatalf("headline clicks %d brand %d non-brand %d unlisted %d; want per day 26, 15, 7 and 4 over 28 days",
+			c.Clicks, c.BrandClicks, c.NonBrandClicks, c.UnlistedClicks)
 	}
-	top, err := e.svc.TopQueries(e.ctx, gsc.Top{NonBrand: true})
+	top, err := e.svc.TopQueries(e.ctx, search.Google, search.Top{NonBrand: true})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(top.Queries) != 1 || top.Queries[0].Query != "go api hosting" || top.Queries[0].Branded {
 		t.Fatalf("top non-brand queries = %+v", top.Queries)
 	}
-	all, err := e.svc.TopQueries(e.ctx, gsc.Top{})
+	all, err := e.svc.TopQueries(e.ctx, search.Google, search.Top{})
 	if err != nil || len(all.Queries) != 3 || all.Queries[0].Query != "fernhollow pricing" || !all.Queries[0].Branded {
 		t.Fatalf("top queries = %+v, %v", all.Queries, err)
 	}
-	split, err := e.svc.Brand(e.ctx, gsc.Range{})
+	split, err := e.svc.Brand(e.ctx, search.Google, search.Range{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(split.Points) != 1 || split.Points[0] != (gsc.BrandPoint{Date: e.day(3), Clicks: 26 * 28, BrandClicks: 15 * 28, NonBrandClicks: 7 * 28, AnonymizedClicks: 4 * 28}) {
+	if len(split.Points) != 1 || split.Points[0] != (search.BrandPoint{Date: e.day(3), Clicks: 26 * 28, BrandClicks: 15 * 28, NonBrandClicks: 7 * 28, UnlistedClicks: 4 * 28}) {
 		t.Fatalf("brand split = %+v, want one full 28-day window", split.Points)
 	}
 	if !slices.Equal(split.Terms, []string{"fernhollow", "fern hollow"}) {
@@ -425,20 +440,20 @@ func TestBrandAndNonBrand(t *testing.T) {
 	if _, err := e.cfg.SetBrandedTerms(e.ctx, []string{"API Hosting"}); err != nil {
 		t.Fatal(err)
 	}
-	sum, _ = e.svc.Summary(e.ctx)
-	if sum.Current.BrandClicks != 7*28 || sum.Current.NonBrandClicks != 15*28 || sum.Current.AnonymizedClicks != 4*28 {
-		t.Fatalf("with the terms changed: brand %d non-brand %d anonymized %d", sum.Current.BrandClicks, sum.Current.NonBrandClicks, sum.Current.AnonymizedClicks)
+	sum, _ = e.svc.Summary(e.ctx, search.Google)
+	if sum.Current.BrandClicks != 7*28 || sum.Current.NonBrandClicks != 15*28 || sum.Current.UnlistedClicks != 4*28 {
+		t.Fatalf("with the terms changed: brand %d non-brand %d unlisted %d", sum.Current.BrandClicks, sum.Current.NonBrandClicks, sum.Current.UnlistedClicks)
 	}
 	v, err := e.cfg.SetBrandedTerms(e.ctx, nil)
 	if err != nil || !v.BrandedTermsDefault || !slices.Equal(v.BrandedTerms, []string{"fernhollow", "fern hollow"}) {
 		t.Fatalf("back to the default terms: %v %v, %v", v.BrandedTerms, v.BrandedTermsDefault, err)
 	}
 
-	pages, err := e.svc.TopPages(e.ctx, gsc.Top{Limit: 2})
+	pages, err := e.svc.TopPages(e.ctx, search.Google, search.Top{Limit: 2})
 	if err != nil || len(pages.Pages) != 2 || pages.Pages[0].Page != prefixProperty+"docs" || pages.Pages[0].Clicks != 11*28 {
 		t.Fatalf("top pages = %+v, %v", pages.Pages, err)
 	}
-	day, err := e.svc.PageDaily(e.ctx, prefixProperty+"pricing", e.now.AddDate(0, 0, -5), e.now.AddDate(0, 0, -3))
+	day, err := e.svc.GooglePageDaily(e.ctx, prefixProperty+"pricing", e.now.AddDate(0, 0, -5), e.now.AddDate(0, 0, -3))
 	if err != nil || len(day) != 3 || day[0].Date != e.day(5) || day[0].Clicks != 10 || day[0].CTR != 0.1 {
 		t.Fatalf("page daily = %+v, %v", day, err)
 	}
@@ -450,13 +465,16 @@ func TestGoals(t *testing.T) {
 	if err != nil || len(goals) != 0 {
 		t.Fatalf("goals on a new instance = %v, %v; want none", goals, err)
 	}
-	if _, err := e.svc.UpsertGoal(e.ctx, gsc.GoalInput{Metric: "sessions", WindowDays: 28, Target: 1, DueOn: "2028-03-15"}); !errors.Is(err, core.ErrInvalid) {
+	if _, err := e.svc.UpsertGoal(e.ctx, search.GoalInput{Provider: search.Google, Metric: "sessions", WindowDays: 28, Target: 1, DueOn: "2028-03-15"}); !errors.Is(err, core.ErrInvalid) {
 		t.Fatalf("unknown metric: %v", err)
 	}
-	if _, err := e.svc.UpsertGoal(e.ctx, gsc.GoalInput{Metric: gsc.MetricClicks, WindowDays: 30, Target: 1, DueOn: "2028-03-15"}); !errors.Is(err, core.ErrInvalid) {
+	if _, err := e.svc.UpsertGoal(e.ctx, search.GoalInput{Provider: "yahoo", Metric: search.MetricClicks, WindowDays: 28, Target: 1, DueOn: "2028-03-15"}); !errors.Is(err, core.ErrInvalid) {
+		t.Fatalf("unknown provider: %v", err)
+	}
+	if _, err := e.svc.UpsertGoal(e.ctx, search.GoalInput{Provider: search.Google, Metric: search.MetricClicks, WindowDays: 30, Target: 1, DueOn: "2028-03-15"}); !errors.Is(err, core.ErrInvalid) {
 		t.Fatalf("a 30-day window: %v", err)
 	}
-	g, err := e.svc.UpsertGoal(e.ctx, gsc.GoalInput{Metric: gsc.MetricClicks, WindowDays: 28, Target: 1000, DueOn: "2028-03-15"})
+	g, err := e.svc.UpsertGoal(e.ctx, search.GoalInput{Provider: search.Google, Metric: search.MetricClicks, WindowDays: 28, Target: 1000, DueOn: "2028-03-15"})
 	if err != nil || g.Progress != nil {
 		t.Fatalf("a goal before any data: %+v, %v", g, err)
 	}
@@ -474,7 +492,7 @@ func TestGoals(t *testing.T) {
 	e.connectServiceAccount(domainProperty)
 	e.sync()
 
-	same, err := e.svc.UpsertGoal(e.ctx, gsc.GoalInput{Metric: gsc.MetricClicks, WindowDays: 28, Target: 200, DueOn: "2028-03-15"})
+	same, err := e.svc.UpsertGoal(e.ctx, search.GoalInput{Provider: search.Google, Metric: search.MetricClicks, WindowDays: 28, Target: 200, DueOn: "2028-03-15"})
 	if err != nil || same.ID != g.ID || same.Target != 200 {
 		t.Fatalf("the same goal again: %+v, %v; want goal %d with the new target", same, err, g.ID)
 	}
@@ -482,15 +500,15 @@ func TestGoals(t *testing.T) {
 	if p == nil || p.Value != 280 || !p.Reached || p.To != e.day(3) || p.From != e.day(30) || p.DaysWithData != 28 || p.Fraction != 1.4 {
 		t.Fatalf("28-day clicks progress = %+v", p)
 	}
-	imp, err := e.svc.UpsertGoal(e.ctx, gsc.GoalInput{Metric: gsc.MetricImpressions, WindowDays: 90, Target: 10000, DueOn: "2028-03-15"})
+	imp, err := e.svc.UpsertGoal(e.ctx, search.GoalInput{Provider: search.Google, Metric: search.MetricImpressions, WindowDays: 90, Target: 10000, DueOn: "2028-03-15"})
 	if err != nil || imp.Progress.Value != 9000 || imp.Progress.Reached || imp.Progress.From != e.day(92) {
 		t.Fatalf("90-day impressions progress = %+v, %v", imp.Progress, err)
 	}
-	nb, err := e.svc.UpsertGoal(e.ctx, gsc.GoalInput{Metric: gsc.MetricNonBrandClicks, WindowDays: 28, Target: 240, DueOn: "2028-03-15"})
+	nb, err := e.svc.UpsertGoal(e.ctx, search.GoalInput{Provider: search.Google, Metric: search.MetricNonBrandClicks, WindowDays: 28, Target: 240, DueOn: "2028-03-15"})
 	if err != nil || nb.Progress.Value != 280 {
 		t.Fatalf("non-brand clicks progress = %+v, %v", nb.Progress, err)
 	}
-	if _, err := e.svc.UpdateGoal(e.ctx, imp.ID, gsc.GoalInput{Metric: gsc.MetricClicks, WindowDays: 28, Target: 5, DueOn: "2028-03-15"}); !errors.Is(err, core.ErrConflict) {
+	if _, err := e.svc.UpdateGoal(e.ctx, imp.ID, search.GoalInput{Provider: search.Google, Metric: search.MetricClicks, WindowDays: 28, Target: 5, DueOn: "2028-03-15"}); !errors.Is(err, core.ErrConflict) {
 		t.Fatalf("updating a goal onto another's key: %v", err)
 	}
 	if err := e.svc.DeleteGoal(e.ctx, imp.ID); err != nil {
@@ -513,7 +531,7 @@ func TestSyncSchedule(t *testing.T) {
 	if n := e.count(`SELECT count(*) FROM job_run`); n != 0 {
 		t.Fatal("a sync ran with nothing connected")
 	}
-	if _, err := e.db.Exec(e.ctx, `INSERT INTO job_run (job, trigger, started_at) VALUES ('gsc_sync', 'scheduled', $1)`, e.now.Add(-3*time.Hour)); err != nil {
+	if _, err := e.db.Exec(e.ctx, `INSERT INTO job_run (job, provider, trigger, started_at) VALUES ('search_sync', 'google', 'scheduled', $1)`, e.now.Add(-3*time.Hour)); err != nil {
 		t.Fatal(err)
 	}
 	if !e.status().Syncing {
@@ -529,7 +547,7 @@ func TestSyncSchedule(t *testing.T) {
 		t.Fatal(err)
 	}
 	e.connectServiceAccount(domainProperty)
-	syncs := func() int64 { return e.count(`SELECT count(*) FROM job_run WHERE job = 'gsc_sync'`) }
+	syncs := func() int64 { return e.count(`SELECT count(*) FROM job_run WHERE job = 'search_sync'`) }
 	for range 2 {
 		if err := e.svc.SyncIfDue(e.ctx); err != nil {
 			t.Fatal(err)
@@ -566,7 +584,7 @@ func TestSyncSchedule(t *testing.T) {
 	}
 
 	e.connectServiceAccount(prefixProperty)
-	if _, err := e.svc.SetProperty(e.ctx, gsc.PropertyInput{Property: prefixProperty, Backfill: new(false)}); err != nil {
+	if _, err := e.svc.SetSite(e.ctx, search.Google, search.SiteInput{Site: prefixProperty, Backfill: new(false)}); err != nil {
 		t.Fatal(err)
 	}
 	e.now = e.now.Add(31 * time.Minute)
@@ -584,26 +602,26 @@ func TestSyncRecovers(t *testing.T) {
 	for n := 1; n <= 60; n++ {
 		e.fake.SetRows(domainProperty, site(e.day(n), 1, 10))
 	}
-	long := gsctest.Row{Date: e.day(5), Query: "fernhollow docs", Page: prefixProperty + "docs?ref=" + strings.Repeat("x", 2500), Clicks: 1, Impressions: 2, Position: 3}
+	long := searchtest.Row{Date: e.day(5), Query: "fernhollow docs", Page: prefixProperty + "docs?ref=" + strings.Repeat("x", 2500), Clicks: 1, Impressions: 2, Position: 3}
 	e.fake.SetRows(domainProperty, site(e.day(5), 1, 10), long)
-	if _, err := e.svc.ConnectServiceAccount(e.ctx, e.fake.ServiceAccountKey(t, saEmail)); err != nil {
+	if _, err := e.svc.ConnectKey(e.ctx, search.Google, e.fake.ServiceAccountKey(t, saEmail)); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := e.svc.SetProperty(e.ctx, gsc.PropertyInput{Property: domainProperty, Backfill: new(false)}); err != nil {
+	if _, err := e.svc.SetSite(e.ctx, search.Google, search.SiteInput{Site: domainProperty, Backfill: new(false)}); err != nil {
 		t.Fatal(err)
 	}
 	e.sync()
-	days := func() int64 { return e.count(`SELECT count(*) FROM gsc_site_daily`) }
+	days := func() int64 { return e.count(`SELECT count(*) FROM search_site_daily`) }
 	if days() != 27 {
 		t.Fatalf("days without backfill = %d, want the 27 stored of the last 28", days())
 	}
-	if n := e.count(`SELECT count(*) FROM gsc_page_daily WHERE length(page) > 2000`); n != 0 {
+	if n := e.count(`SELECT count(*) FROM search_page_stats WHERE length(page) > 2000`); n != 0 {
 		t.Fatal("a key too long for an index entry was stored")
 	}
 
 	// Backfill turned on fails after committing older chunks, then a
 	// property pick waiting on the failure is not held back an hour.
-	if _, err := e.svc.SetProperty(e.ctx, gsc.PropertyInput{Property: domainProperty}); err != nil {
+	if _, err := e.svc.SetSite(e.ctx, search.Google, search.SiteInput{Site: domainProperty}); err != nil {
 		t.Fatal(err)
 	}
 	e.fake.FailQueriesFrom(e.day(20))
@@ -617,16 +635,16 @@ func TestSyncRecovers(t *testing.T) {
 	if err := e.svc.SyncIfDue(e.ctx); err != nil {
 		t.Fatal(err)
 	}
-	if n := e.count(`SELECT count(*) FROM job_run WHERE job = 'gsc_sync'`); n != 2 {
+	if n := e.count(`SELECT count(*) FROM job_run WHERE job = 'search_sync'`); n != 2 {
 		t.Fatalf("syncs = %d; a failed sync retried within the hour", n)
 	}
-	if _, err := e.svc.SetProperty(e.ctx, gsc.PropertyInput{Property: domainProperty}); err != nil {
+	if _, err := e.svc.SetSite(e.ctx, search.Google, search.SiteInput{Site: domainProperty}); err != nil {
 		t.Fatal(err)
 	}
 	if err := e.svc.SyncIfDue(e.ctx); err != nil {
 		t.Fatal(err)
 	}
-	if n := e.count(`SELECT count(*) FROM job_run WHERE job = 'gsc_sync'`); n != 3 {
+	if n := e.count(`SELECT count(*) FROM job_run WHERE job = 'search_sync'`); n != 3 {
 		t.Fatalf("syncs = %d; picking the property again waited out the failure's backoff", n)
 	}
 	if days() != 60 {
@@ -637,24 +655,24 @@ func TestSyncRecovers(t *testing.T) {
 	e.now = e.now.Add(25 * time.Hour)
 	_ = e.svc.SyncIfDue(e.ctx)
 	e.fake.FailQueriesFrom("")
-	if _, err := e.svc.SetProperty(e.ctx, gsc.PropertyInput{Property: prefixProperty}); err != nil {
+	if _, err := e.svc.SetSite(e.ctx, search.Google, search.SiteInput{Site: prefixProperty}); err != nil {
 		t.Fatal(err)
 	}
 	if err := e.svc.SyncIfDue(e.ctx); err != nil {
 		t.Fatal(err)
 	}
-	if n := e.count(`SELECT count(*) FROM job_run WHERE job = 'gsc_sync'`); n != 5 {
+	if n := e.count(`SELECT count(*) FROM job_run WHERE job = 'search_sync'`); n != 5 {
 		t.Fatalf("syncs = %d; picking a property after a failure waited out the backoff", n)
 	}
 
 	e.now = e.now.Add(time.Hour)
-	if _, err := e.svc.ConnectServiceAccount(e.ctx, e.fake.ServiceAccountKey(t, saEmail)); err != nil {
+	if _, err := e.svc.ConnectKey(e.ctx, search.Google, e.fake.ServiceAccountKey(t, saEmail)); err != nil {
 		t.Fatal(err)
 	}
 	if err := e.svc.SyncIfDue(e.ctx); err != nil {
 		t.Fatal(err)
 	}
-	if n := e.count(`SELECT count(*) FROM job_run WHERE job = 'gsc_sync'`); n != 6 {
+	if n := e.count(`SELECT count(*) FROM job_run WHERE job = 'search_sync'`); n != 6 {
 		t.Fatalf("syncs = %d; a new credential was not tried at once", n)
 	}
 }
@@ -680,7 +698,7 @@ func TestInspectURL(t *testing.T) {
 		t.Fatalf("inspecting while not connected: %v", err)
 	}
 	crawled := time.Date(2026, 11, 19, 14, 3, 0, 0, time.UTC)
-	e.fake.SetInspection(prefixProperty+"pricing", gsctest.Inspection{Verdict: "PASS", CoverageState: "Submitted and indexed",
+	e.fake.SetInspection(prefixProperty+"pricing", searchtest.Inspection{Verdict: "PASS", CoverageState: "Submitted and indexed",
 		LastCrawl: crawled, GoogleCanonical: prefixProperty + "pricing", UserCanonical: prefixProperty + "pricing/"})
 	e.connectServiceAccount(domainProperty)
 	in, err := e.svc.InspectURL(e.ctx, prefixProperty+"pricing")

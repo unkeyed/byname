@@ -15,7 +15,7 @@ You need Docker with Compose v2.
    docker compose up -d --build --wait
    ```
 
-   `ENCRYPTION_KEY` encrypts the provider keys, Search Console credential, the secrets of the places notifications go and two-factor seeds that Byname stores, so a database backup alone does not reveal them. Keep `.env` with your other secrets. Compose builds the image, starts Postgres 17 and Byname, and returns when both pass their health checks.
+   `ENCRYPTION_KEY` encrypts the provider keys, the search engine credentials, the secrets of the places notifications go and two-factor seeds that Byname stores, so a database backup alone does not reveal them. Keep `.env` with your other secrets. Compose builds the image, starts Postgres 17 and Byname, and returns when both pass their health checks.
 
 2. Check that Byname is up:
 
@@ -33,7 +33,7 @@ You need Docker with Compose v2.
 
    Open the link, enter your name and email, and register a passkey with your fingerprint, face or device PIN. You are the first user and an Admin. The link works once. [Sign-in](sign-in.md) covers providers, roles, two-factor and passwords.
 
-4. Finish onboarding. Byname opens it after you sign in. It asks for your brand and domain, competitors, questions, the AI apps to ask with a Treg token or your own keys, Search Console, social mentions, and the schedule and spend caps. The last step shows what a check and a month cost, and the monthly spend cap finishing sets. Nothing runs until you finish, and a test call for each AI app and model must pass before you can.
+4. Finish onboarding. Byname opens it after you sign in. It asks for your brand and domain, competitors, questions, the AI apps to ask with a Treg token or your own keys, the search engines to read, social mentions, and the schedule and spend caps. The last step shows what a check and a month cost, and the monthly spend cap finishing sets. Nothing runs until you finish, and a test call for each AI app and model must pass before you can.
 
 Postgres keeps its data in the `db` volume that `docker-compose.yml` declares. `docker compose down` stops the stack and keeps the data. `docker compose down -v` also deletes the data.
 
@@ -93,7 +93,7 @@ The container contract is short:
 - Byname listens on `$PORT`, which defaults to `8080`.
 - One process serves the web UI, the REST API under `/v1`, the MCP server at `/mcp` and `/healthz`, and runs the scheduler.
 - On `SIGTERM`, Byname stops taking new requests and waits up to 20 seconds for open requests to finish. A check in progress stops queueing calls and resumes on the next start.
-- Byname keeps no state on disk. You can run several replicas against one database. Migrations, the setup link, scheduled checks, the Search Console sync and the site changes jobs each take a Postgres advisory lock, so a second replica never starts the same check, sync or poll twice.
+- Byname keeps no state on disk. You can run several replicas against one database. Migrations, the setup link, scheduled checks, the search engine sync and the site changes jobs each take a Postgres advisory lock, so a second replica never starts the same check, sync or poll twice.
 - One check runs at a time across every replica. The replica running it renews a lease on it every 30 seconds. If that replica crashes, hangs or is replaced by a new deployment, another one takes the check over within 90 seconds and carries on from the last stored answer. A lost database connection pauses a check instead of failing it, and the next pass resumes it.
 - Byname writes JSON logs to stdout.
 
@@ -102,7 +102,7 @@ The container contract is short:
 The scheduler runs inside the container, so you need no cron service. Every minute it does each of these that is due:
 
 - Starts the AI check when its time comes. You set how many days apart checks run and the time of day under **Settings > Schedule and limits**, with **Pause** and **Check now**. A check missed while no process was running starts on the next start. A check missed while paused does not.
-- Syncs Search Console once a day, and retries an hour after a failed sync. After a sync that succeeds, it raises **Goal reached** and **Google clicks moved** notifications and runs the site changes jobs `recrawl_watch` and `verdicts`. See [Site changes](changes.md#recrawl-watch).
+- Syncs each connected search engine, Google Search Console and Bing Webmaster Tools, once a day, and retries an engine an hour after its sync fails. After a sync that succeeds, it raises that engine's **Goal reached** and **Search clicks moved** notifications. After a Google sync, it runs the site changes jobs `recrawl_watch` and `verdicts`. See [Search engines](search.md#the-daily-sync) and [Site changes](changes.md#recrawl-watch).
 - Polls the connected GitHub repository for merged pull requests once an hour, as the `site_changes` job.
 - Refreshes each AI app's model list once a day.
 - Deletes raw provider responses past the retention set under **Settings > General**, once a day.
@@ -110,11 +110,13 @@ The scheduler runs inside the container, so you need no cron service. Every minu
 
 **Check now** shows what the check will cost, then queues it in the background and never runs it inside the request, so a long check survives a request timeout. It does not move the schedule. **Settings > Schedule and limits** shows the latest check whatever started it, the schedule, **Check now** or **Start first check**, and `GET /v1/settings` has it as `last_check`. Its `next_check` gives the next scheduled check as a day and time in the instance's time zone, how many days away it is, and how often checks run after it.
 
-Nothing that costs money runs before onboarding is finished: no AI check and no social search, even with the Treg token saved. Model lists, Search Console, GitHub and the pages answers link to cost nothing, so those jobs run as soon as they are set up. Social searches also wait until someone turns them on under **Settings > Social**. See [Social](social.md).
+Nothing that costs money runs before onboarding is finished: no AI check and no social search, even with the Treg token saved. Model lists, the search engines, GitHub and the pages answers link to cost nothing, so those jobs run as soon as they are set up. Social searches also wait until someone turns them on under **Settings > Social**. See [Social](social.md).
 
 ## Upgrade
 
 Pull or build the new image and restart the container. Byname applies new migrations when it starts and has no command to undo them, so back up the database before you upgrade.
+
+Upgrading from v0.2.0 or earlier, when Search Console was the only search engine, keeps what it stored. The Search Console connection shows on the Google card under **Settings > Search engines**, with the same property and credential. Its synced days, goals and syncs in the jobs log carry over as Google's. You don't connect again, and the first sync after the upgrade does not repeat a notification already sent. Links in notifications sent before the upgrade still open the right page.
 
 With Docker Compose:
 
@@ -127,7 +129,7 @@ If `DATABASE_URL` cannot create tables, run `byname migrate` with `MIGRATION_DAT
 
 ## Back up
 
-All state is in Postgres: settings, questions, every answer with its raw response, Search Console data, site changes, people and keys. Back it up as you would any Postgres database, for example with `pg_dump`. With Docker Compose:
+All state is in Postgres: settings, questions, every answer with its raw response, search engine data, site changes, people and keys. Back it up as you would any Postgres database, for example with `pg_dump`. With Docker Compose:
 
 ```sh
 docker compose exec -T db pg_dump -U byname byname > byname-backup.sql

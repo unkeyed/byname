@@ -1,26 +1,36 @@
 import { useState, type FormEvent } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, type BrandPoint, type Day, type GscStatus } from "../../api";
+import { api, type BrandPoint, type Day, type SearchStatus } from "../../api";
 import { LineChart, LineKey, niceTicks, type ChartLine } from "../../charts";
 import { keys, useSettings } from "../../queries";
 import { Badge, Button, Card, CardHeader, cx, Dialog, DialogBody, ErrorNote, Icon, inputClass, Pending, scrollArea, ScrollX } from "../../ui";
 import { compact, count, day, figureInfo, longDay, useSearchBrand } from "./model";
 
-/** The three kinds of click a window splits into, in legend order. Your brand is drawn in ink, as everywhere. */
-const kinds: { key: keyof Omit<BrandPoint, "date" | "clicks">; label: string; color: string; detail: string }[] = [
-  { key: "brand_clicks", label: "With your name", color: "var(--you)", detail: "Clicks from searches that include your name or another branded term." },
-  { key: "non_brand_clicks", label: figureInfo.non_brand.label, color: "var(--series-1)", detail: figureInfo.non_brand.hint },
-  { key: "anonymized_clicks", label: "Hidden by Google", color: "var(--faint)", detail: "Clicks from searches Google keeps private. Never counted as searches without your name." },
-];
+type Kind = { key: keyof Omit<BrandPoint, "date" | "clicks">; label: string; color: string; detail: string };
 
-export function BrandCard({ status, from, canEdit }: { status: GscStatus; from: Day; canEdit: boolean }) {
+/** The three kinds of click a window splits into, in legend order. Your brand is drawn in ink, as everywhere. */
+function brandKinds(s: SearchStatus): Kind[] {
+  const unlisted =
+    s.step_days > 1
+      ? { label: `Not in ${s.title}'s top lists`, detail: `Clicks from searches ${s.title} leaves out of its weekly top lists. Never counted as searches without your name.` }
+      : { label: `Hidden by ${s.title}`, detail: `Clicks from searches ${s.title} keeps private. Never counted as searches without your name.` };
+  return [
+    { key: "brand_clicks", label: "With your name", color: "var(--you)", detail: "Clicks from searches that include your name or another branded term." },
+    { key: "non_brand_clicks", label: figureInfo(s.title).non_brand.label, color: "var(--series-1)", detail: figureInfo(s.title).non_brand.hint },
+    { key: "unlisted_clicks", color: "var(--faint)", ...unlisted },
+  ];
+}
+
+export function BrandCard({ status, from, canEdit }: { status: SearchStatus; from: Day; canEdit: boolean }) {
   const brand = useSearchBrand(status, from);
   const [editing, setEditing] = useState(false);
+  const kinds = brandKinds(status);
+  const each = status.step_days > 1 ? `week` : `day`;
 
   let body;
   if (brand.isPending) body = <Pending />;
   else if (brand.isError) body = <div className="px-4 pb-4"><ErrorNote error={brand.error} /></div>;
-  else if (brand.data.points.length === 0) body = <p className="px-4 pb-6 text-sm text-muted">Each point adds up 28 days, so this shows once Byname has 28 days from Google.</p>;
+  else if (brand.data.points.length === 0) body = <p className="px-4 pb-6 text-sm text-muted">Each point adds up 28 days, so this shows once Byname has 28 days from {status.title}.</p>;
   else {
     const pts = brand.data.points;
     const xs = pts.map((p) => ({ key: p.date, label: day(p.date), title: `28 days to ${longDay(p.date)}` }));
@@ -28,7 +38,7 @@ export function BrandCard({ status, from, canEdit }: { status: GscStatus; from: 
     const latest = pts[pts.length - 1];
     body = (
       <div className={cx("grid grid-cols-[minmax(0,1fr)] gap-4 px-4 pb-4 lg:grid-cols-[minmax(0,1fr)_14rem]", brand.isPlaceholderData && "opacity-60")}>
-        <LineChart xs={xs} lines={lines} ticks={niceTicks(Math.max(...pts.flatMap((p) => kinds.map((k) => p[k.key]))))} format={compact} height={220} label="Clicks from searches with your name, without it and hidden by Google, over each 28 days" />
+        <LineChart xs={xs} lines={lines} ticks={niceTicks(Math.max(...pts.flatMap((p) => kinds.map((k) => p[k.key]))))} format={compact} height={220} label={`Clicks from searches with your name, without it and ${kinds[2].label.toLowerCase()}, over each 28 days`} />
         <div className="space-y-3 self-start">
           <ul aria-label={`The 28 days to ${day(latest.date)}`} className="space-y-2 text-xs">
             {kinds.map((k) => (
@@ -93,7 +103,10 @@ export function BrandCard({ status, from, canEdit }: { status: GscStatus; from: 
 
   return (
     <Card>
-      <CardHeader title="Searches with and without your name" description="Clicks in the 28 days up to each day, split by whether the search included your name. Searches without your name come from people who didn't know you yet. Only days Google has finished counting.">
+      <CardHeader
+        title="Searches with and without your name"
+        description={`Clicks in the 28 days up to each ${each === "week" ? `week's end, one point a week because ${status.title} counts searches by the week` : "day"}, split by whether the search included your name. Searches without your name come from people who didn't know you yet. Only ${each}s ${status.title} has finished counting.`}
+      >
         {canEdit && (
           <Button size="sm" onClick={() => setEditing(true)}>
             <Icon name="tag" className="size-3.5" />
@@ -135,7 +148,7 @@ function TermsForm({ onDone }: { onDone: () => void }) {
     <DialogBody>
       <div className="space-y-4">
         <p className="text-sm text-muted">
-          A Google search that contains any of these counts as including your name. Capitals don&apos;t matter. {settings.data.branded_terms_default && terms === null ? "These are the default: your brand's name and aliases." : "The default is your brand's name and aliases."}
+          A search on any engine that contains any of these counts as including your name. Capitals don&apos;t matter. {settings.data.branded_terms_default && terms === null ? "These are the default: your brand's name and aliases." : "The default is your brand's name and aliases."}
         </p>
         <div className="flex min-h-8 flex-wrap gap-1.5" aria-label="Terms">
           {list.length === 0 ? (

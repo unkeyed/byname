@@ -1,9 +1,9 @@
 import { useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { api, type GscStatus, type SearchTotals } from "../../api";
+import { api, type SearchStatus, type SearchTotals, type TopList } from "../../api";
 import { dataVersion, keys } from "../../queries";
 import { Badge, Button, Card, CardHeader, cx, ErrorNote, Icon, Pending, ScrollX } from "../../ui";
-import { count, ctr, dayRange, figureInfo, position } from "./model";
+import { count, ctr, dayRange, figureInfo, position, spanWords } from "./model";
 
 const shortLimit = 10;
 const longLimit = 50;
@@ -18,14 +18,26 @@ function pagePath(url: string): string {
   }
 }
 
-export function TopPages({ status }: { status: GscStatus }) {
+/** The window a list covers, as "Latest 4 weeks, Oct 17 to Nov 13". */
+function windowLabel(list: TopList | undefined, s: SearchStatus): string {
+  if (!list) return "Latest 28 days";
+  const days = Math.round((Date.parse(list.to) - Date.parse(list.from)) / 86_400_000) + 1;
+  return `Latest ${spanWords(days, s.step_days)}, ${dayRange(list.from, list.to)}`;
+}
+
+/** Weekly engines list their top rows a week at a time, so their lists are sums of weekly lists. */
+const weeklyNote = (s: SearchStatus) => (s.step_days > 1 ? `Sums of ${s.title}'s weekly top lists.` : undefined);
+
+export function TopPages({ status }: { status: SearchStatus }) {
   const [limit, setLimit] = useState(shortLimit);
-  const q = useQuery({ queryKey: keys.searchPages(limit, dataVersion(status)), queryFn: () => api.search.pages(limit) });
+  const q = useQuery({ queryKey: keys.searchPages(status.provider, limit, dataVersion(status)), queryFn: () => api.search.pages(status.provider, limit) });
   return (
     <TopCard
       title="Top pages"
       what="page"
-      range={q.data && dayRange(q.data.from, q.data.to)}
+      engine={status.title}
+      span={windowLabel(q.data, status)}
+      note={weeklyNote(status)}
       rows={q.data?.pages.map((p) => ({
         key: p.page,
         totals: p,
@@ -44,15 +56,20 @@ export function TopPages({ status }: { status: GscStatus }) {
   );
 }
 
-export function TopQueries({ status, nonBrand }: { status: GscStatus; nonBrand: boolean }) {
+export function TopQueries({ status, nonBrand }: { status: SearchStatus; nonBrand: boolean }) {
   const [limit, setLimit] = useState(shortLimit);
-  const q = useQuery({ queryKey: keys.searchQueries(limit, nonBrand, dataVersion(status)), queryFn: () => api.search.queries(limit, nonBrand) });
+  const q = useQuery({
+    queryKey: keys.searchQueries(status.provider, limit, nonBrand, dataVersion(status)),
+    queryFn: () => api.search.queries(status.provider, limit, nonBrand),
+  });
+  const undercount = status.step_days > 1 ? `${status.title} lists only its top searches each week, so these undercount.` : `${status.title} hides rare searches, so these undercount.`;
   return (
     <TopCard
       title={nonBrand ? "Top searches without your name" : "Top searches"}
       what="search"
-      range={q.data && dayRange(q.data.from, q.data.to)}
-      note={nonBrand ? `${figureInfo.non_brand.hint} Google hides rare searches, so these undercount.` : undefined}
+      engine={status.title}
+      span={windowLabel(q.data, status)}
+      note={nonBrand ? `${figureInfo(status.title).non_brand.hint} ${undercount}` : weeklyNote(status)}
       rows={q.data?.queries.map((r) => ({
         key: r.query,
         totals: r,
@@ -76,7 +93,8 @@ export function TopQueries({ status, nonBrand }: { status: GscStatus; nonBrand: 
 function TopCard({
   title,
   what,
-  range,
+  engine,
+  span,
   note,
   rows,
   error,
@@ -86,7 +104,8 @@ function TopCard({
 }: {
   title: string;
   what: string;
-  range?: string;
+  engine: string;
+  span: string;
   note?: string;
   rows?: { key: string; name: ReactNode; totals: SearchTotals }[];
   error: unknown;
@@ -94,10 +113,11 @@ function TopCard({
   limit: number;
   setLimit: (n: number) => void;
 }) {
+  const info = figureInfo(engine);
   let body;
   if (error) body = <div className="px-4 pb-4"><ErrorNote error={error} /></div>;
   else if (!rows) body = <Pending />;
-  else if (rows.length === 0) body = <p className="px-4 pb-6 text-sm text-muted">No {what === "page" ? "pages" : "searches"} had appearances in these 28 days.</p>;
+  else if (rows.length === 0) body = <p className="px-4 pb-6 text-sm text-muted">No {what === "page" ? "pages" : "searches"} had appearances in this window.</p>;
   else
     body = (
       <div className={cx("pb-2", dim && "opacity-60")}>
@@ -114,9 +134,9 @@ function TopCard({
               <tr className="border-y border-line">
                 <th className="py-1.5 pr-3 pl-4 font-medium capitalize">{what}</th>
                 <th className="py-1.5 pr-3 text-right font-medium">Clicks</th>
-                <th className="py-1.5 pr-3 text-right font-medium">{figureInfo.impressions.label}</th>
-                <th className="py-1.5 pr-3 text-right font-medium">{figureInfo.ctr.label}</th>
-                <th className="py-1.5 pr-4 text-right font-medium">{figureInfo.position.label}</th>
+                <th className="py-1.5 pr-3 text-right font-medium">{info.impressions.label}</th>
+                <th className="py-1.5 pr-3 text-right font-medium">{info.ctr.label}</th>
+                <th className="py-1.5 pr-4 text-right font-medium">{info.position.label}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-line tabular-nums">
@@ -136,7 +156,7 @@ function TopCard({
     );
   return (
     <Card className="min-w-0">
-      <CardHeader title={title} description={[range ? `Latest 28 days, ${range}, by clicks.` : "Latest 28 days, by clicks.", note].filter(Boolean).join(" ")}>
+      <CardHeader title={title} description={[`${span}, by clicks.`, note].filter(Boolean).join(" ")}>
         {rows && (rows.length >= limit || limit > shortLimit) && (
           <Button size="sm" variant="ghost" onClick={() => setLimit(limit > shortLimit ? shortLimit : longLimit)}>
             <Icon name={limit > shortLimit ? "up" : "down"} className="size-3.5" />

@@ -4,10 +4,7 @@ import { cx, scrollArea, ScrollX } from "../../ui";
 import { compact, count, ctr, day, figureInfo, fillDays, longDay, position } from "./model";
 
 type Measure = "clicks" | "impressions";
-const measures: Record<Measure, { label: string; hint: string; color: string }> = {
-  clicks: { ...figureInfo.clicks, color: "var(--series-1)" },
-  impressions: { ...figureInfo.impressions, color: "var(--series-7)" },
-};
+const colors: Record<Measure, string> = { clicks: "var(--series-1)", impressions: "var(--series-7)" };
 
 /** A dated event to mark on the chart, such as a merged change. */
 export interface DayMarker {
@@ -16,11 +13,12 @@ export interface DayMarker {
 }
 
 /**
- * Daily clicks and appearances as small multiples on their own scales,
- * since one axis cannot hold both. Days Google is still counting are dotted
- * on a shaded band.
+ * Daily clicks and appearances from engine, such as Google, as small
+ * multiples on their own scales, since one axis cannot hold both. Days the
+ * engine is still counting are dotted on a shaded band.
  */
 export function DailyChart({
+  engine,
   days: raw,
   from,
   latestFinal,
@@ -28,6 +26,7 @@ export function DailyChart({
   markers = [],
   height = 170,
 }: {
+  engine: string;
   days: SearchDay[];
   from: Day;
   latestFinal: Day;
@@ -36,6 +35,7 @@ export function DailyChart({
   height?: number;
 }) {
   const days = fillDays(raw, from, latestFinal);
+  const info = figureInfo(engine);
   if (days.length === 0) return <p className="px-4 pb-6 text-sm text-muted">No days in this range.</p>;
   const xs = days.map((d) => ({ key: d.date, label: day(d.date), title: longDay(d.date) }));
   const firstPartial = days.findIndex((d) => !d.final);
@@ -45,25 +45,26 @@ export function DailyChart({
     <div className="space-y-4 px-4 pb-4">
       {show.map((m) => {
         const values = days.map((d) => d[m]);
+        const measure = { ...info[m], color: colors[m] };
         const total = days.filter((d) => d.final).reduce((s, d) => s + d[m], 0);
         return (
           <div key={m}>
             <div className="mb-1 flex flex-wrap items-baseline justify-between gap-x-2 text-xs">
               <span>
-                <span className="font-medium">{measures[m].label} per day</span> <span className="text-faint">{measures[m].hint}</span>
+                <span className="font-medium">{measure.label} per day</span> <span className="text-faint">{measure.hint}</span>
               </span>
               <span className="text-muted tabular-nums">{count(total)} in total, counted days only</span>
             </div>
             <LineChart
               xs={xs}
-              lines={[{ key: m, label: measures[m].label, color: measures[m].color, approx: false, values }]}
+              lines={[{ key: m, label: measure.label, color: measure.color, approx: false, values }]}
               ticks={niceTicks(Math.max(...values))}
               format={compact}
               height={height}
               partialFrom={firstPartial >= 0 ? firstPartial : undefined}
-              partialNote="Google is still counting this day"
+              partialNote={`${engine} is still counting this day`}
               markers={chartMarkers}
-              label={`${measures[m].label} per day, ${day(days[0].date)} to ${day(days[days.length - 1].date)}`}
+              label={`${measure.label} per day, ${day(days[0].date)} to ${day(days[days.length - 1].date)}`}
             />
           </div>
         );
@@ -73,7 +74,7 @@ export function DailyChart({
           {firstPartial >= 0 && (
             <li className="flex items-center gap-1.5">
               <LineKey color="var(--muted)" dashed />
-              Dotted on grey: days Google is still counting
+              Dotted on grey: days {engine} is still counting
             </li>
           )}
           {chartMarkers.length > 0 && (
@@ -95,9 +96,9 @@ export function DailyChart({
                 <tr>
                   <th className="py-1 pr-4 font-medium">Day</th>
                   <th className="py-1 pr-4 text-right font-medium">Clicks</th>
-                  <th className="py-1 pr-4 text-right font-medium">{figureInfo.impressions.label}</th>
-                  <th className="py-1 pr-4 text-right font-medium">{figureInfo.ctr.label}</th>
-                  <th className="py-1 pr-4 text-right font-medium">{figureInfo.position.label}</th>
+                  <th className="py-1 pr-4 text-right font-medium">{info.impressions.label}</th>
+                  <th className="py-1 pr-4 text-right font-medium">{info.ctr.label}</th>
+                  <th className="py-1 pr-4 text-right font-medium">{info.position.label}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-line">

@@ -59,7 +59,7 @@ func configure(t *testing.T, svc *config.Service) {
 			t.Fatal(err)
 		}
 	}
-	for _, k := range []config.StepKey{config.StepBrand, config.StepCompetitors, config.StepQuestions, config.StepSurfaces, config.StepSearchConsole, config.StepSchedule} {
+	for _, k := range []config.StepKey{config.StepBrand, config.StepCompetitors, config.StepQuestions, config.StepSurfaces, config.StepSearch, config.StepSchedule} {
 		if _, err := svc.SaveStep(ctx, k); err != nil {
 			t.Fatal(err)
 		}

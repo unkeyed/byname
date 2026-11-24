@@ -1,8 +1,8 @@
 # Site changes
 
-**Google search > Site changes** answers one question: did a change you shipped to your site help the page in Google once Google saw it? Byname records each change to a page, waits until Google sees the change, which is Google's first crawl of the page after it, and then compares the page's Search Console numbers before and after with comparison pages: a few steady pages you promise not to edit.
+**Search > Site changes** answers one question: did a change you shipped to your site help the page in Google once Google saw it? Byname records each change to a page, waits until Google sees the change, which is Google's first crawl of the page after it, and then compares the page's Search Console numbers before and after with comparison pages: a few steady pages you promise not to edit.
 
-A change comes from one of two places. Byname reads pull requests merged into your site's GitHub repository, or someone logs the change by hand. Either way, seeing Google's crawl and working out the results need Search Console. Without it, Byname still records changes but cannot see Google crawl them or work out their results. [Search Console](search-console.md) explains the connection and the daily sync.
+A change comes from one of two places. Byname reads pull requests merged into your site's GitHub repository, or someone logs the change by hand. Either way, seeing Google's crawl and working out the results need Google Search Console. Without it, Byname still records changes but cannot see Google crawl them or work out their results. Bing's numbers play no part in site changes. [Search engines](search.md) explains the connection and the daily sync.
 
 `internal/changes` holds all of it, and this page follows that package.
 
@@ -25,9 +25,9 @@ Each poll lists the pull requests merged into the default branch, newest update 
 
 For each merged pull request, Byname maps every changed file through the path rules and stores one change per page. A page whose files include an added file is a new page. Otherwise, a page with a removed file is removed, and any other page is an edit. A pull request read twice updates its changes in place, so no change is stored twice.
 
-GitHub sends the token's expiry in the `GitHub-Authentication-Token-Expiration` header on every call made with a fine-grained token. Byname records it on each poll and each **Test**, and **Settings > Site changes** shows it. A token without an expiry shows **Never**. Within 14 days of the expiry, Settings and **Google search > Site changes** warn, and Byname raises a **Token expiring** notification, which only Admins see. See [Notifications](notifications.md).
+GitHub sends the token's expiry in the `GitHub-Authentication-Token-Expiration` header on every call made with a fine-grained token. Byname records it on each poll and each **Test**, and **Settings > Site changes** shows it. A token without an expiry shows **Never**. Within 14 days of the expiry, Settings and **Search > Site changes** warn, and Byname raises a **Token expiring** notification, which only Admins see. See [Notifications](notifications.md).
 
-When a poll fails, Settings and **Google search > Site changes** show why. A `401` from GitHub means the token expired or was revoked. A `404` means the repository does not exist or the token cannot read it.
+When a poll fails, Settings and **Search > Site changes** show why. A `401` from GitHub means the token expired or was revoked. A `404` means the repository does not exist or the token cannot read it.
 
 ## Map files to pages
 
@@ -51,7 +51,7 @@ An Admin edits the rules under **Settings > Site changes**. A key or MCP connect
 
 ## Log a change by hand
 
-For a site without GitHub, or a change made outside it, an Editor or Admin clicks **Log a change** on **Google search > Site changes**. A change logged by hand needs:
+For a site without GitHub, or a change made outside it, an Editor or Admin clicks **Log a change** on **Search > Site changes**. A change logged by hand needs:
 
 - the page's full URL, as Search Console reports it
 - what changed: **New page**, **Edit** or **Removed**
@@ -63,7 +63,7 @@ Only a change logged by hand can be deleted. A change from GitHub follows the re
 
 ## Recrawl watch
 
-A result is only fair once Google has seen the change, so the clock starts at Google's first crawl after it, not at the merge. After each Search Console sync that completes, Byname runs the `recrawl_watch` job and then the `verdicts` job.
+A result is only fair once Google has seen the change, so the clock starts at Google's first crawl after it, not at the merge. After each Google sync that completes, Byname runs the `recrawl_watch` job and then the `verdicts` job.
 
 Recrawl watch asks Google's URL Inspection API about each page with a change that Google has not crawled since, the oldest change first. It records Google's inspection result, the coverage state, the last crawl time, and the canonical URLs. When the last crawl is after the change, that crawl becomes the change's first crawl, shown as **Google saw it**. The days of the first and final results then follow from the crawl's day in the instance's time zone.
 
@@ -71,11 +71,11 @@ Recrawl watch asks Google's URL Inspection API about each page with a change tha
 - URL Inspection reports only Google's latest crawl of a page, not each crawl. Byname inspects a waiting page after each daily sync, so the first crawl it records is within a day of the real one. If Google crawled twice between two inspections, Byname records the later crawl.
 - URL Inspection reads what Google knows. It cannot ask Google to crawl or index a page.
 
-The change's timeline on **Google search > Site changes** lists each inspection.
+The change's timeline on **Search > Site changes** lists each inspection.
 
 ## How a change gets its result
 
-Results are experimental. The method is new and has few real results behind it yet, so the app labels every result **Experimental**. Check a surprising result against the page's numbers on **Google search > Traffic** before acting on it.
+Results are experimental. The method is new and has few real results behind it yet, so the app labels every result **Experimental**. Check a surprising result against the page's Google numbers on **Search > Traffic** before acting on it.
 
 Each change gets two results, counted in days from the day Google saw it:
 
@@ -151,13 +151,13 @@ A change Google has already seen keeps the result days it was given. Every resul
 
 Comparison pages are the baseline every result compares against. Each is a page you promise not to change until its hold date, the last day it counts. Pick pages with steady traffic that are like the pages you change. The API calls them control pages.
 
-An Editor or Admin adds them on **Google search > Site changes**, under **Comparison pages**. A key or MCP connection with `config:write` can use `POST /v1/control-pages` or the `upsert_control_page` tool. Adding a URL that is already a comparison page changes its hold date and note.
+An Editor or Admin adds them on **Search > Site changes**, under **Comparison pages**. A key or MCP connection with `config:write` can use `POST /v1/control-pages` or the `upsert_control_page` tool. Adding a URL that is already a comparison page changes its hold date and note.
 
 A comparison page counts in a result while its hold date is on or after the result's day, in the instance's time zone. After that, the page shows as **Ended** and drops out of the comparison set. A changed page never counts as its own comparison. Byname does not check whether a comparison page changed during its hold. A comparison page you change early skews every result that uses it, and with no active comparison pages every result is `insufficient_data`.
 
 ## What Site changes shows
 
-**Google search > Site changes** lists every change, the latest merge first, with its page, its pull request or manual log, the merge day, **Google saw it**, the **First result** and **Final result**, and its status. Opening a change shows its before numbers, both results against the comparison pages, and its timeline of the merge, each inspection, the day Google saw it, and the result days. A notification about a change links to `/google/site-changes?chg=<id>`, which opens that change. **Google search > Traffic** marks each merged pull request and each change logged by hand on its daily chart.
+**Search > Site changes** lists every change, the latest merge first, with its page, its pull request or manual log, the merge day, **Google saw it**, the **First result** and **Final result**, and its status. Opening a change shows its before numbers, both results against the comparison pages, and its timeline of the merge, each inspection, the day Google saw it, and the result days. A notification about a change links to `/search/site-changes?chg=<id>`, which opens that change. **Search > Traffic** marks each merged pull request and each change logged by hand on its daily chart.
 
 Google data arrives about three days late, and one page's appearances swing with demand as much as with rank. Read a result as evidence about one page, not as proof.
 

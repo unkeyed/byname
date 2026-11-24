@@ -7,36 +7,44 @@ import (
 	"strconv"
 
 	"github.com/unkeyed/byname/internal/core"
-	"github.com/unkeyed/byname/internal/gsc"
+	"github.com/unkeyed/byname/internal/search"
 )
 
-// Search Console: results:read reads the numbers and goals, config:write
-// changes goals and branded search terms, and only a signed-in admin
-// connects, picks the property or disconnects. No response carries the
-// credential.
+// Search engines: results:read reads each provider's numbers and goals,
+// config:write changes goals and branded search terms, and only a
+// signed-in admin connects a provider, picks its site or disconnects it.
+// No response carries a credential. The provider is a path segment, such
+// as google or bing, which the service checks against its registry.
 
-func (s *server) searchSummary(w http.ResponseWriter, r *http.Request, _ core.Actor) error {
-	v, err := s.svc.GSC.Summary(r.Context())
+func provider(r *http.Request) search.Provider { return search.Provider(r.PathValue("provider")) }
+
+func (s *server) searchProviders(w http.ResponseWriter, r *http.Request, _ core.Actor) error {
+	v, err := s.svc.Search.Providers(r.Context())
 	return respond(w, http.StatusOK, v, err)
 }
 
-func searchRange(r *http.Request) gsc.Range {
+func (s *server) searchSummary(w http.ResponseWriter, r *http.Request, _ core.Actor) error {
+	v, err := s.svc.Search.Summary(r.Context(), provider(r))
+	return respond(w, http.StatusOK, v, err)
+}
+
+func searchRange(r *http.Request) search.Range {
 	q := r.URL.Query()
-	return gsc.Range{From: q.Get("from"), To: q.Get("to")}
+	return search.Range{From: q.Get("from"), To: q.Get("to")}
 }
 
 func (s *server) searchDaily(w http.ResponseWriter, r *http.Request, _ core.Actor) error {
-	v, err := s.svc.GSC.Daily(r.Context(), searchRange(r))
+	v, err := s.svc.Search.Daily(r.Context(), provider(r), searchRange(r))
 	return respond(w, http.StatusOK, v, err)
 }
 
 func (s *server) searchBrand(w http.ResponseWriter, r *http.Request, _ core.Actor) error {
-	v, err := s.svc.GSC.Brand(r.Context(), searchRange(r))
+	v, err := s.svc.Search.Brand(r.Context(), provider(r), searchRange(r))
 	return respond(w, http.StatusOK, v, err)
 }
 
-func searchTop(r *http.Request) (gsc.Top, error) {
-	var t gsc.Top
+func searchTop(r *http.Request) (search.Top, error) {
+	var t search.Top
 	var err error
 	if t.Days, err = queryInt(r, "days"); err != nil {
 		return t, err
@@ -57,7 +65,7 @@ func (s *server) searchPages(w http.ResponseWriter, r *http.Request, _ core.Acto
 	if err != nil {
 		return err
 	}
-	v, err := s.svc.GSC.TopPages(r.Context(), t)
+	v, err := s.svc.Search.TopPages(r.Context(), provider(r), t)
 	return respond(w, http.StatusOK, v, err)
 }
 
@@ -66,21 +74,21 @@ func (s *server) searchQueries(w http.ResponseWriter, r *http.Request, _ core.Ac
 	if err != nil {
 		return err
 	}
-	v, err := s.svc.GSC.TopQueries(r.Context(), t)
+	v, err := s.svc.Search.TopQueries(r.Context(), provider(r), t)
 	return respond(w, http.StatusOK, v, err)
 }
 
 func (s *server) listGoals(w http.ResponseWriter, r *http.Request, _ core.Actor) error {
-	v, err := s.svc.GSC.Goals(r.Context())
+	v, err := s.svc.Search.Goals(r.Context())
 	return respond(w, http.StatusOK, v, err)
 }
 
 func (s *server) upsertGoal(w http.ResponseWriter, r *http.Request, _ core.Actor) error {
-	var b gsc.GoalInput
+	var b search.GoalInput
 	if err := readJSON(r, &b); err != nil {
 		return err
 	}
-	v, err := s.svc.GSC.UpsertGoal(r.Context(), b)
+	v, err := s.svc.Search.UpsertGoal(r.Context(), b)
 	return respond(w, http.StatusOK, v, err)
 }
 
@@ -89,11 +97,11 @@ func (s *server) updateGoal(w http.ResponseWriter, r *http.Request, _ core.Actor
 	if err != nil {
 		return err
 	}
-	var b gsc.GoalInput
+	var b search.GoalInput
 	if err := readJSON(r, &b); err != nil {
 		return err
 	}
-	v, err := s.svc.GSC.UpdateGoal(r.Context(), id, b)
+	v, err := s.svc.Search.UpdateGoal(r.Context(), id, b)
 	return respond(w, http.StatusOK, v, err)
 }
 
@@ -102,7 +110,7 @@ func (s *server) deleteGoal(w http.ResponseWriter, r *http.Request, _ core.Actor
 	if err != nil {
 		return err
 	}
-	return noContent(w, s.svc.GSC.DeleteGoal(r.Context(), id))
+	return noContent(w, s.svc.Search.DeleteGoal(r.Context(), id))
 }
 
 // putBrandedTerms body {"terms": ["..."]}; an empty list goes back to the
@@ -121,27 +129,23 @@ func (s *server) putBrandedTerms(w http.ResponseWriter, r *http.Request, _ core.
 	return respond(w, http.StatusOK, v, err)
 }
 
-func (s *server) gscStatus(w http.ResponseWriter, r *http.Request, _ core.Actor) error {
-	v, err := s.svc.GSC.Status(r.Context())
+func (s *server) searchSites(w http.ResponseWriter, r *http.Request, _ core.Actor) error {
+	v, err := s.svc.Search.Sites(r.Context(), provider(r))
 	return respond(w, http.StatusOK, v, err)
 }
 
-func (s *server) gscProperties(w http.ResponseWriter, r *http.Request, _ core.Actor) error {
-	v, err := s.svc.GSC.Properties(r.Context())
-	return respond(w, http.StatusOK, v, err)
-}
-
-func (s *server) gscSetProperty(w http.ResponseWriter, r *http.Request, _ core.Actor) error {
-	var b gsc.PropertyInput
+func (s *server) searchSetSite(w http.ResponseWriter, r *http.Request, _ core.Actor) error {
+	var b search.SiteInput
 	if err := readJSON(r, &b); err != nil {
 		return err
 	}
-	v, err := s.svc.GSC.SetProperty(r.Context(), b)
+	v, err := s.svc.Search.SetSite(r.Context(), provider(r), b)
 	return respond(w, http.StatusOK, v, err)
 }
 
-// gscServiceAccount body {"key": "<the JSON key file's contents>"}.
-func (s *server) gscServiceAccount(w http.ResponseWriter, r *http.Request, _ core.Actor) error {
+// searchKey body {"key": "..."}: Google's service account JSON key file,
+// or Bing's API key.
+func (s *server) searchKey(w http.ResponseWriter, r *http.Request, _ core.Actor) error {
 	var b struct {
 		Key string `json:"key"`
 	}
@@ -149,15 +153,19 @@ func (s *server) gscServiceAccount(w http.ResponseWriter, r *http.Request, _ cor
 		return err
 	}
 	return s.recentOnly(r, func() error {
-		v, err := s.svc.GSC.ConnectServiceAccount(r.Context(), b.Key)
+		v, err := s.svc.Search.ConnectKey(r.Context(), provider(r), b.Key)
 		return respond(w, http.StatusOK, v, err)
 	})
 }
 
-// gscOAuthStart takes an optional body {"return_to": "settings" or
+func (s *server) searchDisconnect(w http.ResponseWriter, r *http.Request, _ core.Actor) error {
+	return noContent(w, s.svc.Search.Disconnect(r.Context(), provider(r)))
+}
+
+// googleOAuthStart takes an optional body {"return_to": "settings" or
 // "onboarding"} and responds {"url": "..."}: Google's consent page, which
 // the browser opens next.
-func (s *server) gscOAuthStart(w http.ResponseWriter, r *http.Request, a core.Actor) error {
+func (s *server) googleOAuthStart(w http.ResponseWriter, r *http.Request, a core.Actor) error {
 	var b struct {
 		ReturnTo string `json:"return_to"`
 	}
@@ -166,38 +174,40 @@ func (s *server) gscOAuthStart(w http.ResponseWriter, r *http.Request, a core.Ac
 			return err
 		}
 	}
-	back, err := gsc.ParseReturn(b.ReturnTo)
+	back, err := search.ParseReturn(b.ReturnTo)
 	if err != nil {
 		return err
 	}
 	return s.recentOnly(r, func() error {
-		u, err := s.svc.GSC.StartOAuth(a, back)
+		u, err := s.svc.Search.StartGoogleOAuth(a, back)
 		return respond(w, http.StatusOK, map[string]string{"url": u}, err)
 	})
 }
 
-// gscBack is the page each Return sends the browser to after Google.
-var gscBack = map[gsc.Return]string{
-	gsc.ReturnSettings:   "/settings/search-console",
-	gsc.ReturnOnboarding: "/onboarding/search_console",
+// googleBack is the page each Return sends the browser to after Google.
+var googleBack = map[search.Return]string{
+	search.ReturnSettings:   "/settings/search-engines",
+	search.ReturnOnboarding: "/onboarding/search",
 }
 
-// gscOAuthCallback is where Google sends the browser back. It is public so
-// that it can always redirect to the page the sign-in started from
-// (Settings > Search Console or onboarding), with ?error= when connecting
-// failed, including when the admin's session ended during Google's consent
-// page; it checks for that session itself.
-func (s *server) gscOAuthCallback(w http.ResponseWriter, r *http.Request, _ core.Actor) error {
+// googleOAuthCallback is where Google sends the browser back. Its path
+// stays /auth/gsc/callback, the redirect URI registered on each instance's
+// Google OAuth client. It is public so that it can always redirect to the
+// page the sign-in started from (Settings > Search engines or
+// onboarding), with ?error= when connecting failed, including when the
+// admin's session ended during Google's consent page; it checks for that
+// session itself.
+func (s *server) googleOAuthCallback(w http.ResponseWriter, r *http.Request, _ core.Actor) error {
 	q := r.URL.Query()
-	back := gscBack[s.svc.GSC.OAuthReturn(q.Get("state"))]
+	back := googleBack[s.svc.Search.GoogleOAuthReturn(q.Get("state"))]
 	a, err := s.authn.Caller(r)
 	switch {
 	case err != nil && statusOf(callerErr(err)) >= 500:
 		err = callerErr(err)
 	case err != nil || admin.allows(a) != nil:
-		err = fmt.Errorf("%w: sign in to Byname as an admin, then connect Search Console again", core.ErrForbidden)
+		err = fmt.Errorf("%w: sign in to Byname as an admin, then connect Google again", core.ErrForbidden)
 	default:
-		err = s.svc.GSC.FinishOAuth(r.Context(), a, gsc.OAuthCallback{State: q.Get("state"), Code: q.Get("code"), Error: q.Get("error")})
+		err = s.svc.Search.FinishGoogleOAuth(r.Context(), a, search.OAuthCallback{State: q.Get("state"), Code: q.Get("code"), Error: q.Get("error")})
 	}
 	if err == nil {
 		http.Redirect(w, r, back+"?connected=google", http.StatusSeeOther)
@@ -205,13 +215,9 @@ func (s *server) gscOAuthCallback(w http.ResponseWriter, r *http.Request, _ core
 	}
 	msg := err.Error()
 	if code := statusOf(err); code >= 500 && code != http.StatusBadGateway {
-		s.log.Error("Search Console sign-in failed", "err", err)
-		msg = "connecting Search Console failed on the server; try again"
+		s.log.Error("Google sign-in failed", "err", err)
+		msg = "connecting Google failed on the server; try again"
 	}
 	http.Redirect(w, r, back+"?error="+url.QueryEscape(msg), http.StatusSeeOther)
 	return nil
-}
-
-func (s *server) gscDisconnect(w http.ResponseWriter, r *http.Request, _ core.Actor) error {
-	return noContent(w, s.svc.GSC.Disconnect(r.Context()))
 }

@@ -14,7 +14,7 @@ People sign in to the Byname UI with a passkey or with an account at a configure
 
 The generic OIDC provider works with any issuer that publishes `/.well-known/openid-configuration`, such as Okta, Microsoft Entra ID, Keycloak, Authentik, WorkOS, Clerk, Auth0 and Better Auth. `OIDC_NAME` is the label on the sign-in button, for example `Okta`. It defaults to `SSO`.
 
-Google sign-in is separate from the Search Console connection. `GOOGLE_CLIENT_ID` signs people in to Byname. `GSC_GOOGLE_CLIENT_ID` reads Search Console. See [Search Console](search-console.md).
+Google sign-in is separate from the Search Console connection. `GOOGLE_CLIENT_ID` signs people in to Byname. `GSC_GOOGLE_CLIENT_ID` reads Search Console. See [Search engines](search.md#create-the-google-oauth-client).
 
 ## Register the callback URL
 
@@ -32,7 +32,7 @@ Every person has one of three roles. A role grants scopes, and the same scopes a
 
 | Role | Scopes | Also manages |
 |---|---|---|
-| Admin | `results:read`, `runs:write`, `config:write` | The Treg token and provider keys, Search Console, the GitHub repo for site changes, where notifications go, API keys, connected apps and the team |
+| Admin | `results:read`, `runs:write`, `config:write` | The Treg token and provider keys, the search engine connections, the GitHub repo for site changes, where notifications go, API keys, connected apps and the team |
 | Editor | `results:read`, `runs:write`, `config:write` | Nothing beyond the scopes |
 | Viewer | `results:read` | Nothing beyond the scope |
 
@@ -40,7 +40,7 @@ The scopes mean:
 
 | Scope | Allows |
 |---|---|
-| `results:read` | Read checks, answers, raw responses, questions, brands, Search Console data, goals, site changes, comparison pages, the repo connection, notifications and settings. Never a secret. |
+| `results:read` | Read checks, answers, raw responses, questions, brands, search engine data (Google and Bing), goals, site changes, comparison pages, the repo connection, notifications and settings. Never a secret. |
 | `runs:write` | Queue a check with **Check now**, and pause and resume scheduled checks. |
 | `config:write` | Edit the brand, competitors, questions and question sets, AI apps and models, the schedule, spend caps and check limits, goals, branded search terms, site changes logged by hand, comparison pages, path rules, and when change results fall and what counts as a move. |
 
@@ -88,7 +88,7 @@ Some changes need a sign-in within the last 15 minutes:
 - approving an MCP client
 - inviting a teammate, changing a role or removing a teammate
 - setting or deleting a provider key or the Treg token
-- connecting Search Console
+- connecting a search engine
 - adding or editing where notifications go
 
 After 15 minutes, Byname asks the person to confirm with a passkey or an app code. A person with neither confirms through a linked provider, which Byname asks to check them again (`prompt=login`).

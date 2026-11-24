@@ -59,14 +59,15 @@ func jobsWritten(t *testing.T) []string {
 // job_run CHECK, as the migrations leave it, refuses.
 func TestJobCheckCoversEveryJob(t *testing.T) {
 	jobs := jobsWritten(t)
-	for _, want := range []string{"ai_check", "model_refresh", "gsc_sync", "source_fetch", "site_changes", "recrawl_watch", "verdicts", "social_fetch"} {
+	for _, want := range []string{"ai_check", "model_refresh", "search_sync", "source_fetch", "site_changes", "recrawl_watch", "verdicts", "social_fetch"} {
 		if !slices.Contains(jobs, want) {
 			t.Errorf("found no INSERT for job %s; the scan of the code is broken", want)
 		}
 	}
 	pool := testdb.New(t)
 	for _, job := range jobs {
-		if _, err := pool.Exec(context.Background(), `INSERT INTO job_run (job, trigger, status) VALUES ($1, 'scheduled', 'skipped')`, job); err != nil {
+		if _, err := pool.Exec(context.Background(), `INSERT INTO job_run (job, provider, trigger, status)
+			VALUES ($1, CASE WHEN $1 = 'search_sync' THEN 'google' END, 'scheduled', 'skipped')`, job); err != nil {
 			t.Errorf("job_run refuses job %q, which the code writes: %v", job, err)
 		}
 	}

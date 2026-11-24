@@ -29,6 +29,14 @@ const DefaultURL = "postgres://byname:byname@localhost:5432/byname?sslmode=disab
 // and returns a pool on it. The database is dropped when the test ends.
 func New(t testing.TB) *pgxpool.Pool {
 	t.Helper()
+	return Through(t, "")
+}
+
+// Through is New applying the migrations through the file named last
+// only, such as 016_social_filters.sql, so a test can seed a database the
+// way an earlier release left it and then upgrade it with db.Migrate.
+func Through(t testing.TB, last string) *pgxpool.Pool {
+	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
@@ -55,7 +63,7 @@ func New(t testing.TB) *pgxpool.Pool {
 		t.Fatalf("testdb: connect %s: %v", name, err)
 	}
 	t.Cleanup(pool.Close)
-	if err := db.Migrate(ctx, pool); err != nil {
+	if err := db.MigrateThrough(ctx, pool, last); err != nil {
 		t.Fatalf("testdb: migrate %s: %v", name, err)
 	}
 	return pool

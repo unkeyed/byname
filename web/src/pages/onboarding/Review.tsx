@@ -4,7 +4,7 @@ import { Link, useNavigate } from "react-router";
 import { api, type EstimateRow, type StepKey, type Surface } from "../../api";
 import { fidelityInfo } from "../../lines";
 import { money } from "../../money";
-import { keys, useBrands, useCosts, useGsc, useOnboarding, useQuestions, useSettings, useSocialSettings, useSurfaces } from "../../queries";
+import { keys, useBrands, useCosts, useOnboarding, useSearchProviders, useQuestions, useSettings, useSocialSettings, useSurfaces } from "../../queries";
 import { Badge, Button, buttonClass, Card, CardHeader, ErrorNote, Icon, Pending, RelativeTime, ScrollX, SteadyLabel, useLoading } from "../../ui";
 import { nextCheckPhrase } from "../../checks";
 import { Disclosure } from "../../config/forms";
@@ -39,8 +39,8 @@ export function Review({ nav }: { nav: StepNav }) {
   const surfaces = useSurfaces();
   const social = useSocialSettings();
   const costs = useCosts();
-  const gsc = useGsc();
-  useLoading(gsc.isPending);
+  const engines = useSearchProviders();
+  useLoading(engines.isPending);
   const start = useMutation({
     mutationFn: async () => {
       await api.onboarding.finish();
@@ -79,7 +79,7 @@ export function Review({ nav }: { nav: StepNav }) {
   const est = c.checks.check;
   const socialMonth = c.social.month_usd;
   const cap = s.spend_cap_month_usd ?? c.default_month_cap_usd;
-  const gscProperty = gsc.data?.connected ? gsc.data.property : "";
+  const synced = engines.data?.filter((e) => e.connected && e.site) ?? [];
 
   return (
     <div className="space-y-6">
@@ -145,8 +145,8 @@ export function Review({ nav }: { nav: StepNav }) {
           <Section title="AI apps" step="surfaces">
             {enabled.length === 0 ? "None ticked" : enabled.map((x) => (x.pairs.some((p) => p.model) ? `${x.title} (${x.pairs.filter((p) => p.enabled).map((p) => p.model).join(", ")})` : x.title)).join(", ")}
           </Section>
-          <Section title="Search Console" step="search_console">
-            {gscProperty ? `Connected: ${gscProperty}` : "Not connected. You can connect it later in Settings."}
+          <Section title="Search engines" step="search">
+            {synced.length > 0 ? synced.map((e) => `${e.title}: ${e.site}`).join(" · ") : "None connected. You can connect them later in Settings."}
           </Section>
           <Section title="Social mentions" step="social">
             {social.data.enabled ? `On, from when setup is finished, for ${money(socialMonth, "about")} a month.` : "Off. You can turn it on later in Settings."}

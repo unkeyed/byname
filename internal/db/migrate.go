@@ -6,6 +6,7 @@ import (
 	"embed"
 	"fmt"
 	"io/fs"
+	"slices"
 	"sort"
 
 	"github.com/jackc/pgx/v5"
@@ -22,11 +23,25 @@ var migrations embed.FS
 // wait, then find nothing to do. Files are never edited after release;
 // a change is a new file.
 func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
+	return MigrateThrough(ctx, pool, "")
+}
+
+// MigrateThrough is Migrate stopping after the file named last, such as
+// 016_social_filters.sql, so a test can build a database as an earlier
+// release left it. An empty last applies every file.
+func MigrateThrough(ctx context.Context, pool *pgxpool.Pool, last string) error {
 	names, err := fs.Glob(migrations, "migrations/*.sql")
 	if err != nil {
 		return err
 	}
 	sort.Strings(names)
+	if last != "" {
+		i := slices.Index(names, "migrations/"+last)
+		if i < 0 {
+			return fmt.Errorf("no migration %s", last)
+		}
+		names = names[:i+1]
+	}
 	for _, name := range names {
 		sql, err := migrations.ReadFile(name)
 		if err != nil {

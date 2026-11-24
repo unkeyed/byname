@@ -348,7 +348,8 @@ func (s *Service) Answer(ctx context.Context, id int64) (Answer, error) {
 // Job is one entry of the jobs log.
 type Job struct {
 	ID         int64      `json:"id"`
-	Job        string     `json:"job" jsonschema:"ai_check, model_refresh, source_fetch, gsc_sync, site_changes, recrawl_watch, verdicts, social_fetch, other_brands (reading answers for other brands) or brand_logos"`
+	Job        string     `json:"job" jsonschema:"ai_check, model_refresh, source_fetch, search_sync, site_changes, recrawl_watch, verdicts, social_fetch, other_brands (reading answers for other brands) or brand_logos"`
+	Provider   string     `json:"provider" jsonschema:"the search engine a search_sync synced, such as google or bing; empty for other jobs"`
 	Trigger    string     `json:"trigger"`
 	RunID      *int64     `json:"run_id"`
 	Status     string     `json:"status"`
@@ -366,7 +367,7 @@ func (s *Service) Jobs(ctx context.Context, limit int) ([]Job, error) {
 	if limit < 1 || limit > 200 {
 		return nil, fmt.Errorf("%w: limit must be 1 to 200", core.ErrInvalid)
 	}
-	rows, err := s.db.Query(ctx, `SELECT j.id, j.job, j.trigger, j.run_id, j.status, j.started_at, j.finished_at,
+	rows, err := s.db.Query(ctx, `SELECT j.id, j.job, coalesce(j.provider, ''), j.trigger, j.run_id, j.status, j.started_at, j.finished_at,
 			coalesce(j.error, ''), (CASE WHEN r.id IS NOT NULL THEN r.spend_usd + coalesce((SELECT sum(c.cost_usd) FROM brand_call c WHERE c.run_id = r.id), 0)
 				WHEN j.job IN ('other_brands', 'brand_logos') THEN coalesce((SELECT sum(c.cost_usd) FROM brand_call c WHERE c.job_run_id = j.id), 0) END)::float8
 		FROM job_run j LEFT JOIN run r ON r.id = j.run_id ORDER BY j.started_at DESC, j.id DESC LIMIT $1`, limit)
@@ -375,6 +376,6 @@ func (s *Service) Jobs(ctx context.Context, limit int) ([]Job, error) {
 	}
 	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (Job, error) {
 		var j Job
-		return j, r.Scan(&j.ID, &j.Job, &j.Trigger, &j.RunID, &j.Status, &j.StartedAt, &j.FinishedAt, &j.Error, &j.SpendUSD)
+		return j, r.Scan(&j.ID, &j.Job, &j.Provider, &j.Trigger, &j.RunID, &j.Status, &j.StartedAt, &j.FinishedAt, &j.Error, &j.SpendUSD)
 	})
 }

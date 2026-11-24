@@ -31,7 +31,6 @@ import (
 	"github.com/unkeyed/byname/internal/db"
 	"github.com/unkeyed/byname/internal/discovery"
 	"github.com/unkeyed/byname/internal/engines"
-	"github.com/unkeyed/byname/internal/gsc"
 	"github.com/unkeyed/byname/internal/httpapi"
 	"github.com/unkeyed/byname/internal/instance"
 	"github.com/unkeyed/byname/internal/logos"
@@ -39,6 +38,7 @@ import (
 	"github.com/unkeyed/byname/internal/notify"
 	"github.com/unkeyed/byname/internal/results"
 	"github.com/unkeyed/byname/internal/scheduler"
+	"github.com/unkeyed/byname/internal/search"
 	"github.com/unkeyed/byname/internal/secretbox"
 	"github.com/unkeyed/byname/internal/social"
 	"github.com/unkeyed/byname/internal/sources"
@@ -77,11 +77,16 @@ type config struct {
 	// GSC_GOOGLE_CLIENT_ID + GSC_GOOGLE_CLIENT_SECRET, both or neither: the
 	// instance's own Google OAuth client for Sign in with Google on the
 	// Search Console connection.
-	GSCClient gsc.OAuthClient
+	GSCClient search.OAuthClient
 	// GSC_GOOGLE_BASE_URL, optional and for tests and local development
 	// only: sends every Google call the Search Console connection makes to
 	// a fake Google at this URL. Never set it in production.
 	GSCBaseURL string
+	// SEARCH_BING_BASE_URL, optional and for tests and local development
+	// only: sends every Bing Webmaster Tools call to a fake at this URL
+	// instead of https://ssl.bing.com/webmaster/api.svc/json. Never set it
+	// in production.
+	BingBaseURL string
 	// GITHUB_API_BASE_URL, optional and for tests and local development
 	// only: sends every GitHub call site changes makes to a fake GitHub at
 	// this URL. Never set it in production.
@@ -280,13 +285,16 @@ func loadConfig() (config, error) {
 	if c.GSCBaseURL, err = baseURLEnv("GSC_GOOGLE_BASE_URL"); err != nil {
 		return c, err
 	}
+	if c.BingBaseURL, err = baseURLEnv("SEARCH_BING_BASE_URL"); err != nil {
+		return c, err
+	}
 	if c.GitHubBaseURL, err = baseURLEnv("GITHUB_API_BASE_URL"); err != nil {
 		return c, err
 	}
 	if c.BlueskyBaseURL, err = baseURLEnv("BLUESKY_BASE_URL"); err != nil {
 		return c, err
 	}
-	c.GSCClient = gsc.OAuthClient{ID: os.Getenv("GSC_GOOGLE_CLIENT_ID"), Secret: os.Getenv("GSC_GOOGLE_CLIENT_SECRET")}
+	c.GSCClient = search.OAuthClient{ID: os.Getenv("GSC_GOOGLE_CLIENT_ID"), Secret: os.Getenv("GSC_GOOGLE_CLIENT_SECRET")}
 	if (c.GSCClient.ID == "") != (c.GSCClient.Secret == "") {
 		return c, errors.New("set both GSC_GOOGLE_CLIENT_ID and GSC_GOOGLE_CLIENT_SECRET to connect Search Console with Google sign-in, or neither to connect it with a service account only")
 	}
@@ -487,13 +495,13 @@ func run(log *slog.Logger) error {
 	brands := discovery.New(pool, settings, discovery.Options{Log: log})
 	logoLookups := logos.New(pool, settings, logos.Options{Log: log, Client: sources.PublicClient(cfg.SourcesAllowPrivate)})
 	runs := checks.New(pool, settings, checks.Options{Log: log, Alerts: alerts, Finder: brands})
-	search := gsc.New(pool, gsc.Options{
-		Secrets: cfg.Secrets, Endpoints: gsc.GoogleEndpoints(cfg.GSCBaseURL), Client: cfg.GSCClient,
+	traffic := search.New(pool, search.Options{
+		Secrets: cfg.Secrets, BaseURLs: map[search.Provider]string{search.Google: cfg.GSCBaseURL, search.Bing: cfg.BingBaseURL}, GoogleClient: cfg.GSCClient,
 		PublicURL: cfg.Auth.PublicURL, Terms: settings, Alerts: alerts,
 	})
-	site := changes.New(pool, search, changes.Options{Secrets: cfg.Secrets, Alerts: alerts, GitHubBaseURL: cfg.GitHubBaseURL})
+	site := changes.New(pool, traffic, changes.Options{Secrets: cfg.Secrets, Alerts: alerts, GitHubBaseURL: cfg.GitHubBaseURL})
 	mentions := social.New(pool, settings, social.Options{Alerts: alerts, BaseURLs: map[social.Network]string{social.Bluesky: cfg.BlueskyBaseURL}})
-	if err := sealSecrets(ctx, log, users, settings, alerts, search, site); err != nil {
+	if err := sealSecrets(ctx, log, users, settings, alerts, traffic, site); err != nil {
 		return err
 	}
 	if err := announceSetup(ctx, log, users, cfg.SetupToken); err != nil {
@@ -505,7 +513,7 @@ func run(log *slog.Logger) error {
 	authn := &auth.Authenticator{Keys: auth.NewKeyStore(pool, cfg.Unkey), Users: users, OAuth: auth.NewOAuthServer(pool, cfg.Auth.PublicURL)}
 
 	services := app.Services{Instance: instance.New(version, pool, settings, mentions, brands), Config: settings, Checks: runs, Results: res, Notify: alerts,
-		GSC: search, Changes: site, Social: mentions, Discovery: brands, Logos: logoLookups}
+		Search: traffic, Changes: site, Social: mentions, Discovery: brands, Logos: logoLookups}
 	mux := httpapi.NewMux(services, authn, log)
 	mux.Handle("/mcp", mcpserver.Handler(services, authn.OAuth, version))
 	mux.Handle("/", web.Handler())
@@ -537,13 +545,16 @@ func run(log *slog.Logger) error {
 	if cfg.GSCBaseURL != "" {
 		log.Warn("GSC_GOOGLE_BASE_URL is set: Search Console calls go to it, not to Google. Use it only in tests and local development", "gsc_google_base_url", cfg.GSCBaseURL)
 	}
+	if cfg.BingBaseURL != "" {
+		log.Warn("SEARCH_BING_BASE_URL is set: Bing Webmaster Tools calls go to it, not to Bing. Use it only in tests and local development", "search_bing_base_url", cfg.BingBaseURL)
+	}
 	var jobs sync.WaitGroup
 	if cfg.SourcesAllowPrivate {
 		log.Warn("SOURCES_ALLOW_PRIVATE_IPS is set: cited-source fetching and logo downloads may reach private and loopback addresses. Use it only in tests and local development")
 	}
 	cited := sources.New(pool, settings, sources.Options{AllowPrivate: cfg.SourcesAllowPrivate, UserAgent: "Byname/" + version, Log: log})
 	jobs.Go(func() {
-		scheduler.New(runs, settings, scheduler.Options{Log: log, Sources: cited, Search: search, Changes: site, Social: mentions,
+		scheduler.New(runs, settings, scheduler.Options{Log: log, Sources: cited, Search: traffic, Changes: site, Social: mentions,
 			OtherBrands: []scheduler.Ticker{brands, logoLookups}}).Run(db.Background(ctx))
 	})
 	jobs.Go(func() { alerts.Run(db.Background(ctx)) })
@@ -580,7 +591,7 @@ func run(log *slog.Logger) error {
 // sealSecrets reseals TOTP seeds and credentials sealed under
 // ENCRYPTION_KEY_PREVIOUS with ENCRYPTION_KEY, so a rotation finishes with
 // one restart.
-func sealSecrets(ctx context.Context, log *slog.Logger, users *auth.Users, settings *instconfig.Service, alerts *notify.Service, search *gsc.Service, site *changes.Service) error {
+func sealSecrets(ctx context.Context, log *slog.Logger, users *auth.Users, settings *instconfig.Service, alerts *notify.Service, traffic *search.Service, site *changes.Service) error {
 	totp, err := users.SealTOTPSecrets(ctx)
 	if err != nil {
 		return fmt.Errorf("encrypt TOTP seeds with ENCRYPTION_KEY: %w", err)
@@ -589,11 +600,11 @@ func sealSecrets(ctx context.Context, log *slog.Logger, users *auth.Users, setti
 	if err != nil {
 		return fmt.Errorf("encrypt credentials with ENCRYPTION_KEY: %w", err)
 	}
-	gscCreds, err := search.SealSecrets(ctx)
+	searchCreds, err := traffic.SealSecrets(ctx)
 	if err != nil {
-		return fmt.Errorf("encrypt the Search Console credential with ENCRYPTION_KEY: %w", err)
+		return fmt.Errorf("encrypt the search engine credentials with ENCRYPTION_KEY: %w", err)
 	}
-	creds += gscCreds
+	creds += searchCreds
 	repoCreds, err := site.SealSecrets(ctx)
 	if err != nil {
 		return fmt.Errorf("encrypt the GitHub token with ENCRYPTION_KEY: %w", err)

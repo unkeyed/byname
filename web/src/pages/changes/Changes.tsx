@@ -1,12 +1,12 @@
 import { useState, type FormEvent, type ReactNode } from "react";
 import { Link } from "react-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, type Change, type ChangeKind, type GscStatus, type RepoStatus } from "../../api";
-import { keys, useChanges, useChangeSettings, useGsc, useMe, useRepo } from "../../queries";
+import { api, type Change, type ChangeKind, type RepoStatus, type SearchStatus } from "../../api";
+import { keys, useChanges, useChangeSettings, useMe, useRepo, useSearchProviders } from "../../queries";
 import { Badge, Button, buttonClass, Card, CardHeader, cx, Dialog, DialogBody, EmptyState, ErrorNote, Field, Icon, inputClass, Pending, RelativeTime, RowButton, scrollArea, ScrollX, selectClass, useLoading, useWide, type Tone } from "../../ui";
 import { ViewHeader } from "../results/Header";
 import { fullDay } from "../search/model";
-import { Note, settingsPath as searchConsolePath } from "../search/Search";
+import { Note, settingsPath as searchEnginesPath } from "../search/Search";
 import { ChangeDrawer, ChangeSource, useOpenChange } from "./ChangeDrawer";
 import { ControlPagesCard } from "./ControlPages";
 import { changeKinds, changeStatus, feed, kindInfo, outcomeInfo, pagePath, siteChangesPath, stageInfo, todayIn, useZone, type Feed, type Zone } from "./model";
@@ -17,10 +17,11 @@ export function Changes() {
   const admin = me.data?.role === "admin";
   const changes = useChanges();
   const repo = useRepo();
-  const gsc = useGsc();
+  const providers = useSearchProviders();
+  const google = providers.data?.find((s) => s.provider === "google");
   const zone = useZone();
   const [logging, setLogging] = useState(false);
-  useLoading(gsc.isPending);
+  useLoading(providers.isPending);
   return (
     <>
       <ViewHeader
@@ -38,7 +39,7 @@ export function Changes() {
       />
       <div className={cx("relative min-h-0 flex-1 px-3 py-4 md:px-5 md:py-5", scrollArea)}>
         <div className="mx-auto max-w-6xl space-y-4">
-          <Notices gsc={gsc.data} repo={repo.data} admin={admin} zone={zone} />
+          <Notices google={google} repo={repo.data} admin={admin} zone={zone} />
           <ChangesCard changes={changes.data} error={changes.error ?? repo.error} repo={repo.data} admin={admin} canEdit={canEdit} zone={zone} onLog={() => setLogging(true)} />
           <ControlPagesCard canEdit={canEdit} />
         </div>
@@ -51,7 +52,7 @@ export function Changes() {
   );
 }
 
-function Notices({ gsc, repo, admin, zone }: { gsc: GscStatus | undefined; repo: RepoStatus | undefined; admin: boolean; zone: Zone }) {
+function Notices({ google, repo, admin, zone }: { google: SearchStatus | undefined; repo: RepoStatus | undefined; admin: boolean; zone: Zone }) {
   const fix = (to: string, label: string) =>
     admin && (
       <>
@@ -63,10 +64,10 @@ function Notices({ gsc, repo, admin, zone }: { gsc: GscStatus | undefined; repo:
     );
   return (
     <>
-      {gsc && !gsc.connected && (
+      {google && !google.connected && (
         <Note tone="warn" icon="alert">
-          Search Console is not connected, so Byname can&apos;t see when Google saw a changed page or measure its results. Changes are still recorded.
-          {fix(searchConsolePath, "Connect Search Console")}
+          Google Search Console is not connected, so Byname can&apos;t see when Google saw a changed page or measure its results. Changes are still recorded.
+          {fix(searchEnginesPath, "Connect Search Console")}
         </Note>
       )}
       {repo?.connected && repo.expiring_soon && repo.token_expires_at && (

@@ -17,8 +17,8 @@ export function SiteChanges() {
       <SettingsHeader title="Site changes" />
       <p className="mb-6 text-sm text-muted">
         No GitHub? Log changes by hand under{" "}
-        <Link to="/google/site-changes" className="text-fg underline underline-offset-2">
-          Google search, Site changes
+        <Link to="/search/site-changes" className="text-fg underline underline-offset-2">
+          Search, Site changes
         </Link>
         .
       </p>

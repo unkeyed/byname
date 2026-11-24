@@ -3,7 +3,9 @@
 // first crawl of each page after its change (recrawl watch, through URL
 // Inspection), and the interim and final difference-in-differences reads
 // against control pages (verdicts). The hourly poll and the follow-up
-// after each Search Console sync run from the scheduler through Tick.
+// after each Google sync run from the scheduler through Tick. All of it
+// reads Google alone: URL Inspection is Google's, and only Google reports
+// pages by day.
 package changes
 
 import (
@@ -20,16 +22,17 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/unkeyed/byname/internal/core"
-	"github.com/unkeyed/byname/internal/gsc"
 	"github.com/unkeyed/byname/internal/notify"
+	"github.com/unkeyed/byname/internal/search"
 	"github.com/unkeyed/byname/internal/secretbox"
 )
 
-// Search is what changes reads from Search Console (internal/gsc).
+// Search is what changes reads from Google's Search Console
+// (internal/search). It always asks for search.Google.
 type Search interface {
-	Status(ctx context.Context) (gsc.Status, error)
-	InspectURL(ctx context.Context, pageURL string) (gsc.Inspection, error)
-	PageDaily(ctx context.Context, page string, from, to time.Time) ([]gsc.Day, error)
+	Status(ctx context.Context, p search.Provider) (search.Status, error)
+	InspectURL(ctx context.Context, pageURL string) (search.Inspection, error)
+	GooglePageDaily(ctx context.Context, page string, from, to time.Time) ([]search.Day, error)
 }
 
 // Alerts stores and sends events (internal/notify). Emit is idempotent on
@@ -115,7 +118,7 @@ const (
 type Before struct {
 	From string `json:"from"`
 	To   string `json:"to"`
-	gsc.Totals
+	search.Totals
 }
 
 // Change is one page changed once, with where it is in the watch.
