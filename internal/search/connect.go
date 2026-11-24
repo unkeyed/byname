@@ -119,9 +119,9 @@ func (s *Service) dataSite(ctx context.Context, p Provider) (string, error) {
 }
 
 // ConnectKey checks a pasted key with p, then stores it sealed, keeping
-// the site already picked: a service account's JSON key for Google. For
-// Google, add the service account's email as a user on the site in Search
-// Console first.
+// the site already picked: a service account's JSON key for Google, the
+// account's API key for Bing. For Google, add the service account's email
+// as a user on the site in Search Console first.
 func (s *Service) ConnectKey(ctx context.Context, p Provider, key string) (Status, error) {
 	sp, err := lookup(p)
 	if err != nil {

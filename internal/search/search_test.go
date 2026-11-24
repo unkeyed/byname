@@ -25,6 +25,8 @@ const (
 	domainProperty = "sc-domain:fernhollow.dev"
 	prefixProperty = "https://www.fernhollow.dev/"
 	saEmail        = "byname@fernhollow-search.iam.gserviceaccount.com"
+	bingSite       = "https://www.fernhollow.dev/"
+	bingKey        = "0f1e2d3c4b5a69788796a5b4c3d2e1f0"
 )
 
 var admin = core.Actor{Via: core.ViaSession, ID: "1", UserID: 1, Name: "admin@fernhollow.dev", Role: core.Admin, Scopes: core.Scopes}
@@ -36,6 +38,7 @@ type env struct {
 	svc  *search.Service
 	cfg  *config.Service
 	fake *searchtest.Google
+	bing *searchtest.Bing
 	now  time.Time
 }
 
@@ -47,8 +50,12 @@ func newEnv(t *testing.T) *env {
 	fake.AddSite(prefixProperty, "siteFullUser")
 	fake.AddSite("https://blog.otherproject.io/", "siteRestrictedUser")
 	fake.AddSite("https://unverified.example/", "siteUnverifiedUser")
+	bing := searchtest.NewBing(t, bingKey)
+	bing.AddSite(bingSite, true)
+	bing.AddSite("https://blog.otherproject.io/", true)
+	bing.AddSite("https://staging.fernhollow.dev/", false)
 	cfg := config.New(pool, config.Options{Secrets: secretbox.ForTest()})
-	e := &env{t: t, ctx: context.Background(), db: pool, cfg: cfg, fake: fake,
+	e := &env{t: t, ctx: context.Background(), db: pool, cfg: cfg, fake: fake, bing: bing,
 		now: time.Date(2026, 11, 21, 9, 0, 0, 0, time.UTC)}
 	_, err := cfg.PutSettings(e.ctx, config.Settings{
 		Brand:  config.SelfBrand{Name: "Fernhollow", Aliases: []string{"Fern Hollow"}, Domains: []string{"fernhollow.dev"}},
@@ -58,13 +65,19 @@ func newEnv(t *testing.T) *env {
 	if err != nil {
 		t.Fatal(err)
 	}
-	u, _ := url.Parse("http://localhost:8080")
-	e.svc = search.New(pool, search.Options{
-		Secrets: secretbox.ForTest(), BaseURLs: map[search.Provider]string{search.Google: fake.URL},
-		GoogleClient: search.OAuthClient{ID: "test-client", Secret: "test-secret"}, PublicURL: u,
-		Terms: cfg, Now: func() time.Time { return e.now },
-	})
+	e.svc = e.service(nil)
 	return e
+}
+
+// service is a search service on e's fakes, raising events into alerts
+// when it is set.
+func (e *env) service(alerts search.Alerts) *search.Service {
+	u, _ := url.Parse("http://localhost:8080")
+	return search.New(e.db, search.Options{
+		Secrets: secretbox.ForTest(), BaseURLs: map[search.Provider]string{search.Google: e.fake.URL, search.Bing: e.bing.URL},
+		GoogleClient: search.OAuthClient{ID: "test-client", Secret: "test-secret"}, PublicURL: u,
+		Terms: e.cfg, Alerts: alerts, Now: func() time.Time { return e.now },
+	})
 }
 
 // day is today (Nov 21 in Pacific Time at e.now) minus n days.

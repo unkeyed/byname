@@ -82,6 +82,11 @@ type config struct {
 	// only: sends every Google call the Search Console connection makes to
 	// a fake Google at this URL. Never set it in production.
 	GSCBaseURL string
+	// SEARCH_BING_BASE_URL, optional and for tests and local development
+	// only: sends every Bing Webmaster Tools call to a fake at this URL
+	// instead of https://ssl.bing.com/webmaster/api.svc/json. Never set it
+	// in production.
+	BingBaseURL string
 	// GITHUB_API_BASE_URL, optional and for tests and local development
 	// only: sends every GitHub call site changes makes to a fake GitHub at
 	// this URL. Never set it in production.
@@ -278,6 +283,9 @@ func loadConfig() (config, error) {
 		c.ResendBaseURL = raw
 	}
 	if c.GSCBaseURL, err = baseURLEnv("GSC_GOOGLE_BASE_URL"); err != nil {
+		return c, err
+	}
+	if c.BingBaseURL, err = baseURLEnv("SEARCH_BING_BASE_URL"); err != nil {
 		return c, err
 	}
 	if c.GitHubBaseURL, err = baseURLEnv("GITHUB_API_BASE_URL"); err != nil {
@@ -488,7 +496,7 @@ func run(log *slog.Logger) error {
 	logoLookups := logos.New(pool, settings, logos.Options{Log: log, Client: sources.PublicClient(cfg.SourcesAllowPrivate)})
 	runs := checks.New(pool, settings, checks.Options{Log: log, Alerts: alerts, Finder: brands})
 	traffic := search.New(pool, search.Options{
-		Secrets: cfg.Secrets, BaseURLs: map[search.Provider]string{search.Google: cfg.GSCBaseURL}, GoogleClient: cfg.GSCClient,
+		Secrets: cfg.Secrets, BaseURLs: map[search.Provider]string{search.Google: cfg.GSCBaseURL, search.Bing: cfg.BingBaseURL}, GoogleClient: cfg.GSCClient,
 		PublicURL: cfg.Auth.PublicURL, Terms: settings, Alerts: alerts,
 	})
 	site := changes.New(pool, traffic, changes.Options{Secrets: cfg.Secrets, Alerts: alerts, GitHubBaseURL: cfg.GitHubBaseURL})
@@ -536,6 +544,9 @@ func run(log *slog.Logger) error {
 	}
 	if cfg.GSCBaseURL != "" {
 		log.Warn("GSC_GOOGLE_BASE_URL is set: Search Console calls go to it, not to Google. Use it only in tests and local development", "gsc_google_base_url", cfg.GSCBaseURL)
+	}
+	if cfg.BingBaseURL != "" {
+		log.Warn("SEARCH_BING_BASE_URL is set: Bing Webmaster Tools calls go to it, not to Bing. Use it only in tests and local development", "search_bing_base_url", cfg.BingBaseURL)
 	}
 	var jobs sync.WaitGroup
 	if cfg.SourcesAllowPrivate {

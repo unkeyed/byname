@@ -2,8 +2,9 @@
 // tools: connecting read-only, the daily sync of clicks, impressions and
 // position into Postgres, the numbers the Search page reads, branded
 // search terms, goals and alerts. registry is the one list of providers.
-// Each provider is one adapter file (google.go) that parses its engine's
-// API into reports and never touches SQL; everything else is shared.
+// Each provider is one adapter file (google.go, bing.go) that parses its
+// engine's API into reports and never touches SQL; everything else is
+// shared.
 package search
 
 import (
@@ -23,11 +24,14 @@ import (
 // job_run, and never change once shipped.
 type Provider string
 
-const Google Provider = "google"
+const (
+	Google Provider = "google"
+	Bing   Provider = "bing"
+)
 
 // registry is the one list of providers, in the order every list shows
 // them. Adding a provider is its adapter file and one entry here.
-var registry = []providerSpec{googleSpec}
+var registry = []providerSpec{googleSpec, bingSpec}
 
 type providerSpec struct {
 	Info
@@ -43,7 +47,7 @@ type providerSpec struct {
 // caveats from it.
 type Info struct {
 	Provider Provider     `json:"provider"`
-	Title    string       `json:"title" jsonschema:"the search engine, such as Google"`
+	Title    string       `json:"title" jsonschema:"the search engine, such as Google or Bing"`
 	Product  string       `json:"product" jsonschema:"its webmaster tools, such as Search Console"`
 	Methods  []MethodInfo `json:"methods" jsonschema:"the ways to connect it, in the order to offer them"`
 	StepDays int          `json:"step_days" jsonschema:"the days one stored row of searches or pages covers, 1 or 7; every window is a whole number of them"`
@@ -70,6 +74,7 @@ type Method string
 const (
 	MethodOAuth          Method = "oauth"           // Google: a person's account, through the instance's OAuth client
 	MethodServiceAccount Method = "service_account" // Google: a service account's JSON key
+	MethodAPIKey         Method = "api_key"         // Bing: the account's API key
 )
 
 func lookup(p Provider) (providerSpec, error) {
