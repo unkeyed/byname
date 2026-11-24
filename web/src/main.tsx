@@ -1,7 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { keepPreviousData, MutationCache, QueryCache, QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { createBrowserRouter, RouterProvider } from "react-router";
+import { createBrowserRouter, Navigate, RouterProvider, useLocation } from "react-router";
 import { ApiError } from "./api";
 import { keys } from "./queries";
 import { Layout, NotFound } from "./Layout";
@@ -25,7 +25,28 @@ import "@fontsource-variable/geist";
 import "@fontsource-variable/geist-mono";
 import "./index.css";
 
+/**
+ * Pages that moved when Bing joined Google. Notifications sent before
+ * still link to the old paths, and bookmarks keep them.
+ */
+const moved: Record<string, string> = {
+  "/google": "/search/traffic?provider=google",
+  "/google/traffic": "/search/traffic?provider=google",
+  "/google/site-changes": "/search/site-changes",
+  "/settings/search-console": "/settings/search-engines",
+  "/onboarding/search_console": "/onboarding/search",
+};
+
+/** Sends an old path to where it moved, keeping its query, such as a change's ?chg=. */
+function Moved({ to }: { to: string }) {
+  const { search, hash } = useLocation();
+  const url = new URL(to, window.location.origin);
+  new URLSearchParams(search).forEach((v, k) => url.searchParams.set(k, v));
+  return <Navigate to={url.pathname + url.search + hash} replace />;
+}
+
 const router = createBrowserRouter([
+  ...Object.entries(moved).map(([path, to]) => ({ path, element: <Moved to={to} /> })),
   { path: "/login", element: <Login /> },
   { path: "/invite/:token", element: <AcceptInvite /> },
   { path: "/setup/:token", element: <Setup /> },
