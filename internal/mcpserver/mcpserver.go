@@ -54,7 +54,27 @@ func Handler(svc app.Services, tokens AccessTokens, version string) http.Handler
 	addTools(srv, svc)
 	h := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server { return srv },
 		&mcp.StreamableHTTPOptions{Stateless: true})
-	return requireToken(tokens, h)
+	return anyOrigin(requireToken(tokens, h))
+}
+
+// anyOrigin opens CORS to every origin, as the OAuth endpoints do, so MCP
+// clients that run in a browser can call the tools they signed in for. The
+// token rides in the Authorization header, never a cookie, so a page can
+// only call with a token it already holds. A preflight is answered before
+// the token check, since browsers send it without one.
+func anyOrigin(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		h := w.Header()
+		h.Set("Access-Control-Allow-Origin", "*")
+		h.Set("Access-Control-Expose-Headers", "WWW-Authenticate")
+		if r.Method == http.MethodOptions {
+			h.Set("Access-Control-Allow-Methods", "GET, POST, DELETE")
+			h.Set("Access-Control-Allow-Headers", "Authorization, Content-Type, MCP-Protocol-Version")
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 type verifiedKey struct{}
