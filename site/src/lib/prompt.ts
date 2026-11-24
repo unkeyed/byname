@@ -47,6 +47,6 @@ export const deployPrompt = `Deploy Byname (https://github.com/unkeyed/byname) t
 9. Check and hand over
    - PUBLIC_URL/healthz and PUBLIC_URL/auth/setup/SETUP_TOKEN both answer 200, and PUBLIC_URL/.env answers 403.
    - Give me PUBLIC_URL/setup/SETUP_TOKEN to create the first account with a passkey. Tell me to add a second passkey under Settings > Account.
-   - Tell me the next stop is onboarding: my brand and domain, competitors, questions, where people ask with a Treg token or my own keys, Search Console, and the schedule with spend caps. Nothing runs until I finish it.
+   - Tell me the next stop is onboarding: my brand and domain, competitors, questions, the AI apps to ask with a Treg token or my own keys, Search Console, social mentions, and the schedule with spend caps. Nothing runs until I finish it.
    - Tell me that each later deploy leaves the previous deployment running, and to stop it once the new one is current.
    - Finish with a short summary: the URL, the Unkey project, the variables you set, where the encryption key is saved, and anything you could not do.`;
