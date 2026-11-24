@@ -375,6 +375,27 @@ func TestMCPRefusesAPIKeys(t *testing.T) {
 	agent.call("GET", "/v1/status", nil, http.StatusOK, nil)
 }
 
+// A browser-hosted MCP client gets past the preflight without a token and
+// can read the 401's challenge that starts sign-in.
+func TestMCPAllowsBrowserClients(t *testing.T) {
+	anon, _ := newLocalServer(t)
+	r := anon.raw("OPTIONS", "/mcp", nil, map[string]string{
+		"Origin": "https://inspector.example", "Access-Control-Request-Method": "POST",
+		"Access-Control-Request-Headers": "authorization, content-type, mcp-protocol-version",
+	})
+	allowed := strings.ToLower(r.header.Get("Access-Control-Allow-Headers"))
+	if r.code != http.StatusNoContent || r.header.Get("Access-Control-Allow-Origin") != "*" ||
+		!strings.Contains(r.header.Get("Access-Control-Allow-Methods"), "POST") ||
+		!strings.Contains(allowed, "authorization") || !strings.Contains(allowed, "mcp-protocol-version") {
+		t.Fatalf("preflight = %d %v, want 204 allowing any origin to POST with a token", r.code, r.header)
+	}
+	r = mcpStatus(anon, "")
+	if r.code != http.StatusUnauthorized || r.header.Get("Access-Control-Allow-Origin") != "*" ||
+		!strings.Contains(r.header.Get("Access-Control-Expose-Headers"), "WWW-Authenticate") {
+		t.Fatalf("POST /mcp without a token = %d %v, want a 401 a browser can read", r.code, r.header)
+	}
+}
+
 // The consent page offers the scopes a client asked for, the person picks
 // from them within their role, the grant keeps the choice, and /mcp holds
 // the connection to it.

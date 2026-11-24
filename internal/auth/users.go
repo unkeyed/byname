@@ -82,7 +82,7 @@ type ThrottledError struct {
 }
 
 func (e *ThrottledError) Error() string {
-	return fmt.Sprintf("too many failed attempts, try again in %s", e.RetryAfter)
+	return fmt.Sprintf("too many attempts, try again in %s", e.RetryAfter)
 }
 
 // User is a person who can sign into the UI.

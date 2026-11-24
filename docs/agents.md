@@ -79,6 +79,8 @@ From then on the agent acts as you, with the scopes you ticked. A client that as
 
 Any app can register with any name, so the consent page marks every app **Unverified**. Approve only an app you just started connecting, and check where it sends you back.
 
+Each IP address can register 20 apps and start 30 connections every 10 minutes, which covers a team behind one office network. Past that, `/oauth/register` answers `429` with `Retry-After`, and `/oauth/authorize` shows a page that asks you to wait. The wait ends with the 10 minutes, however many more requests arrive. `/mcp` and the OAuth endpoints accept calls from any origin, so a client that runs in a browser can connect too.
+
 Byname stores codes and tokens only as SHA-256 hashes. Access tokens start with `byn_at_` and refresh tokens with `byn_rt_`. A refresh token works once. Presenting it a second time revokes the whole connection, because then someone other than the client holds a copy.
 
 Every tool names the scope it needs in its `_meta`, under `byname.dev/scope`. A tool the connection lacks the scope for fails with a message that says which scope to reconnect with.

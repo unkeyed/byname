@@ -14,6 +14,7 @@ const refusals: Record<string, string> = {
   invalid_request: "The app did not protect its sign-in with PKCE, which Byname requires. Update the app, or ask its maker to support PKCE.",
   unsupported_response_type: "The app asked for a kind of sign-in Byname does not offer. Byname supports only the authorization code flow.",
   invalid_target: "The app asked for access to something other than this Byname's MCP server. Check the server URL in the app's settings.",
+  temporarily_unavailable: "Byname has had a lot of connection requests from your network in the last few minutes. Wait up to 10 minutes, then start connecting again from the app.",
 };
 
 /**
