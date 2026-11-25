@@ -222,10 +222,7 @@ func (s *Service) Brief(ctx context.Context, questionID, runID int64, sc Scope) 
 		t := panel.TallyOf(scoredOf(cell))
 		l := BriefLine{Series: cell[0].series, Title: lineTitle(cell[0].series.Pair), AnswerID: cell[0].id, AnswerIDs: idsOf(cell),
 			Answered: t.Answered, Named: t.Named, Linked: t.Cited, State: lineState(t.Mentioned(), t.MostlyCited()),
-			Brands: []string{}, FanOut: []string{}, Links: []string{}}
-		if t.Mentioned() {
-			l.Position = nullPosition(t.Position)
-		}
+			Position: nullPosition(t.Position), Brands: []string{}, FanOut: []string{}, Links: []string{}}
 		for _, a := range cell {
 			l.FanOut = appendNew(l.FanOut, a.fanOut...)
 			l.Links = appendNew(l.Links, links[a.id]...)

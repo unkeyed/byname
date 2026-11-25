@@ -28,8 +28,9 @@ type Tally struct {
 	// Answered counts the answers that did not fail, Named those that named
 	// you and Cited those that cited your domains.
 	Answered, Named, Cited int
-	// Position is your best position among the answers that named you, 0
-	// when none did.
+	// Position is your best position among the answers that named you
+	// when most of them did, and 0 otherwise, so a cell that reads as not
+	// naming you never shows a position.
 	Position int
 	// Mentions are the brands most answers named, in the order first named.
 	Mentions []Mention
@@ -68,6 +69,9 @@ func TallyOf(answers []Scored) Tally {
 		if 2*seen[m.Brand] > t.Answered {
 			t.Mentions = append(t.Mentions, m)
 		}
+	}
+	if !t.Mentioned() {
+		t.Position = 0
 	}
 	return t
 }

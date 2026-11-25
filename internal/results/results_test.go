@@ -431,10 +431,11 @@ func TestACellOfSeveralAnswersReadsAsMostOfThem(t *testing.T) {
 		}
 		return id
 	}
-	// answers stores one cell's samples: n for named, - for not, x for failed.
+	// answers stores one cell's samples: n for named, N for named and
+	// linked to your site, - for neither, x for failed.
 	answers := func(run, question, pair int64, samples string) {
 		for i, a := range samples {
-			status, named := "ok", a == 'n'
+			status, named, cited := "ok", a == 'n' || a == 'N', a == 'N'
 			if a == 'x' {
 				status = "failed"
 			}
@@ -443,7 +444,7 @@ func TestACellOfSeveralAnswersReadsAsMostOfThem(t *testing.T) {
 				position = new(1)
 			}
 			if _, err := e.db.Exec(ctx, `INSERT INTO answer (run_id, question_id, surface_model_id, sample, endpoint, fidelity, status, attempts, mentioned, cited, position)
-				VALUES ($1, $2, $3, $4, 'endpoint', 'model_match', $5, 1, $6, false, $7)`, run, question, pair, i+1, status, named, position); err != nil {
+				VALUES ($1, $2, $3, $4, 'endpoint', 'model_match', $5, 1, $6, $7, $8)`, run, question, pair, i+1, status, named, cited, position); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -547,12 +548,90 @@ func TestACellOfSeveralAnswersReadsAsMostOfThem(t *testing.T) {
 			t.Errorf("perplexity line = %+v, want 2 of 3 named, named most of the time, all 3 answers listed", l)
 		}
 	}
-	for _, want := range []string{"got 6 answers, 3 from each app and model.", "That is what most of its 3 answers did: 2 named"} {
+	for _, want := range []string{
+		"got 6 answers, 3 from each app and model.",
+		"- Named Northwind in all 3 of its answers, at best as brand #1, and never linked to its site.",
+		"- Named Northwind in 2 of its 3 answers, at best as brand #1, and never linked to its site.",
+	} {
 		if !strings.Contains(b.Prompt, want) {
 			t.Errorf("brief prompt does not say %q:\n%s", want, b.Prompt)
 		}
 	}
 	if b, err := e.results.Brief(ctx, q2, after, results.Scope{}); err != nil || b.Answered != 5 || !strings.Contains(b.Prompt, "got 5 answers, several from some apps and models.") {
 		t.Errorf("brief on a cell with a failed answer = %+v %v, want 5 answers, several from some apps and models", b, err)
+	}
+
+	// A cell that named you in 1 of 2 answers, its third failed, is half
+	// and not most: it reads as not naming you and shows no position.
+	tied := run()
+	answers(tied, q1, claude, "N-x")
+	answers(tied, q2, perplexity, "NNx")
+	c, err = e.results.Compare(ctx, after, tied)
+	if err != nil || c.Counts[panel.Lost] != 1 {
+		t.Fatalf("compare = %+v %v, want the tied cell lost", c, err)
+	}
+	for _, p := range c.Pairs {
+		if p.PairID == claude && p.QuestionID == q1 && (p.After == nil || p.After.Mentioned || p.After.Position != nil || p.After.Named != 1 || p.After.Answered != 2) {
+			t.Errorf("tied after = %+v, want 1 of 2 named, not mentioned, no position", p.After)
+		}
+	}
+	table, err = e.results.RunQuestions(ctx, tied, results.Scope{})
+	if err != nil || len(table.Rows) != 2 || table.Rows[0].Question.ID != q1 {
+		t.Fatalf("tied table = %+v %v, want both questions, the tied one first", table, err)
+	}
+	for i, sr := range table.Columns {
+		if c := table.Rows[0].Cells[i]; sr.Pair.ID == claude && (c == nil || c.Mentioned || c.Position != nil || c.Named != 1) {
+			t.Errorf("tied cell = %+v, want 1 of 2 named and no position", c)
+		}
+	}
+	if r := table.Rows[0]; r.Named != 0 || r.BestPosition != nil {
+		t.Errorf("tied row = %+v, want no cell naming you and no best position", r)
+	}
+	h, err = e.results.QuestionHistory(ctx, q1, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, s := range h.Series {
+		if s.Pair.ID != claude {
+			continue
+		}
+		if p := s.Points[len(s.Points)-1]; p.RunID != tied || p.Mentioned || p.Position != nil || p.Named != 1 || p.Summary != "Lost mention (was #1)" {
+			t.Errorf("tied point = %+v, want 1 of 2 named, no position, lost", p)
+		}
+	}
+	gaps, err = e.results.Gaps(ctx, tied, results.Scope{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, g := range gaps.Gaps {
+		if g.Question.ID != q1 {
+			continue
+		}
+		if len(g.Pairs) != 1 || g.Pairs[0].Named || g.Pairs[0].Position != nil || g.Pairs[0].NamedAnswers != 1 {
+			t.Errorf("tied gap = %+v, want Claude 1 of 2 named, no position", g)
+		}
+	}
+	prompts, err = e.results.Prompts(ctx, nil, results.Scope{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, r := range prompts.Rows {
+		if r.Question.ID == q1 && (len(r.NamedBy) != 0 || r.BestPosition != nil) {
+			t.Errorf("tied prompt = %+v, want no pair naming you and no best position", r)
+		}
+	}
+	b, err = e.results.Brief(ctx, q1, tied, results.Scope{})
+	if err != nil || len(b.Lines) != 1 {
+		t.Fatalf("tied brief = %+v %v, want one line", b, err)
+	}
+	if l := b.Lines[0]; l.State != results.LineMissed || l.Position != nil || l.Named != 1 || l.Linked != 1 {
+		t.Errorf("tied line = %+v, want missed, as neither most answers named you nor most linked, and no position", l)
+	}
+	if want := "- Named Northwind in 1 of its 2 answers and linked to its site in 1.\n"; !strings.Contains(b.Prompt, want) || strings.Contains(b.Prompt, "most of its") {
+		t.Errorf("tied brief prompt does not say %q, or says most:\n%s", want, b.Prompt)
+	}
+	b, err = e.results.Brief(ctx, q2, tied, results.Scope{})
+	if want := "- Named Northwind in both its answers, at best as brand #1, and linked to its site in both.\n"; err != nil || !strings.Contains(b.Prompt, want) {
+		t.Errorf("brief on 2 of 2 does not say %q: %v\n%s", want, err, b.Prompt)
 	}
 }

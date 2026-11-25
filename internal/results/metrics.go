@@ -245,7 +245,7 @@ type GapPair struct {
 	AnswerIDs    []int64        `json:"answer_ids" jsonschema:"every sample's answer, in sample order"`
 	Status       engines.Status `json:"status" jsonschema:"failed only when every answer failed"`
 	Named        bool           `json:"named" jsonschema:"most answers named you"`
-	Position     *int           `json:"position" jsonschema:"your best position among the answers that named you"`
+	Position     *int           `json:"position" jsonschema:"your best position among the answers that named you; null unless most did"`
 	Answered     int            `json:"answered" jsonschema:"answers that did not fail"`
 	NamedAnswers int            `json:"named_answers" jsonschema:"answers that named you"`
 	// FanOut is the web searches the engine ran for the question, empty

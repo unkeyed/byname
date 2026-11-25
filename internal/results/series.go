@@ -84,7 +84,7 @@ type Standing struct {
 	Status    engines.Status `json:"status" jsonschema:"failed only when every answer failed"`
 	Mentioned bool           `json:"mentioned" jsonschema:"most answers named you"`
 	Cited     bool           `json:"cited" jsonschema:"most answers cited your domains"`
-	Position  *int           `json:"position" jsonschema:"your best position among the answers that named you"`
+	Position  *int           `json:"position" jsonschema:"your best position among the answers that named you; null unless most did"`
 	Answered  int            `json:"answered" jsonschema:"answers that did not fail"`
 	Named     int            `json:"named" jsonschema:"answers that named you"`
 }
@@ -251,7 +251,7 @@ type Point struct {
 	Status        engines.Status `json:"status" jsonschema:"failed only when every answer failed"`
 	Mentioned     bool           `json:"mentioned" jsonschema:"most answers named you"`
 	Cited         bool           `json:"cited" jsonschema:"most answers cited your domains"`
-	Position      *int           `json:"position" jsonschema:"your best position among the answers that named you"`
+	Position      *int           `json:"position" jsonschema:"your best position among the answers that named you; null unless most did"`
 	Answered      int            `json:"answered" jsonschema:"answers that did not fail"`
 	Named         int            `json:"named" jsonschema:"answers that named you"`
 	ReportedModel string         `json:"reported_model" jsonschema:"the model the first sample's answer reported"`
@@ -265,7 +265,7 @@ type HistorySeries struct {
 	Answered     int     `json:"answered" jsonschema:"runs whose answers did not all fail"`
 	Named        int     `json:"named" jsonschema:"runs where most answers named you"`
 	Cited        int     `json:"cited" jsonschema:"runs where most answers cited your domains"`
-	BestPosition *int    `json:"best_position" jsonschema:"your best position over these runs; null when never named"`
+	BestPosition *int    `json:"best_position" jsonschema:"your best position over the runs most answers named you on; null when there are none"`
 	Points       []Point `json:"points"`
 }
 

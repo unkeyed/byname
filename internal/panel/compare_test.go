@@ -172,10 +172,10 @@ func TestTallyReadsWhatMostAnswersSay(t *testing.T) {
 	}{
 		{"2 of 3 named you, the best at #1", []Scored{named(2), notNamed(), cited(named(1, contoso))},
 			engines.StatusOK, 3, 2, 1, true, false, 1, nil},
-		{"1 of 3 is not most", []Scored{cited(named(1)), cited(notNamed()), notNamed()},
-			engines.StatusOK, 3, 1, 2, false, true, 1, nil},
-		{"half is not most", []Scored{named(1), notNamed()},
-			engines.StatusOK, 2, 1, 0, false, false, 1, nil},
+		{"1 of 3 is not most, so no position", []Scored{cited(named(1)), cited(notNamed()), notNamed()},
+			engines.StatusOK, 3, 1, 2, false, true, 0, nil},
+		{"half is not most, so no position", []Scored{named(1), notNamed()},
+			engines.StatusOK, 2, 1, 0, false, false, 0, nil},
 		{"a failed answer is left out", []Scored{named(3), failedAnswer},
 			engines.StatusOK, 1, 1, 0, true, false, 3, nil},
 		{"every answer failed", []Scored{failedAnswer, failedAnswer},
@@ -183,7 +183,7 @@ func TestTallyReadsWhatMostAnswersSay(t *testing.T) {
 		{"no AI answer and a failure", []Scored{noAnswer, failedAnswer},
 			engines.StatusNoAnswer, 1, 0, 0, false, false, 0, nil},
 		{"competitors most answers named", []Scored{notNamed(fabrikam, contoso), notNamed(contoso), named(1)},
-			engines.StatusOK, 3, 1, 0, false, false, 1, []BrandID{contoso}},
+			engines.StatusOK, 3, 1, 0, false, false, 0, []BrandID{contoso}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			got := TallyOf(tc.answers)

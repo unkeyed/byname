@@ -17,7 +17,7 @@ type Cell struct {
 	Status    engines.Status `json:"status" jsonschema:"failed only when every answer failed"`
 	Mentioned bool           `json:"mentioned" jsonschema:"most answers named you"`
 	Cited     bool           `json:"cited" jsonschema:"most answers cited your domains"`
-	Position  *int           `json:"position" jsonschema:"your best position among the answers that named you"`
+	Position  *int           `json:"position" jsonschema:"your best position among the answers that named you; null unless most did"`
 	Answered  int            `json:"answered" jsonschema:"answers that did not fail"`
 	Named     int            `json:"named" jsonschema:"answers that named you"`
 	// Outcome is the change since the previous run: not_comparable when
@@ -33,7 +33,7 @@ type QuestionRow struct {
 	Answered     int     `json:"answered" jsonschema:"cells that did not fail"`
 	Named        int     `json:"named" jsonschema:"cells where most answers named you"`
 	Cited        int     `json:"cited" jsonschema:"cells where most answers cited your domains"`
-	BestPosition *int    `json:"best_position" jsonschema:"your best position in the row's answers; null when none named you"`
+	BestPosition *int    `json:"best_position" jsonschema:"your best position in the row's cells that most answers named you on; null when there are none"`
 	Gained       int     `json:"gained" jsonschema:"cells that gained a mention since the previous run"`
 	Lost         int     `json:"lost"`
 	Moved        int     `json:"moved"`

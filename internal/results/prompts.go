@@ -43,7 +43,7 @@ type PromptRow struct {
 	// ones most answers named you on.
 	Answered     int      `json:"answered"`
 	NamedBy      []Series `json:"named_by"`
-	BestPosition *int     `json:"best_position" jsonschema:"your best position on the latest run; null when no answer named you"`
+	BestPosition *int     `json:"best_position" jsonschema:"your best position on the latest run, among the pairs most answers named you on; null when there are none"`
 	Instead      []string `json:"instead" jsonschema:"competitors named on the latest run by answers that did not name you, most often first"`
 	// Dots line up with Prompts.Runs, null where the question was not asked.
 	Dots []*Dot `json:"dots"`

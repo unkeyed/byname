@@ -6388,7 +6388,7 @@ components:
         position:
           type: [integer, "null"]
           minimum: 1
-          description: Your best position among the answers that named you, 1 first. Null when none did.
+          description: Your best position among the answers that named you, 1 first. Null unless most did.
         answered:
           type: integer
           description: Answers that did not fail.
@@ -6530,7 +6530,7 @@ components:
         position:
           type: [integer, "null"]
           minimum: 1
-          description: Your best position among the answers that named you, 1 first. Null when none did.
+          description: Your best position among the answers that named you, 1 first. Null unless most did.
         answered:
           type: integer
           description: Answers that did not fail.
@@ -6561,7 +6561,7 @@ components:
             best_position:
               type: [integer, "null"]
               minimum: 1
-              description: Your best position over these runs. Null when never named.
+              description: Your best position over the runs most answers named you on. Null when there are none.
             points:
               type: array
               items:
@@ -6845,7 +6845,7 @@ components:
         position:
           type: [integer, "null"]
           minimum: 1
-          description: Your best position among the answers that named you, 1 first. Null when none did.
+          description: Your best position among the answers that named you, 1 first. Null unless most did.
         answered:
           type: integer
           description: Answers that did not fail.
@@ -6879,7 +6879,7 @@ components:
         best_position:
           type: [integer, "null"]
           minimum: 1
-          description: Your best position in the row's answers. Null when none named you.
+          description: Your best position in the row's cells that most answers named you on. Null when there are none.
         gained:
           type: integer
           description: Cells that gained a mention since the previous run.
@@ -7456,7 +7456,7 @@ components:
               description: Most answers named you.
             position:
               type: [integer, "null"]
-              description: Your best position among the answers that named you.
+              description: Your best position among the answers that named you. Null unless most did.
             answered:
               type: integer
               description: Answers that did not fail.
@@ -7625,6 +7625,7 @@ components:
           description: The pairs most answers named you on in the latest run.
         best_position:
           type: [integer, "null"]
+          description: Your best position on the latest run, among the pairs most answers named you on. Null when there are none.
         instead:
           type: array
           items:

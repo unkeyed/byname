@@ -30,7 +30,7 @@ Through the API, `GET /v1/metrics/summary` and every rate point carry `mention_b
 
 More answers make the band tighter and a move easier to trust. The band counts every answer. The move test weighs every answer too, so a question that named you in 1 of 3 answers and then in 3 of 3 counts toward a move.
 
-With several answers, a question in one AI app counts as naming you when most of its answers do, such as 2 of 3. The questions table, **What changed**, **Missed questions** and the question's history go by that, and each shows how many of the answers named you. Gained means most answers did not name you before and most do now. Moved means most named you both times and your best position among them changed. Named you and Linked to your site count every answer.
+With several answers, a question in one AI app counts as naming you when most of its answers do, such as 2 of 3. Half, such as 1 of 2, is not most. Such a question shows no position, even though one answer named you. The questions table, **What changed**, **Missed questions** and the question's history go by that, and each shows how many of the answers named you. Gained means most answers did not name you before and most do now. Moved means most named you both times and your best position among them changed. Named you and Linked to your site count every answer.
 
 A check asks every question once in every AI app before it asks any a second time. A check that reaches its spend cap still has an answer for every question it got to.
 
