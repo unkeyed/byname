@@ -251,7 +251,7 @@ export function MonthSpend() {
         <dl className="grid gap-x-6 gap-y-2 sm:grid-cols-[auto_1fr]">
           <dt className="text-muted">One check</dt>
           <dd className="first-letter:uppercase">
-            {price.amount}: {e.questions} questions in {appCount(c)} AI apps, {e.calls} answers
+            {price.amount}: {e.questions} questions in {appCount(c)} AI apps{e.samples > 1 && `, ${e.samples} times each`}, {e.calls} answers
             {e.find_brands ? `, with ${money(e.find_brands.cost_usd)} to read them for other brands.` : "."}
             {price.unknown && <span className="text-muted"> {price.unknown}</span>}
           </dd>

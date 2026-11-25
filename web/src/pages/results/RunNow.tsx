@@ -101,7 +101,8 @@ function ConfirmCheck({ onConfirm, onCancel, pending, error }: { onConfirm: () =
       <div className="space-y-3 text-sm">
         {e && price ? (
           <p>
-            Ask your {e.questions} {e.questions === 1 ? "question" : "questions"} in {appCount(c)} {appCount(c) === 1 ? "AI app" : "AI apps"} now? That is {e.calls} answers, {price.amount}.
+            Ask your {e.questions} {e.questions === 1 ? "question" : "questions"} in {appCount(c)} {appCount(c) === 1 ? "AI app" : "AI apps"}
+            {e.samples > 1 && `, ${e.samples} times each,`} now? That is {e.calls} answers, {price.amount}.
             {price.unknown && <span className="text-muted"> {price.unknown}</span>}
           </p>
         ) : (

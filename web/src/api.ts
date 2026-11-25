@@ -470,7 +470,9 @@ export interface EstimateRow {
 export interface Estimate {
   questions: number;
   pairs: number;
-  /** Questions times active pairs. */
+  /** Times a check asks each question on each pair, from the settings. */
+  samples: number;
+  /** Questions times active pairs times samples. */
   calls: number;
   /** Over the pairs with a cost per call, plus reading the answers for other brands when that is on. */
   known_usd: number;

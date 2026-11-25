@@ -242,6 +242,22 @@ func TestEstimate(t *testing.T) {
 		t.Errorf("known = %v, want the sum of both pairs and reading their answers", est.KnownUSD)
 	}
 
+	if _, err := db.Exec(ctx, `UPDATE instance_settings SET samples = 3`); err != nil {
+		t.Fatal(err)
+	}
+	if est, err = svc.Estimate(ctx); err != nil || est.Samples != 3 || est.Calls != 12 || est.FindBrands == nil || est.FindBrands.Answers != 12 ||
+		!near(est.KnownUSD, 3*(2*0.055+2*0.004+find)) {
+		t.Errorf("asking each question 3 times: %+v %v, want 12 answers, each paid for and read", est, err)
+	}
+	for _, r := range est.Rows {
+		if r.Calls != 6 {
+			t.Errorf("%s: %d calls, want 2 questions x 3 times", r.Surface, r.Calls)
+		}
+	}
+	if _, err := db.Exec(ctx, `UPDATE instance_settings SET samples = 1`); err != nil {
+		t.Fatal(err)
+	}
+
 	if _, err := db.Exec(ctx, `WITH r AS (INSERT INTO run (question_set_id, trigger, status) SELECT id, 'run_now', 'completed' FROM question_set RETURNING id)
 		INSERT INTO answer (run_id, question_id, surface_model_id, endpoint, fidelity, status, attempts, mentioned, cited, cost_usd)
 		SELECT r.id, q.id, m.id, $1, 'model_match', 'ok', 1, false, false, c.cost

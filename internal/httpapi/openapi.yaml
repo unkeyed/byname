@@ -5927,15 +5927,18 @@ components:
           type: string
     Estimate:
       type: object
-      required: [questions, pairs, calls, known_usd, unknown_pairs, rows, find_brands]
+      required: [questions, pairs, samples, calls, known_usd, unknown_pairs, rows, find_brands]
       properties:
         questions:
           type: integer
         pairs:
           type: integer
+        samples:
+          type: integer
+          description: Times a check asks each question on each pair, from the settings.
         calls:
           type: integer
-          description: Questions times enabled pairs.
+          description: Questions times enabled pairs times samples.
         known_usd:
           type: number
           description: The sum over pairs with a cost per call, plus reading the answers for other brands when that is on.

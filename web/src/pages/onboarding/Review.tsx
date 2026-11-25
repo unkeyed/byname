@@ -91,7 +91,8 @@ export function Review({ nav }: { nav: StepNav }) {
           </p>
           <p className="text-muted">
             Each check asks {plural(est.questions, "question")} in {plural(est.pairs, "AI app")}
-            {est.pairs !== enabled.length && " and model"}, {plural(est.calls, "answer")} in all. At every {s.check_every_days === 1 ? "day" : `${s.check_every_days} days`} that is{" "}
+            {est.pairs !== enabled.length && " and model"}
+            {est.samples > 1 && `, ${est.samples} times each`}, {plural(est.calls, "answer")} in all. At every {s.check_every_days === 1 ? "day" : `${s.check_every_days} days`} that is{" "}
             {money(c.checks.month_usd, "about")} a month
             {socialMonth > 0 ? <>, plus {money(socialMonth, "about")} a month for social mentions.</> : "."}
             {est.unknown_pairs > 0 && ` ${plural(est.unknown_pairs, "AI app")} ${est.unknown_pairs === 1 ? "has" : "have"} no price yet, so the first check will tell.`}

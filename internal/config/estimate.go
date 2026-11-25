@@ -25,13 +25,14 @@ const (
 )
 
 // Estimate is what one check is expected to cost: calls are questions
-// times active pairs, and each pair's cost per call is a mean of past
+// times active pairs times samples, and each pair's cost per call is a mean of past
 // answers or a sample. Token-billed answers vary with every call, so this is
 // only ever an estimate, and pairs with neither a history nor a sample are
 // counted as unknown rather than guessed.
 type Estimate struct {
 	Questions    int           `json:"questions"`
 	Pairs        int           `json:"pairs"`
+	Samples      int           `json:"samples" jsonschema:"times a check asks each question on each pair, from the settings"`
 	Calls        int           `json:"calls"`
 	KnownUSD     float64       `json:"known_usd" jsonschema:"the sum over pairs with a cost per call, plus reading the answers for other brands when that is on"`
 	UnknownPairs int           `json:"unknown_pairs"`
@@ -142,6 +143,9 @@ func (s *Service) Estimate(ctx context.Context) (Estimate, error) {
 		return out, err
 	}
 	out.Questions = len(set.Questions)
+	if err := s.db.QueryRow(ctx, `SELECT samples FROM instance_settings`).Scan(&out.Samples); err != nil {
+		return out, err
+	}
 	pairs, err := s.ActivePairs(ctx)
 	if err != nil {
 		return out, err
@@ -162,7 +166,7 @@ func (s *Service) Estimate(ctx context.Context) (Estimate, error) {
 		}
 		row := EstimateRow{
 			PairID: p.ID, Surface: p.Surface, Title: rs.Spec.Title, Model: p.Model, Fidelity: p.Fidelity,
-			Route: st.route, Endpoint: rs.EndpointID(st.baseURL), Calls: out.Questions,
+			Route: st.route, Endpoint: rs.EndpointID(st.baseURL), Calls: out.Questions * out.Samples,
 		}
 		c := costs.of(rs, row.Endpoint)
 		row.CostPerCallUSD, row.Source, row.Samples = c.usd, c.source, c.samples
@@ -176,7 +180,7 @@ func (s *Service) Estimate(ctx context.Context) (Estimate, error) {
 		out.Rows = append(out.Rows, row)
 	}
 	out.Pairs = len(out.Rows)
-	out.Calls = out.Questions * out.Pairs
+	out.Calls = out.Questions * out.Pairs * out.Samples
 	if out.FindBrands, err = s.findEstimate(ctx, out.Calls); err != nil {
 		return out, err
 	}
