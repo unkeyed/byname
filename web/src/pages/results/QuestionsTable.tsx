@@ -19,7 +19,7 @@ export const outcomeMark: Record<Outcome, { icon: "up" | "down" | "updown" | nul
 export function NamedOf({ c }: { c: { answered: number; named: number } }) {
   if (c.answered <= 1) return null;
   return (
-    <span className="text-xs text-faint tabular-nums" title={`${c.named} of ${c.answered} answers named you`}>
+    <span className="text-xs whitespace-nowrap text-faint tabular-nums" title={`${c.named} of ${c.answered} answers named you`}>
       {c.named} of {c.answered}
     </span>
   );

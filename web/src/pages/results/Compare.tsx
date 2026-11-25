@@ -23,10 +23,14 @@ function StandingMark({ s }: { s: Standing | null }) {
   if (!s) return <span className="text-faint">Not asked</span>;
   if (s.status === "failed") return <span className="text-faint">Failed</span>;
   if (s.status === "no_answer") return <span className="text-faint">No answer</span>;
-  const mark = s.mentioned ? <span className="font-semibold text-success tabular-nums">#{s.position}</span> : <span className="text-muted">{s.cited ? "Linked, not named" : "Not named"}</span>;
+  const mark = s.mentioned ? (
+    <span className="font-semibold text-success tabular-nums">#{s.position}</span>
+  ) : (
+    <span className="whitespace-nowrap text-muted">{s.cited ? "Linked, not named" : "Not named"}</span>
+  );
   if (s.answered <= 1) return mark;
   return (
-    <span className="inline-flex items-center gap-1">
+    <span className="inline-flex flex-wrap items-baseline gap-x-1">
       {mark}
       <NamedOf c={s} />
     </span>
@@ -58,7 +62,7 @@ function ChangeMark({ p }: { p: PairChange }) {
   );
 }
 
-const rowGrid = "grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-0.5 md:grid-cols-[minmax(0,1fr)_8rem_8rem_8rem] md:items-center";
+const rowGrid = "grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-0.5 md:grid-cols-[minmax(0,1fr)_8rem_8rem_8rem] md:items-center lg:grid-cols-[minmax(0,1fr)_10.5rem_10.5rem_8rem]";
 
 /** AI answers > What changed: every question and AI app that gained, lost or moved between two checks. */
 export function Compare() {
