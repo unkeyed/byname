@@ -201,7 +201,8 @@ function Headline({ d }: { d: WeekData }) {
         <span className="font-semibold tabular-nums">
           {cur.mentioned} of {cur.answered}
         </span>{" "}
-        answers in the latest check ({pct(cur.mention_rate)}).
+        answers in the latest check ({pct(cur.mention_rate)}
+        {cur.mention_band && `, likely ${pct(cur.mention_band.low)} to ${pct(cur.mention_band.high)}`}).
         {band && ` Your normal range over the ${band.checks} checks before it is ${range(band)}.`}
         {lostTo > 0 && ` A competitor was named instead of you on ${lostTo} ${lostTo === 1 ? "question" : "questions"}.`}
       </p>

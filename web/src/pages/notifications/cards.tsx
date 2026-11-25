@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router";
-import type { Alert, EventKindName, EventPayloads, GoalMetric, Run, SocialDigestPayload, SocialNetwork, Surface } from "../../api";
-import { andList, pct } from "../../lines";
+import type { Alert, EventKindName, EventPayloads, GoalMetric, Move, Run, SocialDigestPayload, SocialNetwork, Surface } from "../../api";
+import { andList, chance, pct } from "../../lines";
 import { cx, Icon, RelativeTime, type IconName } from "../../ui";
 import { formatCount, NetworkMark, networks } from "../social/model";
 
@@ -37,13 +37,15 @@ const cards: Cards = {
     const band = normalRange(p.run_id, ctx.runs);
     const rate = p.named / p.answered;
     if (band) lines.push(`${rate < band.low ? "Below" : rate > band.high ? "Above" : "Inside"} your normal range of ${rangeLabel(band)} over the ${band.checks} checks before.`);
+    const move = p.move;
     if (p.previous_run_id === 0) lines.push("Your first check. The next one shows which answers start or stop naming you.");
-    else lines.push(changeLine(p.gained, p.lost));
+    else lines.push(changeLine(p.gained, p.lost) + (move && p.gained + p.lost > 0 ? ` ${verdict(move)}` : ""));
+    const fell = move?.real && move.after_rate != null && move.before_rate != null && move.after_rate < move.before_rate;
     return {
       icon: "sparkles",
-      tone: band && rate < band.low ? "warn" : "info",
+      tone: (band && rate < band.low) || fell ? "warn" : "info",
       about,
-      title: `AI apps named you in ${p.named} of ${p.answered} answers (${pct(rate)})`,
+      title: `AI apps named you in ${p.named} of ${p.answered} answers (${pct(rate)}${p.band ? `, likely ${pct(p.band.low)} to ${pct(p.band.high)}` : ""})`,
       lines,
       action: p.previous_run_id === 0 ? "Open This week" : "See what changed",
     };
@@ -277,6 +279,12 @@ function changeLine(gained: number, lost: number): string {
   if (gained > 0) parts.push(`${gained} ${gained === 1 ? "answer" : "answers"} started naming you`);
   if (lost > 0) parts.push(gained > 0 ? `${lost} stopped` : `${lost} ${lost === 1 ? "answer" : "answers"} stopped naming you`);
   return `${parts.join(", ")}.`;
+}
+
+/** Whether the flips add up to a real move, as the notification's email says it. */
+function verdict(m: Move): string {
+  if (!m.real) return `Chance alone gives a move this large ${chance(m.p_value)}, so it may be noise.`;
+  return `A real move, ${pct(m.before_rate)} to ${pct(m.after_rate)}. Chance alone gives one this large ${chance(m.p_value)}.`;
 }
 
 /** A search metric on one engine, such as "Bing clicks". */

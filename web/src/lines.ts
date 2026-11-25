@@ -38,6 +38,15 @@ const pctFmt = new Intl.NumberFormat(undefined, { style: "percent", maximumFract
 const pct1Fmt = new Intl.NumberFormat(undefined, { style: "percent", maximumFractionDigits: 1 });
 export const pct = (v: number | null | undefined) => (v == null ? "–" : v > 0 && v < 0.1 ? pct1Fmt.format(v) : pctFmt.format(v));
 
+/** How often chance alone gives a move as large, from its p-value, as notifications say it: "about 62 times in 100". */
+export function chance(p: number): string {
+  const n = Math.round(p * 100);
+  if (p < 0.01) return "less than 1 time in 100";
+  if (n === 1) return "about 1 time in 100";
+  if (n >= 100) return "almost every time";
+  return `about ${n} times in 100`;
+}
+
 const dayFmt = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" });
 export const shortDay = (iso: string) => dayFmt.format(new Date(iso));
 

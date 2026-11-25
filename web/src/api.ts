@@ -604,6 +604,24 @@ export interface Series {
   fidelity: Fidelity;
 }
 
+/** A 95% band on a rate: where the true share likely falls, treating each answer as an independent draw. */
+export interface Band {
+  low: number;
+  high: number;
+}
+
+/** Whether the share of answers naming you moved between two checks by more than chance gives. */
+export interface Move {
+  /** Question and AI app cells answered in both checks and counted in scores. */
+  cells: number;
+  before_rate: number | null;
+  after_rate: number | null;
+  /** The chance of a move at least this large if nothing changed. */
+  p_value: number;
+  /** p_value under 0.05. */
+  real: boolean;
+}
+
 export interface RatePoint {
   run_id: number;
   run_started_at: Timestamp;
@@ -613,6 +631,8 @@ export interface RatePoint {
   cited: number;
   mention_rate: number | null;
   citation_rate: number | null;
+  mention_band: Band | null;
+  citation_band: Band | null;
 }
 
 export interface RateSeries extends Series {
@@ -628,6 +648,8 @@ export interface RunSummary {
   cited: number;
   mention_rate: number | null;
   citation_rate: number | null;
+  mention_band: Band | null;
+  citation_band: Band | null;
   mentions: number;
   share: number | null;
 }
@@ -713,6 +735,7 @@ export interface Comparison {
   after: number;
   counts: Record<Outcome, number>;
   net: number;
+  move: Move;
   pairs: PairChange[];
 }
 
@@ -1588,6 +1611,10 @@ export interface CheckCompletedPayload {
   /** named of answered is the headline: answers that named you, of those that did not fail. */
   named: number;
   answered: number;
+  /** The 95% band on named of answered. Missing on alerts from before Byname added it. */
+  band?: Band | null;
+  /** Null on the first check. Missing on alerts from before Byname added it. */
+  move?: Move | null;
   spend_usd: number;
   /** The questions that changed most, at most three. */
   top: QuestionChange[];
