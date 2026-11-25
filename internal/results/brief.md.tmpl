@@ -1,6 +1,6 @@
 # Get {{.Brand}} into AI answers to "{{.Question.Text}}"
 
-People ask AI assistants this question, and the answers decide which products they look at. Your job is to write or improve content so that AI assistants name {{.Brand}} in their answer and link to {{.Brand}}'s site. Everything below comes from Byname, which asked AI apps this question on {{.Day}} (check #{{.RunID}}) for {{.Market}} readers in language "{{.Language}}" and got {{.Answered}} {{if eq .Answered 1}}answer{{else}}answers{{end}}. Write in that language for those readers.
+People ask AI assistants this question, and the answers decide which products they look at. Your job is to write or improve content so that AI assistants name {{.Brand}} in their answer and link to {{.Brand}}'s site. Everything below comes from Byname, which asked AI apps this question on {{.Day}} (check #{{.RunID}}) for {{.Market}} readers in language "{{.Language}}" and got {{.Answered}} {{if eq .Answered 1}}answer{{else}}answers{{end}}{{if eq .PerLine 1}}, one per app and model{{else if .PerLine}}, {{.PerLine}} from each app and model{{else}}, several from some apps and models{{end}}. Write in that language for those readers.
 
 {{.Brand}}'s sites: {{list .Domains}}.
 
@@ -18,8 +18,11 @@ People ask AI assistants this question, and the answers decide which products th
 {{- else if eq .State "named"}}Named {{$.Brand}}{{if .Position}} as brand #{{.Position}}{{end}} but did not link to its site.
 {{- else if eq .State "linked"}}Linked to {{$.Brand}}'s site but never named {{$.Brand}} in the text.
 {{- else}}Did not name {{$.Brand}} or link to its site.{{end}}
+{{- if gt .Answered 1}}
+- That is what most of its {{.Answered}} answers did: {{.Named}} named {{$.Brand}} and {{.Linked}} linked to its site.
+{{- end}}
 {{- if .Brands}}
-- Brands it named, in order: {{list .Brands}}.
+- Brands {{if gt .Answered 1}}most of its answers{{else}}it{{end}} named, in order: {{list .Brands}}.
 {{- end}}
 {{- if .FanOut}}
 - What it searched the web for: {{quoted .FanOut}}.

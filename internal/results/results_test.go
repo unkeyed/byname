@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"math"
+	"strings"
 	"testing"
 	"time"
 
@@ -535,5 +536,23 @@ func TestACellOfSeveralAnswersReadsAsMostOfThem(t *testing.T) {
 	}
 	if d := prompts.Rows[1].Dots[0]; d == nil || d.Answered != 2 || d.Named != 1 || d.State != results.DotNamed {
 		t.Errorf("second prompt's first dot = %+v, want 2 pairs answered, most answers named you on 1", d)
+	}
+
+	b, err := e.results.Brief(ctx, q1, after, results.Scope{})
+	if err != nil || len(b.Lines) != 2 || b.Answered != 6 || b.Named != 5 {
+		t.Fatalf("brief = %+v %v, want one line per pair, 5 of 6 answers named you", b, err)
+	}
+	for _, l := range b.Lines {
+		if l.Pair.ID == perplexity && (l.Answered != 3 || l.Named != 2 || l.State != results.LineNamed || len(l.AnswerIDs) != 3 || l.AnswerID != l.AnswerIDs[0]) {
+			t.Errorf("perplexity line = %+v, want 2 of 3 named, named most of the time, all 3 answers listed", l)
+		}
+	}
+	for _, want := range []string{"got 6 answers, 3 from each app and model.", "That is what most of its 3 answers did: 2 named"} {
+		if !strings.Contains(b.Prompt, want) {
+			t.Errorf("brief prompt does not say %q:\n%s", want, b.Prompt)
+		}
+	}
+	if b, err := e.results.Brief(ctx, q2, after, results.Scope{}); err != nil || b.Answered != 5 || !strings.Contains(b.Prompt, "got 5 answers, several from some apps and models.") {
+		t.Errorf("brief on a cell with a failed answer = %+v %v, want 5 answers, several from some apps and models", b, err)
 	}
 }

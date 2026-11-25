@@ -980,11 +980,17 @@ export type LineState = "named_linked" | "named" | "linked" | "missed";
 export interface BriefLine extends Series {
   /** "Claude Code · claude-sonnet-4-5", or "ChatGPT app" for a surface that takes no model. */
   title: string;
+  /** The first of answer_ids. */
   answer_id: number;
-  /** linked: linked to your site without naming you. */
+  /** Every answer the line sums up, in the order asked. */
+  answer_ids: number[];
+  answered: number;
+  named: number;
+  linked: number;
+  /** What most answers did. linked: linked to your site without naming you. */
   state: LineState;
   position: number | null;
-  /** Your brand and competitors the answer named, in the order it named them. */
+  /** Your brand and competitors most answers named, in the order first named. */
   brands: string[];
   fan_out: string[];
   links: string[];

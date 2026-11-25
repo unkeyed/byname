@@ -7471,38 +7471,54 @@ components:
                 type: string
               description: The pages the answers linked to, in order, without your own site's; a later answer adds only those earlier ones did not.
     BriefLine:
-      description: One pair's answer to the brief's question.
+      description: One pair's answers to the brief's question. A check that asks a question several times gives it several answers, and the line says what most of them did.
       allOf:
         - $ref: "#/components/schemas/Series"
         - type: object
-          required: [title, answer_id, state, position, brands, fan_out, links]
+          required: [title, answer_id, answer_ids, answered, named, linked, state, position, brands, fan_out, links]
           properties:
             title:
               type: string
               description: The surface, and the model where it takes one, such as "Claude Code · claude-sonnet-4-5".
             answer_id:
               type: integer
+              description: The first of answer_ids.
+            answer_ids:
+              type: array
+              items:
+                type: integer
+              description: Every answer the line sums up, in the order asked.
+            answered:
+              type: integer
+              description: Answers that did not fail.
+            named:
+              type: integer
+              description: Answers that named you.
+            linked:
+              type: integer
+              description: Answers that linked to your site.
             state:
               type: string
               enum: [named_linked, named, linked, missed]
-              description: linked means it linked to your site without naming you.
+              description: What most answers did. linked means they linked to your site without naming you.
             position:
               type: [integer, "null"]
+              description: Your best position among the answers that named you. Null unless most did.
             brands:
               type: array
               items:
                 type: string
-              description: Your brand and competitors the answer named, in the order it named them.
+              description: Your brand and competitors most answers named, in the order first named.
             fan_out:
               type: array
               items:
                 type: string
-              description: The web searches the engine ran. Empty where the endpoint does not expose them.
+              description: The web searches the engine ran, in order and without repeats. Empty where the endpoint does not expose them.
             links:
               type: array
               items:
                 type: string
-              description: The pages the answer linked to, in answer order.
+              description: The pages the answers linked to, in order and without repeats.
     BriefPage:
       type: object
       required: [url, domain, is_self, answers, check, outreach]
