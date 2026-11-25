@@ -418,3 +418,91 @@ func TestAProcessThatLosesItsLeaseStopsAndTheNextResumes(t *testing.T) {
 		t.Fatalf("after the next process resumed it: %+v, want completed with 12 answers", r)
 	}
 }
+
+// cells counts a run's answers by sample: how many question and pair
+// cells hold each sample.
+func (e *env) cells(t *testing.T, id int64) map[int]int {
+	t.Helper()
+	rows, err := e.db.Query(context.Background(), `SELECT sample, count(*) FROM answer WHERE run_id = $1 GROUP BY sample`, id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := map[int]int{}
+	for rows.Next() {
+		var sample, n int
+		if err := rows.Scan(&sample, &n); err != nil {
+			t.Fatal(err)
+		}
+		out[sample] = n
+	}
+	return out
+}
+
+func TestEachQuestionIsAskedSamplesTimesAndResumesWithoutAskingTwice(t *testing.T) {
+	e := setup(t, func(s *config.Settings) { s.Concurrency = 1; s.Samples = 3 })
+	ctx, kill := context.WithCancel(context.Background())
+	var mu sync.Mutex
+	calls := 0
+	e.treg.Before(func(c tregtest.Call) *tregtest.Refusal {
+		mu.Lock()
+		defer mu.Unlock()
+		if !strings.HasSuffix(c.Tool, "-models") {
+			if calls++; calls == 20 {
+				kill()
+			}
+		}
+		return nil
+	})
+	id := e.runNow(t)
+	if err := e.checks.Work(ctx); err != context.Canceled {
+		t.Fatalf("work = %v, want context.Canceled", err)
+	}
+	if got := e.cells(t, id); got[1] != 12 || got[2] != 7 || got[3] != 0 {
+		t.Fatalf("after the kill: cells per sample %v, want all 12 cells' first sample and 7 second samples", got)
+	}
+	if err := e.restart().Work(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	r := e.run(t, id)
+	if got := e.cells(t, id); r.Status != checks.Completed || r.Answers != 36 || got[1] != 12 || got[2] != 12 || got[3] != 12 {
+		t.Fatalf("after resuming: %+v with cells per sample %v, want completed with every one of 12 cells asked 3 times", r, got)
+	}
+	keys := map[string]int{}
+	replays := 0
+	for _, c := range e.treg.Calls() {
+		if strings.HasSuffix(c.Tool, "-models") {
+			continue
+		}
+		keys[c.IdempotencyKey]++
+		if c.Replay {
+			replays++
+		}
+	}
+	if fresh := e.treg.Answers(); fresh != 36 || replays != 1 || len(keys) != 36 {
+		t.Fatalf("%d paid calls, %d replays, %d distinct keys; want 36 paid, the killed call replayed once, and one key per question, pair and sample", fresh, replays, len(keys))
+	}
+	named := 0
+	for k := range keys {
+		if !strings.HasPrefix(k, fmt.Sprintf("byname/run-%d/q-", id)) || !strings.HasSuffix(k, "/1") {
+			t.Errorf("idempotency key %q, want byname/run-%d/q-<id>/sm-<id>[/s-<sample>]/1", k, id)
+		}
+		if strings.Contains(k, "/s-") {
+			named++
+		}
+	}
+	if named != 24 {
+		t.Errorf("%d keys name a sample, want the 24 of samples 2 and 3; sample 1 keeps the key from before samples", named)
+	}
+}
+
+func TestSpendCapStopsWithEveryCellAskedOnceFirst(t *testing.T) {
+	e := setup(t, func(s *config.Settings) { s.SpendCapRunUSD = 0.145; s.Samples = 3 })
+	id := e.runNow(t)
+	if err := e.checks.Work(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	r := e.run(t, id)
+	if got := e.cells(t, id); r.Status != checks.Capped || r.Answers != 15 || got[1] != 12 || got[2] != 3 || got[3] != 0 {
+		t.Fatalf("run = %+v with cells per sample %v; want capped after 15 calls at $0.01, every cell's first sample before any second", r, got)
+	}
+}

@@ -49,6 +49,8 @@ type plan struct {
 type call struct {
 	question config.Question
 	pair     config.Pair
+	// sample is which of the times the run asks question on pair, from 1.
+	sample int
 	// via is the pair's surface on its route: the adapter that asks and the
 	// endpoint stored on the answer.
 	via config.Binding
@@ -183,25 +185,33 @@ func (s *Service) plan(ctx context.Context, runID, setID int64) (plan, *outcome,
 	if err != nil {
 		return p, nil, err
 	}
-	rows, err := s.db.Query(ctx, `SELECT question_id, surface_model_id FROM answer WHERE run_id = $1`, runID)
+	rows, err := s.db.Query(ctx, `SELECT question_id, surface_model_id, sample FROM answer WHERE run_id = $1`, runID)
 	if err != nil {
 		return p, nil, err
 	}
-	done := map[panel.Key]bool{}
+	type asked struct {
+		panel.Key
+		sample int
+	}
+	done := map[asked]bool{}
 	for rows.Next() {
-		var k panel.Key
-		if err := rows.Scan(&k.Question, &k.SurfaceModel); err != nil {
+		var a asked
+		if err := rows.Scan(&a.Question, &a.SurfaceModel, &a.sample); err != nil {
 			return p, nil, err
 		}
-		done[k] = true
+		done[a] = true
 	}
 	if err := rows.Err(); err != nil {
 		return p, nil, err
 	}
-	for _, q := range questions {
-		for _, pair := range pairs {
-			if !done[panel.Key{Question: panel.QuestionID(q.ID), SurfaceModel: panel.SurfaceModelID(pair.ID)}] {
-				p.calls = append(p.calls, call{question: q, pair: pair, via: bindings[pair.Surface]})
+	// Every cell's first sample is asked before any cell's second, so a
+	// run a cap stops early still has an answer in every cell it reached.
+	for sample := 1; sample <= p.settings.Samples; sample++ {
+		for _, q := range questions {
+			for _, pair := range pairs {
+				if !done[asked{panel.Key{Question: panel.QuestionID(q.ID), SurfaceModel: panel.SurfaceModelID(pair.ID)}, sample}] {
+					p.calls = append(p.calls, call{question: q, pair: pair, sample: sample, via: bindings[pair.Surface]})
+				}
 			}
 		}
 	}
@@ -247,7 +257,7 @@ func (s *Service) execute(ctx context.Context, p plan, out *outcome) {
 		wg.Go(func() {
 			defer func() { <-slots }()
 			if err := s.ask(ctx, p, c, out); err != nil && ctx.Err() == nil {
-				s.log.Error("store answer", "run", p.runID, "question", c.question.ID, "pair", c.pair.ID, "err", err)
+				s.log.Error("store answer", "run", p.runID, "question", c.question.ID, "pair", c.pair.ID, "sample", c.sample, "err", err)
 				if permanent(err) {
 					out.stop(Failed, "could not store an answer: "+err.Error(), "")
 				} else {
@@ -272,8 +282,14 @@ func (s *Service) ask(ctx context.Context, p plan, c call, out *outcome) error {
 	var res engines.Result
 	var err error
 	attempt, backoffs := 1, 0
+	cell := fmt.Sprintf("byname/run-%d/q-%d/sm-%d", p.runID, c.question.ID, c.pair.ID)
+	// The first sample keeps the key from before samples, so a call in
+	// flight across the upgrade replays instead of being paid twice.
+	if c.sample > 1 {
+		cell += fmt.Sprintf("/s-%d", c.sample)
+	}
 	for {
-		req.IdempotencyKey = fmt.Sprintf("byname/run-%d/q-%d/sm-%d/%d", p.runID, c.question.ID, c.pair.ID, attempt)
+		req.IdempotencyKey = fmt.Sprintf("%s/%d", cell, attempt)
 		callCtx, cancel := context.WithTimeout(ctx, timeout)
 		res, err = c.via.Adapter.Call(callCtx, req)
 		cancel()
@@ -391,8 +407,8 @@ func (s *Service) store(ctx context.Context, p plan, c call, res engines.Result,
 		first := &pgx.Batch{}
 		first.Queue(`SELECT 1 FROM run WHERE id = $1 FOR UPDATE`, p.runID)
 		first.Queue(`INSERT INTO answer (run_id, question_id, surface_model_id, endpoint, fidelity, reported_model,
-				status, error, attempts, mentioned, cited, position, cost_usd, text, raw, fan_out, call_id)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+				status, error, attempts, mentioned, cited, position, cost_usd, text, raw, fan_out, call_id, sample)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
 			ON CONFLICT (run_id, question_id, surface_model_id, sample) DO UPDATE SET endpoint = excluded.endpoint,
 				fidelity = excluded.fidelity, reported_model = excluded.reported_model, status = excluded.status,
 				error = excluded.error, attempts = excluded.attempts, mentioned = excluded.mentioned, cited = excluded.cited,
@@ -401,7 +417,7 @@ func (s *Service) store(ctx context.Context, p plan, c call, res engines.Result,
 			RETURNING id`,
 			p.runID, c.question.ID, c.pair.ID, c.via.Endpoint, c.pair.Fidelity, res.ReportedModel,
 			res.Status, res.Error, attempts, scored.Mentioned, scored.Cited, nullPosition(scored.Position), res.CostUSD,
-			res.Text, rawJSON(res.Raw), append([]string{}, res.FanOut...), res.CallID).QueryRow(func(row pgx.Row) error {
+			res.Text, rawJSON(res.Raw), append([]string{}, res.FanOut...), res.CallID, c.sample).QueryRow(func(row pgx.Row) error {
 			return row.Scan(&answerID)
 		})
 		if err := tx.SendBatch(ctx, first).Close(); err != nil {
