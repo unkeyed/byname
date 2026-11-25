@@ -117,13 +117,11 @@ func TestACheckNotifiesEveryChannelWithTheComparison(t *testing.T) {
 	if gained == 0 || lost == 0 {
 		t.Fatalf("compare = %+v, want the check to gain and lose something", cmp)
 	}
-	answers := func(n int) string {
-		if n == 1 {
-			return "1 answer"
-		}
-		return fmt.Sprintf("%d answers", n)
+	apps := "AI apps"
+	if gained == 1 {
+		apps = "AI app"
 	}
-	started, stopped := answers(gained)+" started naming you", answers(lost)+" stopped naming you"
+	started, stopped := fmt.Sprintf("%d %s started naming you on a question", gained, apps), fmt.Sprintf("%d stopped naming you on one", lost)
 	title := fmt.Sprintf("Check #%d: no real change", second)
 	if m := cmp.Move; m.Real {
 		more := "more"
@@ -134,7 +132,7 @@ func TestACheckNotifiesEveryChannelWithTheComparison(t *testing.T) {
 	}
 	since := fmt.Sprintf("Since check #%d, %s and %s.", first, started, stopped)
 	if moved := cmp.Counts["moved"]; moved > 0 {
-		since = fmt.Sprintf("Since check #%d, %s, %s and %s moved your position.", first, started, stopped, answers(moved))
+		since = fmt.Sprintf("Since check #%d, %s, %s and %d moved your position on one.", first, started, stopped, moved)
 	}
 
 	mail := r.smtp.Mail()

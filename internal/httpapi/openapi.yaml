@@ -4583,10 +4583,13 @@ components:
           description: 0 for the first check with answers.
         gained:
           type: integer
+          description: Questions on one AI app and model that most answers did not name you on in the previous check and do now. These count the cells GET /v1/compare compares, not answers.
         lost:
           type: integer
+          description: Questions on one AI app and model that most answers named you on in the previous check and do not now.
         moved:
           type: integer
+          description: Questions on one AI app and model that most answers named you on both times, at a different best position.
         unchanged:
           type: integer
         not_comparable:

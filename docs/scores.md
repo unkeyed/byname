@@ -45,7 +45,7 @@ So Byname still asks a question that names your brand and shows its answers on *
 - Named you and Linked to your site, per check and per AI app,
 - share of mentions, your position and your rank against competitors,
 - **AI answers > Missed questions**, where such a question never appears,
-- the answers that started or stopped naming you on **AI answers > What changed** and in the **Check completed** notification,
+- the AI apps that started or stopped naming you on a question, on **AI answers > What changed** and in the **Check completed** notification,
 - the panel for each AI app.
 
 A question names your brand by the same rules answers are scored with, above. Byname works it out again whenever you change the questions, your brand's name or aliases, the match mode, or a competitor's name, and on every start.

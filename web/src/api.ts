@@ -1636,6 +1636,7 @@ export interface QuestionChange {
 export interface CheckCompletedPayload {
   run_id: number;
   previous_run_id: number;
+  /** gained through not_comparable count questions on one AI app and model, the cells What changed compares, not answers. */
   gained: number;
   lost: number;
   moved: number;

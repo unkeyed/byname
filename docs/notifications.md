@@ -1,6 +1,6 @@
 # Notifications
 
-Byname tells people when something moves: a check finished and some answers started or stopped naming you, a check stopped, a spend cap was reached, a model was paused, a search goal on Google or Bing was reached, search clicks moved, a site change got its final result, a day or week of social posts ended, or the GitHub token for site changes is about to expire. Every notification shows in the app behind the bell, beside your name at the bottom of the sidebar or at the top right on a phone. The bell shows how many you have not read. Each notification is a short card that says what happened and links to the page with the details, and opening it marks it read. To also get notifications by email, in Slack or at your own endpoint, an Admin adds where they go under **Settings > Notifications**, or in onboarding's **Schedule and spend caps** step. With nowhere added, notifications stay in the app. The API calls a notification an alert, as in `GET /v1/alerts`.
+Byname tells people when something moves: a check finished and some AI apps started or stopped naming you on a question, a check stopped, a spend cap was reached, a model was paused, a search goal on Google or Bing was reached, search clicks moved, a site change got its final result, a day or week of social posts ended, or the GitHub token for site changes is about to expire. Every notification shows in the app behind the bell, beside your name at the bottom of the sidebar or at the top right on a phone. The bell shows how many you have not read. Each notification is a short card that says what happened and links to the page with the details, and opening it marks it read. To also get notifications by email, in Slack or at your own endpoint, an Admin adds where they go under **Settings > Notifications**, or in onboarding's **Schedule and spend caps** step. With nowhere added, notifications stay in the app. The API calls a notification an alert, as in `GET /v1/alerts`.
 
 ## Where notifications go
 
@@ -32,7 +32,7 @@ If your workspace only lets admins install apps, Slack asks an admin to approve 
 
 | Event | Kind | Raised when | Seen in the app by |
 |---|---|---|---|
-| Check completed | `check_completed` | A check finished. It says how many answers named you, with the range the true share likely falls in, how many started naming you, stopped naming you or moved your position since the previous check, whether that is a real move or may be noise, the spend, and the questions that changed most. Its title says **no real change** unless chance alone gives a move that large less than 5 times in 100, as [How sure a score is](scores.md#how-sure-a-score-is) explains. Its link opens **AI answers > What changed** for the two checks. | Anyone with `results:read` |
+| Check completed | `check_completed` | A check finished. It says how many answers named you, with the range the true share likely falls in, how many AI apps started naming you on a question, stopped naming you on one or moved your position on one since the previous check, whether that is a real move or may be noise, the spend, and the questions that changed most. Its title says **no real change** unless chance alone gives a move that large less than 5 times in 100, as [How sure a score is](scores.md#how-sure-a-score-is) explains. Its link opens **AI answers > What changed** for the two checks. | Anyone with `results:read` |
 | Check refused | `check_refused` | Treg, the service that runs each question and bills you per answer, refused a request, for example for an empty balance, and the check stopped. | Anyone with `results:read` |
 | Check failed | `check_failed` | A check could not start, or could not save its answers. | Anyone with `results:read` |
 | Spend cap reached | `spend_cap_reached` | A check stopped asking questions when it reached the spend cap for one check or for the month. | Anyone with `results:read` |
@@ -70,7 +70,7 @@ A webhook gets a `POST` to its URL with a JSON body:
 	"title": "Check #42: no real change",
 	"lines": [
 		"AI apps named you in 31 of 96 answers (32%, likely between 24% and 42%).",
-		"Since check #41, 3 answers started naming you, 1 answer stopped naming you and 2 answers moved your position.",
+		"Since check #41, 3 AI apps started naming you on a question, 1 stopped naming you on one and 2 moved your position on one.",
 		"Chance alone gives a move this large about 62 times in 100, so it may be noise."
 	],
 	"url": "https://byname.example.com/ai/what-changed?before=41&after=42",
@@ -83,7 +83,7 @@ A webhook gets a `POST` to its URL with a JSON body:
 }
 ```
 
-`payload` is the event's own data, and its fields depend on `kind`. Its field names keep the API's words, such as `run_id` for the check and `gained` and `lost` for answers that started and stopped naming you. Its field names keep the API's words, such as `run_id` for the check and `gained` and `lost` for answers that started and stopped naming you. `id` is the same on every retry of one delivery, so use it to ignore a repeat. Each request carries these headers:
+`payload` is the event's own data, and its fields depend on `kind`. Its field names keep the API's words, such as `run_id` for the check and `gained` and `lost` for the AI apps that started and stopped naming you on a question. Each of those counts one question on one AI app and model, not one answer. `id` is the same on every retry of one delivery, so use it to ignore a repeat. Each request carries these headers:
 
 | Header | Value |
 |---|---|
