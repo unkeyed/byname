@@ -221,8 +221,8 @@ func (s *Service) Summary(ctx context.Context, since *time.Time, sc Scope) ([]Ru
 // Gap is a question where at least one pair did not name you on a run.
 type Gap struct {
 	Question QuestionRef `json:"question"`
-	// Engines is how many pairs answered; Named how many named you, the N
-	// of "visible on N of M".
+	// Engines is how many pairs answered; Named how many of them most
+	// answers named you on, the N of "visible on N of M".
 	Engines     int `json:"engines"`
 	Named       int `json:"named"`
 	Competitors int `json:"competitors" jsonschema:"distinct competitors the answers named"`
@@ -231,25 +231,29 @@ type Gap struct {
 	Opportunity int       `json:"opportunity"`
 	Demand      *int      `json:"demand" jsonschema:"monthly searches; null until a demand source is configured"`
 	NamedOnMiss []string  `json:"named_on_miss" jsonschema:"competitors named by the answers that did not name you, most often first"`
-	Pairs       []GapPair `json:"pairs" jsonschema:"each pair's answer, in pair order"`
+	Pairs       []GapPair `json:"pairs" jsonschema:"each pair's answers, in pair order"`
 	// Pages are the pages marked as answering the question, under any
 	// version of it, so a row shows it is already handled.
 	Pages []MarkedPage `json:"pages" jsonschema:"pages marked as answering this question, most recently marked first"`
 }
 
-// GapPair is one pair's answer to a gap's question.
+// GapPair is one pair's answers to a gap's question: what most of them
+// say, and how many there were.
 type GapPair struct {
 	Series
-	AnswerID int64          `json:"answer_id"`
-	Status   engines.Status `json:"status"`
-	Named    bool           `json:"named"`
-	Position *int           `json:"position"`
+	AnswerID     int64          `json:"answer_id" jsonschema:"the first sample's answer"`
+	AnswerIDs    []int64        `json:"answer_ids" jsonschema:"every sample's answer, in sample order"`
+	Status       engines.Status `json:"status" jsonschema:"failed only when every answer failed"`
+	Named        bool           `json:"named" jsonschema:"most answers named you"`
+	Position     *int           `json:"position" jsonschema:"your best position among the answers that named you"`
+	Answered     int            `json:"answered" jsonschema:"answers that did not fail"`
+	NamedAnswers int            `json:"named_answers" jsonschema:"answers that named you"`
 	// FanOut is the web searches the engine ran for the question, empty
 	// where the endpoint does not expose them.
-	FanOut []string `json:"fan_out"`
-	// Links are the pages the answer linked to, in order, leaving out your
-	// own site's.
-	Links []string `json:"links" jsonschema:"the pages the answer linked to, in order, without your own site's"`
+	FanOut []string `json:"fan_out" jsonschema:"the web searches the answers ran, in order; a later answer adds only those earlier ones did not"`
+	// Links are the pages the answers linked to, in order, leaving out
+	// your own site's.
+	Links []string `json:"links" jsonschema:"the pages the answers linked to, in order, without your own site's; a later answer adds only those earlier ones did not"`
 }
 
 type Gaps struct {
@@ -293,11 +297,11 @@ func (s *Service) Gaps(ctx context.Context, runID int64, sc Scope) (Gaps, error)
 	}
 	var gaps []panel.Gap
 	for _, q := range order {
-		var scored []panel.Scored
-		for _, a := range byQuestion[q] {
-			scored = append(scored, a.scored)
+		var cells [][]panel.Scored
+		for _, cell := range cellsBy(byQuestion[q], bySeries) {
+			cells = append(cells, scoredOf(cell))
 		}
-		gaps = append(gaps, panel.NewGap(q, scored, brands, nil))
+		gaps = append(gaps, panel.NewGap(q, cells, brands, nil))
 	}
 	questions, err := s.questionRefs(ctx, order)
 	if err != nil {
@@ -316,14 +320,32 @@ func (s *Service) Gaps(ctx context.Context, runID int64, sc Scope) (Gaps, error)
 		row := Gap{Question: questions[g.Question], Engines: g.Engines, Named: g.Named, Competitors: g.Competitors,
 			Opportunity: g.Opportunity(), Demand: g.Demand, NamedOnMiss: namedInstead(byQuestion[g.Question], brands), Pairs: []GapPair{},
 			Pages: append([]MarkedPage{}, marked[g.Question]...)}
-		for _, a := range byQuestion[g.Question] {
-			row.Pairs = append(row.Pairs, GapPair{Series: a.series, AnswerID: a.id, Status: a.scored.Status, Named: a.scored.Mentioned,
-				Position: nullPosition(a.scored.Position), FanOut: a.fanOut, Links: append([]string{}, links[a.id]...)})
+		for _, cell := range cellsBy(byQuestion[g.Question], bySeries) {
+			t := panel.TallyOf(scoredOf(cell))
+			p := GapPair{Series: cell[0].series, AnswerID: cell[0].id, AnswerIDs: idsOf(cell), Status: t.Status, Named: t.Mentioned(),
+				Position: nullPosition(t.Position), Answered: t.Answered, NamedAnswers: t.Named, FanOut: []string{}, Links: []string{}}
+			for _, a := range cell {
+				p.FanOut = appendNew(p.FanOut, a.fanOut...)
+				p.Links = appendNew(p.Links, links[a.id]...)
+			}
+			row.Pairs = append(row.Pairs, p)
 		}
 		slices.SortStableFunc(row.Pairs, func(a, b GapPair) int { return cmp.Compare(a.Pair.ID, b.Pair.ID) })
 		out.Gaps = append(out.Gaps, row)
 	}
 	return out, nil
+}
+
+// appendNew appends one answer's items that list, built from a cell's
+// earlier answers, does not hold yet.
+func appendNew(list []string, items ...string) []string {
+	earlier := list
+	for _, it := range items {
+		if !slices.Contains(earlier, it) {
+			list = append(list, it)
+		}
+	}
+	return list
 }
 
 // answerLinks is each answer's linked pages, in order, without your own

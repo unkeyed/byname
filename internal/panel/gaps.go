@@ -12,34 +12,38 @@ type Gap struct {
 	Question QuestionID
 	// Engines is how many surface model pairs answered (failures excluded).
 	Engines int
-	// Named is how many of those answers named you.
+	// Named is how many of those pairs most answers named you on.
 	Named int
-	// Competitors is how many distinct competitors those answers named.
+	// Competitors is how many distinct competitors any answer named.
 	Competitors int
 	// Demand is monthly searches for the topic, or nil when no demand
 	// source is configured or it has no figure.
 	Demand *int
 }
 
-// NewGap summarizes one question's answers from the latest run.
-func NewGap(q QuestionID, answers []Scored, brands []Brand, demand *int) Gap {
+// NewGap summarizes one question's answers from the latest run, a cell of
+// answers per pair.
+func NewGap(q QuestionID, cells [][]Scored, brands []Brand, demand *int) Gap {
 	kinds := map[BrandID]BrandKind{}
 	for _, b := range brands {
 		kinds[b.ID] = b.Kind
 	}
 	g := Gap{Question: q, Demand: demand}
 	competitors := map[BrandID]bool{}
-	for _, a := range answers {
-		if a.Status == engines.StatusFailed {
+	for _, answers := range cells {
+		t := TallyOf(answers)
+		if t.Status == engines.StatusFailed {
 			continue
 		}
 		g.Engines++
-		if a.Mentioned {
+		if t.Mentioned() {
 			g.Named++
 		}
-		for _, m := range a.Mentions {
-			if kinds[m.Brand] == KindCompetitor {
-				competitors[m.Brand] = true
+		for _, a := range answers {
+			for _, m := range a.Mentions {
+				if kinds[m.Brand] == KindCompetitor {
+					competitors[m.Brand] = true
+				}
 			}
 		}
 	}

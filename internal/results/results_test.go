@@ -413,9 +413,9 @@ func TestScreens(t *testing.T) {
 	})
 }
 
-// A pair asked each question three times compares by what most of its
-// answers say, and the move weighs every answer.
-func TestCompareCountsEveryAnswerOfACell(t *testing.T) {
+// A pair asked each question three times compares, charts and ranks by
+// what most of its answers say, and the move weighs every answer.
+func TestACellOfSeveralAnswersReadsAsMostOfThem(t *testing.T) {
 	e := setup(t)
 	set, err := e.config.CurrentQuestions(ctx)
 	if err != nil {
@@ -494,5 +494,46 @@ func TestCompareCountsEveryAnswerOfACell(t *testing.T) {
 		if p := s.Points[1]; p.Answered != 3 || p.Named != 2 || !p.Mentioned || len(p.AnswerIDs) != 3 || p.Summary != "Gained mention at #1" {
 			t.Errorf("later point = %+v, want 2 of 3 named, all 3 answers listed, gained", p)
 		}
+	}
+
+	table, err := e.results.RunQuestions(ctx, after, results.Scope{})
+	if err != nil || len(table.Columns) != 2 || len(table.Rows) != 2 {
+		t.Fatalf("questions table = %+v %v, want 2 questions on 2 pairs", table, err)
+	}
+	if r := table.Rows[0]; r.Answered != 2 || r.Named != 2 || r.Gained != 2 {
+		t.Errorf("first row = %+v, want both cells answered, mostly named and gained", r)
+	}
+	for i, sr := range table.Columns {
+		c := table.Rows[1].Cells[i]
+		if sr.Pair.ID == perplexity && (c.Answered != 2 || c.Named != 2 || !c.Mentioned || len(c.AnswerIDs) != 3 || c.AnswerID != c.AnswerIDs[0] || c.Status != engines.StatusOK) {
+			t.Errorf("perplexity cell = %+v, want 2 of 2 answered named, all 3 answers listed", c)
+		}
+	}
+
+	gaps, err := e.results.Gaps(ctx, before, results.Scope{})
+	if err != nil || len(gaps.Gaps) != 2 {
+		t.Fatalf("gaps = %+v %v, want both questions of the earlier check", gaps, err)
+	}
+	for _, g := range gaps.Gaps {
+		if g.Question.ID != q2 {
+			continue
+		}
+		if g.Engines != 2 || g.Named != 1 || len(g.Pairs) != 2 {
+			t.Fatalf("gap = %+v, want 2 pairs, most answers naming you on 1", g)
+		}
+		if p := g.Pairs[0]; p.Pair.ID != claude || p.Named || p.Answered != 3 || p.NamedAnswers != 1 || len(p.AnswerIDs) != 3 {
+			t.Errorf("claude = %+v, want 1 of 3 named, not most", p)
+		}
+	}
+
+	prompts, err := e.results.Prompts(ctx, nil, results.Scope{})
+	if err != nil || len(prompts.Rows) != 2 || len(prompts.Runs) != 2 {
+		t.Fatalf("prompts = %+v %v, want 2 questions over 2 checks", prompts, err)
+	}
+	if r := prompts.Rows[0]; r.Answered != 2 || len(r.NamedBy) != 2 {
+		t.Errorf("first prompt = %+v, want 2 pairs answered and both named you, each listed once", r)
+	}
+	if d := prompts.Rows[1].Dots[0]; d == nil || d.Answered != 2 || d.Named != 1 || d.State != results.DotNamed {
+		t.Errorf("second prompt's first dot = %+v, want 2 pairs answered, most answers named you on 1", d)
 	}
 }

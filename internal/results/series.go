@@ -304,26 +304,14 @@ func (s *Service) QuestionHistory(ctx context.Context, questionID int64, since *
 	if err != nil {
 		return History{}, err
 	}
-	type cellKey struct {
+	type runSeries struct {
 		Series
 		run int64
-	}
-	var cells [][]scoredAnswer
-	at := map[cellKey]int{}
-	for _, x := range answers {
-		k := cellKey{x.series, x.runID}
-		i, ok := at[k]
-		if !ok {
-			i = len(cells)
-			at[k] = i
-			cells = append(cells, nil)
-		}
-		cells[i] = append(cells[i], x)
 	}
 	out := History{QuestionID: questionID, Question: q, Series: []HistorySeries{}}
 	index := map[Series]int{}
 	prev := map[Series]*panel.Tally{}
-	for _, cell := range cells {
+	for _, cell := range cellsBy(answers, func(a scoredAnswer) runSeries { return runSeries{a.series, a.runID} }) {
 		x := cell[0]
 		i, ok := index[x.series]
 		if !ok {
@@ -331,12 +319,7 @@ func (s *Service) QuestionHistory(ctx context.Context, questionID int64, since *
 			index[x.series] = i
 			out.Series = append(out.Series, HistorySeries{Series: x.series, Points: []Point{}})
 		}
-		ids := make([]int64, len(cell))
-		scored := make([]panel.Scored, len(cell))
-		for j, a := range cell {
-			ids[j], scored[j] = a.id, a.scored
-		}
-		t := panel.TallyOf(scored)
+		t := panel.TallyOf(scoredOf(cell))
 		hs := &out.Series[i]
 		if t.Status != engines.StatusFailed {
 			hs.Answered++
@@ -351,7 +334,7 @@ func (s *Service) QuestionHistory(ctx context.Context, questionID int64, since *
 			hs.BestPosition = &p
 		}
 		hs.Points = append(hs.Points, Point{
-			RunID: x.runID, RunStartedAt: x.started, AnswerID: x.id, AnswerIDs: ids, QuestionID: int64(x.question), Status: t.Status,
+			RunID: x.runID, RunStartedAt: x.started, AnswerID: x.id, AnswerIDs: idsOf(cell), QuestionID: int64(x.question), Status: t.Status,
 			Mentioned: t.Mentioned(), Cited: t.MostlyCited(), Position: nullPosition(t.Position), Answered: t.Answered, Named: t.Named,
 			ReportedModel: x.reported, Summary: panel.Summarize(prev[x.series], t, brands),
 		})
@@ -360,6 +343,44 @@ func (s *Service) QuestionHistory(ctx context.Context, questionID int64, since *
 	// A pair's series stay in the order they began, oldest first.
 	slices.SortStableFunc(out.Series, func(a, b HistorySeries) int { return cmp.Compare(a.Pair.ID, b.Pair.ID) })
 	return out, nil
+}
+
+// cellsBy groups answers into cells by key, in the order each key first
+// appears, each cell's answers in the order given.
+func cellsBy[K comparable](answers []scoredAnswer, key func(scoredAnswer) K) [][]scoredAnswer {
+	var out [][]scoredAnswer
+	at := map[K]int{}
+	for _, a := range answers {
+		k := key(a)
+		i, ok := at[k]
+		if !ok {
+			i = len(out)
+			at[k] = i
+			out = append(out, nil)
+		}
+		out[i] = append(out[i], a)
+	}
+	return out
+}
+
+// bySeries keys a question's answers in one run into cells.
+func bySeries(a scoredAnswer) Series { return a.series }
+
+// scoredOf is a cell's answers as panel scores them.
+func scoredOf(cell []scoredAnswer) []panel.Scored {
+	out := make([]panel.Scored, len(cell))
+	for i, a := range cell {
+		out[i] = a.scored
+	}
+	return out
+}
+
+func idsOf(cell []scoredAnswer) []int64 {
+	out := make([]int64, len(cell))
+	for i, a := range cell {
+		out[i] = a.id
+	}
+	return out
 }
 
 func nullPosition(p int) *int {

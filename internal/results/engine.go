@@ -41,8 +41,8 @@ type EnginePrompt struct {
 	// AnswerID is the answer to open: the best placed one when the line
 	// combines models.
 	AnswerID int64    `json:"answer_id"`
-	Position *int     `json:"position" jsonschema:"your best position on the line; null when not named"`
-	Cited    bool     `json:"cited" jsonschema:"an answer cited your domains"`
+	Position *int     `json:"position" jsonschema:"your best position on the line, among pairs most answers named you on; null when there are none"`
+	Cited    bool     `json:"cited" jsonschema:"most answers cited your domains on a pair of the line"`
 	Instead  []string `json:"instead" jsonschema:"competitors named by answers that did not name you, most often first"`
 }
 
@@ -59,7 +59,7 @@ type Engine struct {
 	// mention rate; null when none answered.
 	Visibility      *float64        `json:"visibility"`
 	Prompts         int             `json:"prompts" jsonschema:"questions the line answered on the latest run"`
-	VisiblePrompts  int             `json:"visible_prompts" jsonschema:"of those, questions it named you on"`
+	VisiblePrompts  int             `json:"visible_prompts" jsonschema:"of those, questions most answers named you on, on a pair of the line"`
 	AveragePosition *float64        `json:"average_position" jsonschema:"your mean position over the latest run's answers that named you; null when none did"`
 	Points          []RatePoint     `json:"points" jsonschema:"visibility per run, oldest first"`
 	Ranking         []BrandStanding `json:"ranking" jsonschema:"you and every competitor the line named over the range, most mentioned first; technologies left out"`
@@ -177,10 +177,16 @@ func (s *Service) Engine(ctx context.Context, since *time.Time, l Line) (Engine,
 	for _, q := range order {
 		group := byQuestion[q]
 		ep := EnginePrompt{Question: refs[q], AnswerID: group[0].id, Instead: namedInstead(group, brands)}
-		for _, a := range group {
-			ep.Cited = ep.Cited || a.scored.Cited
-			if p := a.scored.Position; p > 0 && (ep.Position == nil || p < *ep.Position) {
-				ep.Position, ep.AnswerID = &p, a.id
+		for _, cell := range cellsBy(group, bySeries) {
+			t := panel.TallyOf(scoredOf(cell))
+			ep.Cited = ep.Cited || t.MostlyCited()
+			if !t.Mentioned() {
+				continue
+			}
+			for _, a := range cell {
+				if p := a.scored.Position; p > 0 && (ep.Position == nil || p < *ep.Position) {
+					ep.Position, ep.AnswerID = &p, a.id
+				}
 			}
 		}
 		if ep.Position != nil {

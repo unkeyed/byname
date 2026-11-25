@@ -30,13 +30,13 @@ func TestOpportunity(t *testing.T) {
 }
 
 func TestNewGapCountsAnswersAndCompetitors(t *testing.T) {
-	answers := []Scored{
-		named(1, contoso, redis),
-		notNamed(contoso, fabrikam),
-		notNamed(),
-		failedAnswer,
+	cells := [][]Scored{
+		{named(1, contoso, redis)},
+		{notNamed(contoso, fabrikam)},
+		{notNamed()},
+		{failedAnswer},
 	}
-	g := NewGap(7, answers, brands, searches(400))
+	g := NewGap(7, cells, brands, searches(400))
 	want := Gap{Question: 7, Engines: 3, Named: 1, Competitors: 2, Demand: g.Demand}
 	if g != want || *g.Demand != 400 {
 		t.Errorf("got %+v, want %+v", g, want)
@@ -59,5 +59,17 @@ func TestRankGaps(t *testing.T) {
 	// orders them. 4 and 2 score 2, and 4 named more competitors.
 	if want := []QuestionID{3, 5, 4, 2}; !slices.Equal(order, want) {
 		t.Errorf("order %v, want %v", order, want)
+	}
+}
+
+func TestNewGapCountsPairsByMostOfTheirAnswers(t *testing.T) {
+	cells := [][]Scored{
+		{named(1), notNamed(fabrikam), named(2)},
+		{named(1), notNamed(contoso), notNamed()},
+		{failedAnswer, failedAnswer, failedAnswer},
+	}
+	g := NewGap(7, cells, brands, nil)
+	if want := (Gap{Question: 7, Engines: 2, Named: 1, Competitors: 2}); g != want {
+		t.Errorf("got %+v, want %+v: two pairs answered, most answers named you on one, and any answer's competitor counts", g, want)
 	}
 }

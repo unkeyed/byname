@@ -1,6 +1,6 @@
 # Get {{.Brand}} into AI answers to "{{.Question.Text}}"
 
-People ask AI assistants this question, and the answers decide which products they look at. Your job is to write or improve content so that AI assistants name {{.Brand}} in their answer and link to {{.Brand}}'s site. Everything below comes from Byname, which asked AI apps this question on {{.Day}} (check #{{.RunID}}) for {{.Market}} readers in language "{{.Language}}" and got {{.Answered}} {{if eq .Answered 1}}answer{{else}}answers{{end}}, one per app and model. Write in that language for those readers.
+People ask AI assistants this question, and the answers decide which products they look at. Your job is to write or improve content so that AI assistants name {{.Brand}} in their answer and link to {{.Brand}}'s site. Everything below comes from Byname, which asked AI apps this question on {{.Day}} (check #{{.RunID}}) for {{.Market}} readers in language "{{.Language}}" and got {{.Answered}} {{if eq .Answered 1}}answer{{else}}answers{{end}}. Write in that language for those readers.
 
 {{.Brand}}'s sites: {{list .Domains}}.
 

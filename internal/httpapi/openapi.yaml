@@ -6819,21 +6819,36 @@ components:
           description: One per line, in pair order.
     Cell:
       type: object
-      description: One pair's answer to one question.
-      required: [answer_id, status, mentioned, cited, position, outcome]
+      description: One pair's answers to one question. Asked several times, it says what most of the answers say.
+      required: [answer_id, answer_ids, status, mentioned, cited, position, answered, named, outcome]
       properties:
         answer_id:
           type: integer
+          description: The first sample's answer.
+        answer_ids:
+          type: array
+          items:
+            type: integer
+          description: Every sample's answer, in sample order.
         status:
           $ref: "#/components/schemas/AnswerStatus"
+          description: Failed only when every answer failed.
         mentioned:
           type: boolean
+          description: Most answers named you.
         cited:
           type: boolean
+          description: Most answers cited your domains.
         position:
           type: [integer, "null"]
           minimum: 1
-          description: Your position, 1 first. Null when not named.
+          description: Your best position among the answers that named you, 1 first. Null when none did.
+        answered:
+          type: integer
+          description: Answers that did not fail.
+        named:
+          type: integer
+          description: Answers that named you.
         outcome:
           $ref: "#/components/schemas/Outcome"
     QuestionRow:
@@ -6854,14 +6869,14 @@ components:
           description: Cells that did not fail.
         named:
           type: integer
-          description: Cells that named you.
+          description: Cells where most answers named you.
         cited:
           type: integer
-          description: Cells that cited your domains.
+          description: Cells where most answers cited your domains.
         best_position:
           type: [integer, "null"]
           minimum: 1
-          description: Your best position across the row. Null when no cell named you.
+          description: Your best position in the row's answers. Null when none named you.
         gained:
           type: integer
           description: Cells that gained a mention since the previous run.
@@ -6900,7 +6915,7 @@ components:
           description: How many pairs answered.
         named:
           type: integer
-          description: How many of those named you.
+          description: How many of those pairs most answers named you on.
         competitors:
           type: integer
           description: Distinct competitors the answers named.
@@ -7415,31 +7430,46 @@ components:
           type: boolean
           description: The site matching your primary domain.
     GapPair:
-      description: One pair's answer to a gap's question.
+      description: One pair's answers to a gap's question. Asked several times, it says what most of the answers say.
       allOf:
         - $ref: "#/components/schemas/Series"
         - type: object
-          required: [answer_id, status, named, position, fan_out, links]
+          required: [answer_id, answer_ids, status, named, position, answered, named_answers, fan_out, links]
           properties:
             answer_id:
               type: integer
+              description: The first sample's answer.
+            answer_ids:
+              type: array
+              items:
+                type: integer
+              description: Every sample's answer, in sample order.
             status:
               type: string
               enum: [ok, no_answer, failed]
+              description: Failed only when every answer failed.
             named:
               type: boolean
+              description: Most answers named you.
             position:
               type: [integer, "null"]
+              description: Your best position among the answers that named you.
+            answered:
+              type: integer
+              description: Answers that did not fail.
+            named_answers:
+              type: integer
+              description: Answers that named you.
             fan_out:
               type: array
               items:
                 type: string
-              description: The web searches the engine ran for the question. Empty where the endpoint does not expose them.
+              description: The web searches the engine ran for the question, in order; a later answer adds only those earlier ones did not. Empty where the endpoint does not expose them.
             links:
               type: array
               items:
                 type: string
-              description: The pages the answer linked to, in order, without your own site's.
+              description: The pages the answers linked to, in order, without your own site's; a later answer adds only those earlier ones did not.
     BriefLine:
       description: One pair's answer to the brief's question.
       allOf:
@@ -7553,11 +7583,13 @@ components:
         state:
           type: string
           enum: [named, cited, not_named, failed]
-          description: named when some pair named you, cited when none did but one cited your domains, not_named when some pair answered without either, failed when every call failed.
+          description: named when most answers named you on some pair, cited when on none but most cited your domains on one, not_named when some pair answered without either, failed when every call failed.
         named:
           type: integer
+          description: Pairs most answers named you on.
         answered:
           type: integer
+          description: Pairs whose calls did not all fail.
     PromptRow:
       type: object
       required: [question, answered, named_by, best_position, instead, dots]
@@ -7571,7 +7603,7 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Series"
-          description: The pairs that named you on the latest run.
+          description: The pairs most answers named you on in the latest run.
         best_position:
           type: [integer, "null"]
         instead:
@@ -7700,11 +7732,13 @@ components:
           $ref: "#/components/schemas/QuestionRef"
         answer_id:
           type: integer
-          description: The answer to open, the best placed one when the line combines models.
+          description: The answer to open, the best placed one when the line combines models or asks more than once.
         position:
           type: [integer, "null"]
+          description: Your best position among the pairs most answers named you on. Null when there are none.
         cited:
           type: boolean
+          description: Most answers cited your domains on a pair of the line.
         instead:
           type: array
           items:
@@ -7735,6 +7769,7 @@ components:
               type: integer
             visible_prompts:
               type: integer
+              description: Questions most answers named you on, on a pair of the line.
             average_position:
               type: [number, "null"]
             points:
