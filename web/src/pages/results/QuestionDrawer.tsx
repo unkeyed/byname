@@ -328,15 +328,15 @@ function Analysis({ series: s, point, label, onRaw }: { series: HistorySeries; p
             ) : (
               <ol className="divide-y divide-line rounded-surface border border-line bg-surface text-xs">
                 {answer.data.citations.map((c, i) => (
-                  <li key={i} className="flex flex-col gap-1 px-3 py-2 sm:flex-row sm:items-center sm:gap-3">
-                    <span className="flex min-w-0 flex-1 items-center gap-2">
+                  <li key={i} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2">
+                    <span className="flex min-w-0 flex-[1_1_16rem] items-center gap-2">
                       <span className="text-faint tabular-nums">{i + 1}</span>
                       <a href={c.url} target="_blank" rel="noreferrer noopener" className={cx("min-w-0 truncate py-3.5 hover:underline md:py-0", c.is_self && "font-semibold")} title={c.url}>
                         {c.url.replace(/^https?:\/\/(www\.)?/, "")}
                       </a>
                       {c.is_self && <Badge tone="info">Yours</Badge>}
                     </span>
-                    <span className="flex shrink-0 flex-wrap items-center gap-1 pl-5 sm:pl-0">
+                    <span className="flex min-w-0 flex-wrap items-center gap-1 pl-5 sm:ml-auto sm:justify-end sm:pl-0">
                       <PageMark check={c.page} />
                       {c.page?.competitors.map((b) => (
                         <Badge key={b} tone="outline">
