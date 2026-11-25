@@ -75,7 +75,7 @@ function WhoNamedYou({ gap }: { gap: Gap }) {
   const labels = useLabels(surfaces.data);
   const named = gap.pairs.filter((p) => p.named);
   const missed = gap.pairs.filter((p) => !p.named);
-  const names = (ps: GapPair[]) => andList(ps.map((p) => labels.line(p.pair)));
+  const names = (ps: GapPair[]) => andList(ps.map((p) => labels.line(p.pair) + (p.answered > 1 ? ` (${p.named_answers} of ${p.answered})` : "")));
   if (named.length === 0) return <p className="text-xs text-danger">No AI app named you.</p>;
   if (named.length <= missed.length)
     return (

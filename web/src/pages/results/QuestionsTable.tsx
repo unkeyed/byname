@@ -15,6 +15,16 @@ export const outcomeMark: Record<Outcome, { icon: "up" | "down" | "updown" | nul
   not_comparable: { icon: null, label: "Nothing to compare", className: "text-faint" },
 };
 
+/** "2 of 3" beside a mark when a check asked more than once: how many of the answers named you. */
+export function NamedOf({ c }: { c: { answered: number; named: number } }) {
+  if (c.answered <= 1) return null;
+  return (
+    <span className="text-xs text-faint tabular-nums" title={`${c.named} of ${c.answered} answers named you`}>
+      {c.named} of {c.answered}
+    </span>
+  );
+}
+
 export function CellMark({ cell }: { cell: Cell | null }) {
   if (!cell) return <span className="text-faint" title="Not asked in this AI app">–</span>;
   const o = outcomeMark[cell.outcome];
@@ -39,6 +49,7 @@ export function CellMark({ cell }: { cell: Cell | null }) {
   return (
     <span className="inline-flex items-center gap-1">
       {body}
+      <NamedOf c={cell} />
       {o.icon && (
         <span className={o.className} title={`${o.label} since the previous check`}>
           <Icon name={o.icon} className="size-3" />

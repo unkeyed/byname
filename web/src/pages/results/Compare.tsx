@@ -7,7 +7,7 @@ import { Link } from "react-router";
 import { buttonClass, Card, CardHeader, cx, EmptyState, ErrorNote, Icon, Pending, scrollArea, selectClass, useLoading } from "../../ui";
 import { runTime, useView } from "../../view";
 import { Segmented, ViewHeader } from "./Header";
-import { outcomeMark } from "./QuestionsTable";
+import { NamedOf, outcomeMark } from "./QuestionsTable";
 
 const shows = [
   { id: "changed", label: "Changed" },
@@ -23,8 +23,14 @@ function StandingMark({ s }: { s: Standing | null }) {
   if (!s) return <span className="text-faint">Not asked</span>;
   if (s.status === "failed") return <span className="text-faint">Failed</span>;
   if (s.status === "no_answer") return <span className="text-faint">No answer</span>;
-  if (s.mentioned) return <span className="font-semibold text-success tabular-nums">#{s.position}</span>;
-  return <span className="text-muted">{s.cited ? "Linked, not named" : "Not named"}</span>;
+  const mark = s.mentioned ? <span className="font-semibold text-success tabular-nums">#{s.position}</span> : <span className="text-muted">{s.cited ? "Linked, not named" : "Not named"}</span>;
+  if (s.answered <= 1) return mark;
+  return (
+    <span className="inline-flex items-center gap-1">
+      {mark}
+      <NamedOf c={s} />
+    </span>
+  );
 }
 
 /** Places climbed: positive is up the list (#3 to #1), negative is down it. */
@@ -100,6 +106,7 @@ export function Compare() {
     for (const p of pairs) byQuestion.set(p.question_id, [...(byQuestion.get(p.question_id) ?? []), p]);
     const moves = (cmp.data?.pairs ?? []).map(climbed);
     const flipped = cmp.data != null && cmp.data.counts.gained + cmp.data.counts.lost > 0;
+    const sampled = cmp.data?.pairs.some((p) => (p.before?.answer_ids.length ?? 0) > 1 || (p.after?.answer_ids.length ?? 0) > 1) ?? false;
     const openPair = (p: PairChange) => view.set({ q: p.question_id, qa: p.after?.answer_id ?? p.before?.answer_id ?? null }, { push: true });
     body = (
       <div className="space-y-4">
@@ -159,6 +166,7 @@ export function Compare() {
             </div>
             <p className="text-xs text-muted">
               Gained: an AI app named you and did not before. Lost: the reverse. Moved: it named you both times, in a different position. Net change is gained minus lost.
+              {sampled && " An AI app asked a question more than once counts as naming you when most of its answers did."}
               {flipped && ` Chance alone gives a move this large ${chance(cmp.data.move.p_value)}. A move is real when that is less than 5 times in 100.`}
             </p>
             <Card>

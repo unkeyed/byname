@@ -240,11 +240,22 @@ function AnswerList({ run, filter }: { run: Run; filter: ResultsFilter }) {
   );
   const open = (a: AnswerSummary) => view.set({ q: a.question.id, qa: a.id, qv: "raw" }, { push: true });
   const competitors = (a: AnswerSummary) => a.mentions.filter((m) => m.kind === "competitor").length;
-  const mark = (a: AnswerSummary) => <CellMark cell={{ answer_id: a.id, status: a.status, mentioned: a.mentioned, cited: a.cited, position: a.position, outcome: "not_comparable" }} />;
+  const mark = (a: AnswerSummary) => (
+    <CellMark
+      cell={{ answer_id: a.id, answer_ids: [a.id], status: a.status, mentioned: a.mentioned, cited: a.cited, position: a.position, answered: 1, named: a.mentioned ? 1 : 0, outcome: "not_comparable" }}
+    />
+  );
+  const asked = Math.max(1, ...answers.data.map((a) => a.sample));
   const pairLabel = (a: AnswerSummary) => (
     <>
       {labels.line(a.pair)}
       {a.fidelity === "approximation" && <span className="text-warn"> · stand-in</span>}
+      {asked > 1 && (
+        <span className="text-faint">
+          {" "}
+          · answer {a.sample} of {asked}
+        </span>
+      )}
     </>
   );
 
