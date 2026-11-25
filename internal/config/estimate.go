@@ -269,6 +269,8 @@ func (s *Service) CheckCosts(ctx context.Context) (CheckCosts, error) {
 // DefaultMonthCap is the monthly spend cap onboarding sets when none is
 // set: three times the monthly estimate, rounded up to a whole dollar, and
 // at least $5, so a normal month never reaches it and a runaway one stops.
+// web/src/config/costs.ts does the same for the onboarding hint, and both
+// are tested against monthcap.json.
 func DefaultMonthCap(monthUSD float64) float64 {
 	cents := math.Round(3 * monthUSD * 100)
 	return max(5, math.Ceil(cents/100))

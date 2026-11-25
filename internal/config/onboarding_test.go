@@ -1,8 +1,10 @@
 package config_test
 
 import (
+	"encoding/json"
 	"errors"
 	"math"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -284,12 +286,24 @@ func TestEstimate(t *testing.T) {
 	}
 }
 
-func TestDefaultMonthCap(t *testing.T) {
-	for _, c := range []struct{ month, want float64 }{
-		{0, 5}, {1.2, 5}, {1.67, 6}, {4.0 / 3, 5}, {10.0 / 3, 10}, {12.34, 38},
-	} {
-		if got := config.DefaultMonthCap(c.month); got != c.want {
-			t.Errorf("DefaultMonthCap(%v) = %v, want %v", c.month, got, c.want)
+func TestDefaultMonthCapMatchesSharedCases(t *testing.T) {
+	raw, err := os.ReadFile("monthcap.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var cases []struct {
+		Month float64 `json:"month_usd"`
+		Cap   float64 `json:"cap_usd"`
+	}
+	if err := json.Unmarshal(raw, &cases); err != nil {
+		t.Fatal(err)
+	}
+	if len(cases) == 0 {
+		t.Fatal("monthcap.json has no cases")
+	}
+	for _, c := range cases {
+		if got := config.DefaultMonthCap(c.Month); got != c.Cap {
+			t.Errorf("DefaultMonthCap(%v) = %v, want %v", c.Month, got, c.Cap)
 		}
 	}
 }

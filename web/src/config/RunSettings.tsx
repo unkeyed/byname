@@ -3,7 +3,7 @@ import type { Costs, Settings, SettingsView } from "../api";
 import { useCan, useCosts, useSettings } from "../queries";
 import { cx, ErrorNote, inputClass, labelClass, Pending } from "../ui";
 import { money } from "../money";
-import { monthOfChecks } from "./costs";
+import { defaultMonthCap, monthOfChecks } from "./costs";
 import { defaultFooter, Disclosure, NumberField, ReadOnlyNote, SubmitButton, useSaveSettings, type Footer } from "./forms";
 import { formatNumber, parseNumber, type NumberKey } from "./rules";
 
@@ -114,7 +114,7 @@ function Body({
         samples: `${hints.samples} At ${samples === 1 ? "once" : `${samples} times`}, one check costs ${money(perCheck, "about")}.`,
         spend_cap_run_usd: `One check costs ${money(perCheck, "about")}. ${hints.spend_cap_run_usd}`,
         spend_cap_month_usd: `A month costs ${money(checksMonth + socialMonth, "about")}${socialMonth > 0 ? ", social searches included" : ""}. ${
-          capEmpty && !initial.onboarded_at ? `Leave it empty and finishing setup sets ${money(costs.default_month_cap_usd)}, which you can change.` : hints.spend_cap_month_usd
+          capEmpty && !initial.onboarded_at ? `Leave it empty and finishing setup sets ${money(defaultMonthCap(checksMonth + socialMonth))}, which you can change.` : hints.spend_cap_month_usd
         }`,
       }
     : {};
