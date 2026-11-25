@@ -2,6 +2,8 @@ package notify_test
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"net/url"
 	"strings"
 	"testing"
@@ -12,6 +14,7 @@ import (
 	"github.com/unkeyed/byname/internal/core"
 	"github.com/unkeyed/byname/internal/engines/tregtest"
 	"github.com/unkeyed/byname/internal/notify"
+	"github.com/unkeyed/byname/internal/panel"
 	"github.com/unkeyed/byname/internal/results"
 	"github.com/unkeyed/byname/internal/secretbox"
 	"github.com/unkeyed/byname/internal/testdb"
@@ -217,5 +220,101 @@ func TestFirstLinkToAMarkedPageRaisesPageLinkedOnce(t *testing.T) {
 	want := "2 answers linked to it, the first since you marked it as answering “" + set.Questions[0].Text + "”."
 	if a.Title != "Claude Code linked to northwind.example/blog/zero-downtime" || len(a.Lines) != 1 || a.Lines[0] != want || a.Path != "/ai/missed?tab=handled" {
 		t.Errorf("page_linked = %q %q at %q", a.Title, a.Lines, a.Path)
+	}
+}
+
+// Two answers that stopped naming you, of twelve, are within chance, so the
+// check says no real change and how often chance alone moves that much.
+func TestCheckCompletedSaysAFewFlipsMayBeNoise(t *testing.T) {
+	ctx := context.Background()
+	db := testdb.New(t)
+	treg := tregtest.New(t)
+	alerts := notify.New(db, results.New(db), notify.Options{Secrets: secretbox.ForTest(), PublicURL: &url.URL{Scheme: "https", Host: "byname.example"}})
+	cfg := config.New(db, config.Options{Secrets: secretbox.ForTest(), TregBaseURL: treg.URL, Alerts: alerts})
+	checkstest.Seed(t, cfg, treg, nil)
+	runs := checks.New(db, cfg, checks.Options{Alerts: alerts})
+	check := func() {
+		t.Helper()
+		if _, _, err := runs.RunNow(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if err := runs.Work(ctx); err != nil {
+			t.Fatal(err)
+		}
+	}
+	check()
+	treg.SetBody("dataforseo.x.ai-optimization-claude-llm-responses-live", []byte(`{"status_code":20000,"tasks":[{"status_code":20000,"result":[{"model_name":"claude-sonnet-4-5-20250929",
+		"items":[{"type":"message","sections":[{"type":"text","text":"Contoso Gateway is the usual choice for this."}]}]}]}]}`))
+	check()
+
+	list, err := alerts.Alerts(ctx, reader, notify.AlertQuery{})
+	if err != nil || len(list.Alerts) != 2 {
+		t.Fatalf("alerts = %+v %v, want one per check", list, err)
+	}
+	a := list.Alerts[0]
+	var p notify.CheckCompletedPayload
+	if err := json.Unmarshal(a.Payload, &p); err != nil {
+		t.Fatal(err)
+	}
+	// McNemar's (|0-2|-1)²/2 = 0.5 on one degree of freedom is p 0.48.
+	if m := p.Move; p.Lost != 2 || p.Gained != 0 || m == nil || m.Cells != 12 || m.Real || m.PValue < 0.479 || m.PValue > 0.480 {
+		t.Fatalf("payload = %+v, move %+v, want 2 lost of 12 compared, p 0.48, not real", p, p.Move)
+	}
+	if p.Band == nil || p.Band.Low >= float64(p.Named)/float64(p.Answered) || p.Band.High <= float64(p.Named)/float64(p.Answered) {
+		t.Fatalf("band = %+v, want one around %d of %d", p.Band, p.Named, p.Answered)
+	}
+	want := []string{
+		fmt.Sprintf("AI apps named you in %d of %d answers (%.0f%%, likely between %.0f%% and %.0f%%).", p.Named, p.Answered,
+			100*float64(p.Named)/float64(p.Answered), 100*p.Band.Low, 100*p.Band.High),
+		"Since check #1, 2 answers stopped naming you.",
+		"Chance alone gives a move this large about 48 times in 100, so it may be noise.",
+	}
+	if a.Title != "Check #2: no real change" || strings.Join(a.Lines[:min(3, len(a.Lines))], "\n") != strings.Join(want, "\n") {
+		t.Fatalf("check_completed = %q\n%s\nwant lines:\n%s", a.Title, strings.Join(a.Lines, "\n"), strings.Join(want, "\n"))
+	}
+	var firstPayload notify.CheckCompletedPayload
+	if err := json.Unmarshal(list.Alerts[1].Payload, &firstPayload); err != nil {
+		t.Fatal(err)
+	}
+	if first := list.Alerts[1]; first.Title != "Check #1 finished, the first to compare against" || firstPayload.Move != nil || firstPayload.Band == nil {
+		t.Fatalf("first check = %q %s, want a band and no move to compare", first.Title, first.Payload)
+	}
+}
+
+// A broad rise is real and says by how much. An alert stored before bands
+// and moves existed still reads as it did.
+func TestCheckCompletedSaysARealMoveAndReadsOldAlerts(t *testing.T) {
+	ctx := context.Background()
+	db := testdb.New(t)
+	alerts := notify.New(db, nil, notify.Options{Secrets: secretbox.ForTest()})
+	rose := notify.CheckCompletedPayload{RunID: 42, PreviousRunID: 41, Gained: 8, Unchanged: 88, Net: 8, Named: 31, Answered: 96,
+		Band: &panel.Band{Low: 0.2378, High: 0.4217},
+		Move: &panel.Move{Cells: 96, BeforeRate: new(23.0 / 96), AfterRate: new(31.0 / 96), PValue: 0.0133, Real: true},
+		Top:  []notify.QuestionChange{{QuestionID: 7, Question: "Best invoicing app?", Gained: 3}},
+	}
+	if err := alerts.Emit(ctx, notify.Event{Subject: "run/42", Payload: rose}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(ctx, `INSERT INTO alert (kind, subject, payload, created_at) VALUES ('check_completed', 'run/41', $1, now())`,
+		`{"run_id":41,"previous_run_id":40,"gained":3,"lost":1,"moved":0,"unchanged":92,"not_comparable":0,"net":2,"named":23,"answered":96,"spend_usd":0.5,"top":[]}`); err != nil {
+		t.Fatal(err)
+	}
+	list, err := alerts.Alerts(ctx, reader, notify.AlertQuery{})
+	if err != nil || len(list.Alerts) != 2 {
+		t.Fatalf("alerts = %+v %v", list, err)
+	}
+	old, got := list.Alerts[0], list.Alerts[1]
+	want := []string{
+		"AI apps named you in 31 of 96 answers (32%, likely between 24% and 42%).",
+		"Since check #41, 8 answers started naming you.",
+		"Chance alone gives a move this large about 1 time in 100.",
+		"“Best invoicing app?”: 3 AI apps started naming you.",
+	}
+	if got.Title != "Check #42: named you more often, 24% → 32%" || strings.Join(got.Lines, "\n") != strings.Join(want, "\n") {
+		t.Errorf("real move = %q\n%s", got.Title, strings.Join(got.Lines, "\n"))
+	}
+	want = []string{"AI apps named you in 23 of 96 answers.", "Since check #40, 3 answers started naming you and 1 answer stopped naming you."}
+	if old.Title != "Check #41: 3 answers started naming you, 1 answer stopped naming you" || strings.Join(old.Lines, "\n") != strings.Join(want, "\n") {
+		t.Errorf("old alert = %q\n%s", old.Title, strings.Join(old.Lines, "\n"))
 	}
 }

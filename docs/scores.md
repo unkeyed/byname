@@ -1,6 +1,6 @@
 # How answers are scored
 
-Every answer Byname stores says whether it named you, whether it linked to your site, and where you came among the brands it named. The scores on **This week**, **AI answers > Competitors**, **AI answers > Missed questions**, **AI answers > What changed** and every chart add those up. This page covers the two things that most often make a score look better or worse than it is: questions that name your brand, and aliases that are everyday words.
+Every answer Byname stores says whether it named you, whether it linked to your site, and where you came among the brands it named. The scores on **This week**, **AI answers > Competitors**, **AI answers > Missed questions**, **AI answers > What changed** and every chart add those up. This page covers how sure a score is, and the two things that most often make a score look better or worse than it is: questions that name your brand, and aliases that are everyday words.
 
 ## Named you
 
@@ -11,6 +11,18 @@ Linking to one of your domains, or a subdomain of one, counts apart. An answer t
 Scores count only the brands you track: your own, your competitors and your technologies. Byname also lists the other brands answers name, under **AI answers > Competitors > Also named in answers**, but those count in no score until you track one. [Other brands and logos](other-brands.md) covers them.
 
 Changing a tracked brand scores every stored answer again, locally and for free: adding, changing or removing a competitor or technology, or changing your brand's name, aliases, domains or the match mode. A competitor you add today counts in last month's answers too, and where it was named ahead of you, your position in that answer drops a place.
+
+## How sure a score is
+
+A check asks each question once in each AI app. Asked again, an AI app can answer differently, so a score moves a little between checks even when nothing changed.
+
+The band is the range the true share likely falls in. **This week** shows it next to how often AI apps named you, as in "32%, likely 24% to 42%". It is a 95% band. It treats each answer as an independent draw. The same questions are asked in every check, so if anything the band overstates how far a score swings between checks.
+
+A move between two checks is real when it is larger than chance gives. Byname compares each question in each AI app with itself across the two checks, and weighs the answers that started naming you against the ones that stopped. A question that named you both times, or neither time, says nothing about a move. The move is real when chance alone gives one that large less than 5 times in 100. **AI answers > What changed** and the **Check completed** notification say which it is.
+
+With one answer per question and AI app, a few flips are rarely real. 3 answers that started naming you and 1 that stopped happen by chance about 62 times in 100. 8 that started and none that stopped happen by chance about 1 time in 100, so that move is real.
+
+Through the API, `GET /v1/metrics/summary` and every rate point carry `mention_band` and `citation_band`, each with `low` and `high` from 0 to 1, or null when no answer counted. `GET /v1/compare` carries `move` with `cells`, `before_rate`, `after_rate`, `p_value` and `real`. The band is a Wilson score interval. The move is a Cochran–Mantel–Haenszel test with one stratum per question and AI app and a continuity correction. With one answer on each side, that is McNemar's test.
 
 ## Questions that name your brand
 

@@ -95,14 +95,16 @@ type PairChange struct {
 }
 
 // Comparison is every question and pair across two runs, with counts per
-// outcome and the net change (gained minus lost). Pairs list every
-// question, but the counts and the net leave out questions that count in
-// no score, such as one that names your brand.
+// outcome, the net change (gained minus lost) and whether the share of
+// answers naming you moved by more than chance gives. Pairs list every
+// question, but the counts, the net and the move leave out questions that
+// count in no score, such as one that names your brand.
 type Comparison struct {
 	Before int64                 `json:"before"`
 	After  int64                 `json:"after"`
 	Counts map[panel.Outcome]int `json:"counts"`
 	Net    int                   `json:"net"`
+	Move   panel.Move            `json:"move" jsonschema:"whether the share of answers naming you moved by more than chance, each question and pair compared with itself"`
 	Pairs  []PairChange          `json:"pairs"`
 }
 
@@ -172,6 +174,7 @@ func (s *Service) Compare(ctx context.Context, before, after int64) (Comparison,
 	if err != nil {
 		return Comparison{}, err
 	}
+	var cells []panel.Cell
 	for _, p := range c.Pairs {
 		pc := PairChange{QuestionID: int64(p.Key.Question), PairID: int64(p.Key.SurfaceModel), Question: questions[p.Key.Question],
 			Pair: pairs[int64(p.Key.SurfaceModel)], Outcome: p.Outcome}
@@ -191,9 +194,21 @@ func (s *Service) Compare(ctx context.Context, before, after int64) (Comparison,
 		if pc.Question.CountsInScores {
 			out.Counts[p.Outcome]++
 		}
+		if pc.Question.CountsInScores && p.Outcome != panel.NotComparable {
+			cells = append(cells, panel.Cell{BeforeNamed: named(p.Before), BeforeAnswered: 1, AfterNamed: named(p.After), AfterAnswered: 1})
+		}
 	}
 	out.Net = out.Counts[panel.Gained] - out.Counts[panel.Lost]
+	out.Move = panel.Shift(cells)
 	return out, nil
+}
+
+// named is 1 for an answer that named you, the count a cell holds.
+func named(s *panel.Scored) int {
+	if s.Mentioned {
+		return 1
+	}
+	return 0
 }
 
 // questionMap maps each question of set older to the question of set newer

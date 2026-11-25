@@ -129,10 +129,12 @@ func (s *Service) Engine(ctx context.Context, since *time.Time, l Line) (Engine,
 	}
 	slices.Sort(out.Models)
 	for i := range out.Points {
-		if p := &out.Points[i]; p.Answered > 0 {
+		p := &out.Points[i]
+		if p.Answered > 0 {
 			p.MentionRate = new(float64(p.Mentioned) / float64(p.Answered))
 			p.CitationRate = new(float64(p.Cited) / float64(p.Answered))
 		}
+		p.MentionBand, p.CitationBand = panel.Wilson(p.Mentioned, p.Answered), panel.Wilson(p.Cited, p.Answered)
 	}
 	for _, b := range standings {
 		if mentions > 0 {

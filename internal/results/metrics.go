@@ -18,14 +18,16 @@ import (
 // RatePoint is one series in one run. Rates are over answered calls
 // (failed ones excluded) and null when none answered.
 type RatePoint struct {
-	RunID        int64     `json:"run_id"`
-	RunStartedAt time.Time `json:"run_started_at"`
-	Calls        int       `json:"calls"`
-	Answered     int       `json:"answered"`
-	Mentioned    int       `json:"mentioned"`
-	Cited        int       `json:"cited"`
-	MentionRate  *float64  `json:"mention_rate"`
-	CitationRate *float64  `json:"citation_rate"`
+	RunID        int64       `json:"run_id"`
+	RunStartedAt time.Time   `json:"run_started_at"`
+	Calls        int         `json:"calls"`
+	Answered     int         `json:"answered"`
+	Mentioned    int         `json:"mentioned"`
+	Cited        int         `json:"cited"`
+	MentionRate  *float64    `json:"mention_rate"`
+	CitationRate *float64    `json:"citation_rate"`
+	MentionBand  *panel.Band `json:"mention_band" jsonschema:"95% band on mention_rate; null when none answered"`
+	CitationBand *panel.Band `json:"citation_band" jsonschema:"95% band on citation_rate; null when none answered"`
 }
 
 type RateSeries struct {
@@ -68,6 +70,7 @@ func (s *Service) Rates(ctx context.Context, since *time.Time, sc Scope, by Grou
 			p.MentionRate = new(float64(p.Mentioned) / float64(p.Answered))
 			p.CitationRate = new(float64(p.Cited) / float64(p.Answered))
 		}
+		p.MentionBand, p.CitationBand = panel.Wilson(p.Mentioned, p.Answered), panel.Wilson(p.Cited, p.Answered)
 		i, ok := index[sr]
 		if !ok {
 			i = len(out)
@@ -170,15 +173,17 @@ func (s *Service) Share(ctx context.Context, since *time.Time, sc Scope) ([]Shar
 // brand mentions. It counts pairs; it is not an average of line rates.
 // Answers to questions that name your brand are left out unless counted.
 type RunSummary struct {
-	RunID        int64     `json:"run_id"`
-	RunStartedAt time.Time `json:"run_started_at"`
-	Answered     int       `json:"answered" jsonschema:"question and pair answers that did not fail"`
-	Mentioned    int       `json:"mentioned" jsonschema:"answers that named you"`
-	Cited        int       `json:"cited" jsonschema:"answers that cited your domains"`
-	MentionRate  *float64  `json:"mention_rate" jsonschema:"mentioned over answered; null when none answered"`
-	CitationRate *float64  `json:"citation_rate" jsonschema:"cited over answered; null when none answered"`
-	Mentions     int       `json:"mentions" jsonschema:"mentions of you and your competitors, the share's denominator"`
-	Share        *float64  `json:"share" jsonschema:"your mentions over mentions; null when no brand was named"`
+	RunID        int64       `json:"run_id"`
+	RunStartedAt time.Time   `json:"run_started_at"`
+	Answered     int         `json:"answered" jsonschema:"question and pair answers that did not fail"`
+	Mentioned    int         `json:"mentioned" jsonschema:"answers that named you"`
+	Cited        int         `json:"cited" jsonschema:"answers that cited your domains"`
+	MentionRate  *float64    `json:"mention_rate" jsonschema:"mentioned over answered; null when none answered"`
+	CitationRate *float64    `json:"citation_rate" jsonschema:"cited over answered; null when none answered"`
+	MentionBand  *panel.Band `json:"mention_band" jsonschema:"95% band on mention_rate, treating each answer as an independent draw; null when none answered"`
+	CitationBand *panel.Band `json:"citation_band" jsonschema:"95% band on citation_rate; null when none answered"`
+	Mentions     int         `json:"mentions" jsonschema:"mentions of you and your competitors, the share's denominator"`
+	Share        *float64    `json:"share" jsonschema:"your mentions over mentions; null when no brand was named"`
 }
 
 // Summary is the headline per run over the pairs in scope, oldest run first.
@@ -205,6 +210,7 @@ func (s *Service) Summary(ctx context.Context, since *time.Time, sc Scope) ([]Ru
 			x.MentionRate = new(float64(x.Mentioned) / float64(x.Answered))
 			x.CitationRate = new(float64(x.Cited) / float64(x.Answered))
 		}
+		x.MentionBand, x.CitationBand = panel.Wilson(x.Mentioned, x.Answered), panel.Wilson(x.Cited, x.Answered)
 		if x.Mentions > 0 {
 			x.Share = new(float64(self) / float64(x.Mentions))
 		}

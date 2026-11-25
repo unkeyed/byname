@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { api, type Outcome, type PairChange, type Standing } from "../../api";
-import { shortDay, useLabels } from "../../lines";
+import { chance, pct, shortDay, useLabels } from "../../lines";
 import { keys, useAnsweredRuns, useSettings, useSurfaces } from "../../queries";
 import { nextCheckDay } from "../../checks";
 import { Link } from "react-router";
@@ -99,6 +99,7 @@ export function Compare() {
     const byQuestion = new Map<number, PairChange[]>();
     for (const p of pairs) byQuestion.set(p.question_id, [...(byQuestion.get(p.question_id) ?? []), p]);
     const moves = (cmp.data?.pairs ?? []).map(climbed);
+    const flipped = cmp.data != null && cmp.data.counts.gained + cmp.data.counts.lost > 0;
     const openPair = (p: PairChange) => view.set({ q: p.question_id, qa: p.after?.answer_id ?? p.before?.answer_id ?? null }, { push: true });
     body = (
       <div className="space-y-4">
@@ -149,10 +150,16 @@ export function Compare() {
                 <div className={cx("text-2xl font-semibold tabular-nums", cmp.data.net > 0 ? "text-success" : cmp.data.net < 0 ? "text-danger" : undefined)} data-count="net">
                   {cmp.data.net > 0 ? `+${cmp.data.net}` : cmp.data.net}
                 </div>
+                {flipped && (
+                  <div className={cx("text-xs", cmp.data.move.real ? "font-medium" : "text-muted")} data-verdict={cmp.data.move.real ? "real" : "noise"}>
+                    {cmp.data.move.real ? `A real move, ${pct(cmp.data.move.before_rate)} to ${pct(cmp.data.move.after_rate)}` : "Within chance, may be noise"}
+                  </div>
+                )}
               </Card>
             </div>
             <p className="text-xs text-muted">
               Gained: an AI app named you and did not before. Lost: the reverse. Moved: it named you both times, in a different position. Net change is gained minus lost.
+              {flipped && ` Chance alone gives a move this large ${chance(cmp.data.move.p_value)}. A move is real when that is less than 5 times in 100.`}
             </p>
             <Card>
               <CardHeader
