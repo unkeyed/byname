@@ -346,8 +346,8 @@ function LinkedPages({ filter }: { filter: ResultsFilter }) {
 function PageRow({ page: p }: { page: SourcePage }) {
   const others = p.check?.brands.filter((b) => !p.check!.competitors.includes(b)) ?? [];
   return (
-    <li className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-start sm:gap-4">
-      <div className="min-w-0 flex-1">
+    <li className="flex flex-wrap items-start gap-x-4 gap-y-2 px-4 py-3">
+      <div className="min-w-0 flex-[1_1_16rem]">
         <a href={p.url} target="_blank" rel="noreferrer noopener" className={cx("block truncate py-3 text-sm hover:underline md:py-0", p.is_self && "font-semibold")}>
           {shortUrl(p.url)}
         </a>
@@ -364,7 +364,7 @@ function PageRow({ page: p }: { page: SourcePage }) {
           )}
         </div>
       </div>
-      <div className="flex shrink-0 flex-col gap-1 sm:items-end">
+      <div className="flex min-w-0 flex-col gap-1 sm:ml-auto sm:items-end">
         <PageMark check={p.check} />
         {p.check && p.check.brands.length > 0 && (
           <span className="flex flex-wrap gap-1 sm:justify-end">
