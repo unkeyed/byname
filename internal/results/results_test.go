@@ -412,3 +412,87 @@ func TestScreens(t *testing.T) {
 		}
 	})
 }
+
+// A pair asked each question three times compares by what most of its
+// answers say, and the move weighs every answer.
+func TestCompareCountsEveryAnswerOfACell(t *testing.T) {
+	e := setup(t)
+	set, err := e.config.CurrentQuestions(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	q1, q2 := set.Questions[0].ID, set.Questions[1].ID
+	claude, perplexity := e.pairID(t, engines.ClaudeCode), e.pairID(t, engines.PerplexityApp)
+	run := func() int64 {
+		var id int64
+		if err := e.db.QueryRow(ctx, `INSERT INTO run (question_set_id, trigger, status) VALUES ($1, 'run_now', 'completed') RETURNING id`, set.ID).Scan(&id); err != nil {
+			t.Fatal(err)
+		}
+		return id
+	}
+	// answers stores one cell's samples: n for named, - for not, x for failed.
+	answers := func(run, question, pair int64, samples string) {
+		for i, a := range samples {
+			status, named := "ok", a == 'n'
+			if a == 'x' {
+				status = "failed"
+			}
+			var position *int
+			if named {
+				position = new(1)
+			}
+			if _, err := e.db.Exec(ctx, `INSERT INTO answer (run_id, question_id, surface_model_id, sample, endpoint, fidelity, status, attempts, mentioned, cited, position)
+				VALUES ($1, $2, $3, $4, 'endpoint', 'model_match', $5, 1, $6, false, $7)`, run, question, pair, i+1, status, named, position); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	before, after := run(), run()
+	answers(before, q1, claude, "---")
+	answers(after, q1, claude, "nnn")
+	answers(before, q1, perplexity, "---")
+	answers(after, q1, perplexity, "nn-")
+	answers(before, q2, claude, "n--")
+	answers(after, q2, claude, "nnn")
+	answers(before, q2, perplexity, "nnn")
+	answers(after, q2, perplexity, "nnx")
+
+	c, err := e.results.Compare(ctx, before, after)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.Counts[panel.Gained] != 3 || c.Counts[panel.Unchanged] != 1 || c.Net != 3 {
+		t.Fatalf("counts %v net %d, want 3 cells most answers newly named you and 1 unchanged", c.Counts, c.Net)
+	}
+	for _, p := range c.Pairs {
+		if p.QuestionID == q2 && p.PairID == perplexity {
+			if a := p.After; a == nil || a.Answered != 2 || a.Named != 2 || !a.Mentioned || len(a.AnswerIDs) != 3 || a.AnswerID != a.AnswerIDs[0] {
+				t.Errorf("after = %+v, want 2 of 2 answered named, all 3 answers listed", a)
+			}
+		}
+	}
+	// 10 of 11 answers name you against 4 of 12 a check before. Stratified
+	// by cell, statsmodels' StratifiedTable.test_null_odds(correction=True)
+	// gives 7.2, p 0.00729. Read as one answer per cell it would be 3
+	// flips, McNemar's p 0.248.
+	if m := c.Move; m.Cells != 4 || !m.Real || math.Abs(m.PValue-0.007290358091535665) > 1e-9 ||
+		math.Abs(*m.BeforeRate-4.0/12) > 1e-9 || math.Abs(*m.AfterRate-10.0/11) > 1e-9 {
+		t.Fatalf("move = %+v, want 4 cells, 4 of 12 named before and 10 of 11 after, p 0.0073, real", m)
+	}
+
+	h, err := e.results.QuestionHistory(ctx, q1, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, s := range h.Series {
+		if s.Pair.ID != perplexity {
+			continue
+		}
+		if len(s.Points) != 2 || s.Answered != 2 || s.Named != 1 {
+			t.Fatalf("perplexity history = %+v, want one point per check, named on the later one", s)
+		}
+		if p := s.Points[1]; p.Answered != 3 || p.Named != 2 || !p.Mentioned || len(p.AnswerIDs) != 3 || p.Summary != "Gained mention at #1" {
+			t.Errorf("later point = %+v, want 2 of 3 named, all 3 answers listed, gained", p)
+		}
+	}
+}

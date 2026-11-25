@@ -35,7 +35,8 @@ type scoredAnswer struct {
 	scored   panel.Scored
 }
 
-// scoredAnswers loads answers as panel.Scored, in run order.
+// scoredAnswers loads answers as panel.Scored, in run order and, within a
+// run, in sample order.
 func (s *Service) scoredAnswers(ctx context.Context, where string, args ...any) ([]scoredAnswer, error) {
 	rows, err := s.db.Query(ctx, `SELECT a.id, a.run_id, coalesce(r.started_at, r.queued_at), a.question_id, q.counts_in_scores,
 			m.id, m.surface_key, coalesce(m.model, ''), a.endpoint, a.fidelity, a.reported_model, a.fan_out,
@@ -46,7 +47,7 @@ func (s *Service) scoredAnswers(ctx context.Context, where string, args ...any) 
 		JOIN question q ON q.id = a.question_id
 		LEFT JOIN brand_mention bm ON bm.answer_id = a.id
 		WHERE `+where+`
-		GROUP BY a.id, r.id, m.id, q.id ORDER BY a.run_id, a.id`, args...)
+		GROUP BY a.id, r.id, m.id, q.id ORDER BY a.run_id, a.sample, a.id`, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -75,13 +76,23 @@ func (s *Service) brands(ctx context.Context) ([]panel.Brand, error) {
 	})
 }
 
-// Standing is one pair's answer in one run, as compare shows it.
+// Standing is one pair's answers to a question in one run, as compare
+// shows it: what most of them say, and how many there were.
 type Standing struct {
-	AnswerID  int64          `json:"answer_id"`
-	Status    engines.Status `json:"status"`
-	Mentioned bool           `json:"mentioned"`
-	Cited     bool           `json:"cited"`
-	Position  *int           `json:"position"`
+	AnswerID  int64          `json:"answer_id" jsonschema:"the first sample's answer"`
+	AnswerIDs []int64        `json:"answer_ids" jsonschema:"every sample's answer, in sample order"`
+	Status    engines.Status `json:"status" jsonschema:"failed only when every answer failed"`
+	Mentioned bool           `json:"mentioned" jsonschema:"most answers named you"`
+	Cited     bool           `json:"cited" jsonschema:"most answers cited your domains"`
+	Position  *int           `json:"position" jsonschema:"your best position among the answers that named you"`
+	Answered  int            `json:"answered" jsonschema:"answers that did not fail"`
+	Named     int            `json:"named" jsonschema:"answers that named you"`
+}
+
+// standing is a cell's answers as compare shows them.
+func standing(ids []int64, t panel.Tally) Standing {
+	return Standing{AnswerID: ids[0], AnswerIDs: ids, Status: t.Status, Mentioned: t.Mentioned(), Cited: t.MostlyCited(),
+		Position: nullPosition(t.Position), Answered: t.Answered, Named: t.Named}
 }
 
 type PairChange struct {
@@ -96,7 +107,9 @@ type PairChange struct {
 
 // Comparison is every question and pair across two runs, with counts per
 // outcome, the net change (gained minus lost) and whether the share of
-// answers naming you moved by more than chance gives. Pairs list every
+// answers naming you moved by more than chance gives. A question and pair
+// asked several times counts by what most of its answers say; the move
+// weighs every answer. Pairs list every
 // question, but the counts, the net and the move leave out questions that
 // count in no score, such as one that names your brand.
 type Comparison struct {
@@ -132,7 +145,7 @@ func (s *Service) Compare(ctx context.Context, before, after int64) (Comparison,
 		}
 	}
 	runs := map[int64]panel.Run{before: {}, after: {}}
-	standing := map[int64]map[panel.Key]Standing{before: {}, after: {}}
+	answerIDs := map[int64]map[panel.Key][]int64{before: {}, after: {}}
 	series := map[int64]map[panel.Key]Series{before: {}, after: {}}
 	answers, err := s.scoredAnswers(ctx, `a.run_id = ANY($1)`, []int64{before, after})
 	if err != nil {
@@ -142,9 +155,11 @@ func (s *Service) Compare(ctx context.Context, before, after int64) (Comparison,
 	for _, x := range answers {
 		pairs[x.series.Pair.ID] = x.series.Pair
 		k := panel.Key{Question: x.question, SurfaceModel: panel.SurfaceModelID(x.series.Pair.ID)}
-		runs[x.runID][k] = x.scored
-		series[x.runID][k] = x.series
-		standing[x.runID][k] = Standing{AnswerID: x.id, Status: x.scored.Status, Mentioned: x.scored.Mentioned, Cited: x.scored.Cited, Position: nullPosition(x.scored.Position)}
+		if _, ok := series[x.runID][k]; !ok {
+			series[x.runID][k] = x.series
+		}
+		runs[x.runID][k] = append(runs[x.runID][k], x.scored)
+		answerIDs[x.runID][k] = append(answerIDs[x.runID][k], x.id)
 	}
 	for k, sr := range series[before] {
 		mapped := k
@@ -178,37 +193,27 @@ func (s *Service) Compare(ctx context.Context, before, after int64) (Comparison,
 	for _, p := range c.Pairs {
 		pc := PairChange{QuestionID: int64(p.Key.Question), PairID: int64(p.Key.SurfaceModel), Question: questions[p.Key.Question],
 			Pair: pairs[int64(p.Key.SurfaceModel)], Outcome: p.Outcome}
-		if st, ok := standing[after][p.Key]; ok && p.After != nil {
-			pc.After = &st
+		if p.After != nil {
+			pc.After = new(standing(answerIDs[after][p.Key], *p.After))
 		}
 		if p.Before != nil {
 			k := p.Key
 			if old, ok := reverse[k.Question]; ok {
 				k.Question = old
 			}
-			if st, ok := standing[before][k]; ok {
-				pc.Before = &st
-			}
+			pc.Before = new(standing(answerIDs[before][k], *p.Before))
 		}
 		out.Pairs = append(out.Pairs, pc)
 		if pc.Question.CountsInScores {
 			out.Counts[p.Outcome]++
 		}
 		if pc.Question.CountsInScores && p.Outcome != panel.NotComparable {
-			cells = append(cells, panel.Cell{BeforeNamed: named(p.Before), BeforeAnswered: 1, AfterNamed: named(p.After), AfterAnswered: 1})
+			cells = append(cells, panel.Cell{BeforeNamed: p.Before.Named, BeforeAnswered: p.Before.Answered, AfterNamed: p.After.Named, AfterAnswered: p.After.Answered})
 		}
 	}
 	out.Net = out.Counts[panel.Gained] - out.Counts[panel.Lost]
 	out.Move = panel.Shift(cells)
 	return out, nil
-}
-
-// named is 1 for an answer that named you, the count a cell holds.
-func named(s *panel.Scored) int {
-	if s.Mentioned {
-		return 1
-	}
-	return 0
 }
 
 // questionMap maps each question of set older to the question of set newer
@@ -235,17 +240,21 @@ func (s *Service) questionMap(ctx context.Context, older, newer int64) (panel.Qu
 	return m, rows.Err()
 }
 
-// Point is one pair's answer to a question in one run.
+// Point is one pair's answers to a question in one run: what most of them
+// say, and how many there were.
 type Point struct {
 	RunID         int64          `json:"run_id"`
 	RunStartedAt  time.Time      `json:"run_started_at"`
-	AnswerID      int64          `json:"answer_id"`
+	AnswerID      int64          `json:"answer_id" jsonschema:"the first sample's answer"`
+	AnswerIDs     []int64        `json:"answer_ids" jsonschema:"every sample's answer, in sample order"`
 	QuestionID    int64          `json:"question_id" jsonschema:"the question as that run asked it, which may be an earlier version's"`
-	Status        engines.Status `json:"status"`
-	Mentioned     bool           `json:"mentioned"`
-	Cited         bool           `json:"cited"`
-	Position      *int           `json:"position"`
-	ReportedModel string         `json:"reported_model"`
+	Status        engines.Status `json:"status" jsonschema:"failed only when every answer failed"`
+	Mentioned     bool           `json:"mentioned" jsonschema:"most answers named you"`
+	Cited         bool           `json:"cited" jsonschema:"most answers cited your domains"`
+	Position      *int           `json:"position" jsonschema:"your best position among the answers that named you"`
+	Answered      int            `json:"answered" jsonschema:"answers that did not fail"`
+	Named         int            `json:"named" jsonschema:"answers that named you"`
+	ReportedModel string         `json:"reported_model" jsonschema:"the model the first sample's answer reported"`
 	// Summary is the change since this series' previous run, such as
 	// "Gained mention at #1 · Northwind cited · Dropped: Contoso".
 	Summary string `json:"summary"`
@@ -253,9 +262,9 @@ type Point struct {
 
 type HistorySeries struct {
 	Series
-	Answered     int     `json:"answered" jsonschema:"runs whose answer did not fail"`
-	Named        int     `json:"named" jsonschema:"runs whose answer named you"`
-	Cited        int     `json:"cited" jsonschema:"runs whose answer cited your domains"`
+	Answered     int     `json:"answered" jsonschema:"runs whose answers did not all fail"`
+	Named        int     `json:"named" jsonschema:"runs where most answers named you"`
+	Cited        int     `json:"cited" jsonschema:"runs where most answers cited your domains"`
 	BestPosition *int    `json:"best_position" jsonschema:"your best position over these runs; null when never named"`
 	Points       []Point `json:"points"`
 }
@@ -269,7 +278,7 @@ type History struct {
 }
 
 // QuestionHistory is one question's answers across runs, one series per
-// pair, endpoint and fidelity, following the question back through the
+// pair, endpoint and fidelity and one point per run in each, following the question back through the
 // earlier versions it carries on. since limits it to runs started then or
 // later; nil is all time.
 func (s *Service) QuestionHistory(ctx context.Context, questionID int64, since *time.Time) (History, error) {
@@ -295,35 +304,58 @@ func (s *Service) QuestionHistory(ctx context.Context, questionID int64, since *
 	if err != nil {
 		return History{}, err
 	}
+	type cellKey struct {
+		Series
+		run int64
+	}
+	var cells [][]scoredAnswer
+	at := map[cellKey]int{}
+	for _, x := range answers {
+		k := cellKey{x.series, x.runID}
+		i, ok := at[k]
+		if !ok {
+			i = len(cells)
+			at[k] = i
+			cells = append(cells, nil)
+		}
+		cells[i] = append(cells[i], x)
+	}
 	out := History{QuestionID: questionID, Question: q, Series: []HistorySeries{}}
 	index := map[Series]int{}
-	prev := map[Series]*panel.Scored{}
-	for _, x := range answers {
+	prev := map[Series]*panel.Tally{}
+	for _, cell := range cells {
+		x := cell[0]
 		i, ok := index[x.series]
 		if !ok {
 			i = len(out.Series)
 			index[x.series] = i
 			out.Series = append(out.Series, HistorySeries{Series: x.series, Points: []Point{}})
 		}
+		ids := make([]int64, len(cell))
+		scored := make([]panel.Scored, len(cell))
+		for j, a := range cell {
+			ids[j], scored[j] = a.id, a.scored
+		}
+		t := panel.TallyOf(scored)
 		hs := &out.Series[i]
-		if x.scored.Status != engines.StatusFailed {
+		if t.Status != engines.StatusFailed {
 			hs.Answered++
 		}
-		if x.scored.Mentioned {
+		if t.Mentioned() {
 			hs.Named++
 		}
-		if x.scored.Cited {
+		if t.MostlyCited() {
 			hs.Cited++
 		}
-		if p := x.scored.Position; p > 0 && (hs.BestPosition == nil || p < *hs.BestPosition) {
+		if p := t.Position; p > 0 && (hs.BestPosition == nil || p < *hs.BestPosition) {
 			hs.BestPosition = &p
 		}
 		hs.Points = append(hs.Points, Point{
-			RunID: x.runID, RunStartedAt: x.started, AnswerID: x.id, QuestionID: int64(x.question), Status: x.scored.Status,
-			Mentioned: x.scored.Mentioned, Cited: x.scored.Cited, Position: nullPosition(x.scored.Position), ReportedModel: x.reported,
-			Summary: panel.Summarize(prev[x.series], x.scored, brands),
+			RunID: x.runID, RunStartedAt: x.started, AnswerID: x.id, AnswerIDs: ids, QuestionID: int64(x.question), Status: t.Status,
+			Mentioned: t.Mentioned(), Cited: t.MostlyCited(), Position: nullPosition(t.Position), Answered: t.Answered, Named: t.Named,
+			ReportedModel: x.reported, Summary: panel.Summarize(prev[x.series], t, brands),
 		})
-		prev[x.series] = &x.scored
+		prev[x.series] = &t
 	}
 	// A pair's series stay in the order they began, oldest first.
 	slices.SortStableFunc(out.Series, func(a, b HistorySeries) int { return cmp.Compare(a.Pair.ID, b.Pair.ID) })

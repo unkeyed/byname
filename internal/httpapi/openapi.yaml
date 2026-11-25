@@ -6362,21 +6362,36 @@ components:
           $ref: "#/components/schemas/Fidelity"
     Standing:
       type: object
-      description: One pair's answer in one run, as compare shows it.
-      required: [answer_id, status, mentioned, cited, position]
+      description: One pair's answers to a question in one run, as compare shows it. Asked several times, it says what most of the answers say.
+      required: [answer_id, answer_ids, status, mentioned, cited, position, answered, named]
       properties:
         answer_id:
           type: integer
+          description: The first sample's answer.
+        answer_ids:
+          type: array
+          items:
+            type: integer
+          description: Every sample's answer, in sample order.
         status:
           $ref: "#/components/schemas/AnswerStatus"
+          description: Failed only when every answer failed.
         mentioned:
           type: boolean
+          description: Most answers named you.
         cited:
           type: boolean
+          description: Most answers cited your domains.
         position:
           type: [integer, "null"]
           minimum: 1
-          description: Your position, 1 first. Null when not named.
+          description: Your best position among the answers that named you, 1 first. Null when none did.
+        answered:
+          type: integer
+          description: Answers that did not fail.
+        named:
+          type: integer
+          description: Answers that named you.
     PairChange:
       type: object
       required: [question_id, pair_id, question, pair, outcome, before, after]
@@ -6480,8 +6495,8 @@ components:
           description: Ordered by question, then pair.
     Point:
       type: object
-      description: One pair's answer to a question in one run. Plot points by run, not by day.
-      required: [run_id, run_started_at, answer_id, question_id, status, mentioned, cited, position, reported_model, summary]
+      description: One pair's answers to a question in one run. Asked several times, it says what most of the answers say. Plot points by run, not by day.
+      required: [run_id, run_started_at, answer_id, answer_ids, question_id, status, mentioned, cited, position, answered, named, reported_model, summary]
       properties:
         run_id:
           type: integer
@@ -6491,21 +6506,37 @@ components:
           description: When the run started, or was queued if it never started.
         answer_id:
           type: integer
+          description: The first sample's answer.
+        answer_ids:
+          type: array
+          items:
+            type: integer
+          description: Every sample's answer, in sample order.
         question_id:
           type: integer
           description: The question as that run asked it, which may be an earlier version's.
         status:
           $ref: "#/components/schemas/AnswerStatus"
+          description: Failed only when every answer failed.
         mentioned:
           type: boolean
+          description: Most answers named you.
         cited:
           type: boolean
+          description: Most answers cited your domains.
         position:
           type: [integer, "null"]
           minimum: 1
-          description: Your position, 1 first. Null when not named.
+          description: Your best position among the answers that named you, 1 first. Null when none did.
+        answered:
+          type: integer
+          description: Answers that did not fail.
+        named:
+          type: integer
+          description: Answers that named you.
         reported_model:
           type: string
+          description: The model the first sample's answer reported.
         summary:
           type: string
           description: 'The change since this series''s previous run, such as "Gained mention at #1 · Northwind cited · Dropped: Contoso".'
@@ -6517,13 +6548,13 @@ components:
           properties:
             answered:
               type: integer
-              description: Runs whose answer did not fail.
+              description: Runs whose answers did not all fail.
             named:
               type: integer
-              description: Runs whose answer named you.
+              description: Runs where most answers named you.
             cited:
               type: integer
-              description: Runs whose answer cited your domains.
+              description: Runs where most answers cited your domains.
             best_position:
               type: [integer, "null"]
               minimum: 1
