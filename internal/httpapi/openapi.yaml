@@ -5334,7 +5334,7 @@ components:
     Settings:
       type: object
       description: Your brand, market, schedule, spend caps and call limits.
-      required: [brand, match_mode, market, language, time_zone, check_every_days, check_time, spend_cap_run_usd, spend_cap_month_usd, concurrency, retries, timeout_s, raw_retention_days]
+      required: [brand, match_mode, market, language, time_zone, check_every_days, check_time, spend_cap_run_usd, spend_cap_month_usd, concurrency, retries, timeout_s, samples, raw_retention_days]
       properties:
         brand:
           $ref: "#/components/schemas/SelfBrand"
@@ -5382,6 +5382,12 @@ components:
           minimum: 30
           maximum: 600
           description: Seconds per call.
+        samples:
+          type: integer
+          minimum: 1
+          maximum: 5
+          default: 1
+          description: Times a check asks each question on each AI app and model. More answers tighten the bands and make a move easier to trust, and each one is another paid answer. Left out, it is 1.
         raw_retention_days:
           type: [integer, "null"]
           minimum: 1
@@ -6254,7 +6260,7 @@ components:
     AnswerSummary:
       type: object
       description: One answer as the answers list shows it.
-      required: [id, run_id, question, pair, endpoint, fidelity, reported_model, status, error, attempts, mentioned, cited, position, cost_usd, citation_count, mentions, others, answered_at]
+      required: [id, run_id, question, pair, sample, endpoint, fidelity, reported_model, status, error, attempts, mentioned, cited, position, cost_usd, citation_count, mentions, others, answered_at]
       properties:
         id:
           type: integer
@@ -6264,6 +6270,10 @@ components:
           $ref: "#/components/schemas/QuestionRef"
         pair:
           $ref: "#/components/schemas/PairRef"
+        sample:
+          type: integer
+          minimum: 1
+          description: Which of the times the check asked this question on this pair, from 1. See samples in the settings.
         endpoint:
           type: string
         fidelity:

@@ -48,7 +48,8 @@ func newEnv(t *testing.T) *env {
 }
 
 // newEnvOn is newEnv on pool, which may hold an earlier release's schema:
-// it writes nothing but the settings.
+// it writes nothing but your brand, in SQL every release's schema takes,
+// and leaves every other setting at its default.
 func newEnvOn(t *testing.T, pool *pgxpool.Pool) *env {
 	t.Helper()
 	fake := searchtest.NewGoogle(t)
@@ -63,11 +64,7 @@ func newEnvOn(t *testing.T, pool *pgxpool.Pool) *env {
 	cfg := config.New(pool, config.Options{Secrets: secretbox.ForTest()})
 	e := &env{t: t, ctx: context.Background(), db: pool, cfg: cfg, fake: fake, bing: bing,
 		now: time.Date(2026, 11, 21, 9, 0, 0, 0, time.UTC)}
-	_, err := cfg.PutSettings(e.ctx, config.Settings{
-		Brand:  config.SelfBrand{Name: "Fernhollow", Aliases: []string{"Fern Hollow"}, Domains: []string{"fernhollow.dev"}},
-		Market: "US", Language: "en", TimeZone: "UTC", CheckEveryDays: 3, CheckTime: "06:00",
-		SpendCapRunUSD: 5, Concurrency: 8, Retries: 1, TimeoutS: 180,
-	})
+	_, err := pool.Exec(e.ctx, `INSERT INTO brand (name, aliases, domains, kind) VALUES ('Fernhollow', '{Fern Hollow}', '{fernhollow.dev}', 'self')`)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -224,6 +224,8 @@ export interface Settings {
   concurrency: number;
   retries: number;
   timeout_s: number;
+  /** Times a check asks each question on each pair, 1 to 5. */
+  samples: number;
   /** null keeps raw responses forever. */
   raw_retention_days: number | null;
 }

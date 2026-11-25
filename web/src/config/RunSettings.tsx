@@ -7,12 +7,13 @@ import { monthOfChecks } from "./costs";
 import { defaultFooter, Disclosure, NumberField, ReadOnlyNote, SubmitButton, useSaveSettings, type Footer } from "./forms";
 import { formatNumber, parseNumber, type NumberKey } from "./rules";
 
-const scheduleKeys = ["check_every_days"] as const satisfies NumberKey[];
+const scheduleKeys = ["check_every_days", "samples"] as const satisfies NumberKey[];
 const capKeys = ["spend_cap_run_usd", "spend_cap_month_usd"] as const satisfies NumberKey[];
 const tuningKeys = ["concurrency", "retries", "timeout_s"] as const satisfies NumberKey[];
 
 const hints: Partial<Record<NumberKey, string>> = {
   check_every_days: "1 to 30. Every question is asked in every AI app this often.",
+  samples: "1 to 5. Default 1. More answers make each score's band tighter and a move between checks easier to trust. Each one is another paid answer.",
   spend_cap_run_usd: "A check stops asking once it has spent this much.",
   spend_cap_month_usd: "Covers AI checks and social searches together. Empty means no monthly cap.",
   concurrency: "1 to 32. Default 8.",
@@ -155,6 +156,7 @@ function Body({
               </label>
               {timeError && <p className="text-xs text-danger">{timeError}</p>}
             </Disclosure>
+            {field("samples")}
           </div>
         )}
         {limits && (

@@ -393,7 +393,7 @@ func (s *Service) store(ctx context.Context, p plan, c call, res engines.Result,
 		first.Queue(`INSERT INTO answer (run_id, question_id, surface_model_id, endpoint, fidelity, reported_model,
 				status, error, attempts, mentioned, cited, position, cost_usd, text, raw, fan_out, call_id)
 			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
-			ON CONFLICT (run_id, question_id, surface_model_id) DO UPDATE SET endpoint = excluded.endpoint,
+			ON CONFLICT (run_id, question_id, surface_model_id, sample) DO UPDATE SET endpoint = excluded.endpoint,
 				fidelity = excluded.fidelity, reported_model = excluded.reported_model, status = excluded.status,
 				error = excluded.error, attempts = excluded.attempts, mentioned = excluded.mentioned, cited = excluded.cited,
 				position = excluded.position, cost_usd = excluded.cost_usd, text = excluded.text, raw = excluded.raw,
