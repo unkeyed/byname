@@ -3,6 +3,7 @@ package results_test
 import (
 	"context"
 	"errors"
+	"math"
 	"testing"
 	"time"
 
@@ -130,6 +131,11 @@ func TestRunsAnswersAndCompare(t *testing.T) {
 	}
 	if c.Counts[panel.Lost] != 2 || c.Counts[panel.Unchanged] != 10 || c.Net != -2 || len(c.Pairs) != 12 {
 		t.Fatalf("compare counts %v net %d over %d pairs, want Claude lost on both questions and the rest unchanged", c.Counts, c.Net, len(c.Pairs))
+	}
+	// Two answers that stopped naming you, against none that started, is
+	// McNemar's (|0-2|-1)²/2 = 0.5, well within chance.
+	if m := c.Move; m.Cells != 12 || m.Real || math.Abs(m.PValue-0.4795001221869535) > 1e-9 || math.Abs(*m.BeforeRate-*m.AfterRate-2.0/12) > 1e-9 {
+		t.Fatalf("move = %+v, want 12 cells, 2 of 12 fewer named, p 0.48, not real", m)
 	}
 
 	gaps, err := e.results.Gaps(ctx, 0, results.Scope{})
@@ -310,6 +316,13 @@ func TestScreens(t *testing.T) {
 		}
 		if r2.Mentioned != 0 || *r2.MentionRate != 0 || r2.Mentions != 4 || *r2.Share != 0 {
 			t.Fatalf("run 2 = %+v, want none named and Contoso's 4 mentions", r2)
+		}
+		// Wilson's band on 4 of 4 is 51% to 100%, and on 0 of 4 0% to 49%.
+		if b := r1.MentionBand; b == nil || math.Abs(b.Low-0.5101091635454027) > 1e-9 || b.High != 1 {
+			t.Errorf("run 1 mention band = %+v, want 0.51 to 1", b)
+		}
+		if b := r2.MentionBand; b == nil || b.Low != 0 || math.Abs(b.High-0.4898908364545973) > 1e-9 {
+			t.Errorf("run 2 mention band = %+v, want 0 to 0.49", b)
 		}
 	})
 

@@ -6379,10 +6379,49 @@ components:
             - $ref: "#/components/schemas/Standing"
             - type: "null"
           description: Null when the pair has no answer in the after run.
+    Band:
+      type: object
+      description: A 95% Wilson score band on a rate, treating each answer as an independent draw.
+      required: [low, high]
+      properties:
+        low:
+          type: number
+          minimum: 0
+          maximum: 1
+        high:
+          type: number
+          minimum: 0
+          maximum: 1
+    Move:
+      type: object
+      description: Whether the share of answers naming you moved between two runs by more than chance gives. Each question and pair is compared with itself across the runs, answers that started naming you weighed against ones that stopped.
+      required: [cells, before_rate, after_rate, p_value, real]
+      properties:
+        cells:
+          type: integer
+          description: Question and pair cells compared, those answered in both runs and counted in scores.
+        before_rate:
+          type: [number, "null"]
+          minimum: 0
+          maximum: 1
+          description: Named over answered across those cells in the earlier run. Null when no cell compares.
+        after_rate:
+          type: [number, "null"]
+          minimum: 0
+          maximum: 1
+          description: Named over answered across those cells in the later run. Null when no cell compares.
+        p_value:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: The chance of a move at least this large if nothing changed. 1 when no answer flipped.
+        real:
+          type: boolean
+          description: True when p_value is under 0.05.
     Comparison:
       type: object
-      description: Every question and pair across two runs, with counts per outcome and the net change.
-      required: [before, after, counts, net, pairs]
+      description: Every question and pair across two runs, with counts per outcome, the net change and whether the share of answers naming you really moved.
+      required: [before, after, counts, net, move, pairs]
       properties:
         before:
           type: integer
@@ -6409,6 +6448,8 @@ components:
         net:
           type: integer
           description: gained minus lost.
+        move:
+          $ref: "#/components/schemas/Move"
         pairs:
           type: array
           items:
@@ -6486,7 +6527,7 @@ components:
     RatePoint:
       type: object
       description: One series in one run. Rates are over answered calls, failed ones excluded.
-      required: [run_id, run_started_at, calls, answered, mentioned, cited, mention_rate, citation_rate]
+      required: [run_id, run_started_at, calls, answered, mentioned, cited, mention_rate, citation_rate, mention_band, citation_band]
       properties:
         run_id:
           type: integer
@@ -6513,6 +6554,16 @@ components:
           minimum: 0
           maximum: 1
           description: cited over answered, counted apart from mentions. Null when none answered.
+        mention_band:
+          oneOf:
+            - $ref: "#/components/schemas/Band"
+            - type: "null"
+          description: The 95% band on mention_rate. Null when none answered.
+        citation_band:
+          oneOf:
+            - $ref: "#/components/schemas/Band"
+            - type: "null"
+          description: The 95% band on citation_rate. Null when none answered.
     RateSeries:
       allOf:
         - $ref: "#/components/schemas/Series"
@@ -6584,7 +6635,7 @@ components:
     RunSummary:
       type: object
       description: One run's headline over the pairs in scope. It counts pairs; it is not an average of line rates.
-      required: [run_id, run_started_at, answered, mentioned, cited, mention_rate, citation_rate, mentions, share]
+      required: [run_id, run_started_at, answered, mentioned, cited, mention_rate, citation_rate, mention_band, citation_band, mentions, share]
       properties:
         run_id:
           type: integer
@@ -6611,6 +6662,16 @@ components:
           minimum: 0
           maximum: 1
           description: cited over answered. Null when none answered.
+        mention_band:
+          oneOf:
+            - $ref: "#/components/schemas/Band"
+            - type: "null"
+          description: The 95% band on mention_rate. Null when none answered.
+        citation_band:
+          oneOf:
+            - $ref: "#/components/schemas/Band"
+            - type: "null"
+          description: The 95% band on citation_rate. Null when none answered.
         mentions:
           type: integer
           description: Mentions of you and your competitors, the share's denominator.

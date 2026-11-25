@@ -100,8 +100,8 @@ func TestQuestionNamingTheBrandIsLeftOutOfScores(t *testing.T) {
 	for _, n := range c.Counts {
 		total += n
 	}
-	if len(c.Pairs) != 18 || total != 12 {
-		t.Fatalf("compare lists %d pairs and counts %d, want all 18 listed and the 12 that count counted", len(c.Pairs), total)
+	if len(c.Pairs) != 18 || total != 12 || c.Move.Cells != 12 {
+		t.Fatalf("compare lists %d pairs, counts %d and weighs %d in the move, want all 18 listed and the 12 that count counted", len(c.Pairs), total, c.Move.Cells)
 	}
 
 	if q, err = e.config.SetQuestionScoring(ctx, q.ID, config.QuestionScoringInput{CountInScores: new(true)}); err != nil || !q.CountInScores || !q.NamesBrand {
