@@ -4574,7 +4574,7 @@ components:
     CheckCompletedPayload:
       type: object
       description: check_completed. A finished check against the previous one with answers.
-      required: [run_id, previous_run_id, gained, lost, moved, unchanged, not_comparable, net, named, answered, spend_usd, top]
+      required: [run_id, previous_run_id, gained, lost, moved, unchanged, not_comparable, net, named, answered, band, move, spend_usd, top]
       properties:
         run_id:
           type: integer
@@ -4599,6 +4599,16 @@ components:
         answered:
           type: integer
           description: Answers that did not fail and count in scores.
+        band:
+          oneOf:
+            - $ref: "#/components/schemas/Band"
+            - type: "null"
+          description: The 95% band on named of answered. Null when none answered, and on alerts from before Byname added it.
+        move:
+          oneOf:
+            - $ref: "#/components/schemas/Move"
+            - type: "null"
+          description: Whether the share of answers naming you moved since the previous check by more than chance gives, as GET /v1/compare returns it. Null on the first check, and on alerts from before Byname added it.
         spend_usd:
           type: number
         top:

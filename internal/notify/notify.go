@@ -26,6 +26,7 @@ import (
 
 	"github.com/unkeyed/byname/internal/core"
 	"github.com/unkeyed/byname/internal/engines"
+	"github.com/unkeyed/byname/internal/panel"
 	"github.com/unkeyed/byname/internal/results"
 	"github.com/unkeyed/byname/internal/secretbox"
 )
@@ -196,7 +197,7 @@ func (s *Service) RunFinished(ctx context.Context, runID int64) error {
 // checkCompleted compares a run with the previous run that has answers,
 // through the same results.Compare that GET /v1/compare serves.
 func (s *Service) checkCompleted(ctx context.Context, r results.Run) (Payload, error) {
-	p := CheckCompletedPayload{RunID: r.ID, Named: r.Mentioned, Answered: r.Scored, SpendUSD: r.SpendUSD, Top: []QuestionChange{}}
+	p := CheckCompletedPayload{RunID: r.ID, Named: r.Mentioned, Answered: r.Scored, Band: panel.Wilson(r.Mentioned, r.Scored), SpendUSD: r.SpendUSD, Top: []QuestionChange{}}
 	table, err := s.results.RunQuestions(ctx, r.ID, results.Scope{})
 	if err != nil || table.PreviousRunID == nil {
 		return p, err
@@ -207,7 +208,7 @@ func (s *Service) checkCompleted(ctx context.Context, r results.Run) (Payload, e
 		return p, err
 	}
 	p.Gained, p.Lost, p.Moved = c.Counts["gained"], c.Counts["lost"], c.Counts["moved"]
-	p.Unchanged, p.NotComparable, p.Net = c.Counts["unchanged"], c.Counts["not_comparable"], c.Net
+	p.Unchanged, p.NotComparable, p.Net, p.Move = c.Counts["unchanged"], c.Counts["not_comparable"], c.Net, &c.Move
 	rows := slices.Clone(table.Rows)
 	changed := func(r results.QuestionRow) int { return r.Gained + r.Lost + r.Moved }
 	slices.SortStableFunc(rows, func(a, b results.QuestionRow) int { return changed(b) - changed(a) })

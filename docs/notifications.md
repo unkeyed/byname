@@ -32,7 +32,7 @@ If your workspace only lets admins install apps, Slack asks an admin to approve 
 
 | Event | Kind | Raised when | Seen in the app by |
 |---|---|---|---|
-| Check completed | `check_completed` | A check finished. It says how many answers started naming you, stopped naming you or moved your position since the previous check, how many answers named you, the spend, and the questions that changed most. Its link opens **AI answers > What changed** for the two checks. | Anyone with `results:read` |
+| Check completed | `check_completed` | A check finished. It says how many answers named you, with the range the true share likely falls in, how many started naming you, stopped naming you or moved your position since the previous check, whether that is a real move or may be noise, the spend, and the questions that changed most. Its title says **no real change** unless chance alone gives a move that large less than 5 times in 100. Its link opens **AI answers > What changed** for the two checks. | Anyone with `results:read` |
 | Check refused | `check_refused` | Treg, the service that runs each question and bills you per answer, refused a request, for example for an empty balance, and the check stopped. | Anyone with `results:read` |
 | Check failed | `check_failed` | A check could not start, or could not save its answers. | Anyone with `results:read` |
 | Spend cap reached | `spend_cap_reached` | A check stopped asking questions when it reached the spend cap for one check or for the month. | Anyone with `results:read` |
@@ -67,10 +67,18 @@ A webhook gets a `POST` to its URL with a JSON body:
 {
 	"id": "alert-12/channel-3",
 	"kind": "check_completed",
-	"title": "Check #42: 3 answers started naming you, 1 answer stopped naming you",
-	"lines": ["AI apps named you in 31 of 96 answers.", "Since check #41, 3 answers started naming you, 1 answer stopped naming you and 2 answers moved your position."],
+	"title": "Check #42: no real change",
+	"lines": [
+		"AI apps named you in 31 of 96 answers (32%, likely between 24% and 42%).",
+		"Since check #41, 3 answers started naming you, 1 answer stopped naming you and 2 answers moved your position.",
+		"Chance alone gives a move this large about 62 times in 100, so it may be noise."
+	],
 	"url": "https://byname.example.com/ai/what-changed?before=41&after=42",
-	"payload": {"run_id": 42, "previous_run_id": 41, "gained": 3, "lost": 1, "moved": 2, "net": 2, "named": 31, "answered": 96},
+	"payload": {
+		"run_id": 42, "previous_run_id": 41, "gained": 3, "lost": 1, "moved": 2, "net": 2, "named": 31, "answered": 96,
+		"band": {"low": 0.238, "high": 0.422},
+		"move": {"cells": 94, "before_rate": 0.309, "after_rate": 0.33, "p_value": 0.617, "real": false}
+	},
 	"created_at": "2026-11-21T06:14:09Z"
 }
 ```

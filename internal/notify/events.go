@@ -3,11 +3,13 @@ package notify
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"slices"
 	"strings"
 	"time"
 
 	"github.com/unkeyed/byname/internal/engines"
+	"github.com/unkeyed/byname/internal/panel"
 )
 
 // Kind is one kind of event. The registry below is the only list of them.
@@ -91,7 +93,7 @@ func kind[P Payload](k Kind, title, description string, audience Audience) KindI
 // registry is every event kind, in the order Settings lists them. A kind
 // another package emits later is declared here with its payload type first.
 var registry = []KindInfo{
-	kind[CheckCompletedPayload](CheckCompleted, "Check completed", "Which answers started or stopped naming you since the previous check, and the questions that changed most.", Readers),
+	kind[CheckCompletedPayload](CheckCompleted, "Check completed", "Which answers started or stopped naming you since the previous check, whether that is more than chance, and the questions that changed most.", Readers),
 	kind[CheckRefusedPayload](CheckRefused, "Check refused", "Treg, the service that runs each question and bills you per answer, refused a request, for example for an empty balance, and the check stopped.", Readers),
 	kind[CheckFailedPayload](CheckFailed, "Check failed", "A check could not start, or could not save its answers.", Readers),
 	kind[SpendCapReachedPayload](SpendCapReached, "Spend cap reached", "A check stopped asking questions when it reached the spend cap for one check or for the month.", Readers),
@@ -139,9 +141,15 @@ type CheckCompletedPayload struct {
 	Net           int   `json:"net"`
 	// Named of Answered is the headline: question and pair answers that
 	// named you, of those that did not fail.
-	Named    int     `json:"named"`
-	Answered int     `json:"answered"`
-	SpendUSD float64 `json:"spend_usd"`
+	Named    int `json:"named"`
+	Answered int `json:"answered"`
+	// Band is the 95% band on Named of Answered, nil when none answered.
+	Band *panel.Band `json:"band"`
+	// Move is whether the share naming you moved by more than chance since
+	// the previous check, nil on the first. Alerts stored before it was
+	// added have neither.
+	Move     *panel.Move `json:"move"`
+	SpendUSD float64     `json:"spend_usd"`
 	// Top is the questions that changed most, at most topQuestions.
 	Top []QuestionChange `json:"top"`
 }
@@ -149,7 +157,12 @@ type CheckCompletedPayload struct {
 func (CheckCompletedPayload) Kind() Kind { return CheckCompleted }
 
 func (p CheckCompletedPayload) message() Message {
-	m := Message{Path: "/", Action: "Open This week", Lines: []string{fmt.Sprintf("AI apps named you in %d of %d answers.", p.Named, p.Answered)}}
+	headline := fmt.Sprintf("AI apps named you in %d of %d answers.", p.Named, p.Answered)
+	if p.Band != nil {
+		headline = fmt.Sprintf("AI apps named you in %d of %d answers (%s, likely between %s and %s).",
+			p.Named, p.Answered, percent(float64(p.Named)/float64(p.Answered)), percent(p.Band.Low), percent(p.Band.High))
+	}
+	m := Message{Path: "/", Action: "Open This week", Lines: []string{headline}}
 	if p.PreviousRunID == 0 {
 		m.Title = fmt.Sprintf("Check #%d finished, the first to compare against", p.RunID)
 		return m
@@ -161,8 +174,23 @@ func (p CheckCompletedPayload) message() Message {
 		m.Lines = append(m.Lines, fmt.Sprintf("No answer started or stopped naming you since check #%d.", p.PreviousRunID))
 		return m
 	}
-	m.Title = fmt.Sprintf("Check #%d: %s", p.RunID, strings.Join(changes[:min(2, len(changes))], ", "))
 	m.Lines = append(m.Lines, fmt.Sprintf("Since check #%d, %s.", p.PreviousRunID, sentenceList(changes)))
+	switch mv := p.Move; {
+	case mv == nil:
+		m.Title = fmt.Sprintf("Check #%d: %s", p.RunID, strings.Join(changes[:min(2, len(changes))], ", "))
+	case mv.Real:
+		more := "more"
+		if *mv.AfterRate < *mv.BeforeRate {
+			more = "less"
+		}
+		m.Title = fmt.Sprintf("Check #%d: named you %s often, %s → %s", p.RunID, more, percent(*mv.BeforeRate), percent(*mv.AfterRate))
+		m.Lines = append(m.Lines, fmt.Sprintf("Chance alone gives a move this large %s.", chance(mv.PValue)))
+	default:
+		m.Title = fmt.Sprintf("Check #%d: no real change", p.RunID)
+		if p.Gained+p.Lost > 0 {
+			m.Lines = append(m.Lines, fmt.Sprintf("Chance alone gives a move this large %s, so it may be noise.", chance(mv.PValue)))
+		}
+	}
 	for _, q := range p.Top {
 		m.Lines = append(m.Lines, fmt.Sprintf("“%s”: %s.", q.Question, sentenceList(changeParts(q.Gained, q.Lost, q.Moved, "AI app", "AI apps"))))
 	}
@@ -182,6 +210,23 @@ func changeParts(gained, lost, moved int, one, many string) []string {
 		}
 	}
 	return parts
+}
+
+// percent is a rate of 0 to 1 in whole percent, such as "32%".
+func percent(x float64) string { return fmt.Sprintf("%d%%", int(math.Round(x*100))) }
+
+// chance says a p-value as how often in 100 tries chance alone would do it.
+func chance(p float64) string {
+	switch n := int(math.Round(p * 100)); {
+	case p < 0.01:
+		return "less than 1 time in 100"
+	case n == 1:
+		return "about 1 time in 100"
+	case n >= 100:
+		return "almost every time"
+	default:
+		return fmt.Sprintf("about %d times in 100", n)
+	}
 }
 
 func count(n int, one, many string) string {

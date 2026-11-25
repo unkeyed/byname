@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"net/http"
 	"os"
 	"strings"
@@ -13,6 +14,7 @@ import (
 	"github.com/unkeyed/byname/internal/core"
 	"github.com/unkeyed/byname/internal/notify"
 	"github.com/unkeyed/byname/internal/notify/notifytest"
+	"github.com/unkeyed/byname/internal/panel"
 )
 
 const resendKey = "re_test_key_never_returned"
@@ -108,6 +110,7 @@ func TestACheckNotifiesEveryChannelWithTheComparison(t *testing.T) {
 	var cmp struct {
 		Counts map[string]int `json:"counts"`
 		Net    int            `json:"net"`
+		Move   panel.Move     `json:"move"`
 	}
 	agent.call("GET", fmt.Sprintf("/v1/compare?before=%d&after=%d", first, second), nil, http.StatusOK, &cmp)
 	gained, lost := cmp.Counts["gained"], cmp.Counts["lost"]
@@ -121,7 +124,14 @@ func TestACheckNotifiesEveryChannelWithTheComparison(t *testing.T) {
 		return fmt.Sprintf("%d answers", n)
 	}
 	started, stopped := answers(gained)+" started naming you", answers(lost)+" stopped naming you"
-	title := fmt.Sprintf("Check #%d: %s, %s", second, started, stopped)
+	title := fmt.Sprintf("Check #%d: no real change", second)
+	if m := cmp.Move; m.Real {
+		more := "more"
+		if *m.AfterRate < *m.BeforeRate {
+			more = "less"
+		}
+		title = fmt.Sprintf("Check #%d: named you %s often, %d%% → %d%%", second, more, int(math.Round(100**m.BeforeRate)), int(math.Round(100**m.AfterRate)))
+	}
 	since := fmt.Sprintf("Since check #%d, %s and %s.", first, started, stopped)
 	if moved := cmp.Counts["moved"]; moved > 0 {
 		since = fmt.Sprintf("Since check #%d, %s, %s and %s moved your position.", first, started, stopped, answers(moved))
@@ -153,7 +163,8 @@ func TestACheckNotifiesEveryChannelWithTheComparison(t *testing.T) {
 	}
 	p := body.Payload
 	if body.Kind != notify.CheckCompleted || p.RunID != second || p.PreviousRunID != first || p.Gained != gained || p.Lost != lost ||
-		p.Moved != cmp.Counts["moved"] || p.Unchanged != cmp.Counts["unchanged"] || p.Net != cmp.Net || len(p.Top) == 0 {
+		p.Moved != cmp.Counts["moved"] || p.Unchanged != cmp.Counts["unchanged"] || p.Net != cmp.Net || len(p.Top) == 0 ||
+		p.Move == nil || p.Move.Cells != cmp.Move.Cells || p.Move.PValue != cmp.Move.PValue || p.Move.Real != cmp.Move.Real || p.Band == nil {
 		t.Fatalf("webhook payload = %+v, want GET /v1/compare's %+v", p, cmp)
 	}
 
