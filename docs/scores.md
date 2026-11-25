@@ -14,7 +14,7 @@ Changing a tracked brand scores every stored answer again, locally and for free:
 
 ## How sure a score is
 
-A check asks each question once in each AI app. Asked again, an AI app can answer differently, so a score moves a little between checks even when nothing changed.
+A check asks each question once in each AI app unless you raise it, as below. Asked again, an AI app can answer differently, so a score moves a little between checks even when nothing changed.
 
 The band is the range the true share likely falls in. **This week** shows it next to how often AI apps named you, as in "32%, likely 24% to 42%". It is a 95% band. It treats each answer as an independent draw. The same questions are asked in every check, so if anything the band overstates how far a score swings between checks.
 
@@ -23,6 +23,18 @@ A move between two checks is real when it is larger than chance gives. Byname co
 With one answer per question and AI app, a few flips are rarely real. 3 answers that started naming you and 1 that stopped happen by chance about 62 times in 100. 8 that started and none that stopped happen by chance about 1 time in 100, so that move is real.
 
 Through the API, `GET /v1/metrics/summary` and every rate point carry `mention_band` and `citation_band`, each with `low` and `high` from 0 to 1, or null when no answer counted. `GET /v1/compare` carries `move` with `cells`, `before_rate`, `after_rate`, `p_value` and `real`. The band is a Wilson score interval. The move is a Cochran–Mantel–Haenszel test with one stratum per question and AI app and a continuity correction. With one answer on each side, that is McNemar's test.
+
+### Ask each question more than once
+
+**Ask each question** under **Settings > Schedule and limits** sets how many times a check asks each question in each AI app, from 1 to 5. It is 1 until you change it. Each time is another paid answer, so 3 times costs three times as much. See [Treg](engines/treg.md#cost).
+
+More answers make the band tighter and a move easier to trust. The band counts every answer. The move test weighs every answer too, so a question that named you in 1 of 3 answers and then in 3 of 3 counts toward a move.
+
+With several answers, a question in one AI app counts as naming you when most of its answers do, such as 2 of 3. The questions table, **What changed**, **Missed questions** and the question's history go by that, and each shows how many of the answers named you. Gained means most answers did not name you before and most do now. Moved means most named you both times and your best position among them changed. Named you and Linked to your site count every answer.
+
+A check asks every question once in every AI app before it asks any a second time. A check that reaches its spend cap still has an answer for every question it got to.
+
+Through the API, set `samples` with `PUT /v1/settings` or the `update_settings` tool. Each answer has `sample`, from 1. A cell of `GET /v1/runs/{id}/questions`, a pair of `GET /v1/compare` and a point of `GET /v1/questions/{id}/history` have `answered`, `named` and `answer_ids`. A pair of `GET /v1/gaps` has `answered`, `named_answers` and `answer_ids`.
 
 ## Questions that name your brand
 
