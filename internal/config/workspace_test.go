@@ -1,6 +1,8 @@
 package config_test
 
 import (
+	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -8,6 +10,8 @@ import (
 
 	"github.com/unkeyed/byname/internal/config"
 	"github.com/unkeyed/byname/internal/core"
+	"github.com/unkeyed/byname/internal/db"
+	"github.com/unkeyed/byname/internal/engines"
 	"github.com/unkeyed/byname/internal/engines/tregtest"
 	"github.com/unkeyed/byname/internal/secretbox"
 	"github.com/unkeyed/byname/internal/testdb"
@@ -86,7 +90,23 @@ func TestWorkspacesKeepTheirOwnSetup(t *testing.T) {
 		SELECT 'claude_code', true, 'provider', id FROM credential WHERE kind = 'anthropic'`); err != nil {
 		t.Fatalf("a workspace's surface on the shared key: %v", err)
 	}
-	is(t, northwind.DeleteCredential(ctx, "anthropic"), core.ErrConflict)
+	// The key is in use whichever workspace asks: Kyring's AI app runs
+	// on it, though Northwind's do not.
+	w, err := db.CurrentWorkspace(ctx, second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []config.CredentialUse{{Workspace: w.Name, Slug: w.Slug, Surfaces: []engines.Surface{engines.ClaudeCode}}}
+	for _, svc := range []*config.Service{northwind, kyring} {
+		if cred, err := svc.Credential(ctx, "anthropic"); err != nil || !reflect.DeepEqual(cred.UsedBy, want) {
+			t.Fatalf("used by %+v %v, want %+v", cred.UsedBy, err, want)
+		}
+	}
+	err = northwind.DeleteCredential(ctx, "anthropic")
+	is(t, err, core.ErrConflict)
+	if !strings.Contains(err.Error(), "Claude Code in "+w.Name) {
+		t.Fatalf("deleting a key another workspace uses: %v, want it to name the workspace", err)
+	}
 
 	var userID int64
 	if err := pool.QueryRow(ctx, `INSERT INTO users (email, role) VALUES ('maya@northwind.example', 'admin') RETURNING id`).Scan(&userID); err != nil {

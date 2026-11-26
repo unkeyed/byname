@@ -429,7 +429,8 @@ export interface Credential {
   /** "ok", or why it failed, or that the provider has no free test call. */
   last_test_status: string;
   updated_at: Timestamp | null;
-  used_by: SurfaceKey[];
+  /** Every workspace shares the key, so this names each one whose AI apps use it. */
+  used_by: { workspace: string; slug: string; surfaces: SurfaceKey[] }[];
 }
 
 export type StepKey = "brand" | "competitors" | "questions" | "surfaces" | "search" | "social" | "schedule" | "review";

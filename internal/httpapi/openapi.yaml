@@ -5999,9 +5999,20 @@ components:
           description: Null while no key is set.
         used_by:
           type: array
+          description: Each workspace with AI apps whose route calls with this key, and those apps. Every workspace shares the key, so this lists them all.
           items:
-            $ref: "#/components/schemas/SurfaceKey"
-          description: Surfaces whose route calls with this key.
+            type: object
+            required: [workspace, slug, surfaces]
+            properties:
+              workspace:
+                type: string
+                description: The workspace's name.
+              slug:
+                type: string
+              surfaces:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SurfaceKey"
     Onboarding:
       type: object
       required: [steps, finished_at, missing, first_scheduled_check]

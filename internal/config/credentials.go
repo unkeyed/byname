@@ -26,7 +26,15 @@ type Credential struct {
 	LastTestedAt   *time.Time             `json:"last_tested_at"`
 	LastTestStatus string                 `json:"last_test_status" jsonschema:"ok, or why the last test failed"`
 	UpdatedAt      *time.Time             `json:"updated_at"`
-	UsedBy         []engines.Surface      `json:"used_by" jsonschema:"surfaces whose route calls with this key"`
+	UsedBy         []CredentialUse        `json:"used_by" jsonschema:"each workspace with AI apps whose route calls with this key, and those apps; every workspace shares the key"`
+}
+
+// CredentialUse is the surfaces in one workspace whose route calls with a
+// key.
+type CredentialUse struct {
+	Workspace string            `json:"workspace" jsonschema:"the workspace's name"`
+	Slug      string            `json:"slug" jsonschema:"the workspace's slug"`
+	Surfaces  []engines.Surface `json:"surfaces"`
 }
 
 var credentialHints = map[engines.CredentialKind]string{
@@ -74,7 +82,7 @@ func (s *Service) Credentials(ctx context.Context) ([]Credential, error) {
 	out := make([]Credential, len(engines.CredentialKinds))
 	byKind := map[engines.CredentialKind]*Credential{}
 	for i, k := range engines.CredentialKinds {
-		out[i] = Credential{Kind: k, Title: credentialTitle(k), Hint: credentialHints[k], UsedBy: []engines.Surface{}}
+		out[i] = Credential{Kind: k, Title: credentialTitle(k), Hint: credentialHints[k], UsedBy: []CredentialUse{}}
 		byKind[k] = &out[i]
 	}
 	rows, err := s.db.Query(ctx, `SELECT kind, org, last_tested_at, coalesce(last_test_status, ''), updated_at FROM credential`)
@@ -94,19 +102,84 @@ func (s *Service) Credentials(ctx context.Context) ([]Credential, error) {
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
-	states, err := s.surfaceStates(ctx, s.db)
+	uses, err := s.credentialUses(ctx)
 	if err != nil {
 		return nil, err
 	}
-	for _, spec := range engines.All() {
-		st := states[spec.Surface]
-		rs, err := engines.RouteOf(spec.Surface, st.route)
-		if err != nil {
-			continue
+	for _, u := range uses {
+		byKind[u.kind].UsedBy = append(byKind[u.kind].UsedBy, u.CredentialUse)
+	}
+	return out, nil
+}
+
+type credentialUse struct {
+	kind engines.CredentialKind
+	CredentialUse
+}
+
+// credentialUses reads every workspace's surfaces, since the keys are
+// shared: a key one workspace no longer uses may still run another's
+// checks. They come in workspace order, then registry order.
+func (s *Service) credentialUses(ctx context.Context) ([]credentialUse, error) {
+	rows, err := s.db.Query(ctx, `SELECT name, slug, schema_name FROM workspace ORDER BY id`)
+	if err != nil {
+		return nil, err
+	}
+	type workspace struct{ name, slug, schema string }
+	all, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (workspace, error) {
+		var w workspace
+		return w, r.Scan(&w.name, &w.slug, &w.schema)
+	})
+	if err != nil {
+		return nil, err
+	}
+	var union []string
+	for i, w := range all {
+		union = append(union, fmt.Sprintf(`SELECT %d, key, enabled, route FROM %s.surface`, i, pgx.Identifier{w.schema}.Sanitize()))
+	}
+	rows, err = s.db.Query(ctx, strings.Join(union, " UNION ALL "))
+	if err != nil {
+		return nil, err
+	}
+	states := make([]map[engines.Surface]surfaceState, len(all))
+	for rows.Next() {
+		var i int
+		var k engines.Surface
+		var st surfaceState
+		if err := rows.Scan(&i, &k, &st.enabled, &st.route); err != nil {
+			return nil, err
 		}
-		if st.enabled || st.route != engines.RouteTreg {
-			c := byKind[rs.Credential()]
-			c.UsedBy = append(c.UsedBy, spec.Surface)
+		if states[i] == nil {
+			states[i] = map[engines.Surface]surfaceState{}
+		}
+		states[i][k] = st
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	var out []credentialUse
+	for i, w := range all {
+		byKind := map[engines.CredentialKind]*credentialUse{}
+		var kinds []engines.CredentialKind
+		for _, spec := range engines.All() {
+			st, ok := states[i][spec.Surface]
+			if !ok || !(st.enabled || st.route != engines.RouteTreg) {
+				continue
+			}
+			rs, err := engines.RouteOf(spec.Surface, st.route)
+			if err != nil {
+				continue
+			}
+			u := byKind[rs.Credential()]
+			if u == nil {
+				u = &credentialUse{kind: rs.Credential(), CredentialUse: CredentialUse{Workspace: w.name, Slug: w.slug}}
+				byKind[u.kind] = u
+				kinds = append(kinds, u.kind)
+			}
+			u.Surfaces = append(u.Surfaces, spec.Surface)
+		}
+		for _, k := range kinds {
+			out = append(out, *byKind[k])
 		}
 	}
 	return out, nil
@@ -196,7 +269,11 @@ func (s *Service) DeleteCredential(ctx context.Context, rawKind string) error {
 		return err
 	}
 	if len(c.UsedBy) > 0 {
-		return fmt.Errorf("%w: %s is used by %s; move those surfaces to another route first", core.ErrConflict, c.Title, joinSurfaces(c.UsedBy))
+		var where []string
+		for _, u := range c.UsedBy {
+			where = append(where, joinSurfaces(u.Surfaces)+" in "+u.Workspace)
+		}
+		return fmt.Errorf("%w: %s is used by %s; move those surfaces to another route first", core.ErrConflict, c.Title, strings.Join(where, "; "))
 	}
 	tag, err := s.db.Exec(ctx, `DELETE FROM credential WHERE kind = $1`, kind)
 	if pg := (*pgconn.PgError)(nil); errors.As(err, &pg) && pg.Code == "23503" {
