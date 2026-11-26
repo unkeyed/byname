@@ -8,6 +8,17 @@ export default defineConfig({
   site: "https://byname.dev",
   output: "server",
   adapter: node({ mode: "standalone" }),
+  // Old URLs people and crawlers already try. The canonical page is the destination.
+  redirects: {
+    "/pricing": { status: 301, destination: "/cost" },
+    "/compare": { status: 301, destination: "/alternatives" },
+    "/vs": { status: 301, destination: "/alternatives" },
+    "/vs/peec-ai": { status: 301, destination: "/alternatives/peec-ai" },
+    "/vs/profound": { status: 301, destination: "/alternatives/profound" },
+    "/vs/otterly": { status: 301, destination: "/alternatives/otterly" },
+    "/vs/semrush": { status: 301, destination: "/alternatives/semrush" },
+    "/vs/ahrefs": { status: 301, destination: "/alternatives/ahrefs" },
+  },
   devToolbar: { enabled: false },
   // Emit every asset, fonts included, as a file instead of a data: URL, so
   // the Content-Security-Policy can stay at font-src 'self'.

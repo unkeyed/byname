@@ -1,0 +1,57 @@
+---
+import Page from "../../layouts/Page.astro";
+import Related from "../../components/Related.astro";
+import { guide } from "../../lib/reading";
+import { articleNode, faqNode, graph } from "../../lib/seo";
+import { origin } from "../../lib/site";
+
+const page = guide("/blog/developer-tools-startup");
+const date = page.date!;
+const faqs = [
+  {
+    q: "How can a developer tools startup see what AI assistants say about it?",
+    a: "Run Byname and ask it the questions your buyers ask a coding agent. Byname can ask Claude Code and Codex CLI, keep every answer, and record who was named and which sites were linked. Each brand has its own MCP server, so your agent can read that back.",
+  },
+  {
+    q: "Does Byname read a real Claude Code or Codex CLI session?",
+    a: "No. Claude Code, Gemini CLI, and Codex CLI are labeled 'Same model, not the full tool'. Byname calls the model your team picks, with web search turned on. The call does not include the tool's own system prompt or its agent loop. The label is stored on the answer and is never averaged with a real app answer.",
+  },
+  {
+    q: "What does a Claude Code or Codex CLI answer cost in the sample?",
+    a: "The sample Byname shows, from November 21, 2026, is $55 per 1,000 answers for Claude Code and $73 per 1,000 for Codex CLI. That is about $0.055 and $0.073 an answer. Those endpoints are billed by tokens, so a real call can cost a different amount. Neither tool is on by default.",
+  },
+];
+const jsonLd = graph(
+  articleNode({ title: page.title, description: page.description, url: origin + page.path, date }),
+  faqNode(faqs),
+);
+---
+<Page title={page.title} description={page.description} path={page.path} kicker="Post" kickerHref="/blog" section="blog" published={date} jsonLd={jsonLd}>
+  <h1>{page.title}</h1>
+  <p class="byline"><time datetime={date}>November 26, 2026</time> · James Perkins</p>
+  <p>{faqs[0].a}</p>
+
+  <h2>Ask where your buyers ask</h2>
+  <p>A developer tools buyer does not only open the ChatGPT app. They ask Claude Code, Gemini CLI, and Codex CLI which library or host to use. Byname can ask those three, plus the ChatGPT app, Google AI Mode, and the other apps in the <a href="/docs/engines/surfaces">AI apps list</a>.</p>
+  <p>You write the questions. A useful set is the ones a developer actually types: how to add rate limits, where to host a Postgres-backed API, what to use instead of a gateway you already run. Byname does not put your brand name into the question.</p>
+
+  <h2>{faqs[1].q}</h2>
+  <p>{faqs[1].a}</p>
+  <p>That is still useful. You see the model and the search, which is what many of those sessions start from, and you see the label so you do not treat it as the full tool. The ChatGPT app, the Gemini app, Google AI Mode, Google AI Overview, Copilot, Bing AI Mode, and Brave are read from the app and labeled as real app answers.</p>
+
+  <h2>What it costs to turn the developer tools on</h2>
+  <p>{faqs[2].a} Gemini CLI's sample on the same date is $60 per 1,000 answers. The apps that are on by default, the ChatGPT app and the Google ones, were a few dollars per 1,000 in that sample. <a href="/cost">What Byname costs</a> has the full table.</p>
+  <p>One check that did not rely on those developer tools, 390 answers on November 26, 2026, cost $2.96. Adding Claude Code and Codex CLI raises the bill. The per-check spend cap, $5 by default, will stop a check that passes it.</p>
+
+  <h2>Read it from the agent you already use</h2>
+  <p>Each brand has its own MCP server. Claude Code, Cursor, and other MCP clients sign in as you in the browser, with the scopes you pick. You can ask which questions named a competitor, which pages the answers linked, and for a brief your coding agent can turn into a page on your site.</p>
+  <p>One install tracks several brands. A developer tools company with more than one product gives each product its own questions, results, and MCP URL. The keys are shared.</p>
+
+  <Related
+    paths={["/cost", "/blog/seo-social-and-ai-visibility", "/blog/recommended-by-chatgpt"]}
+    links={[
+      { href: "/docs/engines/surfaces", title: "AI apps and accuracy labels" },
+      { href: "/docs/agents", title: "Agents" },
+    ]}
+  />
+</Page>

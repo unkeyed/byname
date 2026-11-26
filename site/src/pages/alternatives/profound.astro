@@ -1,0 +1,58 @@
+---
+import Page from "../../layouts/Page.astro";
+import BynameDiff from "../../components/BynameDiff.astro";
+import Related from "../../components/Related.astro";
+import Sources from "../../components/Sources.astro";
+import { guide } from "../../lib/reading";
+import { faqNode, graph, webPageNode } from "../../lib/seo";
+import { origin } from "../../lib/site";
+
+const page = guide("/alternatives/profound");
+const faqs = [
+  {
+    q: "Who is Profound a better fit for?",
+    a: "A company that wants Profound's hosted platform: daily answer-engine tracking, prompt-volume research, crawler analytics, and agents that draft work, on a custom enterprise contract.",
+  },
+  {
+    q: "Who is Byname a better fit for?",
+    a: "A team that wants the tracker in its own network, on its own keys, with several brands on one install and an MCP server for each brand. You also want search console data and social posts in the same app, and you want to pay the AI provider per answer rather than take a custom contract.",
+  },
+];
+const jsonLd = graph(
+  webPageNode({ title: page.title, description: page.description, url: origin + page.path, date: "2026-11-26" }),
+  faqNode(faqs),
+);
+---
+<Page title={page.title} description={page.description} path={page.path} kicker="Alternatives" kickerHref="/alternatives" section="alternatives" jsonLd={jsonLd}>
+  <h1>Byname and Profound</h1>
+  <p class="byline">Updated <time datetime="2026-11-26">November 26, 2026</time></p>
+  <p>Profound is a hosted AI marketing platform. Byname is an open source AI visibility tracker (AEO / GEO) you run yourself. Profound covers measurement, prompt research, and content agents in one subscription. Byname covers measurement, and leaves the writing to you and your own agent.</p>
+  <p>This page is a description, not a ranking.</p>
+
+  <h2>What Profound does well</h2>
+  <p>Profound's pricing page says it runs structured prompts across AI platforms and tracks citations, sentiment, ranking, and competitors. The enterprise plan includes daily tracking. The engines listed there are ChatGPT, Perplexity, Google AI Mode, Gemini, DeepSeek, Anthropic Claude, Google AI Overviews, Exa Search, Muse Spark, and Qwen. The plan says up to 10 answer engines.</p>
+  <p>Profound also publishes prompt volumes, which it describes as what real users ask.</p>
+  <p>Agent Analytics tracks AI crawler traffic and AI-referred visits. The pricing page lists integrations with Akamai, AWS, Cloudflare, Fastly, Google Analytics, Google Cloud, Netlify, Vercel, and WordPress. Profound also tracks ChatGPT Shopping.</p>
+  <p>Profound Agents research, write, and run recurring workflows. Profound says agents are priced in credits, and that credit packages are custom. Exports are CSV and JSON, and the pricing page lists an API.</p>
+
+  <h2>What Profound publishes for price</h2>
+  <p>The pricing page offers Enterprise, with custom pricing. A FAQ on that page, last updated November 16, 2026, says Profound retired its Starter and Growth plans for brands in September 2026. It says the $399 and $499 prices for those plans are no longer available for new subscriptions.</p>
+  <p>Byname's software has no subscription. A check of 390 answers cost $2.96 in provider calls. That number is not a quote against Profound's contract. The two bills are for different things.</p>
+
+  <BynameDiff />
+
+  <h2>{faqs[0].q}</h2>
+  <p>{faqs[0].a}</p>
+
+  <h2>{faqs[1].q}</h2>
+  <p>{faqs[1].a}</p>
+
+  <Sources
+    links={[
+      { href: "https://www.tryprofound.com/", label: "tryprofound.com" },
+      { href: "https://www.tryprofound.com/features", label: "Profound features" },
+      { href: "https://www.tryprofound.com/pricing", label: "Profound pricing" },
+    ]}
+  />
+  <Related paths={["/cost", "/alternatives", "/alternatives/peec-ai", "/blog/recommended-by-chatgpt"]} />
+</Page>

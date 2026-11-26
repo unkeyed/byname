@@ -20,13 +20,23 @@ interface Props {
   markdown?: string;
   bodyClass?: string;
   docs?: boolean;
+  /** Which nav item is the current section. */
+  section?: "cost" | "alternatives" | "blog" | "docs";
+  /** ISO date, for article pages. Also sets article:published_time. */
+  published?: string;
+  /** Schema.org graph. Rendered as JSON-LD. */
+  jsonLd?: unknown;
 }
-const { title, description, ogDescription = description, path, type = "website", markdown, bodyClass, docs = false } = Astro.props;
+const { title, description, ogDescription = description, path, type = "website", markdown, bodyClass, docs = false, section, published, jsonLd } = Astro.props;
 const url = origin + path;
+const json = jsonLd ? JSON.stringify(jsonLd).replace(/</g, "\\u003c") : "";
 const links = [
   { href: "/#questions", label: "How it works" },
+  { href: "/cost", label: "Cost", current: section === "cost" },
+  { href: "/alternatives", label: "Alternatives", current: section === "alternatives" },
+  { href: "/blog", label: "Blog", current: section === "blog" },
   { href: "/#agents", label: "Agents" },
-  { href: "/docs/", label: "Docs", current: docs },
+  { href: "/docs/", label: "Docs", current: docs || section === "docs" },
   { href: repo, label: "GitHub" },
 ];
 ---
@@ -52,10 +62,12 @@ const links = [
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
     <meta property="og:image:alt" content="Byname: when buyers ask AI, does it say your name? An AI answer marked up by Byname: Unkey circled at position 2, the products named instead underlined." />
+    {published && <meta property="article:published_time" content={published} />}
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content={title} />
     <meta name="twitter:description" content={ogDescription} />
     <meta name="twitter:image" content={`${origin}/og.png`} />
+    {json && <script is:inline type="application/ld+json" set:html={json} />}
   </head>
   <body class={bodyClass}>
     <a class="skip" href="#main">Skip to content</a>
@@ -82,7 +94,7 @@ const links = [
       <div class="wrap foot-grid">
         <div>
           <a class="logo" href="/" aria-label="Byname home">by<span class="mk" data-mark="circle" data-pad="6 5">name</span></a>
-          <p class="foot-tag">Find out when AI answers name you, and who they name instead.</p>
+          <p class="foot-tag">Open source AI visibility tracker (AEO / GEO). Find out when AI answers name you, and who they name instead.</p>
           <p class="foot-meta">MIT licensed. Provided by <a href="https://www.unkey.com">Unkey</a>.</p>
         </div>
         <nav aria-labelledby="f-product"><h2 id="f-product">Product</h2><ul>
@@ -104,6 +116,13 @@ const links = [
           <li><a href="/docs/notifications">Notifications</a></li>
           <li><a href="/docs/agents">Agents</a></li>
           <li><a href="/llms.txt">llms.txt</a></li>
+        </ul></nav>
+        <nav aria-labelledby="f-read"><h2 id="f-read">Read</h2><ul>
+          <li><a href="/cost">What it costs</a></li>
+          <li><a href="/alternatives">Alternatives</a></li>
+          <li><a href="/blog/seo-social-and-ai-visibility">SEO, social, and AI</a></li>
+          <li><a href="/blog/developer-tools-startup">Developer tools startups</a></li>
+          <li><a href="/blog/recommended-by-chatgpt">Recommended by ChatGPT</a></li>
         </ul></nav>
         <nav aria-labelledby="f-project"><h2 id="f-project">Project</h2><ul>
           <li><a href={repo}>GitHub</a></li>

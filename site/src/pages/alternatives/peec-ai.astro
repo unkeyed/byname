@@ -1,0 +1,59 @@
+---
+import Page from "../../layouts/Page.astro";
+import BynameDiff from "../../components/BynameDiff.astro";
+import Related from "../../components/Related.astro";
+import Sources from "../../components/Sources.astro";
+import { guide } from "../../lib/reading";
+import { faqNode, graph, webPageNode } from "../../lib/seo";
+import { origin } from "../../lib/site";
+
+const page = guide("/alternatives/peec-ai");
+const faqs = [
+  {
+    q: "Who is Peec AI a better fit for?",
+    a: "A marketing team or an agency that wants Peec to run the tracking. Peec is a hosted product, with daily prompt runs, sentiment, and published plans that include a set number of prompts and projects.",
+  },
+  {
+    q: "Who is Byname a better fit for?",
+    a: "A team that wants the tracker in its own network, on its own keys, with several brands on one install and an MCP server for each brand. You also want Google Search Console, Bing Webmaster Tools, and social posts in the same app, and you are fine paying the AI provider for the answers you ask.",
+  },
+];
+const jsonLd = graph(
+  webPageNode({ title: page.title, description: page.description, url: origin + page.path, date: "2026-11-26" }),
+  faqNode(faqs),
+);
+---
+<Page title={page.title} description={page.description} path={page.path} kicker="Alternatives" kickerHref="/alternatives" section="alternatives" jsonLd={jsonLd}>
+  <h1>Byname and Peec AI</h1>
+  <p class="byline">Updated <time datetime="2026-11-26">November 26, 2026</time></p>
+  <p>Peec AI is a hosted AI search platform for marketing teams. Byname is an open source AI visibility tracker (AEO / GEO) you run yourself. Both track whether AI answers mention a brand. They are built for different ways of working.</p>
+  <p>This page is a description, not a ranking.</p>
+
+  <h2>What Peec AI does well</h2>
+  <p>Peec's site describes it as AI search analytics for marketing teams. It tracks three metrics: visibility (the share of chats that mention the brand), position, and sentiment. It separates a brand mention from a source citation, and it tracks citations at domain and URL level.</p>
+  <p>You set prompts, add brands, and pick models. Peec's FAQ says each prompt runs once every 24 hours on every model you selected. You can filter by model, country, and prompt tags.</p>
+  <p>The pricing page lists these models on every plan: ChatGPT, Perplexity, AI Overviews, AI Mode, Gemini, Naver AI Briefing, ERNIE, and Bing AI Mode. Enterprise adds more. Peec says it scrapes the web interface for most engines, so the stored answer reflects what a person would see there.</p>
+  <p>Peec also publishes recommended actions, source gap analysis, CSV export, and an MCP server. The pricing table includes MCP on every plan. The API is included from Pro up. Looker Studio is included on Advanced and Enterprise. The pricing page also lists a Google Analytics integration.</p>
+
+  <h2>What Peec publishes for price</h2>
+  <p>On November 26, 2026, peec.ai/pricing listed four plans. Starter is $95 a month (50 prompts, 3 models, 1 project). Pro is $245 a month (150 prompts, 3 models, 2 projects). Advanced is $495 a month (350 prompts, 3 models, 5 projects, and Looker Studio). Enterprise is custom. Every plan says unlimited users, and annual billing is 15% off. An extra model is priced separately on the same page.</p>
+  <p>Those are Peec's published subscription prices. They are not comparable, one for one, with a single Byname check. A Byname check of 390 answers cost $2.96 in provider calls. That is a different kind of bill, for a different amount of work.</p>
+
+  <BynameDiff />
+
+  <h2>{faqs[0].q}</h2>
+  <p>{faqs[0].a}</p>
+
+  <h2>{faqs[1].q}</h2>
+  <p>{faqs[1].a}</p>
+
+  <Sources
+    links={[
+      { href: "https://peec.ai/", label: "peec.ai" },
+      { href: "https://peec.ai/pricing", label: "peec.ai/pricing" },
+      { href: "https://peec.ai/ai-instructions", label: "peec.ai/ai-instructions" },
+      { href: "https://docs.peec.ai/understanding-your-performance", label: "Peec docs: understanding your performance" },
+    ]}
+  />
+  <Related paths={["/cost", "/alternatives", "/alternatives/profound", "/blog/seo-social-and-ai-visibility"]} />
+</Page>

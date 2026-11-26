@@ -296,6 +296,14 @@
 @media (max-width: 1000px) { .run, .anywhere { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 560px) { .run-acts { margin-left: 0; } .steps li { padding-left: 40px; } .prompt pre { max-height: 360px; } }
 
+/* Cost, alternatives, and posts. */
+.reads { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
+.read-card { display: flex; flex-direction: column; gap: 10px; padding: 22px 24px 24px; text-decoration: none; min-height: 100%; }
+.read-card h3 { font: 400 28px/1.15 var(--serif); letter-spacing: -0.015em; }
+.read-card p { margin: 0; color: var(--ink-2); font-size: 15.5px; line-height: 1.55; }
+.read-card .go { margin-top: auto; padding-top: 18px; color: var(--you); }
+@media (max-width: 900px) { .reads { grid-template-columns: minmax(0, 1fr); } }
+
 /* The copy toast */
 .toast { position: fixed; left: 50%; bottom: 24px; z-index: 30; max-width: calc(100vw - 32px); padding: 12px 18px; border-radius: 999px; background: var(--ink); color: var(--paper); font-size: 14.5px; box-shadow: var(--shadow); transform: translate(-50%, 16px); opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s; }
 .toast.show { opacity: 1; transform: translate(-50%, 0); }

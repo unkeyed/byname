@@ -5,13 +5,14 @@
 <h1 align="center">Byname</h1>
 
 <p align="center">
+  Open source AI visibility tracker (AEO / GEO).<br />
   Find out when AI assistants name you. And who they name instead.<br />
   <a href="https://byname.dev">Website</a> · <a href="docs/">Docs</a> · <a href="https://byname.dev/#deploy">Deploy on Unkey</a>
 </p>
 
 Your buyers ask ChatGPT, Google AI Mode and Claude Code which product to use. Each answer names a few brands and links a few sites. When yours is not one of them, nothing tells you, and nothing tells you who was named instead.
 
-Byname is an open source app you run yourself that asks those questions for you. It asks them where your buyers ask, on a schedule you set, keeps every answer with its cost, and counts who was named and whose site was linked. Your Google and Bing search numbers sit on the same timeline, and your agents read it all over MCP and REST.
+Byname is an open source AI visibility tracker (AEO / GEO) you run yourself. It asks those questions where your buyers ask, on a schedule you set, keeps every answer with its cost, and counts who was named and whose site was linked. Your Google and Bing search numbers sit on the same timeline, and your agents read it all over MCP and REST.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/this-week-dark.webp" />

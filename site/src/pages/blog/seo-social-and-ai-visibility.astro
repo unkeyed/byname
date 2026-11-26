@@ -1,0 +1,56 @@
+---
+import Page from "../../layouts/Page.astro";
+import Related from "../../components/Related.astro";
+import { guide } from "../../lib/reading";
+import { articleNode, faqNode, graph } from "../../lib/seo";
+import { origin } from "../../lib/site";
+
+const page = guide("/blog/seo-social-and-ai-visibility");
+const date = page.date!;
+const faqs = [
+  {
+    q: "What tool tracks SEO, social and AI visibility in one place?",
+    a: "Byname does. It is an open source AI visibility tracker (AEO / GEO) you run yourself. One install reads AI answers, Google Search Console, Bing Webmaster Tools, and public posts that name you on X, Reddit, Hacker News, LinkedIn, YouTube, Threads, and Bluesky.",
+  },
+  {
+    q: "Does Byname add Google and Bing together?",
+    a: "No. Google Search Console and Bing Webmaster Tools stay on their own timelines. Their days and what they count are different, so Byname does not merge the numbers.",
+  },
+  {
+    q: "Which social networks does Byname search?",
+    a: "X, Reddit, Hacker News, LinkedIn, YouTube, Threads, and Bluesky. A post is kept only when it uses your name as a whole word. You can leave out your team's own accounts. Social search is off until you turn it on.",
+  },
+];
+const jsonLd = graph(
+  articleNode({ title: page.title, description: page.description, url: origin + page.path, date }),
+  faqNode(faqs),
+);
+---
+<Page title={page.title} description={page.description} path={page.path} kicker="Post" kickerHref="/blog" section="blog" published={date} jsonLd={jsonLd}>
+  <h1>{page.title}</h1>
+  <p class="byline"><time datetime={date}>November 26, 2026</time> · James Perkins</p>
+  <p>{faqs[0].a}</p>
+
+  <h2>AI answers</h2>
+  <p>You write the questions your buyers ask. Byname asks them in the AI apps you pick, on a schedule you set, up to five times each. It keeps every answer, who was named and at what position, which sites were linked, and what the call cost.</p>
+  <p>Seven of the apps are read from the product a person uses: the ChatGPT app, the Gemini app, Google AI Mode, Google AI Overview, Microsoft Copilot, Bing AI Mode, and Brave. Claude Code, Gemini CLI, and Codex CLI are asked with your team's model and web search on. Byname labels those as the same model, not the full tool, because the call does not include the tool's own system prompt or agent loop. The Claude app and the Perplexity app are stand-ins, and the label says so. Answers with different labels are never averaged.</p>
+  <p>Each score carries the range the true share likely falls in. A move between checks says whether it is real or may be noise.</p>
+
+  <h2>Search</h2>
+  <p>{faqs[1].a} The numbers are clicks, appearances, click rate, and average position, from each engine's own webmaster tools. Byname only reads. For Google it can also say whether a page change helped, against pages you left alone. That part is marked experimental in the app.</p>
+
+  <h2>Social</h2>
+  <p>{faqs[2].a} Six of the networks are searched through Treg. Bluesky uses its public API and costs nothing.</p>
+
+  <h2>One install, several brands</h2>
+  <p>Each brand has its own questions, competitors, schedule, results, and MCP server. The team and the provider keys are shared. A coding agent signs in over MCP and can ask what changed. Scripts use a scoped API key.</p>
+  <p>The software is MIT licensed. You pay the provider calls, not a seat. <a href="/cost">What Byname costs</a> has the numbers from one real check: $2.96 for 390 answers, and an estimate of $44.12 a month at that size every 3 days.</p>
+
+  <Related
+    paths={["/cost", "/alternatives", "/blog/developer-tools-startup"]}
+    links={[
+      { href: "/docs/search", title: "Search engines" },
+      { href: "/docs/social", title: "Social" },
+    ]}
+  />
+</Page>

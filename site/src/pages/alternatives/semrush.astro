@@ -1,0 +1,57 @@
+---
+import Page from "../../layouts/Page.astro";
+import BynameDiff from "../../components/BynameDiff.astro";
+import Related from "../../components/Related.astro";
+import Sources from "../../components/Sources.astro";
+import { guide } from "../../lib/reading";
+import { faqNode, graph, webPageNode } from "../../lib/seo";
+import { origin } from "../../lib/site";
+
+const page = guide("/alternatives/semrush");
+const faqs = [
+  {
+    q: "Who is Semrush a better fit for?",
+    a: "An SEO or marketing team that already works in Semrush, or that wants AI visibility next to Semrush's other toolkits. Semrush's knowledge base says the AI Visibility Toolkit is built for SMBs, agencies, and mid-market companies.",
+  },
+  {
+    q: "Who is Byname a better fit for?",
+    a: "A team that wants one open source app for AI answers, Search Console, Bing, and social posts, on its own keys. You do not need the rest of a Semrush subscription, and you want an MCP server per brand.",
+  },
+];
+const jsonLd = graph(
+  webPageNode({ title: page.title, description: page.description, url: origin + page.path, date: "2026-11-26" }),
+  faqNode(faqs),
+);
+---
+<Page title={page.title} description={page.description} path={page.path} kicker="Alternatives" kickerHref="/alternatives" section="alternatives" jsonLd={jsonLd}>
+  <h1>Byname and Semrush AI Visibility</h1>
+  <p class="byline">Updated <time datetime="2026-11-26">November 26, 2026</time></p>
+  <p>Semrush sells an AI Visibility Toolkit for SEOs and marketers who want to see how brands appear in AI-generated answers. Byname is an open source AI visibility tracker (AEO / GEO) you run yourself. Semrush is a broad marketing suite. This page is about the AI Visibility Toolkit, not every Semrush product.</p>
+  <p>This page is a description, not a ranking.</p>
+
+  <h2>What the toolkit does well</h2>
+  <p>Semrush's knowledge base lists six parts. Visibility Overview gives an AI Visibility Score, worldwide or by region. Competitor Research shows where competitors are cited and you are not. Prompt Research works like keyword research for AI topics, with volume, difficulty, and intent. Brand Performance covers share of voice, sentiment, and the narratives around the brand. Prompt Tracking follows prompts you choose, and the page names Google AI Mode and ChatGPT as examples. An AI Search Site Audit flags technical issues that could block AI crawlers.</p>
+  <p>The same page says Visibility Overview, Competitor Research, and Prompt Research update daily. Brand Performance updates weekly. Prompt tracking updates daily. The site audit runs when you run it.</p>
+  <p>The knowledge base also talks about adding the toolkit to an existing Semrush subscription, including an SEO Toolkit subscription. Someone who already lives in Semrush can put AI visibility next to that work.</p>
+
+  <h2>What Semrush publishes for price</h2>
+  <p>The knowledge base lists the AI Visibility Toolkit at $99 a month. It says there is no free trial. At that price it includes 1 project, 1 domain for Brand Performance, 25 prompts for Prompt Tracking, 300 daily queries in AI Analysis reports, 1,000 daily queries in Prompt Research, AI search checks in Site Audit for up to 100 pages, and 10 CSV exports a day.</p>
+  <p>The same page says another user on a corporate account needs another license at $99, and another Brand Performance domain is $99. Fifty more prompts for Prompt Tracking are $60 a month. Semrush One bundles the SEO and AI Visibility toolkits and raises the prompt limits. This page does not repeat those bundle prices. Read the knowledge base for them.</p>
+  <p>Byname has no toolkit fee. A check of 390 answers cost $2.96 in provider calls. That does not buy Semrush's prompt research database, and Semrush's $99 does not include your Postgres host. They are different bills.</p>
+
+  <BynameDiff />
+
+  <h2>{faqs[0].q}</h2>
+  <p>{faqs[0].a}</p>
+
+  <h2>{faqs[1].q}</h2>
+  <p>{faqs[1].a}</p>
+
+  <Sources
+    links={[
+      { href: "https://www.semrush.com/kb/1493-ai-visibility-toolkit", label: "Semrush knowledge base: AI Visibility Toolkit" },
+      { href: "https://www.semrush.com/kb/1011-subscriptions", label: "Semrush knowledge base: subscriptions and toolkits" },
+    ]}
+  />
+  <Related paths={["/cost", "/alternatives", "/alternatives/ahrefs", "/blog/seo-social-and-ai-visibility"]} />
+</Page>

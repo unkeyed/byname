@@ -1,0 +1,59 @@
+---
+import Page from "../../layouts/Page.astro";
+import BynameDiff from "../../components/BynameDiff.astro";
+import Related from "../../components/Related.astro";
+import Sources from "../../components/Sources.astro";
+import { guide } from "../../lib/reading";
+import { faqNode, graph, webPageNode } from "../../lib/seo";
+import { origin } from "../../lib/site";
+
+const page = guide("/alternatives/ahrefs");
+const faqs = [
+  {
+    q: "Who is Ahrefs Brand Radar a better fit for?",
+    a: "Someone who wants a large index of search-backed prompts with no setup, or who already pays for Ahrefs and wants the custom prompts included in that plan. Ahrefs says the index works best once a brand already appears in AI search. Custom prompts are there for brands that are not well known yet, and for questions you write yourself.",
+  },
+  {
+    q: "Who is Byname a better fit for?",
+    a: "A team that wants to ask its own questions, including in Claude Code and Codex CLI, and keep the answers, Search Console, Bing, and social posts in an app it runs. You want an MCP server per brand, and you do not need a 592 million prompt index.",
+  },
+];
+const jsonLd = graph(
+  webPageNode({ title: page.title, description: page.description, url: origin + page.path, date: "2026-11-26" }),
+  faqNode(faqs),
+);
+---
+<Page title={page.title} description={page.description} path={page.path} kicker="Alternatives" kickerHref="/alternatives" section="alternatives" jsonLd={jsonLd}>
+  <h1>Byname and Ahrefs Brand Radar</h1>
+  <p class="byline">Updated <time datetime="2026-11-26">November 26, 2026</time></p>
+  <p>Ahrefs Brand Radar studies how a brand shows up in AI answers. Byname is an open source AI visibility tracker (AEO / GEO) you run yourself. Brand Radar starts from Ahrefs's keyword index. Byname starts from the questions you type in.</p>
+  <p>This page is a description, not a ranking.</p>
+
+  <h2>What Brand Radar does well</h2>
+  <p>Ahrefs describes two ways to track. The AI Visibility Index shows a brand across 592 million or more prompts, with no setup. Custom prompts are the exact questions you care about, checked daily, weekly, or monthly.</p>
+  <p>The index covers AI Overviews, AI Mode, ChatGPT, Gemini, and Perplexity. Custom prompts add Claude. Ahrefs says the index question sets are re-tested monthly, on a 90-day reporting window. Search-query indexes, for AI Overviews and AI Mode only, track keywords that triggered an AI answer in Google.</p>
+  <p>The metrics are mentions, citations, AI share of voice, and estimated impressions. Ahrefs says estimated impressions weight mentions by Google search volume. It says that is a model of potential visibility, not measured AI traffic, and not a count of who saw the answer.</p>
+  <p>Brand Radar also looks at offsite sources that influence answers. The page lists YouTube, TikTok, and Reddit, and says that part is free while in beta.</p>
+
+  <h2>What Ahrefs publishes for price</h2>
+  <p>The Brand Radar page says prompt tracking is free for every paid Ahrefs Lite plan and above. It lists a daily custom-prompt quota of 5 on Lite, 10 on Standard, and 20 on Advanced. Each prompt is checked daily on every selected platform. The page says Claude uses 8 checks per update. It says the AI Visibility Index starts at $199 a month.</p>
+  <p>Add-on prices for extra custom-prompt checks were on the page in a layout that did not stay attached to a plan name in the copy read here, so they are left out. Use ahrefs.com/brand-radar for those numbers.</p>
+  <p>Byname has no Ahrefs plan to add on to. A check of 390 answers cost $2.96 in provider calls. That check is your questions, not the 592 million prompt index.</p>
+
+  <BynameDiff />
+
+  <h2>{faqs[0].q}</h2>
+  <p>{faqs[0].a}</p>
+
+  <h2>{faqs[1].q}</h2>
+  <p>{faqs[1].a}</p>
+
+  <Sources
+    links={[
+      { href: "https://ahrefs.com/brand-radar", label: "ahrefs.com/brand-radar" },
+      { href: "https://ahrefs.com/blog/brand-radar-methodology/", label: "Ahrefs: Brand Radar methodology" },
+      { href: "https://help.ahrefs.com/en/articles/15501968-ai-visibility-metrics", label: "Ahrefs help: AI visibility metrics" },
+    ]}
+  />
+  <Related paths={["/cost", "/alternatives", "/alternatives/semrush", "/blog/developer-tools-startup"]} />
+</Page>

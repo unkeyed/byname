@@ -1,0 +1,28 @@
+---
+import Page from "../../layouts/Page.astro";
+import { childGuides, guide } from "../../lib/reading";
+import { graph, webPageNode } from "../../lib/seo";
+import { origin } from "../../lib/site";
+
+const page = guide("/blog");
+const posts = childGuides("blog");
+const jsonLd = graph(webPageNode({ title: page.title, description: page.description, url: origin + page.path }));
+
+const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+function written(iso: string) {
+  const [y, m, d] = iso.split("-").map(Number);
+  return `${months[m - 1]} ${d}, ${y}`;
+}
+---
+<Page title={page.title} description={page.description} path={page.path} kicker="Posts" section="blog" jsonLd={jsonLd}>
+  <h1>Posts</h1>
+  <p class="lede-doc">Short answers to questions people ask about AI visibility. Byname is an open source AI visibility tracker (AEO / GEO).</p>
+  <div class="index-grid index-stack">
+    {posts.map((post) => (
+      <a class="index-card" href={post.path}>
+        <span class="index-name">{post.title}</span>
+        <span class="index-desc">{post.date ? `${written(post.date)}. ` : ""}{post.description}</span>
+      </a>
+    ))}
+  </div>
+</Page>
