@@ -2,8 +2,10 @@ package db_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
 	"regexp"
 	"slices"
 	"strings"
@@ -14,6 +16,10 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/unkeyed/byname/internal/db"
+	"github.com/unkeyed/byname/internal/notify"
+	"github.com/unkeyed/byname/internal/notify/notifytest"
+	"github.com/unkeyed/byname/internal/results"
+	"github.com/unkeyed/byname/internal/secretbox"
 	"github.com/unkeyed/byname/internal/testdb"
 )
 
@@ -28,7 +34,7 @@ func TestWorkspaceBaselineMatchesPublic(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if w.Schema == db.Public {
+	if w.Schema == db.Home {
 		t.Fatalf("CreateWorkspace = %+v, want a schema of its own", w)
 	}
 
@@ -289,7 +295,7 @@ func TestWorkspacesAreListedRenamedAndKnowThemselves(t *testing.T) {
 		t.Fatal(err)
 	}
 	all, err := db.Workspaces(ctx, pool)
-	if err != nil || len(all) != 2 || all[0].Schema != db.Public || all[1].ID != second.ID {
+	if err != nil || len(all) != 2 || all[0].Schema != db.Home || all[1].ID != second.ID {
 		t.Fatalf("Workspaces = %+v %v, want the first then kyring", all, err)
 	}
 	for _, c := range []struct {
@@ -344,5 +350,59 @@ func TestNameFirstWorkspace(t *testing.T) {
 	}
 	if w, err := db.CurrentWorkspace(ctx, fresh); err != nil || w.Name != "Unkey Inc." || w.Slug != "unkey-inc" {
 		t.Fatalf("first workspace = %+v %v, want Unkey Inc. at unkey-inc", w, err)
+	}
+}
+
+// An install whose tables are not in public, because DATABASE_URL sets
+// search_path or the role has a schema of its own, upgrades with its
+// tables where they are: the first workspace is that schema, its locks
+// keep the keys earlier releases took, and a new workspace reaches the
+// shared tables and functions there.
+func TestAnInstallOutsidePublicUpgrades(t *testing.T) {
+	ctx := context.Background()
+	pool := testdb.ThroughIn(t, "018_samples.sql", "app")
+	if _, err := pool.Exec(ctx, `INSERT INTO brand (name, kind) VALUES ('Northwind Cloud', 'self')`); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Migrate(ctx, pool); err != nil {
+		t.Fatal(err)
+	}
+
+	first, err := db.CurrentWorkspace(ctx, pool)
+	if err != nil || first.Slug != "northwind-cloud" {
+		t.Fatalf("CurrentWorkspace = %+v, %v; want the install as northwind-cloud", first, err)
+	}
+
+	alerts := notify.New(pool, results.New(pool), notify.Options{Secrets: secretbox.ForTest(), PublicURL: &url.URL{Scheme: "https", Host: "byname.example"}})
+	rec, srv := notifytest.NewReceiver(t)
+	if _, err := alerts.CreateChannel(ctx, notify.ChannelInput{Name: "hook", Kind: notify.Webhook,
+		Settings: json.RawMessage(`{"url":"` + srv.URL + `"}`), Events: []notify.Kind{notify.CheckFailed}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := alerts.Emit(ctx, notify.Event{Subject: "run/1", Payload: notify.CheckFailedPayload{RunID: 1, Message: "x"}}); err != nil {
+		t.Fatal(err)
+	}
+	if n, err := alerts.DeliverDue(ctx); err != nil || n != 1 || len(rec.Requests()) != 1 {
+		t.Fatalf("DeliverDue = %d, %v, %d requests; want the alert delivered", n, err, len(rec.Requests()))
+	}
+
+	var sameKey bool
+	if err := pool.QueryRow(ctx, `SELECT `+db.WorkspaceLock("byname.test")+` = hashtext('byname.test')`).Scan(&sameKey); err != nil || !sameKey {
+		t.Fatalf("the first workspace's lock key is hashtext(name): %v, %v; want true, as releases before workspaces took it", sameKey, err)
+	}
+
+	w, err := db.CreateWorkspace(ctx, pool, "Kyring", "kyring")
+	if err != nil {
+		t.Fatal(err)
+	}
+	kyring := db.In(pool, w.Schema)
+	var key string
+	var users, brands int
+	if err := kyring.QueryRow(ctx, `SELECT page_key('https://www.Example.com/a/'), (SELECT count(*) FROM users), (SELECT count(*) FROM brand)`).
+		Scan(&key, &users, &brands); err != nil || key != "example.com/a" || brands != 0 {
+		t.Fatalf("Kyring: page_key %q, %d users, %d brands, %v; want app's page_key and users and its own empty brand table", key, users, brands, err)
+	}
+	if got, err := db.CurrentWorkspace(ctx, kyring); err != nil || got.ID != w.ID {
+		t.Fatalf("CurrentWorkspace in Kyring = %+v, %v; want Kyring", got, err)
 	}
 }

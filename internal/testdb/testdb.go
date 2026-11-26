@@ -38,6 +38,14 @@ func New(t testing.TB) *pgxpool.Pool {
 // An empty last applies every migration, as New does.
 func Through(t testing.TB, last string) *pgxpool.Pool {
 	t.Helper()
+	return ThroughIn(t, last, "")
+}
+
+// ThroughIn is Through on an install whose tables live in schema rather
+// than public, as when DATABASE_URL sets search_path or the role has a
+// schema of its own. An empty schema is public.
+func ThroughIn(t testing.TB, last, schema string) *pgxpool.Pool {
+	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
@@ -59,6 +67,18 @@ func Through(t testing.TB, last string) *pgxpool.Pool {
 		t.Fatalf("testdb: %v", err)
 	}
 	cfg.ConnConfig.Database = name
+	if schema != "" {
+		conn, err := pgx.ConnectConfig(ctx, cfg.ConnConfig)
+		if err != nil {
+			t.Fatalf("testdb: connect %s: %v", name, err)
+		}
+		_, err = conn.Exec(ctx, "CREATE SCHEMA "+pgx.Identifier{schema}.Sanitize())
+		conn.Close(ctx)
+		if err != nil {
+			t.Fatalf("testdb: create schema %s: %v", schema, err)
+		}
+		cfg.ConnConfig.RuntimeParams["search_path"] = schema
+	}
 	db.RouteSchemas(cfg)
 	pool, err := pgxpool.NewWithConfig(ctx, cfg)
 	if err != nil {

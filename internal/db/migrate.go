@@ -138,8 +138,8 @@ func migrateWorkspaces(ctx context.Context, pool *pgxpool.Pool) error {
 		if err := r.Scan(&s.w.ID, &s.w.Slug, &s.w.Name, &schema, &s.w.CreatedAt, &s.applied); err != nil {
 			return s, err
 		}
-		s.w.Schema, err = parseSchema(schema)
-		return s, err
+		s.w.Schema = parseSchema(schema)
+		return s, nil
 	})
 	if err != nil {
 		return err
@@ -171,8 +171,8 @@ func applyWorkspaceLocked(ctx context.Context, tx pgx.Tx, w Workspace, f workspa
 	if applied {
 		return nil
 	}
-	if w.Schema != Public {
-		if _, err := tx.Exec(ctx, `SET LOCAL search_path = `+w.Schema.searchPath()); err != nil {
+	if w.Schema != Home {
+		if _, err := tx.Exec(ctx, setPath, pgx.Identifier{w.Schema.String()}.Sanitize(), true); err != nil {
 			return err
 		}
 	}

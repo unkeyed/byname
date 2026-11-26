@@ -52,7 +52,7 @@ Any Postgres that accepts a connection URL works: a local container, Neon, Supab
 
 On start, Byname applies its migrations from `internal/db/migrations`. Each migration runs in its own transaction under a Postgres advisory lock, so several replicas can start at the same time. A migration to the tables every workspace shares is recorded in `schema_migrations`. A migration to the tables each workspace has of its own is applied to every workspace and recorded per workspace in `workspace_migration`.
 
-Each brand Byname tracks is a workspace. The first workspace's tables are in the `public` schema. Adding a workspace creates a schema for it, `ws_<id>`, with its own copy of those tables.
+Each brand Byname tracks is a workspace. The first workspace's tables are in the install's own schema: the first schema on the role's `search_path`, which is `public` unless `DATABASE_URL` or the role sets another. Adding a workspace creates a schema for it, `ws_<id>`, with its own copy of those tables. Its queries find the shared tables through the role's `search_path`, after its own schema.
 
 ## `MIGRATION_DATABASE_URL`
 

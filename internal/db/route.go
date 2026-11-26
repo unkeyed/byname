@@ -25,7 +25,7 @@ func RouteSchemas(cfg *pgxpool.Config) {
 		if have, _ := data[pathKey].(Schema); have == want {
 			return true, nil
 		}
-		if want == Public {
+		if want == Home {
 			if _, err := conn.Exec(ctx, `RESET search_path`); err != nil {
 				return false, err
 			}
@@ -33,10 +33,10 @@ func RouteSchemas(cfg *pgxpool.Config) {
 			return true, nil
 		}
 		// A schema that is missing, or that the role cannot use, would
-		// leave public first on the path and hand out the first
-		// workspace's rows, so that fails here instead.
+		// leave the install's own schema first on the path and hand out
+		// the first workspace's rows, so that fails here instead.
 		var first string
-		if err := conn.QueryRow(ctx, `SELECT set_config('search_path', $1, false), current_schema()`, want.searchPath()).Scan(nil, &first); err != nil {
+		if err := conn.QueryRow(ctx, setPath, pgx.Identifier{want.String()}.Sanitize(), false).Scan(nil, &first); err != nil {
 			return false, err
 		}
 		if first != want.String() {
@@ -100,7 +100,7 @@ func (b bound) Acquire(ctx context.Context) (*pgxpool.Conn, error) { return b.p.
 // same key: "" for the first workspace, whose keys predate workspaces and
 // must not change, and "ws_<id>/" for a pool In bound to any other.
 func KeyScope(p Pool) string {
-	if b, ok := p.(bound); ok && b.schema != Public {
+	if b, ok := p.(bound); ok && b.schema != Home {
 		return b.schema.String() + "/"
 	}
 	return ""

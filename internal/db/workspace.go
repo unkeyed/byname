@@ -23,42 +23,45 @@ type Workspace struct {
 }
 
 // Schema is the Postgres schema a workspace's tables live in. The zero
-// value, Public, is the first workspace's: the tables every release before
-// workspaces created. Every later workspace has ws_<id>.
+// value, Home, is the first workspace's. Every later workspace has ws_<id>.
 type Schema struct{ id int64 }
 
-// Public is the first workspace's schema.
-var Public Schema
+// Home is the first workspace's schema: the install's own, where every
+// release before workspaces created the tables. It is whichever schema the
+// role's own search_path resolves to, public unless DATABASE_URL or the
+// role says otherwise, so it has no fixed name and String is empty.
+var Home Schema
 
 func (s Schema) String() string {
-	if s == Public {
-		return "public"
+	if s == Home {
+		return ""
 	}
 	return "ws_" + strconv.FormatInt(s.id, 10)
 }
 
-func (s Schema) searchPath() string {
-	return pgx.Identifier{s.String()}.Sanitize() + ", public"
-}
+// setPath makes $1 the first schema on search_path, ahead of the role's
+// own path, where the shared tables and functions such as page_key live.
+// $2 is set_config's is_local. It answers the schema queries now use.
+const setPath = `SELECT set_config('search_path', concat_ws(', ', $1::text, nullif(reset_val, '')), $2), current_schema()
+	FROM pg_settings WHERE name = 'search_path'`
 
-func parseSchema(name string) (Schema, error) {
-	if name == "public" {
-		return Public, nil
-	}
-	if rest, ok := strings.CutPrefix(name, "ws_"); ok {
-		if id, err := strconv.ParseInt(rest, 10, 64); err == nil && id > 0 {
-			return Schema{id}, nil
+var wsSchema = regexp.MustCompile(`^ws_([0-9]+)$`)
+
+func parseSchema(name string) Schema {
+	if m := wsSchema.FindStringSubmatch(name); m != nil {
+		if id, err := strconv.ParseInt(m[1], 10, 64); err == nil && id > 0 {
+			return Schema{id}
 		}
 	}
-	return Public, fmt.Errorf("db: %q is not a workspace schema", name)
+	return Home
 }
 
 // SharedTables are the tables every workspace shares: the team and how it
 // signs in, API keys, OAuth, the AI provider keys and the bookkeeping of
-// migrations and workspaces. They exist in public only, and a workspace's
-// queries reach them through its search_path. Every other table and view
-// in public belongs to the first workspace, and every later workspace has
-// its own copy.
+// migrations and workspaces. They exist in the install's own schema only,
+// and a workspace's queries reach them through its search_path. Every
+// other table and view there belongs to the first workspace, and every
+// later workspace has its own copy.
 var SharedTables = []string{
 	"api_keys",
 	"auth_challenges",
@@ -91,9 +94,8 @@ func scanWorkspace(row pgx.Row) (Workspace, error) {
 	if err := row.Scan(&w.ID, &w.Slug, &w.Name, &schema, &w.CreatedAt); err != nil {
 		return Workspace{}, err
 	}
-	var err error
-	w.Schema, err = parseSchema(schema)
-	return w, err
+	w.Schema = parseSchema(schema)
+	return w, nil
 }
 
 // ErrSlugTaken is CreateWorkspace's answer when another workspace has the

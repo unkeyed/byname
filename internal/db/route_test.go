@@ -80,7 +80,7 @@ func TestInRefusesAPoolThatDoesNotRoute(t *testing.T) {
 			t.Fatal("db.In bound a pool that would read the first workspace's tables, want a panic")
 		}
 	}()
-	db.In(p, db.Public)
+	db.In(p, db.Home)
 }
 
 func TestAMissingWorkspaceSchemaFailsInsteadOfReadingPublic(t *testing.T) {
