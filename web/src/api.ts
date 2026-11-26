@@ -1996,6 +1996,7 @@ export const api = {
     list: () => request<Entity[]>("GET", "/v1/entities"),
     create: (body: { name: string; slug?: string }) => request<Entity>("POST", "/v1/entities", { body }),
     rename: (slug: string, name: string) => request<Entity>("PATCH", `/v1/entities/${enc(slug)}`, { body: { name } }),
+    remove: (slug: string) => request<void>("DELETE", `/v1/entities/${enc(slug)}`),
   },
 
   /** Every change to a sign-in method can fail with reauth_required (see needsReauth). */

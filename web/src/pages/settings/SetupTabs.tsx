@@ -14,7 +14,7 @@ import { money } from "../../money";
 import { keys, useCan, useCosts, useSettings } from "../../queries";
 import { Badge, Button, Card, CardHeader, cx, ErrorNote, Icon, Pending, RelativeTime, SteadyLabel } from "../../ui";
 import { RunNowButton } from "../results/RunNow";
-import { RenameEntity } from "../../Entities";
+import { DeleteEntity, RenameEntity } from "../../Entities";
 import { SettingsHeader, SettingsSubhead } from "./Settings";
 
 // Settings pages over the same components onboarding uses, so each setup screen exists once.
@@ -25,6 +25,7 @@ export function General() {
       <SettingsHeader title="General" />
       <RenameEntity />
       <BrandForm retention />
+      <DeleteEntity />
     </>
   );
 }

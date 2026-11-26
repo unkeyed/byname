@@ -5,7 +5,7 @@ import { api, ApiError, type Entity } from "./api";
 import { keys, useIsAdmin } from "./queries";
 import { go, openRoutes, useEntity } from "./routing";
 import { samePage } from "./samePage";
-import { Badge, Button, Card, CardHeader, cx, Dialog, DialogBody, ErrorNote, Field, Icon, Initials, inputClass, scrollArea } from "./ui";
+import { Badge, Button, Card, CardHeader, cx, Dialog, DialogBody, ErrorNote, Field, Icon, Initials, inputClass, scrollArea, Spinner } from "./ui";
 
 /** The slug the server gives a name when none is typed, as db.Slug makes it. */
 export function slugify(name: string): string {
@@ -200,5 +200,79 @@ function RenameForm({ entity }: { entity: Entity }) {
         <ErrorNote error={rename.error} />
       </form>
     </Card>
+  );
+}
+
+/**
+ * Settings > General, for admins: deleting the open entity and everything
+ * in it. The first one stays, since paths without /e/<slug> mean it.
+ */
+export function DeleteEntity() {
+  const { current, list } = useEntity();
+  const admin = useIsAdmin();
+  const [asking, setAsking] = useState(false);
+  if (!admin || !current) return null;
+  if (current.default) {
+    return (
+      <Card className="mt-6">
+        <CardHeader title="Delete entity" description="The first entity cannot be deleted: links, API keys and MCP connections without /e/<slug> in their path all lead to it." />
+      </Card>
+    );
+  }
+  const first = list.data?.find((w) => w.default);
+  return (
+    <Card className="mt-6">
+      <CardHeader title="Delete entity" description={`Deletes ${current.name} and everything in it, for everyone. This cannot be undone.`}>
+        <Button variant="danger" onClick={() => setAsking(true)}>
+          <Icon name="trash" className="size-3.5" />
+          Delete entity
+        </Button>
+      </CardHeader>
+      <Dialog open={asking} onClose={() => setAsking(false)} title={`Delete ${current.name}?`}>
+        <ConfirmDelete key={current.id} entity={current} onCancel={() => setAsking(false)} onDeleted={() => first && go(`/e/${first.slug}`)} />
+      </Dialog>
+    </Card>
+  );
+}
+
+function ConfirmDelete({ entity, onCancel, onDeleted }: { entity: Entity; onCancel: () => void; onDeleted: () => void }) {
+  const qc = useQueryClient();
+  const [typed, setTyped] = useState("");
+  const remove = useMutation({
+    mutationFn: () => api.entities.remove(entity.slug),
+    onSuccess: () => {
+      qc.setQueryData<Entity[]>(keys.entities, (l) => l?.filter((w) => w.id !== entity.id));
+      void qc.invalidateQueries({ queryKey: keys.entities });
+      onDeleted();
+    },
+  });
+  const matches = typed.trim() === entity.name;
+  const submit = (e: FormEvent) => {
+    e.preventDefault();
+    if (matches) remove.mutate();
+  };
+  return (
+    <DialogBody>
+      <form onSubmit={submit} className="space-y-4 text-sm">
+        <p>
+          This permanently deletes {entity.name}: its brand, competitors, questions, checks and results, search engine and site connections, social mentions and
+          notification channels. Its pages at /e/{entity.slug} stop working at once, and the data is gone for good a few minutes later.
+        </p>
+        <p className="text-muted">Your team, API keys, connected apps and provider keys are shared by every entity and stay.</p>
+        <Field label={`Type ${entity.name} to confirm`}>
+          <input data-autofocus value={typed} onChange={(e) => setTyped(e.target.value)} autoComplete="off" spellCheck={false} className={inputClass} />
+        </Field>
+        <ErrorNote error={remove.error} />
+        <div className="flex justify-end gap-2 pt-1">
+          <Button variant="ghost" onClick={onCancel}>
+            Cancel
+          </Button>
+          <Button type="submit" variant="danger" disabled={!matches || remove.isPending}>
+            {remove.isPending ? <Spinner className="size-3.5 border" /> : <Icon name="trash" className="size-3.5" />}
+            Delete {entity.name}
+          </Button>
+        </div>
+      </form>
+    </DialogBody>
   );
 }
