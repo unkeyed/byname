@@ -2,19 +2,26 @@ import { Link } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../api";
 import { keys } from "../../queries";
+import { useWorkspace } from "../../routing";
 import { Badge, Card, CodeBlock, ConfirmButton, EmptyState, ErrorNote, Icon, Pending, RelativeTime } from "../../ui";
 import { SettingsHeader, SettingsSubhead } from "./Settings";
 
-export function snippets(origin: string) {
+/**
+ * base is where the open entity's MCP server and API answer. The default
+ * entity's is the bare origin, because its slug can still change once
+ * during onboarding.
+ */
+function snippets(base: string) {
   return {
-    claude: `claude mcp add --transport http byname ${origin}/mcp`,
-    cursor: JSON.stringify({ mcpServers: { byname: { url: `${origin}/mcp` } } }, null, 2),
-    curl: `curl ${origin}/v1/status \\\n  -H "Authorization: Bearer <your-api-key>"`,
+    claude: `claude mcp add --transport http byname ${base}/mcp`,
+    cursor: JSON.stringify({ mcpServers: { byname: { url: `${base}/mcp` } } }, null, 2),
+    curl: `curl ${base}/v1/status \\\n  -H "Authorization: Bearer <your-api-key>"`,
   };
 }
 
 export function Apps() {
-  const s = snippets(location.origin);
+  const { slug, current } = useWorkspace();
+  const s = snippets(current?.default ? location.origin : `${location.origin}/w/${slug}`);
 
   return (
     <>
@@ -24,6 +31,7 @@ export function Apps() {
         <SettingsSubhead className="mb-0">Connect an MCP client</SettingsSubhead>
         <CodeBlock label="Claude Code" code={s.claude} />
         <CodeBlock label="Cursor (.cursor/mcp.json)" code={s.cursor} />
+        {current && <p className="text-xs text-muted">This address reads and changes {current.name} only. Each entity has its own, and one sign-in covers all of them.</p>}
       </section>
 
       <section className="mt-8">
