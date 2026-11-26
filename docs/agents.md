@@ -165,7 +165,7 @@ curl https://byname.example.com/v1/entities -H "Authorization: Bearer $BYNAME_AP
 curl https://byname.example.com/e/kyring/v1/runs -H "Authorization: Bearer $BYNAME_API_KEY"
 ```
 
-`GET /v1/entities` lists each entity's slug and whether its onboarding is finished. The team, API keys, apps and provider keys are shared, so their routes answer the same in every entity. MCP works the same way: `/mcp` serves the first entity and `/e/<slug>/mcp` the one with that slug. See [Connect to one entity](#connect-to-one-entity).
+`GET /v1/entities` lists each entity's slug and whether its onboarding is finished. Adding, renaming and deleting an entity take an admin signed in to the UI, not an API key, and MCP has no tool for them. A deleted entity answers `404` at once, under any key or connection, and its data is gone about five minutes later. The team, API keys, apps and provider keys are shared, so their routes answer the same in every entity. MCP works the same way: `/mcp` serves the first entity and `/e/<slug>/mcp` the one with that slug. See [Connect to one entity](#connect-to-one-entity).
 
 ## MCP tools
 

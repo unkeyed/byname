@@ -54,11 +54,13 @@ On start, Byname applies its migrations from `internal/db/migrations`. Each migr
 
 Each brand Byname tracks is an entity. The first entity's tables are in the install's own schema: the first schema on the role's `search_path`, which is `public` unless `DATABASE_URL` or the role sets another. Adding an entity creates a schema for it, `entity_<id>`, with its own copy of those tables. Its queries find the shared tables through the role's `search_path`, after its own schema.
 
+An admin deletes an entity in **Settings > General**, or with `DELETE /v1/entities/{slug}`. Byname marks its row in `entity` deleted, and its slug is free to use again at once. The replica that took the request stops serving it and stops its scheduled checks and other jobs right away. Every other replica does the same within a minute. About five minutes after the delete, one replica drops the entity's schema with every table in it and removes its row, so its data is gone for good. The first entity cannot be deleted: its tables share the install's own schema with the shared tables, and paths without `/e/<slug>` mean it.
+
 ## `MIGRATION_DATABASE_URL`
 
 Some providers, such as PlanetScale Postgres, give you a role that can only read and write data, and a separate admin role that can create tables. Set `DATABASE_URL` to the read/write role and `MIGRATION_DATABASE_URL` to the admin role. Byname opens the admin connection at start, applies the migrations, closes it, and then serves every request through `DATABASE_URL`.
 
-Adding an entity creates tables too, so Byname also opens the admin connection then, creates the entity's schema and tables through it, and closes it.
+Adding an entity creates tables too, and removing a deleted one drops them, so Byname also opens the admin connection then, creates or drops the entity's schema and tables through it, and closes it.
 
 The read/write role needs `SELECT`, `INSERT`, `UPDATE` and `DELETE` on the tables the admin role creates, and `USAGE` on each entity's schema. Granting it the `pg_read_all_data` and `pg_write_all_data` roles covers that, including tables added by later migrations and the schemas of entities added later.
 
