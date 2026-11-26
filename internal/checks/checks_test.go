@@ -506,3 +506,27 @@ func TestSpendCapStopsWithEveryCellAskedOnceFirst(t *testing.T) {
 		t.Fatalf("run = %+v with cells per sample %v; want capped after 15 calls at $0.01, every cell's first sample before any second", r, got)
 	}
 }
+
+// Queuing a due check never holds a connection while it waits for another:
+// on a pool of one, as a small database's background lane can be, it
+// still queues the check.
+func TestClaimingADueCheckNeedsOneConnectionAtATime(t *testing.T) {
+	e := setup(t, nil)
+	if _, err := e.db.Exec(context.Background(), `UPDATE instance_settings SET checks_paused = false, next_check_at = now() - interval '1 minute'`); err != nil {
+		t.Fatal(err)
+	}
+	cfg := e.db.Config().Copy()
+	cfg.MaxConns = 1
+	one, err := pgxpool.NewWithConfig(context.Background(), cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(one.Close)
+	settings := config.New(one, config.Options{Secrets: secretbox.ForTest(), TregBaseURL: e.treg.URL})
+	bounded, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	id, err := checks.New(one, settings, checks.Options{}).ClaimDue(bounded)
+	if err != nil || id == 0 {
+		t.Fatalf("claim due = %d, %v; want a queued check within 10s on one connection", id, err)
+	}
+}
