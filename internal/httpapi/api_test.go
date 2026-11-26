@@ -195,7 +195,7 @@ func serve(t *testing.T, srv *httptest.Server, publicURL string, mod ...func(*au
 	log := slog.New(slog.DiscardHandler)
 	mux := NewMux(reg, authn, log)
 	mux.Handle("/mcp", mcpserver.Handler(reg.Default().Services, reg, authn.OAuth, "test"))
-	srv.Config.Handler = InWorkspace(reg, log, mux)
+	srv.Config.Handler = InWorkspace(reg, authn, log, mux)
 	srv.Start()
 	t.Cleanup(srv.Close)
 	return client{t: t, base: srv.URL, origin: publicURL, setupToken: token, db: pool, reg: reg, svc: reg.Default().Services, treg: treg, resend: resend, google: google, bing: bing, github: github}

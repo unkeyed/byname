@@ -502,7 +502,7 @@ func run(log *slog.Logger) error {
 	// ReadTimeout bounds a slow request body without a proxy in front. There
 	// is no WriteTimeout: an MCP tool call can outlast any fixed limit, and
 	// ReadTimeout does not cancel a handler that has read its body.
-	srv := &http.Server{Addr: ":" + cfg.Port, Handler: httpapi.SecurityHeaders(cfg.Auth.PublicURL, httpapi.InWorkspace(reg, log, mux)),
+	srv := &http.Server{Addr: ":" + cfg.Port, Handler: httpapi.SecurityHeaders(cfg.Auth.PublicURL, httpapi.InWorkspace(reg, authn, log, mux)),
 		ReadHeaderTimeout: 10 * time.Second, ReadTimeout: 30 * time.Second, IdleTimeout: 2 * time.Minute}
 	served := make(chan error, 1)
 	go func() { served <- srv.ListenAndServe() }()

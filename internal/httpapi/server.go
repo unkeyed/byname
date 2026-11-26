@@ -5,6 +5,7 @@
 package httpapi
 
 import (
+	"context"
 	"crypto/rand"
 	_ "embed"
 	"encoding/hex"
@@ -336,9 +337,15 @@ func (s *server) workspace(r *http.Request) workspaces.Entity {
 // bookmarks keep working. /w/kyring/mcp is Kyring's MCP server. Sign-in,
 // OAuth and its metadata belong to the instance, not a workspace, so they
 // answer the same under any prefix, and the metadata only ever names the
-// paths without one. An unknown slug is a JSON 404.
-func InWorkspace(reg *workspaces.Registry, log *slog.Logger, next http.Handler) http.Handler {
-	s := &server{reg: reg, log: log}
+// paths without one.
+//
+// A slug this process does not serve yet answers as a real one would
+// anyone without credentials: the instance's own routes answer, and
+// every other route is 401, without asking the database whether the slug
+// exists. Only a signed-in caller makes it look, for a workspace another
+// replica made, and gets a JSON 404 for a slug no workspace has.
+func InWorkspace(reg *workspaces.Registry, authn *auth.Authenticator, log *slog.Logger, next http.Handler) http.Handler {
+	s := &server{reg: reg, authn: authn, keys: authn.Keys, users: authn.Users, oauth: authn.OAuth, log: log}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		rest, ok := strings.CutPrefix(r.URL.Path, "/w/")
 		if !ok {
@@ -347,18 +354,59 @@ func InWorkspace(reg *workspaces.Registry, log *slog.Logger, next http.Handler) 
 		}
 		slug, path, _ := strings.Cut(rest, "/")
 		path = "/" + path
-		e, err := reg.Lookup(r.Context(), slug)
-		if err != nil {
-			s.writeError(w, r, err)
+		strip := func(ctx context.Context) *http.Request {
+			r2 := r.Clone(ctx)
+			r2.URL.Path = path
+			if r.URL.RawPath != "" {
+				r2.URL.RawPath = strings.TrimPrefix(r.URL.RawPath, "/w/"+slug)
+			}
+			return r2
+		}
+		e, ok := reg.Live(slug)
+		if !ok && instancePath(path) {
+			next.ServeHTTP(w, strip(r.Context()))
 			return
 		}
-		r2 := r.Clone(workspaces.NewContext(r.Context(), e))
-		r2.URL.Path = path
-		if r.URL.RawPath != "" {
-			r2.URL.RawPath = strings.TrimPrefix(r.URL.RawPath, "/w/"+slug)
+		if !ok {
+			if err := s.signedIn(r); err != nil {
+				s.writeError(w, r, err)
+				return
+			}
+			var err error
+			if e, err = reg.Lookup(r.Context(), slug); err != nil {
+				s.writeError(w, r, err)
+				return
+			}
 		}
-		next.ServeHTTP(w, r2)
+		next.ServeHTTP(w, strip(workspaces.NewContext(r.Context(), e)))
 	})
+}
+
+// instancePath is whether path belongs to the instance rather than a
+// workspace: sign-in, OAuth and its metadata, health and this API's
+// description. They answer the same under any /w/<slug>.
+func instancePath(path string) bool {
+	for _, p := range []string{"/auth/", "/oauth/", "/.well-known/"} {
+		if strings.HasPrefix(path, p) {
+			return true
+		}
+	}
+	return path == "/healthz" || path == "/v1/openapi.yaml"
+}
+
+// signedIn is nil for a caller with a session, an API key, or an MCP
+// client's OAuth access token, and otherwise the 401 a route would give.
+func (s *server) signedIn(r *http.Request) error {
+	_, err := s.authn.Caller(r)
+	if err == nil {
+		return nil
+	}
+	if scheme, token, ok := strings.Cut(r.Header.Get("Authorization"), " "); ok && strings.EqualFold(scheme, "Bearer") {
+		if _, _, verr := s.oauth.VerifyAccessToken(r.Context(), strings.TrimSpace(token)); verr == nil {
+			return nil
+		}
+	}
+	return callerErr(err)
 }
 
 // allows refuses an authenticated caller the route is not for.

@@ -181,6 +181,23 @@ func (r *Registry) Lookup(ctx context.Context, slug string) (Entity, error) {
 	return e, err
 }
 
+// Live is the workspace with slug if this process serves it already,
+// without asking the database.
+func (r *Registry) Live(slug string) (Entity, bool) {
+	return r.live(func(w db.Workspace) bool { return w.Slug == slug })
+}
+
+func (r *Registry) live(match func(db.Workspace) bool) (Entity, bool) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	for _, l := range r.byID {
+		if match(l.Workspace) {
+			return l.Entity, true
+		}
+	}
+	return Entity{}, false
+}
+
 // ByID is the workspace with id, refreshing as Lookup does when it is not
 // live.
 func (r *Registry) ByID(ctx context.Context, id int64) (Entity, error) {
@@ -194,17 +211,7 @@ func (r *Registry) ByID(ctx context.Context, id int64) (Entity, error) {
 const missRefreshEvery = 3 * time.Second
 
 func (r *Registry) find(ctx context.Context, match func(db.Workspace) bool) (Entity, bool, error) {
-	inMemory := func() (Entity, bool) {
-		r.mu.RLock()
-		defer r.mu.RUnlock()
-		for _, l := range r.byID {
-			if match(l.Workspace) {
-				return l.Entity, true
-			}
-		}
-		return Entity{}, false
-	}
-	if e, ok := inMemory(); ok {
+	if e, ok := r.live(match); ok {
 		return e, true, nil
 	}
 	r.missMu.Lock()
@@ -217,7 +224,7 @@ func (r *Registry) find(ctx context.Context, match func(db.Workspace) bool) (Ent
 	if err := r.Refresh(ctx); err != nil {
 		return Entity{}, false, err
 	}
-	e, ok := inMemory()
+	e, ok := r.live(match)
 	if ok {
 		r.missMu.Lock()
 		r.missedAt = time.Time{}

@@ -3,6 +3,7 @@ package httpapi
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -43,11 +44,24 @@ func (s *server) resourceMetadata(slug string) *oauthex.ProtectedResourceMetadat
 	}
 }
 
+// workspaceResourceMetadata answers anyone, as MCP clients ask before
+// signing in, so it says which slugs this process serves: that is the
+// document's purpose. A slug it does not serve yet is looked for only for
+// a signed-in caller.
 func (s *server) workspaceResourceMetadata(w http.ResponseWriter, r *http.Request) {
-	e, err := s.reg.Lookup(r.Context(), r.PathValue("slug"))
-	if err != nil {
-		s.writeError(w, r, err)
-		return
+	slug := r.PathValue("slug")
+	e, ok := s.reg.Live(slug)
+	if !ok {
+		var err error
+		if s.signedIn(r) == nil {
+			e, err = s.reg.Lookup(r.Context(), slug)
+		} else {
+			err = fmt.Errorf("%w: no workspace %q", core.ErrNotFound, slug)
+		}
+		if err != nil {
+			s.writeError(w, r, err)
+			return
+		}
 	}
 	mcpauth.ProtectedResourceMetadataHandler(s.resourceMetadata(e.Workspace.Slug)).ServeHTTP(w, r)
 }

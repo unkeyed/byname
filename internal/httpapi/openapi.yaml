@@ -45,7 +45,8 @@ info:
     below also works under `/w/{workspace}`, which serves it for the
     workspace with that slug: `GET /w/kyring/v1/brands` lists Kyring's
     brands. A path without the prefix is the default workspace's, the first
-    one made. An unknown slug is 404. The team, sign-in, API keys, apps and
+    one made. An unknown slug is 404 to a signed-in caller, and 401 to anyone
+    else, as a real slug is. The team, sign-in, API keys, apps and
     the provider keys under `/v1/credentials` are shared, so they answer the
     same under any prefix. `/mcp` serves the default workspace and
     `/w/{workspace}/mcp` the one with that slug, and one MCP sign-in works

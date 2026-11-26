@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -15,6 +16,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/oauthex"
 
 	"github.com/unkeyed/byname/internal/config"
+	"github.com/unkeyed/byname/internal/db"
 )
 
 func twoWorkspaces(person client) {
@@ -146,4 +148,46 @@ func TestOneMCPSignInCoversEveryWorkspace(t *testing.T) {
 			t.Errorf("token for %s = %+v, want invalid_target", bad, e)
 		}
 	}
+}
+
+// Someone without credentials cannot tell a workspace's slug from a
+// made-up one, and cannot make the server look for either. Only a
+// signed-in caller, or an MCP client with a token, brings a workspace
+// another replica made live here.
+func TestAnonymousCallersCannotTellWhichSlugsExist(t *testing.T) {
+	anon, person := newLocalServer(t)
+	if _, err := db.CreateWorkspace(context.Background(), anon.db, "Kyring", "kyring"); err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range []string{"/v1/brands", "/v1/nothing-here", "/auth/options"} {
+		real, made := anon.do("GET", "/w/default"+path, nil), anon.do("GET", "/w/nope"+path, nil)
+		if real.code != made.code || !bytes.Equal(real.body, made.body) {
+			t.Errorf("GET %s under a real slug = %d %s, under a made-up one %d %s; want the same", path, real.code, real.body, made.code, made.body)
+		}
+	}
+	if r := anon.do("GET", "/w/kyring/v1/brands", nil); r.code != http.StatusUnauthorized {
+		t.Fatalf("an anonymous GET under a slug this replica has not seen = %d, want 401", r.code)
+	}
+	if r := anon.do("GET", "/.well-known/oauth-protected-resource/w/kyring/mcp", nil); r.code != http.StatusNotFound {
+		t.Fatalf("anonymous metadata for a slug this replica has not seen = %d, want 404 without looking", r.code)
+	}
+	if _, ok := anon.reg.Live("kyring"); ok {
+		t.Fatal("an anonymous request brought kyring live, want only signed-in callers to look for new workspaces")
+	}
+
+	_, token := connectTo(t, anon, person, "Cursor", anon.base+"/w/kyring/mcp")
+	cs, err := mcpSessionAt(anon, "/w/kyring/mcp", token.AccessToken)
+	if err != nil {
+		t.Fatalf("an MCP client with a token at a workspace another replica made: %v", err)
+	}
+	if got := toolBrands(t, cs); len(got) != 0 {
+		t.Errorf("Kyring's brands = %v, want none", got)
+	}
+	cs.Close()
+	anon.call("GET", "/.well-known/oauth-protected-resource/w/kyring/mcp", nil, http.StatusOK, nil)
+
+	if _, err := db.CreateWorkspace(context.Background(), anon.db, "Planetfall", "planetfall"); err != nil {
+		t.Fatal(err)
+	}
+	person.call("GET", "/w/planetfall/v1/brands", nil, http.StatusOK, nil)
 }
