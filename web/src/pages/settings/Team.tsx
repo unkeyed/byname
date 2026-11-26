@@ -1,9 +1,9 @@
 import { useState, type FormEvent } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useReauthMutation } from "./Reauth";
-import { useNavigate } from "react-router";
 import { api, inviteURL, roleInfo, roleLabel, roles, type Email, type Role } from "../../api";
 import { keys, useAuthOptions, useMe } from "../../queries";
+import { toLogin } from "../../routing";
 import { Avatar, Badge, Button, Card, ConfirmButton, CopyField, cx, ErrorNote, inputClass, Pending, RelativeTime, selectClass } from "../../ui";
 import { SettingsHeader, SettingsSubhead } from "./Settings";
 
@@ -50,7 +50,6 @@ export function Team() {
 function Members() {
   const me = useMe();
   const qc = useQueryClient();
-  const navigate = useNavigate();
   const users = useQuery({ queryKey: keys.users, queryFn: async () => (await api.users.list()) ?? [] });
   const setRole = useReauthMutation({
     mutationFn: ({ id, role }: { id: number; role: Role }) => api.users.setRole(id, role),
@@ -60,8 +59,7 @@ function Members() {
     mutationFn: api.users.remove,
     onSuccess: (_, id) => {
       if (me.data?.user_id === id) {
-        qc.clear();
-        void navigate("/login", { replace: true });
+        toLogin();
         return;
       }
       return qc.invalidateQueries({ queryKey: keys.users });

@@ -1,8 +1,9 @@
 import { useMemo, useState, type ReactNode } from "react";
-import { useQueryClient } from "@tanstack/react-query";
-import { Link, Navigate, NavLink, Outlet, useLocation, useNavigate } from "react-router";
+import { Link, Navigate, NavLink, Outlet, useLocation } from "react-router";
 import { api, ApiError } from "./api";
-import { useCan, useMe, useStatus } from "./queries";
+import { useCan, useMe } from "./queries";
+import { go, toLogin, useWorkspace } from "./routing";
+import { WorkspaceSwitcher } from "./Workspaces";
 import { NotSetUp } from "./pages/onboarding/Onboarding";
 import { Toaster } from "./components/Toaster";
 import { QuestionDrawer } from "./pages/results/QuestionDrawer";
@@ -11,7 +12,7 @@ import { Bell } from "./pages/notifications/Bell";
 import { useView } from "./view";
 import { nav } from "./nav";
 import { useTheme, type ThemeMode } from "./theme";
-import { Avatar, Button, buttonClass, Crumbs, cx, EmptyState, ErrorNote, Icon, LoadBoundary, Logo, NavMenu, PageHeader, scrollArea, Spinner, useModal, useWide, type IconName } from "./ui";
+import { Avatar, Button, buttonClass, Crumbs, cx, EmptyState, ErrorNote, Icon, LoadBoundary, NavMenu, PageHeader, scrollArea, Spinner, useModal, useWide, type IconName } from "./ui";
 
 const themes: { mode: ThemeMode; icon: IconName; label: string }[] = [
   { mode: "system", icon: "monitor", label: "System theme" },
@@ -27,27 +28,26 @@ export function Layout() {
   // Here, not in NavBody: NavBody moves between the rail and the phone menu
   // as the window resizes, and the theme must follow the system throughout.
   const theme = useTheme();
-  const status = useStatus();
+  const { slug, current, list } = useWorkspace();
   const canSetUp = useCan("config:write");
-  // Until setup is finished, people who can finish it go to onboarding and everyone else sees why the pages are empty. Settings stays open to all.
-  const notSetUp = status.data?.onboarded === false && !location.pathname.startsWith("/settings");
+  // Until an entity is set up, people who can finish it go to its onboarding and everyone else sees why the pages are empty. Settings stays open to all.
+  const notSetUp = current?.onboarded === false && !location.pathname.startsWith("/settings");
+  const missing = list.isSuccess && !current;
   const phoneBar = useMemo(() => (wide ? null : { open: () => setMenuOpen(true), end: <Bell /> }), [wide]);
 
-  if (me.isPending || (status.isPending && !me.isError)) {
+  // A 401 is already on its way to the login page.
+  if (me.isPending || (list.isPending && !me.isError) || (me.error instanceof ApiError && me.error.status === 401)) {
     return (
       <div className="grid h-full place-items-center">
         <Spinner />
       </div>
     );
   }
-  if (me.error instanceof ApiError && me.error.status === 401) {
-    return <Navigate to={`/login?next=${encodeURIComponent(location.pathname + location.search)}`} replace />;
-  }
-  if (me.isError) {
+  if (me.isError || list.isError) {
     return (
       <div className="mx-auto mt-24 max-w-sm space-y-3 px-4">
-        <ErrorNote error={me.error} />
-        <Button onClick={() => void me.refetch()}>Try again</Button>
+        <ErrorNote error={me.error ?? list.error} />
+        <Button onClick={() => void (me.isError ? me.refetch() : list.refetch())}>Try again</Button>
       </div>
     );
   }
@@ -66,8 +66,26 @@ export function Layout() {
           <MenuSheet open={menuOpen} onClose={() => setMenuOpen(false)} label={me.data.name} theme={theme} />
         )}
         <main className="flex min-w-0 flex-1 flex-col overflow-hidden bg-bg">
-          <LoadBoundary key={notSetUp ? "not-set-up" : pageKey(location.pathname)} className="flex min-h-0 flex-1 flex-col">
-            {notSetUp ? (
+          <LoadBoundary key={missing ? "missing" : notSetUp ? "not-set-up" : pageKey(location.pathname)} className="flex min-h-0 flex-1 flex-col">
+            {missing ? (
+              <>
+                <PageHeader title="Not found" />
+                <div className="mx-auto mt-16 max-w-md px-4">
+                  <EmptyState
+                    icon="building"
+                    title="No entity here"
+                    action={
+                      <Button onClick={() => go(`/w/${list.data.find((w) => w.default)?.slug ?? ""}`)}>
+                        <Icon name="left" className="size-3.5" />
+                        Open {list.data.find((w) => w.default)?.name}
+                      </Button>
+                    }
+                  >
+                    Nothing is tracked at /w/{slug}. Pick an entity from the switcher.
+                  </EmptyState>
+                </div>
+              </>
+            ) : notSetUp ? (
               <>
                 <PageHeader title="Byname" />
                 <NotSetUp />
@@ -113,8 +131,6 @@ function MenuSheet({ open, onClose, label, theme }: { open: boolean; onClose: ()
 type ThemeState = ReturnType<typeof useTheme>;
 
 function NavBody({ label, theme: [theme, setTheme], rail, onNavigate, close }: { label: string; theme: ThemeState; rail?: boolean; onNavigate?: () => void; close?: ReactNode }) {
-  const queryClient = useQueryClient();
-  const navigate = useNavigate();
   const filters = useView().filterSearch();
   const wideOnly = rail ? "hidden lg:block" : "block";
 
@@ -122,17 +138,15 @@ function NavBody({ label, theme: [theme, setTheme], rail, onNavigate, close }: {
     try {
       await api.auth.logout();
     } finally {
-      queryClient.clear();
-      void navigate("/login");
+      toLogin();
     }
   };
 
   return (
     <>
-      <div className={cx("flex h-12 shrink-0 items-center gap-2", rail ? "justify-center lg:justify-start lg:px-4" : "pr-2 pl-4")}>
-        <Logo />
-        <span className={cx(wideOnly, "text-sm font-semibold")}>Byname</span>
-        {close && <span className="ml-auto flex items-center gap-1">{close}</span>}
+      <div className={cx("flex h-12 shrink-0 items-center gap-2", rail ? "justify-center lg:justify-start lg:px-2.5" : "pr-2 pl-2.5")}>
+        <WorkspaceSwitcher rail={rail} onNavigate={onNavigate} />
+        {close && <span className="flex items-center gap-1">{close}</span>}
       </div>
       <nav aria-label="Main" className="flex flex-col gap-0.5 px-2 py-2">
         {nav.map((n) => (

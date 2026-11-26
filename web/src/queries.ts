@@ -5,6 +5,7 @@ import { api, type Grouping, type Line, type ResultsFilter, type Run, type Scope
 /** Query keys in one place, so a mutation can invalidate exactly what it touched. */
 export const keys = {
   me: ["me"] as const,
+  workspaces: ["workspaces"] as const,
   keys: ["keys"] as const,
   apps: ["apps"] as const,
   consent: (request: string) => ["consent", request] as const,
@@ -14,7 +15,6 @@ export const keys = {
   secondFactor: ["second-factor"] as const,
   invite: (token: string) => ["invite", token] as const,
   setup: (token: string) => ["setup", token] as const,
-  status: ["status"] as const,
   settings: ["settings"] as const,
   brands: ["brands"] as const,
   surfaces: ["surfaces"] as const,
@@ -138,11 +138,12 @@ export const useLogos = () =>
 
 export const useMe = () => useQuery({ queryKey: keys.me, queryFn: api.me.get, staleTime: Infinity });
 
+export const useWorkspaces = () => useQuery({ queryKey: keys.workspaces, queryFn: api.workspaces.list, staleTime: 60_000 });
+
 export const useAuthOptions = () => useQuery({ queryKey: keys.authOptions, queryFn: api.auth.options, staleTime: 60_000 });
 
 export const useAccount = () => useQuery({ queryKey: keys.account, queryFn: api.account.get });
 
-export const useStatus = () => useQuery({ queryKey: keys.status, queryFn: api.status, staleTime: 60_000 });
 export const useSettings = () => useQuery({ queryKey: keys.settings, queryFn: api.settings.get });
 export const useBrands = () => useQuery({ queryKey: keys.brands, queryFn: api.brands.list, staleTime: 60_000 });
 export const useSurfaces = () => useQuery({ queryKey: keys.surfaces, queryFn: api.surfaces.list, staleTime: 60_000 });
