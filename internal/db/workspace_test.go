@@ -90,29 +90,29 @@ func describe(t *testing.T, pool *pgxpool.Pool, schema string, only []string, no
 	}
 	rows, err := tx.Query(ctx, `
 		WITH rel AS (
-			SELECT c.oid, c.relname, c.relkind FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+			SELECT c.oid, c.relname, c.relkind FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
 			WHERE n.nspname = $1 AND c.relkind IN ('r', 'p', 'v', 'm', 'f') AND ($2::text[] IS NULL OR c.relname = ANY ($2))
 		)
 		SELECT format('relation %s kind %s', relname, relkind) FROM rel
 		UNION ALL
 		SELECT format('column %s.%s #%s %s notnull=%s default=%s identity=%s generated=%s collation=%s sequence=%s',
-			rel.relname, a.attname, row_number() OVER (PARTITION BY rel.oid ORDER BY a.attnum), pg_catalog.format_type(a.atttypid, a.atttypmod),
-			a.attnotnull, pg_catalog.pg_get_expr(d.adbin, d.adrelid), a.attidentity, a.attgenerated, a.attcollation::regcollation,
+			rel.relname, a.attname, row_number() OVER (PARTITION BY rel.oid ORDER BY a.attnum), format_type(a.atttypid, a.atttypmod),
+			a.attnotnull, pg_get_expr(d.adbin, d.adrelid), a.attidentity, a.attgenerated, a.attcollation::regcollation,
 			(SELECT format('%s,%s,%s,%s,%s,%s', s.seqtypid::regtype, s.seqstart, s.seqincrement, s.seqmin, s.seqmax, s.seqcycle)
-				FROM pg_catalog.pg_sequence s WHERE s.seqrelid = pg_catalog.pg_get_serial_sequence(format('%I.%I', $1, rel.relname), a.attname)::regclass))
-		FROM rel JOIN pg_catalog.pg_attribute a ON a.attrelid = rel.oid AND a.attnum > 0 AND NOT a.attisdropped
-		LEFT JOIN pg_catalog.pg_attrdef d ON d.adrelid = a.attrelid AND d.adnum = a.attnum
+				FROM pg_sequence s WHERE s.seqrelid = pg_get_serial_sequence(format('%I.%I', $1, rel.relname), a.attname)::regclass))
+		FROM rel JOIN pg_attribute a ON a.attrelid = rel.oid AND a.attnum > 0 AND NOT a.attisdropped
+		LEFT JOIN pg_attrdef d ON d.adrelid = a.attrelid AND d.adnum = a.attnum
 		UNION ALL
-		SELECT format('constraint %s.%s %s', rel.relname, c.conname, pg_catalog.pg_get_constraintdef(c.oid))
-		FROM rel JOIN pg_catalog.pg_constraint c ON c.conrelid = rel.oid
+		SELECT format('constraint %s.%s %s', rel.relname, c.conname, pg_get_constraintdef(c.oid))
+		FROM rel JOIN pg_constraint c ON c.conrelid = rel.oid
 		UNION ALL
-		SELECT format('index %s', pg_catalog.pg_get_indexdef(i.indexrelid))
-		FROM rel JOIN pg_catalog.pg_index i ON i.indrelid = rel.oid
+		SELECT format('index %s', pg_get_indexdef(i.indexrelid))
+		FROM rel JOIN pg_index i ON i.indrelid = rel.oid
 		UNION ALL
-		SELECT format('trigger %s', pg_catalog.pg_get_triggerdef(tg.oid))
-		FROM rel JOIN pg_catalog.pg_trigger tg ON tg.tgrelid = rel.oid AND NOT tg.tgisinternal
+		SELECT format('trigger %s', pg_get_triggerdef(tg.oid))
+		FROM rel JOIN pg_trigger tg ON tg.tgrelid = rel.oid AND NOT tg.tgisinternal
 		UNION ALL
-		SELECT format('view %s %s', rel.relname, pg_catalog.pg_get_viewdef(rel.oid))
+		SELECT format('view %s %s', rel.relname, pg_get_viewdef(rel.oid))
 		FROM rel WHERE rel.relkind IN ('v', 'm')`, schema, only)
 	if err != nil {
 		t.Fatal(err)
@@ -122,10 +122,10 @@ func describe(t *testing.T, pool *pgxpool.Pool, schema string, only []string, no
 		t.Fatal(err)
 	}
 
-	rows, err = tx.Query(ctx, `SELECT c.relname, coalesce(array_agg(a.attname::text) FILTER (WHERE pg_catalog.pg_get_expr(d.adbin, d.adrelid) = 'now()'), '{}')
-		FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
-		JOIN pg_catalog.pg_attribute a ON a.attrelid = c.oid AND a.attnum > 0 AND NOT a.attisdropped
-		LEFT JOIN pg_catalog.pg_attrdef d ON d.adrelid = a.attrelid AND d.adnum = a.attnum
+	rows, err = tx.Query(ctx, `SELECT c.relname, coalesce(array_agg(a.attname::text) FILTER (WHERE pg_get_expr(d.adbin, d.adrelid) = 'now()'), '{}')
+		FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+		JOIN pg_attribute a ON a.attrelid = c.oid AND a.attnum > 0 AND NOT a.attisdropped
+		LEFT JOIN pg_attrdef d ON d.adrelid = a.attrelid AND d.adnum = a.attnum
 		WHERE n.nspname = $1 AND c.relkind IN ('r', 'p') AND ($2::text[] IS NULL OR c.relname = ANY ($2))
 		GROUP BY c.relname`, schema, only)
 	if err != nil {
@@ -144,8 +144,8 @@ func describe(t *testing.T, pool *pgxpool.Pool, schema string, only []string, no
 	}
 	for _, tb := range tables {
 		var data string
-		if err := tx.QueryRow(ctx, `SELECT coalesce(pg_catalog.jsonb_agg(pg_catalog.to_jsonb(t) OPERATOR(pg_catalog.-) $1::text[]
-			ORDER BY pg_catalog.to_jsonb(t)::text), '[]')::text FROM `+pgx.Identifier{schema, tb.name}.Sanitize()+` t`, tb.now).Scan(&data); err != nil {
+		if err := tx.QueryRow(ctx, `SELECT coalesce(jsonb_agg(to_jsonb(t) - $1::text[]
+			ORDER BY to_jsonb(t)::text), '[]')::text FROM `+pgx.Identifier{schema, tb.name}.Sanitize()+` t`, tb.now).Scan(&data); err != nil {
 			t.Fatal(err)
 		}
 		lines = append(lines, fmt.Sprintf("rows %s %s", tb.name, data))
