@@ -12,6 +12,7 @@ import (
 	"golang.org/x/oauth2"
 
 	"github.com/unkeyed/byname/internal/core"
+	"github.com/unkeyed/byname/internal/db"
 )
 
 // What only Google has: sign-in through the instance's OAuth client, where
@@ -40,13 +41,15 @@ func ParseReturn(s string) (Return, error) {
 
 // oauthState is what the state parameter carries through Google's consent
 // page, sealed so nobody else can mint or read one: who started the
-// connection, the PKCE verifier, when it stops being accepted, and where
-// the browser goes back to.
+// connection, the PKCE verifier, when it stops being accepted, where the
+// browser goes back to, and the workspace the connection is for, since
+// every workspace shares the one callback.
 type oauthState struct {
-	UserID   int64  `json:"u"`
-	Verifier string `json:"v"`
-	Expires  int64  `json:"e"`
-	Return   Return `json:"r,omitempty"`
+	UserID    int64  `json:"u"`
+	Verifier  string `json:"v"`
+	Expires   int64  `json:"e"`
+	Return    Return `json:"r,omitempty"`
+	Workspace int64  `json:"w,omitempty"`
 }
 
 // stateSeal is Search Console's own label from before Bing joined, so a
@@ -57,11 +60,15 @@ const stateSeal = "gsc:oauth-state"
 // asking for read-only Search Console access with offline access, so
 // Google returns a refresh token. The browser comes back to
 // /auth/gsc/callback, which sends it on to back.
-func (s *Service) StartGoogleOAuth(a core.Actor, back Return) (string, error) {
+func (s *Service) StartGoogleOAuth(ctx context.Context, a core.Actor, back Return) (string, error) {
 	if !s.google.client.set() {
 		return "", fmt.Errorf("%w: Sign in with Google needs this instance's own Google OAuth client; set GSC_GOOGLE_CLIENT_ID and GSC_GOOGLE_CLIENT_SECRET, or connect a service account instead", core.ErrInvalid)
 	}
-	st := oauthState{UserID: a.UserID, Verifier: oauth2.GenerateVerifier(), Expires: s.now().Add(15 * time.Minute).Unix(), Return: back}
+	w, err := db.CurrentWorkspace(ctx, s.db)
+	if err != nil {
+		return "", err
+	}
+	st := oauthState{UserID: a.UserID, Verifier: oauth2.GenerateVerifier(), Expires: s.now().Add(15 * time.Minute).Unix(), Return: back, Workspace: w.ID}
 	raw, err := json.Marshal(st)
 	if err != nil {
 		return "", err
@@ -70,19 +77,28 @@ func (s *Service) StartGoogleOAuth(a core.Actor, back Return) (string, error) {
 	return s.google.oauthConfig().AuthCodeURL(state, oauth2.AccessTypeOffline, oauth2.ApprovalForce, oauth2.S256ChallengeOption(st.Verifier)), nil
 }
 
-// GoogleOAuthReturn is where the sign-in that state belongs to sends the
-// browser back: the Return sealed in it, or ReturnSettings when state is
-// not one this instance sealed.
-func (s *Service) GoogleOAuthReturn(state string) Return {
+// OAuthOrigin is where a Google sign-in started: the workspace it
+// connects, 0 for one started before there were workspaces, which is the
+// first's, and the page the browser goes back to.
+type OAuthOrigin struct {
+	Workspace int64
+	Return    Return
+}
+
+// GoogleOAuthOrigin reads where the sign-in that state belongs to started:
+// what is sealed in it, or ReturnSettings in the first workspace when state
+// is not one this instance sealed.
+func (s *Service) GoogleOAuthOrigin(state string) OAuthOrigin {
 	var st oauthState
 	raw, err := s.secrets.Open(state, stateSeal)
 	if err != nil || json.Unmarshal([]byte(raw), &st) != nil {
-		return ReturnSettings
+		return OAuthOrigin{Return: ReturnSettings}
 	}
-	if r, err := ParseReturn(string(st.Return)); err == nil {
-		return r
+	back, err := ParseReturn(string(st.Return))
+	if err != nil {
+		back = ReturnSettings
 	}
-	return ReturnSettings
+	return OAuthOrigin{Workspace: st.Workspace, Return: back}
 }
 
 // OAuthCallback is what Google sends the browser back with.

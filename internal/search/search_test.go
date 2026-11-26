@@ -145,7 +145,7 @@ func followConsent(t *testing.T, consent string) *url.URL {
 
 func TestOAuthStoresTheRefreshTokenSealed(t *testing.T) {
 	e := newEnv(t)
-	consent, err := e.svc.StartGoogleOAuth(admin, search.ReturnSettings)
+	consent, err := e.svc.StartGoogleOAuth(e.ctx, admin, search.ReturnSettings)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -224,14 +224,14 @@ func TestOAuthStoresTheRefreshTokenSealed(t *testing.T) {
 func TestOAuthRefusals(t *testing.T) {
 	e := newEnv(t)
 	e.fake.DenyConsent = true
-	back := followConsent(t, must(e.svc.StartGoogleOAuth(admin, search.ReturnSettings)))
+	back := followConsent(t, must(e.svc.StartGoogleOAuth(e.ctx, admin, search.ReturnSettings)))
 	err := e.svc.FinishGoogleOAuth(e.ctx, admin, search.OAuthCallback{State: back.Query().Get("state"), Error: back.Query().Get("error")})
 	if !errors.Is(err, core.ErrInvalid) || !strings.Contains(err.Error(), "access_denied") {
 		t.Fatalf("denied consent: %v", err)
 	}
 	e.fake.DenyConsent = false
 	e.fake.OmitRefreshToken = true
-	back = followConsent(t, must(e.svc.StartGoogleOAuth(admin, search.ReturnSettings)))
+	back = followConsent(t, must(e.svc.StartGoogleOAuth(e.ctx, admin, search.ReturnSettings)))
 	if err := e.svc.FinishGoogleOAuth(e.ctx, admin, search.OAuthCallback{State: back.Query().Get("state"), Code: back.Query().Get("code")}); err == nil {
 		t.Fatal("a sign-in without a refresh token was accepted")
 	}
@@ -243,7 +243,7 @@ func TestOAuthRefusals(t *testing.T) {
 		t.Fatalf("forged state: %v", err)
 	}
 	noClient := search.New(e.db, search.Options{Secrets: secretbox.ForTest(), Terms: e.cfg})
-	if _, err := noClient.StartGoogleOAuth(admin, search.ReturnSettings); !errors.Is(err, core.ErrInvalid) || !strings.Contains(err.Error(), "GSC_GOOGLE_CLIENT_ID") {
+	if _, err := noClient.StartGoogleOAuth(e.ctx, admin, search.ReturnSettings); !errors.Is(err, core.ErrInvalid) || !strings.Contains(err.Error(), "GSC_GOOGLE_CLIENT_ID") {
 		t.Fatalf("Sign in with Google without a client: %v", err)
 	}
 }
