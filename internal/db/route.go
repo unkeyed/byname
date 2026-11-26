@@ -15,11 +15,11 @@ type schemaKey struct{}
 // has, so switching costs a round trip and staying costs none.
 const pathKey = "byname.schema"
 
-// RouteSchemas makes every connection cfg's pools hand out reach the
-// tables of the workspace its query is bound to with In, and the first
-// workspace's when it is bound to none, as sign-in and every query before
-// workspaces are. Code that queries through these pools must never SET
-// search_path outside a transaction; SET LOCAL is fine.
+// RouteSchemas points each connection a pool built from cfg hands out at
+// the tables of the workspace its query is bound to with In, or at the
+// first workspace's when it is bound to none, as sign-in is. Code that
+// queries through such a pool must never SET search_path outside a
+// transaction; SET LOCAL is fine.
 func RouteSchemas(cfg *pgxpool.Config) {
 	cfg.PrepareConn = func(ctx context.Context, conn *pgx.Conn) (bool, error) {
 		want, _ := ctx.Value(schemaKey{}).(Schema)
