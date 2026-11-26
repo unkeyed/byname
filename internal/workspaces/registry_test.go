@@ -52,7 +52,7 @@ func TestAWorkspaceAnotherReplicaMadeGoesLiveOnce(t *testing.T) {
 	ctx := context.Background()
 	pool := testdb.New(t)
 	jobs := &jobCounter{running: map[int64]*atomic.Int32{}}
-	r := &Registry{pool: pool, opts: opts, log: opts.Log, byID: map[int64]*live{}, build: jobs.build}
+	r := &Registry{pool: pool, opts: opts, log: opts.Log, byID: map[int64]*live{}, build: jobs.build, now: time.Now}
 	if err := r.Refresh(ctx); err != nil {
 		t.Fatal(err)
 	}
@@ -207,5 +207,59 @@ func TestCreateThroughTheMigrationRole(t *testing.T) {
 	}
 	if _, err := e.Services.Config.Brands(ctx); err != nil {
 		t.Fatalf("the read/write role cannot read the new workspace's tables: %v", err)
+	}
+}
+
+// Anyone can ask for a made-up slug, so a lookup this process cannot
+// answer refreshes from the database at most once every missRefreshEvery.
+// A workspace another replica made in that window goes live once it ends.
+func TestUnknownSlugsRefreshAtMostOnceAWhile(t *testing.T) {
+	ctx := context.Background()
+	pool := testdb.New(t)
+	r, err := Open(ctx, pool, opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	clock := time.Now()
+	r.now = func() time.Time { return clock }
+	other, err := Open(ctx, pool, opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := r.Lookup(ctx, "nope"); !errors.Is(err, core.ErrNotFound) {
+		t.Fatalf("Lookup(nope) = %v, want not found", err)
+	}
+	kyring, err := other.Create(ctx, "Kyring", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	clock = clock.Add(missRefreshEvery - time.Millisecond)
+	if _, err := r.Lookup(ctx, "kyring"); !errors.Is(err, core.ErrNotFound) {
+		t.Fatalf("Lookup(kyring) within %v of a refresh that found nothing = %v, want not found without asking the database", missRefreshEvery, err)
+	}
+	if _, err := r.ByID(ctx, kyring.ID); !errors.Is(err, core.ErrNotFound) {
+		t.Fatalf("ByID(kyring) within %v of a refresh that found nothing = %v, want not found", missRefreshEvery, err)
+	}
+
+	clock = clock.Add(time.Millisecond)
+	if e, err := r.Lookup(ctx, "kyring"); err != nil || e.Workspace.ID != kyring.ID {
+		t.Fatalf("Lookup(kyring) once the wait is over = %+v %v", e.Workspace, err)
+	}
+	// That refresh found what it looked for, so it holds nothing back.
+	pf, err := other.Create(ctx, "Planetfall", "pf")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if e, err := r.ByID(ctx, pf.ID); err != nil || e.Workspace.Slug != "pf" {
+		t.Fatalf("ByID(pf) right after a refresh that found kyring = %+v %v", e.Workspace, err)
+	}
+
+	// Create answers from its own refresh, whatever a lookup just missed.
+	if _, err := r.Lookup(ctx, "still-nope"); !errors.Is(err, core.ErrNotFound) {
+		t.Fatal(err)
+	}
+	if made, err := r.Create(ctx, "Byname", ""); err != nil || made.Slug != "byname" {
+		t.Fatalf("Create right after a miss = %+v %v", made, err)
 	}
 }

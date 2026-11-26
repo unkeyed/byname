@@ -57,12 +57,18 @@ type Registry struct {
 	jobs    context.Context // Run's, nil until it runs
 	stopped bool
 	running sync.WaitGroup
+
+	now func() time.Time
+	// missedAt is when a lookup last refreshed for a workspace it did not
+	// know, unless that refresh found it.
+	missMu   sync.Mutex
+	missedAt time.Time
 }
 
 // Open builds every workspace in the database on pool, which must not be
 // bound to one. Nothing runs in the background until Run.
 func Open(ctx context.Context, pool db.Pool, o Options) (*Registry, error) {
-	r := &Registry{pool: pool, opts: o, log: o.Log, byID: map[int64]*live{}}
+	r := &Registry{pool: pool, opts: o, log: o.Log, byID: map[int64]*live{}, now: time.Now}
 	if r.log == nil {
 		r.log = slog.Default()
 	}
@@ -162,51 +168,66 @@ func (r *Registry) defaultID() int64 {
 }
 
 // Lookup is the workspace with slug. A slug it does not know yet sends it
-// to the database once, for a workspace made or renamed elsewhere.
+// to the database, for a workspace made or renamed elsewhere, at most
+// once every missRefreshEvery.
 func (r *Registry) Lookup(ctx context.Context, slug string) (Entity, error) {
-	find := func() (Entity, bool) {
+	e, ok, err := r.find(ctx, func(w db.Workspace) bool { return w.Slug == slug })
+	if err == nil && !ok {
+		err = fmt.Errorf("%w: no workspace %q; GET /v1/workspaces lists them", core.ErrNotFound, slug)
+	}
+	return e, err
+}
+
+// ByID is the workspace with id, refreshing as Lookup does when it is not
+// live.
+func (r *Registry) ByID(ctx context.Context, id int64) (Entity, error) {
+	e, ok, err := r.find(ctx, func(w db.Workspace) bool { return w.ID == id })
+	if err == nil && !ok {
+		err = fmt.Errorf("%w: no workspace %d", core.ErrNotFound, id)
+	}
+	return e, err
+}
+
+// missRefreshEvery bounds how often lookups of workspaces this process
+// does not know refresh from the database. Anyone can send a made-up slug,
+// and each refresh is a query.
+const missRefreshEvery = 3 * time.Second
+
+// find is the live workspace match picks. When none is, it refreshes and
+// looks again, unless a refresh within missRefreshEvery found nothing
+// either. A refresh that finds it does not count: that happens once per
+// workspace.
+func (r *Registry) find(ctx context.Context, match func(db.Workspace) bool) (Entity, bool, error) {
+	inMemory := func() (Entity, bool) {
 		r.mu.RLock()
 		defer r.mu.RUnlock()
 		for _, l := range r.byID {
-			if l.Workspace.Slug == slug {
+			if match(l.Workspace) {
 				return l.Entity, true
 			}
 		}
 		return Entity{}, false
 	}
-	if e, ok := find(); ok {
-		return e, nil
+	if e, ok := inMemory(); ok {
+		return e, true, nil
 	}
+	r.missMu.Lock()
+	if r.now().Before(r.missedAt.Add(missRefreshEvery)) {
+		r.missMu.Unlock()
+		return Entity{}, false, nil
+	}
+	r.missedAt = r.now()
+	r.missMu.Unlock()
 	if err := r.Refresh(ctx); err != nil {
-		return Entity{}, err
+		return Entity{}, false, err
 	}
-	if e, ok := find(); ok {
-		return e, nil
+	e, ok := inMemory()
+	if ok {
+		r.missMu.Lock()
+		r.missedAt = time.Time{}
+		r.missMu.Unlock()
 	}
-	return Entity{}, fmt.Errorf("%w: no workspace %q; GET /v1/workspaces lists them", core.ErrNotFound, slug)
-}
-
-// ByID is the workspace with id, refreshing once when it is not live.
-func (r *Registry) ByID(ctx context.Context, id int64) (Entity, error) {
-	find := func() (Entity, bool) {
-		r.mu.RLock()
-		defer r.mu.RUnlock()
-		l, ok := r.byID[id]
-		if !ok {
-			return Entity{}, false
-		}
-		return l.Entity, true
-	}
-	if e, ok := find(); ok {
-		return e, nil
-	}
-	if err := r.Refresh(ctx); err != nil {
-		return Entity{}, err
-	}
-	if e, ok := find(); ok {
-		return e, nil
-	}
-	return Entity{}, fmt.Errorf("%w: no workspace %d", core.ErrNotFound, id)
+	return e, ok, nil
 }
 
 // List is every workspace, the default first, with whether each has
@@ -280,6 +301,9 @@ func (r *Registry) Create(ctx context.Context, name, slug string) (Summary, erro
 		return Summary{}, fmt.Errorf("%w: another workspace has the slug %q; choose another", core.ErrConflict, slug)
 	}
 	if err != nil {
+		return Summary{}, err
+	}
+	if err := r.Refresh(ctx); err != nil {
 		return Summary{}, err
 	}
 	return r.summary(ctx, w.ID)
