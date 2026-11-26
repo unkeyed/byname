@@ -182,6 +182,7 @@ type AnswerSummary struct {
 	RunID         int64       `json:"run_id"`
 	Question      QuestionRef `json:"question"`
 	Pair          PairRef     `json:"pair"`
+	Sample        int         `json:"sample" jsonschema:"which of the times the check asked this question on this pair, from 1"`
 	Endpoint      string      `json:"endpoint"`
 	Fidelity      string      `json:"fidelity"`
 	ReportedModel string      `json:"reported_model"`
@@ -226,25 +227,25 @@ type Citation struct {
 }
 
 const answerSelect = `SELECT a.id, a.run_id, q.id, q.group_name, q.text, q.counts_in_scores, m.id, m.surface_key, coalesce(m.model, ''),
-		a.endpoint, a.fidelity, a.reported_model, a.status, a.error, a.attempts, a.mentioned, a.cited, a.position,
+		a.sample, a.endpoint, a.fidelity, a.reported_model, a.status, a.error, a.attempts, a.mentioned, a.cited, a.position,
 		a.cost_usd::float8, (SELECT count(*) FROM citation c WHERE c.answer_id = a.id), a.answered_at
 	FROM answer a JOIN question q ON q.id = a.question_id JOIN surface_model m ON m.id = a.surface_model_id`
 
 func scanAnswer(row pgx.CollectableRow) (AnswerSummary, error) {
 	var a AnswerSummary
 	err := row.Scan(&a.ID, &a.RunID, &a.Question.ID, &a.Question.Group, &a.Question.Text, &a.Question.CountsInScores, &a.Pair.ID, &a.Pair.Surface, &a.Pair.Model,
-		&a.Endpoint, &a.Fidelity, &a.ReportedModel, &a.Status, &a.Error, &a.Attempts, &a.Mentioned, &a.Cited, &a.Position,
+		&a.Sample, &a.Endpoint, &a.Fidelity, &a.ReportedModel, &a.Status, &a.Error, &a.Attempts, &a.Mentioned, &a.Cited, &a.Position,
 		&a.CostUSD, &a.CitationCount, &a.AnsweredAt)
 	a.Mentions, a.Others = []Mention{}, []OtherMention{}
 	return a, err
 }
 
-// RunAnswers lists a run's answers in question order.
+// RunAnswers lists a run's answers in question order, then pair, then sample.
 func (s *Service) RunAnswers(ctx context.Context, runID int64) ([]AnswerSummary, error) {
 	if _, err := s.Run(ctx, runID); err != nil {
 		return nil, err
 	}
-	rows, err := s.db.Query(ctx, answerSelect+` WHERE a.run_id = $1 ORDER BY q.ord, m.id`, runID)
+	rows, err := s.db.Query(ctx, answerSelect+` WHERE a.run_id = $1 ORDER BY q.ord, m.id, a.sample`, runID)
 	if err != nil {
 		return nil, err
 	}

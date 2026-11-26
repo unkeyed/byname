@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router";
 import type { Alert, EventKindName, EventPayloads, GoalMetric, Move, Run, SocialDigestPayload, SocialNetwork, Surface } from "../../api";
-import { andList, chance, pct } from "../../lines";
+import { andList, chance, changeLine, pct } from "../../lines";
 import { cx, Icon, RelativeTime, type IconName } from "../../ui";
 import { formatCount, NetworkMark, networks } from "../social/model";
 
@@ -38,8 +38,8 @@ const cards: Cards = {
     const rate = p.named / p.answered;
     if (band) lines.push(`${rate < band.low ? "Below" : rate > band.high ? "Above" : "Inside"} your normal range of ${rangeLabel(band)} over the ${band.checks} checks before.`);
     const move = p.move;
-    if (p.previous_run_id === 0) lines.push("Your first check. The next one shows which answers start or stop naming you.");
-    else lines.push(changeLine(p.gained, p.lost) + (move && p.gained + p.lost > 0 ? ` ${verdict(move)}` : ""));
+    if (p.previous_run_id === 0) lines.push("Your first check. The next one shows which AI apps start or stop naming you on each question.");
+    else lines.push(changeLine(p.previous_run_id, p.gained, p.lost, p.moved) + (move && p.gained + p.lost > 0 ? ` ${verdict(move)}` : ""));
     const fell = move?.real && move.after_rate != null && move.before_rate != null && move.after_rate < move.before_rate;
     return {
       icon: "sparkles",
@@ -272,14 +272,6 @@ function normalRange(runID: number, runs: Run[]): Band | null {
 }
 
 const rangeLabel = (b: Band) => (Math.round(b.low * 100) === Math.round(b.high * 100) ? pct(b.low) : `${Math.round(b.low * 100)} to ${pct(b.high)}`);
-
-function changeLine(gained: number, lost: number): string {
-  if (gained === 0 && lost === 0) return "No answer started or stopped naming you since the check before.";
-  const parts = [];
-  if (gained > 0) parts.push(`${gained} ${gained === 1 ? "answer" : "answers"} started naming you`);
-  if (lost > 0) parts.push(gained > 0 ? `${lost} stopped` : `${lost} ${lost === 1 ? "answer" : "answers"} stopped naming you`);
-  return `${parts.join(", ")}.`;
-}
 
 /** Whether the flips add up to a real move, as the notification's email says it. */
 function verdict(m: Move): string {

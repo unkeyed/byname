@@ -1,0 +1,9 @@
+[
+  { "previous_run_id": 2, "gained": 0, "lost": 0, "moved": 0, "text": "No AI app started or stopped naming you on a question since check #2." },
+  { "previous_run_id": 2, "gained": 1, "lost": 0, "moved": 0, "text": "Since check #2, 1 AI app started naming you on a question." },
+  { "previous_run_id": 2, "gained": 9, "lost": 4, "moved": 0, "text": "Since check #2, 9 AI apps started naming you on a question and 4 stopped naming you on one." },
+  { "previous_run_id": 7, "gained": 0, "lost": 1, "moved": 0, "text": "Since check #7, 1 AI app stopped naming you on a question." },
+  { "previous_run_id": 7, "gained": 0, "lost": 2, "moved": 1, "text": "Since check #7, 2 AI apps stopped naming you on a question and 1 moved your position on one." },
+  { "previous_run_id": 41, "gained": 3, "lost": 1, "moved": 2, "text": "Since check #41, 3 AI apps started naming you on a question, 1 stopped naming you on one and 2 moved your position on one." },
+  { "previous_run_id": 41, "gained": 0, "lost": 0, "moved": 1, "text": "Since check #41, 1 AI app moved your position on a question." }
+]

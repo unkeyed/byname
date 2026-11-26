@@ -23,7 +23,7 @@ A provider error that Treg passes through is different. It is stored as a failed
 
 ## Cost
 
-A check costs questions times each AI app and model you turned on times each endpoint's cost per call. The review step and `GET /v1/estimate` estimate it from each endpoint's past answers, or from the sample cost in [AI apps](surfaces.md#ai-apps-and-their-pinned-endpoints) before the first check. The per-check spend cap stops asking new questions once a check passes it. The monthly cap stops a check from starting, and social searches from calling Treg, once the month's checks and social searches have spent that much.
+A check costs questions times each AI app and model you turned on times each endpoint's cost per call, times how many times it asks each question. That is once unless you raise [Ask each question](../scores.md#ask-each-question-more-than-once). The review step and `GET /v1/estimate` estimate it from each endpoint's past answers, or from the sample cost in [AI apps](surfaces.md#ai-apps-and-their-pinned-endpoints) before the first check. The per-check spend cap stops asking new questions once a check passes it. The monthly cap stops a check from starting, and social searches from calling Treg, once the month's checks and social searches have spent that much.
 
 Treg bills you, not Byname. `GET /v1/costs`, or the `get_costs` tool, gathers every cost figure in one place, in US dollars:
 

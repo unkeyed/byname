@@ -201,6 +201,7 @@ export const numberFields = {
   concurrency: { label: "Concurrency", unit: "calls at once", min: 1, max: 32, int: true },
   retries: { label: "Retries", unit: "per call", min: 0, max: 3, int: true },
   timeout_s: { label: "Timeout", unit: "seconds per call", min: 30, max: 600, int: true },
+  samples: { label: "Ask each question", unit: "times in each AI app", min: 1, max: 5, int: true },
   raw_retention_days: { label: "Keep raw responses for", unit: "days", min: 1, int: true, optional: true },
   interim_days: { label: "First result", unit: "days after Google saw the change", min: 7, max: 90, int: true },
   verdict_days: { label: "Final result", unit: "days after Google saw the change", min: 14, max: 180, int: true },
@@ -254,6 +255,7 @@ export function editable(v: SettingsView): Settings {
     concurrency: v.concurrency,
     retries: v.retries,
     timeout_s: v.timeout_s,
+    samples: v.samples,
     raw_retention_days: v.raw_retention_days,
   };
 }

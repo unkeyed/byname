@@ -223,8 +223,9 @@ func TestFirstLinkToAMarkedPageRaisesPageLinkedOnce(t *testing.T) {
 	}
 }
 
-// Two answers that stopped naming you, of twelve, are within chance, so the
-// check says no real change and how often chance alone moves that much.
+// Two AI apps that stopped naming you on a question, of twelve compared,
+// are within chance, so the check says no real change and how often chance
+// alone moves that much.
 func TestCheckCompletedSaysAFewFlipsMayBeNoise(t *testing.T) {
 	ctx := context.Background()
 	db := testdb.New(t)
@@ -266,7 +267,7 @@ func TestCheckCompletedSaysAFewFlipsMayBeNoise(t *testing.T) {
 	want := []string{
 		fmt.Sprintf("AI apps named you in %d of %d answers (%.0f%%, likely between %.0f%% and %.0f%%).", p.Named, p.Answered,
 			100*float64(p.Named)/float64(p.Answered), 100*p.Band.Low, 100*p.Band.High),
-		"Since check #1, 2 answers stopped naming you.",
+		"Since check #1, 2 AI apps stopped naming you on a question.",
 		"Chance alone gives a move this large about 48 times in 100, so it may be noise.",
 	}
 	if a.Title != "Check #2: no real change" || strings.Join(a.Lines[:min(3, len(a.Lines))], "\n") != strings.Join(want, "\n") {
@@ -306,15 +307,15 @@ func TestCheckCompletedSaysARealMoveAndReadsOldAlerts(t *testing.T) {
 	old, got := list.Alerts[0], list.Alerts[1]
 	want := []string{
 		"AI apps named you in 31 of 96 answers (32%, likely between 24% and 42%).",
-		"Since check #41, 8 answers started naming you.",
+		"Since check #41, 8 AI apps started naming you on a question.",
 		"Chance alone gives a move this large about 1 time in 100.",
 		"“Best invoicing app?”: 3 AI apps started naming you.",
 	}
 	if got.Title != "Check #42: named you more often, 24% → 32%" || strings.Join(got.Lines, "\n") != strings.Join(want, "\n") {
 		t.Errorf("real move = %q\n%s", got.Title, strings.Join(got.Lines, "\n"))
 	}
-	want = []string{"AI apps named you in 23 of 96 answers.", "Since check #40, 3 answers started naming you and 1 answer stopped naming you."}
-	if old.Title != "Check #41: 3 answers started naming you, 1 answer stopped naming you" || strings.Join(old.Lines, "\n") != strings.Join(want, "\n") {
+	want = []string{"AI apps named you in 23 of 96 answers.", "Since check #40, 3 AI apps started naming you on a question and 1 stopped naming you on one."}
+	if old.Title != "Check #41: 3 AI apps started naming you on a question, 1 stopped naming you on one" || strings.Join(old.Lines, "\n") != strings.Join(want, "\n") {
 		t.Errorf("old alert = %q\n%s", old.Title, strings.Join(old.Lines, "\n"))
 	}
 }

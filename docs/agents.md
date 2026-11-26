@@ -157,7 +157,7 @@ Byname's MCP server has 90 tools. Every REST route an API key can call has one w
 | `start_brand_backfill` | `runs:write` | `POST /v1/other-brands/backfill` | Read every past answer never read for other brands, as one job in Check history, within the monthly spend cap. |
 | `status` | `results:read` | `GET /v1/status` | Byname's version and whether onboarding is done. |
 | `get_costs` | `results:read` | `GET /v1/costs` | What Byname costs, in US dollars: one answer in each AI app, one check, a month of checks and of social searches, and what this month has spent against the monthly cap. See [Treg](engines/treg.md#cost). |
-| `list_alerts` | `results:read` | `GET /v1/alerts` | Notifications newest first, the ones the app shows under the bell: finished checks with the answers that started or stopped naming you, refused or failed checks, spend caps reached, paused models, search goals reached and search clicks that moved on Google or Bing, change results, an expiring GitHub token and social digests, each with whether the person this connection acts for has read it, and the unread count. |
+| `list_alerts` | `results:read` | `GET /v1/alerts` | Notifications newest first, the ones the app shows under the bell: finished checks with the AI apps that started or stopped naming you on a question, refused or failed checks, spend caps reached, paused models, search goals reached and search clicks that moved on Google or Bing, change results, an expiring GitHub token and social digests, each with whether the person this connection acts for has read it, and the unread count. |
 | `mark_alerts_read` | `results:read` | `POST /v1/alerts/read` | Mark notifications read for the person this connection acts for, by id or all at once. |
 | `prompts` | `results:read` | `GET /v1/prompts` | Every question of the latest check in range: the AI apps and models that named you there, your best position, the competitors named instead, and per check whether some AI app named you, only linked to your site, did not, or every call failed. |
 | `cited_sources` | `results:read` | `GET /v1/sources` | The domains and pages answers linked to most over the checks in range, whether each page's HTML names you and which brands it names. |
@@ -179,7 +179,7 @@ Byname's MCP server has 90 tools. Every REST route an API key can call has one w
 | `save_onboarding_step` | `config:write` | `PUT /v1/onboarding/steps/{step}` | Mark an onboarding step saved, after saving its data with the matching tool, or to skip an optional step (competitors, search, social). |
 | `finish_onboarding` | `config:write` | `POST /v1/onboarding/finish` | Finish onboarding once the required steps are saved and every AI app and model turned on has passed test_pair. With no monthly cap set, it sets one of three times the monthly estimate, at least $5.00. |
 | `test_pair` | `config:write` | `POST /v1/pairs/{id}/test` | Make one short paid call for an AI app and model through its route. |
-| `estimate_cost` | `results:read` | `GET /v1/estimate` | The estimated cost of one check: calls (questions times each AI app and model turned on) and each one's cost per call from its endpoint's past answers or the sampled cost, with those that have neither counted as unknown. |
+| `estimate_cost` | `results:read` | `GET /v1/estimate` | The estimated cost of one check: calls (questions times each AI app and model turned on times how many times each question is asked) and each one's cost per call from its endpoint's past answers or the sampled cost, with those that have neither counted as unknown. |
 | `set_question_scoring` | `config:write` | `PUT /v1/questions/{id}/scoring` | Count a question's answers in scores, leave them out, or go back to the default, which leaves out a question whose text names your brand. See [How answers are scored](scores.md). |
 | `check_naming` | `results:read` | `POST /v1/naming-check` | Check text before saving it: which brands each question names, and whether each alias is a common English word. Stores nothing. |
 | `run_now` | `runs:write` | `POST /v1/runs` | Queue an AI check now without moving the schedule. |
@@ -214,7 +214,7 @@ Byname's MCP server has 90 tools. Every REST route an API key can call has one w
 | `delete_goal` | `config:write` | `DELETE /v1/goals/{id}` | Delete a search goal. |
 | `update_branded_terms` | `config:write` | `PUT /v1/settings/branded-terms` | Replace the branded search terms, which decide brand against non-brand on every search engine. |
 
-The server's instructions tell an agent where to start: `list_runs`, then `compare_runs` for the answers that started or stopped naming you, `gaps` for missed questions, `content_brief` for a prompt that tells an agent working on your site what to write to win one, and `question_history` for one question over time. They also say that each AI app and model is its own line with its own accuracy label, never averaged with another, and that naming you and linking to your site are counted apart.
+The server's instructions tell an agent where to start: `list_runs`, then `compare_runs` for the AI apps that started or stopped naming you on a question, `gaps` for missed questions, `content_brief` for a prompt that tells an agent working on your site what to write to win one, and `question_history` for one question over time. They also say that each AI app and model is its own line with its own accuracy label, never averaged with another, and that naming you and linking to your site are counted apart.
 
 When a tool fails, its error says what to do next. An invalid value names the field and what it accepts, and a missing record says how to find or create one. An internal failure shows only a `request_id`, and the server log has the cause under the same id.
 
@@ -236,7 +236,7 @@ curl "https://byname.example.com/v1/compare?before=41&after=42" \
 	-H "Authorization: Bearer byn_..."
 ```
 
-The answer counts the answers that started naming you (`gained`), stopped (`lost`), moved your position (`moved`) or stayed the same, with the net change, and lists each question and AI app that changed. The app shows the same comparison on **AI answers > What changed**.
+The answer counts the questions on each AI app and model that started naming you (`gained`), stopped (`lost`), moved your position (`moved`) or stayed the same, with the net change, and lists each question and AI app that changed. The app shows the same comparison on **AI answers > What changed**.
 
 Find the missed questions, where some AI app did not name you:
 

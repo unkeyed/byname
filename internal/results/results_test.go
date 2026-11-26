@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"math"
+	"strings"
 	"testing"
 	"time"
 
@@ -411,4 +412,226 @@ func TestScreens(t *testing.T) {
 			}
 		}
 	})
+}
+
+// A pair asked each question three times compares, charts and ranks by
+// what most of its answers say, and the move weighs every answer.
+func TestACellOfSeveralAnswersReadsAsMostOfThem(t *testing.T) {
+	e := setup(t)
+	set, err := e.config.CurrentQuestions(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	q1, q2 := set.Questions[0].ID, set.Questions[1].ID
+	claude, perplexity := e.pairID(t, engines.ClaudeCode), e.pairID(t, engines.PerplexityApp)
+	run := func() int64 {
+		var id int64
+		if err := e.db.QueryRow(ctx, `INSERT INTO run (question_set_id, trigger, status) VALUES ($1, 'run_now', 'completed') RETURNING id`, set.ID).Scan(&id); err != nil {
+			t.Fatal(err)
+		}
+		return id
+	}
+	// answers stores one cell's samples: n for named, N for named and
+	// linked to your site, - for neither, x for failed.
+	answers := func(run, question, pair int64, samples string) {
+		for i, a := range samples {
+			status, named, cited := "ok", a == 'n' || a == 'N', a == 'N'
+			if a == 'x' {
+				status = "failed"
+			}
+			var position *int
+			if named {
+				position = new(1)
+			}
+			if _, err := e.db.Exec(ctx, `INSERT INTO answer (run_id, question_id, surface_model_id, sample, endpoint, fidelity, status, attempts, mentioned, cited, position)
+				VALUES ($1, $2, $3, $4, 'endpoint', 'model_match', $5, 1, $6, $7, $8)`, run, question, pair, i+1, status, named, cited, position); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	before, after := run(), run()
+	answers(before, q1, claude, "---")
+	answers(after, q1, claude, "nnn")
+	answers(before, q1, perplexity, "---")
+	answers(after, q1, perplexity, "nn-")
+	answers(before, q2, claude, "n--")
+	answers(after, q2, claude, "nnn")
+	answers(before, q2, perplexity, "nnn")
+	answers(after, q2, perplexity, "nnx")
+
+	c, err := e.results.Compare(ctx, before, after)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.Counts[panel.Gained] != 3 || c.Counts[panel.Unchanged] != 1 || c.Net != 3 {
+		t.Fatalf("counts %v net %d, want 3 cells most answers newly named you and 1 unchanged", c.Counts, c.Net)
+	}
+	for _, p := range c.Pairs {
+		if p.QuestionID == q2 && p.PairID == perplexity {
+			if a := p.After; a == nil || a.Answered != 2 || a.Named != 2 || !a.Mentioned || len(a.AnswerIDs) != 3 || a.AnswerID != a.AnswerIDs[0] {
+				t.Errorf("after = %+v, want 2 of 2 answered named, all 3 answers listed", a)
+			}
+		}
+	}
+	// 10 of 11 answers name you against 4 of 12 a check before. Stratified
+	// by cell, statsmodels' StratifiedTable.test_null_odds(correction=True)
+	// gives 7.2, p 0.00729. Read as one answer per cell it would be 3
+	// flips, McNemar's p 0.248.
+	if m := c.Move; m.Cells != 4 || !m.Real || math.Abs(m.PValue-0.007290358091535665) > 1e-9 ||
+		math.Abs(*m.BeforeRate-4.0/12) > 1e-9 || math.Abs(*m.AfterRate-10.0/11) > 1e-9 {
+		t.Fatalf("move = %+v, want 4 cells, 4 of 12 named before and 10 of 11 after, p 0.0073, real", m)
+	}
+
+	h, err := e.results.QuestionHistory(ctx, q1, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, s := range h.Series {
+		if s.Pair.ID != perplexity {
+			continue
+		}
+		if len(s.Points) != 2 || s.Answered != 2 || s.Named != 1 {
+			t.Fatalf("perplexity history = %+v, want one point per check, named on the later one", s)
+		}
+		if p := s.Points[1]; p.Answered != 3 || p.Named != 2 || !p.Mentioned || len(p.AnswerIDs) != 3 || p.Summary != "Gained mention at #1" {
+			t.Errorf("later point = %+v, want 2 of 3 named, all 3 answers listed, gained", p)
+		}
+	}
+
+	table, err := e.results.RunQuestions(ctx, after, results.Scope{})
+	if err != nil || len(table.Columns) != 2 || len(table.Rows) != 2 {
+		t.Fatalf("questions table = %+v %v, want 2 questions on 2 pairs", table, err)
+	}
+	if r := table.Rows[0]; r.Answered != 2 || r.Named != 2 || r.Gained != 2 {
+		t.Errorf("first row = %+v, want both cells answered, mostly named and gained", r)
+	}
+	for i, sr := range table.Columns {
+		c := table.Rows[1].Cells[i]
+		if sr.Pair.ID == perplexity && (c.Answered != 2 || c.Named != 2 || !c.Mentioned || len(c.AnswerIDs) != 3 || c.AnswerID != c.AnswerIDs[0] || c.Status != engines.StatusOK) {
+			t.Errorf("perplexity cell = %+v, want 2 of 2 answered named, all 3 answers listed", c)
+		}
+	}
+
+	gaps, err := e.results.Gaps(ctx, before, results.Scope{})
+	if err != nil || len(gaps.Gaps) != 2 {
+		t.Fatalf("gaps = %+v %v, want both questions of the earlier check", gaps, err)
+	}
+	for _, g := range gaps.Gaps {
+		if g.Question.ID != q2 {
+			continue
+		}
+		if g.Engines != 2 || g.Named != 1 || len(g.Pairs) != 2 {
+			t.Fatalf("gap = %+v, want 2 pairs, most answers naming you on 1", g)
+		}
+		if p := g.Pairs[0]; p.Pair.ID != claude || p.Named || p.Answered != 3 || p.NamedAnswers != 1 || len(p.AnswerIDs) != 3 {
+			t.Errorf("claude = %+v, want 1 of 3 named, not most", p)
+		}
+	}
+
+	prompts, err := e.results.Prompts(ctx, nil, results.Scope{})
+	if err != nil || len(prompts.Rows) != 2 || len(prompts.Runs) != 2 {
+		t.Fatalf("prompts = %+v %v, want 2 questions over 2 checks", prompts, err)
+	}
+	if r := prompts.Rows[0]; r.Answered != 2 || len(r.NamedBy) != 2 {
+		t.Errorf("first prompt = %+v, want 2 pairs answered and both named you, each listed once", r)
+	}
+	if d := prompts.Rows[1].Dots[0]; d == nil || d.Answered != 2 || d.Named != 1 || d.State != results.DotNamed {
+		t.Errorf("second prompt's first dot = %+v, want 2 pairs answered, most answers named you on 1", d)
+	}
+
+	b, err := e.results.Brief(ctx, q1, after, results.Scope{})
+	if err != nil || len(b.Lines) != 2 || b.Answered != 6 || b.Named != 5 {
+		t.Fatalf("brief = %+v %v, want one line per pair, 5 of 6 answers named you", b, err)
+	}
+	for _, l := range b.Lines {
+		if l.Pair.ID == perplexity && (l.Answered != 3 || l.Named != 2 || l.State != results.LineNamed || len(l.AnswerIDs) != 3 || l.AnswerID != l.AnswerIDs[0]) {
+			t.Errorf("perplexity line = %+v, want 2 of 3 named, named most of the time, all 3 answers listed", l)
+		}
+	}
+	for _, want := range []string{
+		"got 6 answers, 3 from each app and model.",
+		"- Named Northwind in all 3 of its answers, at best as brand #1, and never linked to its site.",
+		"- Named Northwind in 2 of its 3 answers, at best as brand #1, and never linked to its site.",
+	} {
+		if !strings.Contains(b.Prompt, want) {
+			t.Errorf("brief prompt does not say %q:\n%s", want, b.Prompt)
+		}
+	}
+	if b, err := e.results.Brief(ctx, q2, after, results.Scope{}); err != nil || b.Answered != 5 || !strings.Contains(b.Prompt, "got 5 answers, several from some apps and models.") {
+		t.Errorf("brief on a cell with a failed answer = %+v %v, want 5 answers, several from some apps and models", b, err)
+	}
+
+	// A cell that named you in 1 of 2 answers, its third failed, is half
+	// and not most: it reads as not naming you and shows no position.
+	tied := run()
+	answers(tied, q1, claude, "N-x")
+	answers(tied, q2, perplexity, "NNx")
+	c, err = e.results.Compare(ctx, after, tied)
+	if err != nil || c.Counts[panel.Lost] != 1 {
+		t.Fatalf("compare = %+v %v, want the tied cell lost", c, err)
+	}
+	for _, p := range c.Pairs {
+		if p.PairID == claude && p.QuestionID == q1 && (p.After == nil || p.After.Mentioned || p.After.Position != nil || p.After.Named != 1 || p.After.Answered != 2) {
+			t.Errorf("tied after = %+v, want 1 of 2 named, not mentioned, no position", p.After)
+		}
+	}
+	table, err = e.results.RunQuestions(ctx, tied, results.Scope{})
+	if err != nil || len(table.Rows) != 2 || table.Rows[0].Question.ID != q1 {
+		t.Fatalf("tied table = %+v %v, want both questions, the tied one first", table, err)
+	}
+	for i, sr := range table.Columns {
+		if c := table.Rows[0].Cells[i]; sr.Pair.ID == claude && (c == nil || c.Mentioned || c.Position != nil || c.Named != 1) {
+			t.Errorf("tied cell = %+v, want 1 of 2 named and no position", c)
+		}
+	}
+	if r := table.Rows[0]; r.Named != 0 || r.BestPosition != nil {
+		t.Errorf("tied row = %+v, want no cell naming you and no best position", r)
+	}
+	h, err = e.results.QuestionHistory(ctx, q1, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, s := range h.Series {
+		if s.Pair.ID != claude {
+			continue
+		}
+		if p := s.Points[len(s.Points)-1]; p.RunID != tied || p.Mentioned || p.Position != nil || p.Named != 1 || p.Summary != "Lost mention (was #1)" {
+			t.Errorf("tied point = %+v, want 1 of 2 named, no position, lost", p)
+		}
+	}
+	gaps, err = e.results.Gaps(ctx, tied, results.Scope{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, g := range gaps.Gaps {
+		if g.Question.ID != q1 {
+			continue
+		}
+		if len(g.Pairs) != 1 || g.Pairs[0].Named || g.Pairs[0].Position != nil || g.Pairs[0].NamedAnswers != 1 {
+			t.Errorf("tied gap = %+v, want Claude 1 of 2 named, no position", g)
+		}
+	}
+	prompts, err = e.results.Prompts(ctx, nil, results.Scope{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, r := range prompts.Rows {
+		if r.Question.ID == q1 && (len(r.NamedBy) != 0 || r.BestPosition != nil) {
+			t.Errorf("tied prompt = %+v, want no pair naming you and no best position", r)
+		}
+	}
+	b, err = e.results.Brief(ctx, q1, tied, results.Scope{})
+	if err != nil || len(b.Lines) != 1 {
+		t.Fatalf("tied brief = %+v %v, want one line", b, err)
+	}
+	if l := b.Lines[0]; l.State != results.LineMissed || l.Position != nil || l.Named != 1 || l.Linked != 1 {
+		t.Errorf("tied line = %+v, want missed, as neither most answers named you nor most linked, and no position", l)
+	}
+	if want := "- Named Northwind in 1 of its 2 answers and linked to its site in 1.\n"; !strings.Contains(b.Prompt, want) || strings.Contains(b.Prompt, "most of its") {
+		t.Errorf("tied brief prompt does not say %q, or says most:\n%s", want, b.Prompt)
+	}
+	b, err = e.results.Brief(ctx, q2, tied, results.Scope{})
+	if want := "- Named Northwind in both its answers, at best as brand #1, and linked to its site in both.\n"; err != nil || !strings.Contains(b.Prompt, want) {
+		t.Errorf("brief on 2 of 2 does not say %q: %v\n%s", want, err, b.Prompt)
+	}
 }

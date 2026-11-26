@@ -117,7 +117,7 @@ function appCost(costs: Costs | undefined, key: SurfaceKey): string | null {
   if (answer == null || !costs) return null;
   const questions = costs.checks.check.questions;
   if (questions === 0) return `${money(answer * 1000, "about")} per 1,000 answers`;
-  const check = answer * questions;
+  const check = answer * questions * costs.checks.check.samples;
   const month = costs.checks.checks_per_month;
   return month > 0 ? `${money(check, "about")} a check, ${money(check * month, "about")} a month` : `${money(check, "about")} a check`;
 }

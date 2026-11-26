@@ -43,7 +43,7 @@ The ChatGPT app, the Gemini app and Google AI Mode are ticked by default in onbo
 
 ## Models
 
-Apps take no model. The app decides, and Byname stores the model name when the endpoint reports one. Developer tools and the stand-ins take one or more models each, picked from the endpoint's live model list. Each model you pick is charted on its own line with its own label, so the questions asked per check are questions times each AI app and model.
+Apps take no model. The app decides, and Byname stores the model name when the endpoint reports one. Developer tools and the stand-ins take one or more models each, picked from the endpoint's live model list. Each model you pick is charted on its own line with its own label, so the questions asked per check are questions times each AI app and model, times how many times each question is asked.
 
 How web search is turned on depends on the endpoint:
 

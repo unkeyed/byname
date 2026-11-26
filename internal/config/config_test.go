@@ -49,8 +49,8 @@ func TestSettingsScheduleTheNextCheck(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if before.NextCheckAt != nil || before.Brand.Name != "" || before.CheckEveryDays != 3 || before.Concurrency != 8 {
-		t.Fatalf("defaults = %+v; want nothing scheduled, no brand, every 3 days, concurrency 8", before)
+	if before.NextCheckAt != nil || before.Brand.Name != "" || before.CheckEveryDays != 3 || before.Concurrency != 8 || before.Samples != 1 {
+		t.Fatalf("defaults = %+v; want nothing scheduled, no brand, every 3 days, concurrency 8, each question asked once", before)
 	}
 
 	got, err := svc.PutSettings(ctx, settings())
@@ -81,6 +81,15 @@ func TestSettingsScheduleTheNextCheck(t *testing.T) {
 		t.Fatalf("after a cap change: %+v %v; the next check must not move", got, err)
 	}
 
+	thrice := cheaper
+	thrice.Samples = 3
+	if got, err = svc.PutSettings(ctx, thrice); err != nil || got.Samples != 3 {
+		t.Fatalf("samples = %d %v, want 3", got.Samples, err)
+	}
+	if got, err = svc.PutSettings(ctx, cheaper); err != nil || got.Samples != 1 {
+		t.Fatalf("samples left out = %d %v, want 1", got.Samples, err)
+	}
+
 	later := cheaper
 	later.CheckTime = "18:30"
 	got, err = svc.PutSettings(ctx, later)
@@ -102,6 +111,8 @@ func TestSettingsScheduleTheNextCheck(t *testing.T) {
 		"concurrency 33":   func(s *config.Settings) { s.Concurrency = 33 },
 		"timeout 10":       func(s *config.Settings) { s.TimeoutS = 10 },
 		"retries 4":        func(s *config.Settings) { s.Retries = 4 },
+		"samples 6":        func(s *config.Settings) { s.Samples = 6 },
+		"samples -1":       func(s *config.Settings) { s.Samples = -1 },
 		"zero cap":         func(s *config.Settings) { s.SpendCapRunUSD = 0 },
 		"check time":       func(s *config.Settings) { s.CheckTime = "6am" },
 	} {

@@ -93,7 +93,7 @@ func kind[P Payload](k Kind, title, description string, audience Audience) KindI
 // registry is every event kind, in the order Settings lists them. A kind
 // another package emits later is declared here with its payload type first.
 var registry = []KindInfo{
-	kind[CheckCompletedPayload](CheckCompleted, "Check completed", "Which answers started or stopped naming you since the previous check, whether that is more than chance, and the questions that changed most.", Readers),
+	kind[CheckCompletedPayload](CheckCompleted, "Check completed", "Which AI apps started or stopped naming you on a question since the previous check, whether that is more than chance, and the questions that changed most.", Readers),
 	kind[CheckRefusedPayload](CheckRefused, "Check refused", "Treg, the service that runs each question and bills you per answer, refused a request, for example for an empty balance, and the check stopped.", Readers),
 	kind[CheckFailedPayload](CheckFailed, "Check failed", "A check could not start, or could not save its answers.", Readers),
 	kind[SpendCapReachedPayload](SpendCapReached, "Spend cap reached", "A check stopped asking questions when it reached the spend cap for one check or for the month.", Readers),
@@ -133,12 +133,14 @@ type CheckCompletedPayload struct {
 	RunID int64 `json:"run_id"`
 	// PreviousRunID is 0 for the first check with answers.
 	PreviousRunID int64 `json:"previous_run_id"`
-	Gained        int   `json:"gained"`
-	Lost          int   `json:"lost"`
-	Moved         int   `json:"moved"`
-	Unchanged     int   `json:"unchanged"`
-	NotComparable int   `json:"not_comparable"`
-	Net           int   `json:"net"`
+	// Gained through NotComparable count questions on one AI app and model,
+	// the cells What changed compares, not answers.
+	Gained        int `json:"gained"`
+	Lost          int `json:"lost"`
+	Moved         int `json:"moved"`
+	Unchanged     int `json:"unchanged"`
+	NotComparable int `json:"not_comparable"`
+	Net           int `json:"net"`
 	// Named of Answered is the headline: question and pair answers that
 	// named you, of those that did not fail.
 	Named    int `json:"named"`
@@ -168,13 +170,12 @@ func (p CheckCompletedPayload) message() Message {
 		return m
 	}
 	m.Path, m.Action = fmt.Sprintf("/ai/what-changed?before=%d&after=%d", p.PreviousRunID, p.RunID), "See what changed"
-	changes := changeParts(p.Gained, p.Lost, p.Moved, "answer", "answers")
+	m.Lines = append(m.Lines, changeLine(p.PreviousRunID, p.Gained, p.Lost, p.Moved))
+	changes := changeParts(p.Gained, p.Lost, p.Moved, " on a question", " on one")
 	if len(changes) == 0 {
 		m.Title = fmt.Sprintf("Check #%d: no change", p.RunID)
-		m.Lines = append(m.Lines, fmt.Sprintf("No answer started or stopped naming you since check #%d.", p.PreviousRunID))
 		return m
 	}
-	m.Lines = append(m.Lines, fmt.Sprintf("Since check #%d, %s.", p.PreviousRunID, sentenceList(changes)))
 	switch mv := p.Move; {
 	case mv == nil:
 		m.Title = fmt.Sprintf("Check #%d: %s", p.RunID, strings.Join(changes[:min(2, len(changes))], ", "))
@@ -192,21 +193,41 @@ func (p CheckCompletedPayload) message() Message {
 		}
 	}
 	for _, q := range p.Top {
-		m.Lines = append(m.Lines, fmt.Sprintf("“%s”: %s.", q.Question, sentenceList(changeParts(q.Gained, q.Lost, q.Moved, "AI app", "AI apps"))))
+		m.Lines = append(m.Lines, fmt.Sprintf("“%s”: %s.", q.Question, sentenceList(changeParts(q.Gained, q.Lost, q.Moved, "", ""))))
 	}
 	return m
 }
 
-// changeParts says how many answers, or AI apps, started naming you,
-// stopped, or put you in a different position, leaving out the zeros.
-func changeParts(gained, lost, moved int, one, many string) []string {
+// changeLine says how many AI apps started naming you on a question,
+// stopped or moved your position since the previous check. Each count is
+// of questions on one AI app and model, the cells What changed compares,
+// so it is never a count of answers. web/src/lines.ts says the same, and
+// changes.json pins both.
+func changeLine(previous int64, gained, lost, moved int) string {
+	parts := changeParts(gained, lost, moved, " on a question", " on one")
+	if len(parts) == 0 {
+		return fmt.Sprintf("No AI app started or stopped naming you on a question since check #%d.", previous)
+	}
+	return fmt.Sprintf("Since check #%d, %s.", previous, sentenceList(parts))
+}
+
+// changeParts says how many AI apps started naming you, stopped, or put
+// you in a different position, leaving out the zeros. The first part names
+// the AI apps and ends with first; the rest give a bare count and end with
+// rest, as in "3 AI apps started naming you on a question" and "1 stopped
+// naming you on one".
+func changeParts(gained, lost, moved int, first, rest string) []string {
 	var parts []string
 	for _, c := range []struct {
 		n    int
 		what string
 	}{{gained, "started naming you"}, {lost, "stopped naming you"}, {moved, "moved your position"}} {
-		if c.n > 0 {
-			parts = append(parts, fmt.Sprintf("%s %s", count(c.n, one, many), c.what))
+		switch {
+		case c.n == 0:
+		case len(parts) == 0:
+			parts = append(parts, fmt.Sprintf("%s %s%s", count(c.n, "AI app", "AI apps"), c.what, first))
+		default:
+			parts = append(parts, fmt.Sprintf("%d %s%s", c.n, c.what, rest))
 		}
 	}
 	return parts

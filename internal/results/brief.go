@@ -30,17 +30,23 @@ const (
 // worse ranks states for a brief, the answers that left you out first.
 var worse = []LineState{LineMissed, LineLinked, LineNamed, LineNamedLinked}
 
-// BriefLine is one AI app and model's answer to the brief's question.
+// BriefLine is one AI app and model's answers to the brief's question. A
+// check that asks a question several times gives it several answers; the
+// line says what most of them did.
 type BriefLine struct {
 	Series
-	Title    string    `json:"title" jsonschema:"the AI app, and the model where it takes one, such as Claude Code · claude-sonnet-4-5"`
-	AnswerID int64     `json:"answer_id"`
-	State    LineState `json:"state" jsonschema:"named_linked, named, linked (linked to your site without naming you) or missed"`
-	Position *int      `json:"position"`
-	Brands   []string  `json:"brands" jsonschema:"your brand and competitors the answer named, in the order it named them"`
-	FanOut   []string  `json:"fan_out" jsonschema:"the web searches the AI app ran, empty where the endpoint does not expose them"`
-	Links    []string  `json:"links" jsonschema:"the pages the answer linked to, in answer order"`
-	Excerpt  string    `json:"-"`
+	Title     string    `json:"title" jsonschema:"the AI app, and the model where it takes one, such as Claude Code · claude-sonnet-4-5"`
+	AnswerID  int64     `json:"answer_id" jsonschema:"the first of answer_ids"`
+	AnswerIDs []int64   `json:"answer_ids" jsonschema:"every answer the line sums up, in the order asked"`
+	Answered  int       `json:"answered" jsonschema:"answers that did not fail"`
+	Named     int       `json:"named" jsonschema:"answers that named you"`
+	Linked    int       `json:"linked" jsonschema:"answers that linked to your site"`
+	State     LineState `json:"state" jsonschema:"what most answers did: named_linked, named, linked (linked to your site without naming you) or missed"`
+	Position  *int      `json:"position" jsonschema:"your best position among the answers that named you; null unless most did"`
+	Brands    []string  `json:"brands" jsonschema:"your brand and competitors most answers named, in the order first named"`
+	FanOut    []string  `json:"fan_out" jsonschema:"the web searches the AI app ran, in order, without repeats; empty where the endpoint does not expose them"`
+	Links     []string  `json:"links" jsonschema:"the pages the answers linked to, in order, without repeats"`
+	Excerpt   string    `json:"-"`
 }
 
 // BriefPage is one page the brief's answers linked to.
@@ -67,8 +73,11 @@ type Brief struct {
 	Instead  []string    `json:"instead" jsonschema:"competitors named by the answers that did not name you, most often first"`
 	FanOut   []string    `json:"fan_out" jsonschema:"every web search the AI apps ran, those of answers that left you out first"`
 	Lines    []BriefLine `json:"lines" jsonschema:"one per AI app and model that answered, those that left you out first"`
-	Pages    []BriefPage `json:"pages" jsonschema:"the 10 pages the most answers linked to"`
-	Prompt   string      `json:"prompt" jsonschema:"markdown to paste into an agent working on your site"`
+	// PerLine is how many answers each line sums up when they all sum up
+	// the same number, else 0.
+	PerLine int         `json:"-"`
+	Pages   []BriefPage `json:"pages" jsonschema:"the 10 pages the most answers linked to"`
+	Prompt  string      `json:"prompt" jsonschema:"markdown to paste into an agent working on your site"`
 }
 
 const (
@@ -209,33 +218,32 @@ func (s *Service) Brief(ctx context.Context, questionID, runID int64, sc Scope) 
 		return Brief{}, err
 	}
 
-	for _, a := range answers {
-		l := BriefLine{Series: a.series, Title: lineTitle(a.series.Pair), AnswerID: a.id, Position: nullPosition(a.scored.Position),
-			Brands: []string{}, FanOut: append([]string{}, a.fanOut...), Links: append([]string{}, links[a.id]...), Excerpt: opening(texts[a.id], excerptRunes)}
-		switch m, c := a.scored.Mentioned, a.scored.Cited; {
-		case m && c:
-			l.State = LineNamedLinked
-		case m:
-			l.State = LineNamed
-		case c:
-			l.State = LineLinked
-		default:
-			l.State = LineMissed
+	for i, cell := range cellsBy(answers, bySeries) {
+		t := panel.TallyOf(scoredOf(cell))
+		l := BriefLine{Series: cell[0].series, Title: lineTitle(cell[0].series.Pair), AnswerID: cell[0].id, AnswerIDs: idsOf(cell),
+			Answered: t.Answered, Named: t.Named, Linked: t.Cited, State: lineState(t.Mentioned(), t.MostlyCited()),
+			Position: nullPosition(t.Position), Brands: []string{}, FanOut: []string{}, Links: []string{}}
+		for _, a := range cell {
+			l.FanOut = appendNew(l.FanOut, a.fanOut...)
+			l.Links = appendNew(l.Links, links[a.id]...)
 		}
-		for _, m := range a.scored.Mentions {
+		// The excerpt is an answer that did what the line says, so a missed
+		// line never quotes the one answer that named you.
+		typical := max(0, slices.IndexFunc(cell, func(a scoredAnswer) bool { return lineState(a.scored.Mentioned, a.scored.Cited) == l.State }))
+		l.Excerpt = opening(texts[cell[typical].id], excerptRunes)
+		for _, m := range t.Mentions {
 			if b := byID[m.Brand]; b.Kind != panel.KindTechnology {
 				l.Brands = append(l.Brands, b.Name)
 			}
 		}
 		p.Lines = append(p.Lines, l)
-		if a.scored.Mentioned {
-			p.Named++
-		}
-		if a.scored.Cited {
-			p.Linked++
+		p.Answered, p.Named, p.Linked = p.Answered+t.Answered, p.Named+t.Named, p.Linked+t.Cited
+		if i == 0 {
+			p.PerLine = t.Answered
+		} else if p.PerLine != t.Answered {
+			p.PerLine = 0
 		}
 	}
-	p.Answered = len(p.Lines)
 	slices.SortFunc(p.Lines, func(a, b BriefLine) int {
 		return cmp.Or(cmp.Compare(slices.Index(worse, a.State), slices.Index(worse, b.State)), cmp.Compare(a.Pair.ID, b.Pair.ID))
 	})
@@ -270,6 +278,21 @@ func (s *Service) Brief(ctx context.Context, questionID, runID int64, sc Scope) 
 	}
 	p.Prompt = out.String()
 	return p.Brief, nil
+}
+
+// lineState is how answers treated you, from whether they named you and
+// linked to your site.
+func lineState(named, linked bool) LineState {
+	switch {
+	case named && linked:
+		return LineNamedLinked
+	case named:
+		return LineNamed
+	case linked:
+		return LineLinked
+	default:
+		return LineMissed
+	}
 }
 
 // lineTitle names a pair as the screens do: "Claude Code · claude-sonnet-4-5",

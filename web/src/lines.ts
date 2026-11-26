@@ -55,3 +55,23 @@ export const shortUrl = (u: string) => u.replace(/^https?:\/\/(www\.)?/, "").rep
 
 /** Names joined as a sentence does: "a", "a and b", "a, b and c". */
 export const andList = (xs: string[]) => (xs.length <= 1 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`);
+
+/**
+ * How many AI apps started naming you on a question, stopped or moved your
+ * position since the previous check, as the Check completed notification
+ * says it. Each count is of questions on one AI app and model, never of
+ * answers. internal/notify/changes.json pins it to the Go wording.
+ */
+export function changeLine(previousRunID: number, gained: number, lost: number, moved: number): string {
+  const parts: string[] = [];
+  for (const [n, what] of [
+    [gained, "started naming you"],
+    [lost, "stopped naming you"],
+    [moved, "moved your position"],
+  ] as const) {
+    if (n === 0) continue;
+    parts.push(parts.length === 0 ? `${n} ${n === 1 ? "AI app" : "AI apps"} ${what} on a question` : `${n} ${what} on one`);
+  }
+  if (parts.length === 0) return `No AI app started or stopped naming you on a question since check #${previousRunID}.`;
+  return `Since check #${previousRunID}, ${andList(parts)}.`;
+}
