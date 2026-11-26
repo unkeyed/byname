@@ -24,6 +24,7 @@ func listTools(t *testing.T) []*mcp.Tool {
 	ctx := context.Background()
 	srv := mcp.NewServer(&mcp.Implementation{Name: "byname", Version: "test"}, nil)
 	addTools(srv, app.Services{Instance: instance.New("test", nil, notOnboarded{}, nil, nil)})
+	addEntityTools(srv, nil)
 	st, ct := mcp.NewInMemoryTransports()
 	if _, err := srv.Connect(ctx, st, nil); err != nil {
 		t.Fatal(err)
@@ -104,7 +105,7 @@ func (ts tokens) VerifyAccessToken(_ context.Context, token string) (core.Actor,
 	return a, time.Now().Add(time.Hour), nil
 }
 
-func (tokens) ResourceMetadataURL() string {
+func (tokens) ResourceMetadataURL(string) string {
 	return "http://localhost/.well-known/oauth-protected-resource/mcp"
 }
 
@@ -133,7 +134,7 @@ func TestStatusNeedsResultsRead(t *testing.T) {
 	reader, writer := client, client
 	reader.Scopes = []core.Scope{core.ResultsRead}
 	writer.Scopes = []core.Scope{core.RunsWrite}
-	srv := httptest.NewServer(Handler(app.Services{Instance: instance.New("v1.2.3", nil, notOnboarded{}, nil, nil)}, tokens{"byn_at_reader": reader, "byn_at_writer": writer}, "test"))
+	srv := httptest.NewServer(Handler(app.Services{Instance: instance.New("v1.2.3", nil, notOnboarded{}, nil, nil)}, noEntities{}, tokens{"byn_at_reader": reader, "byn_at_writer": writer}, "test"))
 	t.Cleanup(srv.Close)
 
 	cs, err := connect(ctx, srv.URL, "byn_at_reader")
@@ -187,5 +188,9 @@ func TestStatusNeedsResultsRead(t *testing.T) {
 
 // notOnboarded answers only Onboarded; the status tool calls nothing else.
 type notOnboarded struct{ instance.Config }
+
+type noEntities struct{ Entities }
+
+func (noEntities) OnRemove(func(int64)) {}
 
 func (notOnboarded) Onboarded(context.Context) (bool, error) { return false, nil }

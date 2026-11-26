@@ -137,7 +137,7 @@ func TestACheckNotifiesEveryChannelWithTheComparison(t *testing.T) {
 
 	mail := r.smtp.Mail()
 	if len(mail) != 1 || mail[0].Subject != title || !strings.Contains(mail[0].Body, since) ||
-		!strings.Contains(mail[0].Body, fmt.Sprintf("%s/ai/what-changed?before=%d&after=%d", testOrigin, first, second)) {
+		!strings.Contains(mail[0].Body, fmt.Sprintf("%s/e/northwind/ai/what-changed?before=%d&after=%d", testOrigin, first, second)) {
 		t.Fatalf("SMTP got %+v, want one message titled %q", mail, title)
 	}
 	emails := c.resend.Emails()

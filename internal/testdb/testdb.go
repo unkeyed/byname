@@ -32,10 +32,19 @@ func New(t testing.TB) *pgxpool.Pool {
 	return Through(t, "")
 }
 
-// Through is New applying the migrations through the file named last
-// only, such as 016_social_filters.sql, so a test can seed a database the
-// way an earlier release left it and then upgrade it with db.Migrate.
+// Through is New applying the global migrations through the file named
+// last only, such as 016_social_filters.sql, so a test can seed a database
+// the way an earlier release left it and then upgrade it with db.Migrate.
+// An empty last applies every migration, as New does.
 func Through(t testing.TB, last string) *pgxpool.Pool {
+	t.Helper()
+	return ThroughIn(t, last, "")
+}
+
+// ThroughIn is Through on an install whose tables live in schema rather
+// than public, as when DATABASE_URL sets search_path or the role has a
+// schema of its own. An empty schema is public.
+func ThroughIn(t testing.TB, last, schema string) *pgxpool.Pool {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -58,15 +67,44 @@ func Through(t testing.TB, last string) *pgxpool.Pool {
 		t.Fatalf("testdb: %v", err)
 	}
 	cfg.ConnConfig.Database = name
+	if schema != "" {
+		conn, err := pgx.ConnectConfig(ctx, cfg.ConnConfig)
+		if err != nil {
+			t.Fatalf("testdb: connect %s: %v", name, err)
+		}
+		_, err = conn.Exec(ctx, "CREATE SCHEMA "+pgx.Identifier{schema}.Sanitize())
+		conn.Close(ctx)
+		if err != nil {
+			t.Fatalf("testdb: create schema %s: %v", schema, err)
+		}
+		cfg.ConnConfig.RuntimeParams["search_path"] = schema
+	}
+	db.RouteSchemas(cfg)
 	pool, err := pgxpool.NewWithConfig(ctx, cfg)
 	if err != nil {
 		t.Fatalf("testdb: connect %s: %v", name, err)
 	}
 	t.Cleanup(pool.Close)
-	if err := db.MigrateThrough(ctx, pool, last); err != nil {
+	migrate := db.Migrate
+	if last != "" {
+		migrate = func(ctx context.Context, pool *pgxpool.Pool) error { return db.MigrateThrough(ctx, pool, last) }
+	}
+	if err := migrate(ctx, pool); err != nil {
 		t.Fatalf("testdb: migrate %s: %v", name, err)
 	}
 	return pool
+}
+
+// Entity adds an entity to pool's database and returns pool bound to
+// it, for tests that check one entity never sees another's rows.
+func Entity(t testing.TB, pool *pgxpool.Pool) db.Pool {
+	t.Helper()
+	slug := "entity-" + randomHex(4)
+	w, err := db.CreateEntity(context.Background(), pool, slug, slug)
+	if err != nil {
+		t.Fatalf("testdb: create entity: %v", err)
+	}
+	return db.In(pool, w.Schema)
 }
 
 func drop(t testing.TB, url, name string) {

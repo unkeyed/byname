@@ -9,11 +9,13 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+
+	"github.com/unkeyed/byname/internal/db"
 )
 
 // syncLock keeps two replicas from syncing at once. Every provider shares
 // it, so one recovery step covers every provider's cut-off syncs.
-const syncLock = `hashtext('byname.search.sync')`
+var syncLock = db.EntityLock("byname.search.sync")
 
 // SyncIfDue syncs each connected site once a day, and at once after a site
 // is picked or the credential replaced, provider by provider in registry
@@ -58,33 +60,27 @@ func (s *Service) Sync(ctx context.Context, p Provider) error {
 }
 
 func (s *Service) locked(ctx context.Context, f func() error) error {
-	return s.withLock(ctx, `SELECT pg_try_advisory_lock(`+syncLock+`)`, f)
+	unlock, ok, err := db.TryLock(ctx, s.db, syncLock)
+	if err != nil || !ok {
+		return err
+	}
+	defer unlock()
+	return s.underLock(ctx, f)
 }
 
 func (s *Service) lockedWait(ctx context.Context, f func() error) error {
-	return s.withLock(ctx, `SELECT pg_advisory_lock(`+syncLock+`) IS NOT NULL`, f)
-}
-
-// withLock runs f holding the session advisory lock on a dedicated
-// connection, so the lock dies with the process.
-func (s *Service) withLock(ctx context.Context, take string, f func() error) error {
-	conn, err := s.db.Acquire(ctx)
+	unlock, err := db.Lock(ctx, s.db, syncLock)
 	if err != nil {
 		return err
 	}
-	defer conn.Release()
-	var locked bool
-	if err := conn.QueryRow(ctx, take).Scan(&locked); err != nil || !locked {
-		return err
-	}
-	defer func() {
-		if _, err := conn.Exec(context.WithoutCancel(ctx), `SELECT pg_advisory_unlock(`+syncLock+`)`); err != nil {
-			_ = conn.Conn().Close(context.WithoutCancel(ctx))
-		}
-	}()
+	defer unlock()
+	return s.underLock(ctx, f)
+}
+
+func (s *Service) underLock(ctx context.Context, f func() error) error {
 	// With the lock held no sync runs anywhere, so one still marked running
 	// was cut off by a crash or a redeploy.
-	if _, err := conn.Exec(ctx, `UPDATE job_run SET status = 'failed', finished_at = $1,
+	if _, err := s.db.Exec(ctx, `UPDATE job_run SET status = 'failed', finished_at = $1,
 			error = 'the process stopped before this sync finished; the next sync carries on from the last stored day'
 		WHERE job = 'search_sync' AND status = 'running'`, s.now()); err != nil {
 		return err

@@ -35,16 +35,39 @@ info:
     with OAuth 2.1 as a person, who approves it and its scopes in the
     browser. The OAuth endpoints are described by
     `/.well-known/oauth-authorization-server` and
-    `/.well-known/oauth-protected-resource/mcp`, not here.
+    `/.well-known/oauth-protected-resource/mcp`, or
+    `/.well-known/oauth-protected-resource/e/{entity}/mcp` for an
+    entity's MCP server, not here.
+
+    Entities. Each brand this instance tracks is an entity with its own
+    settings, brands, questions, AI apps, schedule, checks, results, search
+    engines, site changes, social mentions and notifications. Every path
+    below also works under `/e/{entity}`, which serves it for the
+    entity with that slug: `GET /e/kyring/v1/brands` lists Kyring's
+    brands. A path without the prefix is the default entity's, the first
+    one made. An unknown slug is 404 to a signed-in caller, and 401 to anyone
+    else, as a real slug is. The team, sign-in, API keys, apps and
+    the provider keys under `/v1/credentials` are shared, so they answer the
+    same under any prefix. `/mcp` serves the default entity and
+    `/e/{entity}/mcp` the one with that slug, and one MCP sign-in works
+    at each.
   license:
     name: MIT
     identifier: MIT
 servers:
   - url: /
-    description: The Byname instance serving this document.
+    description: The Byname instance serving this document, in its default entity.
+  - url: /e/{entity}
+    description: The same instance, in the entity with this slug. GET /v1/entities lists the slugs.
+    variables:
+      entity:
+        default: default
+        description: An entity's slug.
 tags:
   - name: system
     description: Health, status and this document.
+  - name: entities
+    description: The brands this instance tracks. results:read lists them; a signed-in admin adds and renames them.
   - name: config
     description: Your brand, competitors, questions, surfaces and schedule. results:read reads them and config:write changes them.
   - name: runs
@@ -139,6 +162,147 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /v1/entities:
+    get:
+      tags: [entities]
+      operationId: listEntities
+      summary: Every entity, the default first, with whether each has finished onboarding. The MCP list_entities tool returns the same.
+      security:
+        - apiKey: [results:read]
+        - session: [results:read]
+      responses:
+        "200":
+          description: The entities.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Entity"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+    post:
+      tags: [entities]
+      operationId: createEntity
+      summary: >-
+        Add an entity for another brand, with onboarding not started. Its
+        paths are /e/{slug}/v1/... Adding it again with the same name and
+        slug returns the same entity.
+      security:
+        - session: [admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              additionalProperties: false
+              properties:
+                name:
+                  type: string
+                  minLength: 1
+                  maxLength: 80
+                slug:
+                  type: string
+                  maxLength: 40
+                  pattern: "^[a-z0-9]+(-[a-z0-9]+)*$"
+                  description: Its name in paths. Left out, it comes from the name, such as planet-fall for Planet Fall. It never changes. default is the first entity's alone, and is refused with 400, as is a name with no letters or digits to make a slug from.
+      responses:
+        "201":
+          description: The entity.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Entity"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /v1/entities/{slug}:
+    patch:
+      tags: [entities]
+      operationId: renameEntity
+      summary: Rename an entity. Its slug stays, so its paths keep working.
+      security:
+        - session: [admin]
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              additionalProperties: false
+              properties:
+                name:
+                  type: string
+                  minLength: 1
+                  maxLength: 80
+      responses:
+        "200":
+          description: The entity.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Entity"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+    delete:
+      tags: [entities]
+      operationId: deleteEntity
+      summary: >-
+        Delete an entity and everything in it: its settings, brands,
+        questions, checks, results and connections. It stops at once, its
+        slug is free to use again, and /e/{slug} answers 404. Its tables are
+        dropped about five minutes later, once every replica has stopped
+        serving it. This cannot be undone. The first entity, which paths
+        without /e/{slug} mean, cannot be deleted and answers 409.
+      security:
+        - session: [admin]
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
         "503":
           $ref: "#/components/responses/Unavailable"
   /v1/settings:
@@ -3410,7 +3574,7 @@ paths:
       tags: [settings]
       operationId: testCredential
       summary: Test a stored key with one free call, where the provider has one, and record how it went.
-      description: A failed test is a result, not an error, and last_test_status says why. Providers with no free call record that instead. 400 when no key of that kind is set.
+      description: A failed test is a result, not an error, and last_test_status says why. Providers with no free call record that instead. The gateway key is tested at every base URL any entity's surfaces use; with several, last_test_status is ok only when all answered, and otherwise says how each went and which entities use it. 400 when no key of that kind is set.
       security:
         - session: [admin]
       responses:
@@ -5001,6 +5165,24 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Scope"
+    Entity:
+      type: object
+      required: [id, slug, name, onboarded, default]
+      properties:
+        id:
+          type: integer
+          format: int64
+        slug:
+          type: string
+          description: Its name in paths, /e/{slug}/v1/...
+        name:
+          type: string
+        onboarded:
+          type: boolean
+          description: Whether its onboarding is finished. Until then nothing runs on schedule.
+        default:
+          type: boolean
+          description: Whether paths without /e/{slug} are this entity's. Only the first entity made is.
     Status:
       type: object
       required: [version, onboarded]
@@ -5853,9 +6035,20 @@ components:
           description: Null while no key is set.
         used_by:
           type: array
+          description: Each entity with AI apps whose route calls with this key, and those apps. Every entity shares the key, so this lists them all.
           items:
-            $ref: "#/components/schemas/SurfaceKey"
-          description: Surfaces whose route calls with this key.
+            type: object
+            required: [entity, slug, surfaces]
+            properties:
+              entity:
+                type: string
+                description: The entity's name.
+              slug:
+                type: string
+              surfaces:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SurfaceKey"
     Onboarding:
       type: object
       required: [steps, finished_at, missing, first_scheduled_check]

@@ -38,7 +38,7 @@ const (
 // robotsToken is the product token robots.txt groups name Byname by.
 const robotsToken = "byname"
 
-const lock = `hashtext('byname.sources.fetch')`
+var lock = db.EntityLock("byname.sources.fetch")
 
 type Options struct {
 	// AllowPrivate lets fetches reach private and loopback addresses. Only
@@ -114,20 +114,11 @@ func New(db db.Pool, cfg *config.Service, o Options) *Service {
 // when another process is fetching. Running it again straight after finds
 // nothing due, so it is safe to call on every scheduler tick.
 func (s *Service) Run(ctx context.Context) (int, error) {
-	conn, err := s.db.Acquire(ctx)
-	if err != nil {
+	unlock, ok, err := db.TryLock(ctx, s.db, lock)
+	if err != nil || !ok {
 		return 0, err
 	}
-	defer conn.Release()
-	var locked bool
-	if err := conn.QueryRow(ctx, `SELECT pg_try_advisory_lock(`+lock+`)`).Scan(&locked); err != nil || !locked {
-		return 0, err
-	}
-	defer func() {
-		if _, err := conn.Exec(context.WithoutCancel(ctx), `SELECT pg_advisory_unlock(`+lock+`)`); err != nil {
-			_ = conn.Conn().Close(context.WithoutCancel(ctx))
-		}
-	}()
+	defer unlock()
 
 	// Holding the lock, no other round is running: a round still marked
 	// running was cut short by a crash or a shutdown.

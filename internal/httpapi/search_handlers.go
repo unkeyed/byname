@@ -179,7 +179,7 @@ func (s *server) googleOAuthStart(w http.ResponseWriter, r *http.Request, a core
 		return err
 	}
 	return s.recentOnly(r, func() error {
-		u, err := s.svc.Search.StartGoogleOAuth(a, back)
+		u, err := s.svc.Search.StartGoogleOAuth(r.Context(), a, back)
 		return respond(w, http.StatusOK, map[string]string{"url": u}, err)
 	})
 }
@@ -192,22 +192,34 @@ var googleBack = map[search.Return]string{
 
 // googleOAuthCallback is where Google sends the browser back. Its path
 // stays /auth/gsc/callback, the redirect URI registered on each instance's
-// Google OAuth client. It is public so that it can always redirect to the
-// page the sign-in started from (Settings > Search engines or
-// onboarding), with ?error= when connecting failed, including when the
-// admin's session ended during Google's consent page; it checks for that
-// session itself.
+// Google OAuth client, for every entity: the state names the entity
+// the sign-in started in, and the connection lands there. It is public so
+// that it can always redirect to the page the sign-in started from
+// (Settings > Search engines or onboarding, in that entity), with
+// ?error= when connecting failed, including when the admin's session ended
+// during Google's consent page; it checks for that session itself.
 func (s *server) googleOAuthCallback(w http.ResponseWriter, r *http.Request, _ core.Actor) error {
 	q := r.URL.Query()
-	back := googleBack[s.svc.Search.GoogleOAuthReturn(q.Get("state"))]
-	a, err := s.authn.Caller(r)
+	origin := s.svc.Search.GoogleOAuthOrigin(q.Get("state"))
+	e := s.reg.Default()
+	var err error
+	if origin.Entity != 0 {
+		if found, ferr := s.reg.ByID(r.Context(), origin.Entity); ferr != nil {
+			err = ferr
+		} else {
+			e = found
+		}
+	}
+	back := "/e/" + e.Entity.Slug + googleBack[origin.Return]
+	a, aerr := s.authn.Caller(r)
 	switch {
-	case err != nil && statusOf(callerErr(err)) >= 500:
-		err = callerErr(err)
-	case err != nil || admin.allows(a) != nil:
+	case err != nil:
+	case aerr != nil && statusOf(callerErr(aerr)) >= 500:
+		err = callerErr(aerr)
+	case aerr != nil || admin.allows(a) != nil:
 		err = fmt.Errorf("%w: sign in to Byname as an admin, then connect Google again", core.ErrForbidden)
 	default:
-		err = s.svc.Search.FinishGoogleOAuth(r.Context(), a, search.OAuthCallback{State: q.Get("state"), Code: q.Get("code"), Error: q.Get("error")})
+		err = e.Services.Search.FinishGoogleOAuth(r.Context(), a, search.OAuthCallback{State: q.Get("state"), Code: q.Get("code"), Error: q.Get("error")})
 	}
 	if err == nil {
 		http.Redirect(w, r, back+"?connected=google", http.StatusSeeOther)

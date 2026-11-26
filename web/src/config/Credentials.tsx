@@ -147,7 +147,11 @@ function CredentialRow({ c }: { c: Credential }) {
           </div>
           <p className="mt-0.5 text-xs text-muted [overflow-wrap:anywhere]">{c.hint}</p>
           <p className="mt-0.5 text-xs text-muted">
-            {c.used_by.length ? <>Used by {c.used_by.map((k) => titles.get(k) ?? k).join(", ")}</> : "No AI app uses it"}
+            {c.used_by.length ? (
+              <>Used by {c.used_by.map((u) => `${u.surfaces.map((k) => titles.get(k) ?? k).join(", ")} in ${u.entity}`).join("; ")}</>
+            ) : (
+              "No AI app uses it"
+            )}
             {c.updated_at && (
               <>
                 {" "}

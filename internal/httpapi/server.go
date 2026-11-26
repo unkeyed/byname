@@ -5,6 +5,7 @@
 package httpapi
 
 import (
+	"context"
 	"crypto/rand"
 	_ "embed"
 	"encoding/hex"
@@ -21,6 +22,7 @@ import (
 	"github.com/unkeyed/byname/internal/app"
 	"github.com/unkeyed/byname/internal/auth"
 	"github.com/unkeyed/byname/internal/core"
+	"github.com/unkeyed/byname/internal/entities"
 )
 
 // access is who may call a route: one of the classes below, or the one
@@ -56,6 +58,11 @@ var routes = []route{
 	{"GET /v1/openapi.yaml", public, (*server).openapi},
 
 	{"GET /v1/status", needs(core.ResultsRead), (*server).status},
+
+	{"GET /v1/entities", needs(core.ResultsRead), (*server).listEntities},
+	{"POST /v1/entities", admin, (*server).createEntity},
+	{"PATCH /v1/entities/{slug}", admin, (*server).renameEntity},
+	{"DELETE /v1/entities/{slug}", admin, (*server).deleteEntity},
 
 	{"GET /v1/settings", needs(core.ResultsRead), (*server).getSettings},
 	{"PUT /v1/settings", needs(core.ConfigWrite), (*server).putSettings},
@@ -238,6 +245,7 @@ var openapiYAML []byte
 
 type server struct {
 	svc   app.Services
+	reg   *entities.Registry
 	authn *auth.Authenticator
 	keys  auth.KeyStore
 	users *auth.Users
@@ -246,13 +254,14 @@ type server struct {
 }
 
 // NewMux mounts every route and the OAuth endpoints (mountOAuth) on a new
-// mux; main adds /mcp and the UI's "/" to the same mux. Unmatched /v1/ paths get a JSON 405 with Allow when
+// mux; main adds /mcp and the UI's "/" to the same mux, and serves it
+// through InEntity. Unmatched /v1/ paths get a JSON 405 with Allow when
 // another method serves the path, else a JSON 404, instead of falling
 // through to the UI. Browser-reachable routes are wrapped in
 // http.CrossOriginProtection, which rejects cross-site unsafe requests and
 // lets non-browser clients (no Sec-Fetch-Site / Origin) through.
-func NewMux(svc app.Services, authn *auth.Authenticator, log *slog.Logger) *http.ServeMux {
-	s := &server{svc: svc, authn: authn, keys: authn.Keys, users: authn.Users, oauth: authn.OAuth, log: log}
+func NewMux(reg *entities.Registry, authn *auth.Authenticator, log *slog.Logger) *http.ServeMux {
+	s := &server{reg: reg, authn: authn, keys: authn.Keys, users: authn.Users, oauth: authn.OAuth, log: log}
 	csrf := http.NewCrossOriginProtection()
 	mux := http.NewServeMux()
 	for _, rt := range routes {
@@ -307,10 +316,112 @@ func (s *server) wrap(rt route) http.Handler {
 			}
 			actor = a
 		}
-		if err := rt.handle(s, w, r, actor); err != nil {
+		in := *s
+		in.svc = s.entity(r).Services
+		if err := rt.handle(&in, w, r, actor); err != nil {
 			s.writeError(w, r, err)
 		}
 	})
+}
+
+func (s *server) entity(r *http.Request) entities.Live {
+	if e, ok := entities.FromContext(r.Context()); ok {
+		return e
+	}
+	return s.reg.Default()
+}
+
+// InEntity serves a path that starts with /e/<slug> as the same path
+// without it, for that entity: /e/kyring/v1/brands is GET /v1/brands in
+// Kyring. Paths without the prefix are the default entity's, as every
+// path was before there were entities, so existing keys, links and
+// bookmarks keep working. /e/kyring/mcp is Kyring's MCP server. Sign-in,
+// OAuth and its metadata belong to the instance, not an entity, so they
+// answer the same under any prefix, and the metadata only ever names the
+// paths without one.
+//
+// A slug this process does not serve yet answers as a real one would
+// anyone without credentials: the instance's own routes answer, a browser
+// loading a page gets the app, and every other route is 401, without
+// asking the database whether the slug exists. Only a signed-in caller
+// makes it look, for an entity another replica made, and gets a JSON
+// 404 for a slug no entity has.
+func InEntity(reg *entities.Registry, authn *auth.Authenticator, log *slog.Logger, next http.Handler) http.Handler {
+	s := &server{reg: reg, authn: authn, keys: authn.Keys, users: authn.Users, oauth: authn.OAuth, log: log}
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		rest, ok := strings.CutPrefix(r.URL.Path, "/e/")
+		if !ok {
+			next.ServeHTTP(w, r)
+			return
+		}
+		slug, path, _ := strings.Cut(rest, "/")
+		path = "/" + path
+		strip := func(ctx context.Context) *http.Request {
+			r2 := r.Clone(ctx)
+			r2.URL.Path = path
+			if r.URL.RawPath != "" {
+				r2.URL.RawPath = strings.TrimPrefix(r.URL.RawPath, "/e/"+slug)
+			}
+			return r2
+		}
+		e, ok := reg.Live(slug)
+		switch {
+		case !ok && instancePath(path):
+			next.ServeHTTP(w, strip(r.Context()))
+			return
+		case !ok && pageLoad(r, path):
+			// The app, at the path as typed, says nothing is tracked there.
+			next.ServeHTTP(w, r)
+			return
+		}
+		if !ok {
+			if err := s.signedIn(r); err != nil {
+				s.writeError(w, r, err)
+				return
+			}
+			var err error
+			if e, err = reg.Lookup(r.Context(), slug); err != nil {
+				s.writeError(w, r, err)
+				return
+			}
+		}
+		next.ServeHTTP(w, strip(entities.NewContext(r.Context(), e)))
+	})
+}
+
+// instancePath is whether path belongs to the instance rather than an
+// entity: sign-in, OAuth and its metadata, health and this API's
+// description. They answer the same under any /e/<slug>.
+func instancePath(path string) bool {
+	for _, p := range []string{"/auth/", "/oauth/", "/.well-known/"} {
+		if strings.HasPrefix(path, p) {
+			return true
+		}
+	}
+	return path == "/healthz" || path == "/v1/openapi.yaml"
+}
+
+// pageLoad is whether r is a browser loading one of the app's pages.
+func pageLoad(r *http.Request, path string) bool {
+	if (r.Method != http.MethodGet && r.Method != http.MethodHead) || !strings.Contains(r.Header.Get("Accept"), "text/html") {
+		return false
+	}
+	return path != "/mcp" && path != "/v1" && !strings.HasPrefix(path, "/v1/") && !strings.HasPrefix(path, "/mcp/") && !instancePath(path)
+}
+
+// signedIn is nil for a caller with a session, an API key, or an MCP
+// client's OAuth access token, and otherwise the 401 a route would give.
+func (s *server) signedIn(r *http.Request) error {
+	_, err := s.authn.Caller(r)
+	if err == nil {
+		return nil
+	}
+	if scheme, token, ok := strings.Cut(r.Header.Get("Authorization"), " "); ok && strings.EqualFold(scheme, "Bearer") {
+		if _, _, verr := s.oauth.VerifyAccessToken(r.Context(), strings.TrimSpace(token)); verr == nil {
+			return nil
+		}
+	}
+	return callerErr(err)
 }
 
 // allows refuses an authenticated caller the route is not for.

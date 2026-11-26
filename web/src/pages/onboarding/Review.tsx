@@ -48,7 +48,7 @@ export function Review({ nav }: { nav: StepNav }) {
     },
     onSuccess: async () => {
       await Promise.all([
-        qc.invalidateQueries({ queryKey: keys.status }),
+        qc.invalidateQueries({ queryKey: keys.entities }),
         qc.invalidateQueries({ queryKey: keys.onboarding }),
         qc.invalidateQueries({ queryKey: keys.settings }),
         qc.invalidateQueries({ queryKey: keys.runs }),

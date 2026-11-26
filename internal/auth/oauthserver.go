@@ -25,8 +25,15 @@ import (
 // authorization spec lays it out. An MCP client registers itself (RFC 7591),
 // sends a person to Authorize, the person approves on the consent page
 // (Decide), and the client trades the code for tokens (Exchange) with PKCE.
-// Access tokens are good for the MCP resource only and act as the person
-// who approved, through the client, with the scopes the person chose.
+// Access tokens act as the person who approved, through the client, with
+// the scopes the person chose.
+//
+// The instance has one MCP server per entity: /mcp for the default and
+// /e/<slug>/mcp for each. A client may name any of them as its resource,
+// and its tokens work at all of them, since the team signs in once for
+// every entity. Each grant records /mcp as its resource whichever one
+// the client named, so tokens issued before there were entities keep
+// working.
 //
 // Every client is public and unverified: anyone can register any name. The
 // consent page shows the redirect target for that reason, and a person can
@@ -77,16 +84,39 @@ func NewOAuthServer(db db.Pool, publicURL *url.URL) *OAuthServer {
 // Issuer is the authorization server's identifier: PUBLIC_URL's origin.
 func (o *OAuthServer) Issuer() string { return o.issuer }
 
-// Resource is the MCP server's resource identifier, PUBLIC_URL/mcp.
-func (o *OAuthServer) Resource() string { return o.resource }
-
-// ResourceMetadataURL is where RFC 9728 puts the metadata for Resource.
-func (o *OAuthServer) ResourceMetadataURL() string {
-	return o.issuer + "/.well-known/oauth-protected-resource/mcp"
+// Resource is the resource identifier of the MCP server for the entity
+// with slug, PUBLIC_URL/e/<slug>/mcp, or of PUBLIC_URL/mcp when slug is
+// empty: the URL a client connects to.
+func (o *OAuthServer) Resource(slug string) string {
+	if slug == "" {
+		return o.resource
+	}
+	return o.issuer + "/e/" + slug + "/mcp"
 }
 
-func (o *OAuthServer) isResource(r string) bool {
-	return strings.TrimSuffix(r, "/") == o.resource
+// ResourceMetadataURL is where RFC 9728 puts the metadata for
+// Resource(slug): the well-known path between its origin and its path.
+func (o *OAuthServer) ResourceMetadataURL(slug string) string {
+	return o.issuer + "/.well-known/oauth-protected-resource" + strings.TrimPrefix(o.Resource(slug), o.issuer)
+}
+
+func (o *OAuthServer) checkResource(ctx context.Context, q dbtx, resource string) error {
+	resource = strings.TrimSuffix(resource, "/")
+	if resource == "" || resource == o.resource {
+		return nil
+	}
+	slug, prefixed := strings.CutPrefix(resource, o.issuer+"/e/")
+	slug, mcp := strings.CutSuffix(slug, "/mcp")
+	found := false
+	if prefixed && mcp && db.SlugPattern.MatchString(slug) {
+		if err := q.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM entity WHERE slug = $1 AND deleted_at IS NULL)`, slug).Scan(&found); err != nil {
+			return err
+		}
+	}
+	if !found {
+		return oauthErr("invalid_target", "resource must be "+o.resource+", or "+o.Resource("<slug>")+" for an entity that exists")
+	}
+	return nil
 }
 
 // Register records a public client. Whatever authentication method or
@@ -250,8 +280,9 @@ func (o *OAuthServer) Authorize(ctx context.Context, c Client, q AuthorizeReques
 		return "", oauthErr("unsupported_response_type", "response_type must be code")
 	case q.CodeChallengeMethod != "S256" || len(q.CodeChallenge) != 43:
 		return "", oauthErr("invalid_request", "PKCE is required: send a code_challenge with code_challenge_method S256")
-	case q.Resource != "" && !o.isResource(q.Resource):
-		return "", oauthErr("invalid_target", "resource must be "+o.resource)
+	}
+	if err := o.checkResource(ctx, o.db, q.Resource); err != nil {
+		return "", err
 	}
 	handle := newToken()
 	if _, err := o.db.Exec(ctx, `DELETE FROM oauth_requests WHERE expires_at < now()`); err != nil {
@@ -385,8 +416,8 @@ func (o *OAuthServer) Exchange(ctx context.Context, c Client, q TokenRequest) (T
 	var out TokenResponse
 	isRefusal := func(err error) bool { _, ok := errors.AsType[*OAuthError](err); return ok }
 	err := guarded(ctx, o.db, []string{"token:" + c.IP}, nil, isRefusal, func(tx pgx.Tx) error {
-		if q.Resource != "" && !o.isResource(q.Resource) {
-			return oauthErr("invalid_target", "resource must be "+o.resource)
+		if err := o.checkResource(ctx, tx, q.Resource); err != nil {
+			return err
 		}
 		var grant int64
 		var err error
@@ -530,8 +561,8 @@ func (o *OAuthServer) Revoke(ctx context.Context, token string) error {
 	})
 }
 
-// VerifyAccessToken returns the app actor behind an access token for the
-// MCP resource and when the token expires, or ErrInvalidToken. The actor
+// VerifyAccessToken returns the app actor behind an access token for this
+// instance's MCP servers and when the token expires, or ErrInvalidToken. The actor
 // has the grant's scopes cut down to the person's current role. Any other
 // error means the database could not decide.
 func (o *OAuthServer) VerifyAccessToken(ctx context.Context, token string) (core.Actor, time.Time, error) {

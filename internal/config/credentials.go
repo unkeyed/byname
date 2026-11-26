@@ -26,7 +26,15 @@ type Credential struct {
 	LastTestedAt   *time.Time             `json:"last_tested_at"`
 	LastTestStatus string                 `json:"last_test_status" jsonschema:"ok, or why the last test failed"`
 	UpdatedAt      *time.Time             `json:"updated_at"`
-	UsedBy         []engines.Surface      `json:"used_by" jsonschema:"surfaces whose route calls with this key"`
+	UsedBy         []CredentialUse        `json:"used_by" jsonschema:"each entity with AI apps whose route calls with this key, and those apps; every entity shares the key"`
+}
+
+// CredentialUse is the surfaces in one entity whose route calls with a
+// key.
+type CredentialUse struct {
+	Entity   string            `json:"entity" jsonschema:"the entity's name"`
+	Slug     string            `json:"slug" jsonschema:"the entity's slug"`
+	Surfaces []engines.Surface `json:"surfaces"`
 }
 
 var credentialHints = map[engines.CredentialKind]string{
@@ -74,7 +82,7 @@ func (s *Service) Credentials(ctx context.Context) ([]Credential, error) {
 	out := make([]Credential, len(engines.CredentialKinds))
 	byKind := map[engines.CredentialKind]*Credential{}
 	for i, k := range engines.CredentialKinds {
-		out[i] = Credential{Kind: k, Title: credentialTitle(k), Hint: credentialHints[k], UsedBy: []engines.Surface{}}
+		out[i] = Credential{Kind: k, Title: credentialTitle(k), Hint: credentialHints[k], UsedBy: []CredentialUse{}}
 		byKind[k] = &out[i]
 	}
 	rows, err := s.db.Query(ctx, `SELECT kind, org, last_tested_at, coalesce(last_test_status, ''), updated_at FROM credential`)
@@ -94,19 +102,95 @@ func (s *Service) Credentials(ctx context.Context) ([]Credential, error) {
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
-	states, err := s.surfaceStates(ctx, s.db)
+	uses, err := s.credentialUses(ctx)
 	if err != nil {
 		return nil, err
 	}
-	for _, spec := range engines.All() {
-		st := states[spec.Surface]
-		rs, err := engines.RouteOf(spec.Surface, st.route)
-		if err != nil {
-			continue
+	for _, u := range uses {
+		byKind[u.kind].UsedBy = append(byKind[u.kind].UsedBy, u.CredentialUse)
+	}
+	return out, nil
+}
+
+type credentialUse struct {
+	kind engines.CredentialKind
+	CredentialUse
+}
+
+type entityRef struct{ name, slug, schema string }
+
+// everyEntity is every entity, in the order they were made, with the
+// schema its tables are in, for a query that reads all of them.
+func (s *Service) everyEntity(ctx context.Context) ([]entityRef, error) {
+	rows, err := s.db.Query(ctx, `SELECT name, slug, schema_name FROM entity WHERE deleted_at IS NULL ORDER BY id`)
+	if err != nil {
+		return nil, err
+	}
+	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (entityRef, error) {
+		var w entityRef
+		return w, r.Scan(&w.name, &w.slug, &w.schema)
+	})
+}
+
+// acrossEntities is query run on each entity's table, as one UNION
+// ALL whose rows start with the entity's index in all. query has one
+// %s, the schema, and its first column is %d, the index.
+func acrossEntities(all []entityRef, query string) string {
+	union := make([]string, len(all))
+	for i, w := range all {
+		union[i] = fmt.Sprintf(query, i, pgx.Identifier{w.schema}.Sanitize())
+	}
+	return strings.Join(union, " UNION ALL ")
+}
+
+func (s *Service) credentialUses(ctx context.Context) ([]credentialUse, error) {
+	all, err := s.everyEntity(ctx)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := s.db.Query(ctx, acrossEntities(all, `SELECT %d, key, enabled, route FROM %s.surface`))
+	if err != nil {
+		return nil, err
+	}
+	states := make([]map[engines.Surface]surfaceState, len(all))
+	for rows.Next() {
+		var i int
+		var k engines.Surface
+		var st surfaceState
+		if err := rows.Scan(&i, &k, &st.enabled, &st.route); err != nil {
+			return nil, err
 		}
-		if st.enabled || st.route != engines.RouteTreg {
-			c := byKind[rs.Credential()]
-			c.UsedBy = append(c.UsedBy, spec.Surface)
+		if states[i] == nil {
+			states[i] = map[engines.Surface]surfaceState{}
+		}
+		states[i][k] = st
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	var out []credentialUse
+	for i, w := range all {
+		byKind := map[engines.CredentialKind]*credentialUse{}
+		var kinds []engines.CredentialKind
+		for _, spec := range engines.All() {
+			st, ok := states[i][spec.Surface]
+			if !ok || !(st.enabled || st.route != engines.RouteTreg) {
+				continue
+			}
+			rs, err := engines.RouteOf(spec.Surface, st.route)
+			if err != nil {
+				continue
+			}
+			u := byKind[rs.Credential()]
+			if u == nil {
+				u = &credentialUse{kind: rs.Credential(), CredentialUse: CredentialUse{Entity: w.name, Slug: w.slug}}
+				byKind[u.kind] = u
+				kinds = append(kinds, u.kind)
+			}
+			u.Surfaces = append(u.Surfaces, spec.Surface)
+		}
+		for _, k := range kinds {
+			out = append(out, *byKind[k])
 		}
 	}
 	return out, nil
@@ -159,30 +243,84 @@ func (s *Service) TestCredential(ctx context.Context, rawKind string) (Credentia
 	if err != nil {
 		return Credential{}, err
 	}
-	status := "ok"
+	var status string
 	if kind == engines.CredentialGateway {
-		err = s.db.QueryRow(ctx, `SELECT base_url FROM surface WHERE route = 'gateway' ORDER BY enabled DESC, key LIMIT 1`).Scan(&conn.BaseURL)
-		if err == pgx.ErrNoRows {
-			status = "untested: no surface uses the gateway yet, and its base URL is set per surface"
-		} else if err != nil {
+		if status, err = s.testGateways(ctx, conn); err != nil {
 			return Credential{}, err
 		}
-	}
-	if status == "ok" {
-		pctx, cancel := context.WithTimeout(ctx, 30*time.Second)
-		err := engines.Probe(pctx, kind, conn)
-		cancel()
-		switch {
-		case errors.Is(err, engines.ErrNoProbe):
-			status = "untested: " + credentialTitle(kind) + " has no free call to test a key with; Test a surface that uses it"
-		case err != nil:
-			status = err.Error()
-		}
+	} else {
+		status = probe(ctx, kind, conn)
 	}
 	if _, err := s.db.Exec(ctx, `UPDATE credential SET last_tested_at = $2, last_test_status = $3 WHERE kind = $1`, kind, s.now(), status); err != nil {
 		return Credential{}, err
 	}
 	return s.Credential(ctx, kind)
+}
+
+// probe is how one free call with conn went: ok, or why not.
+func probe(ctx context.Context, kind engines.CredentialKind, conn engines.Conn) string {
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	err := engines.Probe(ctx, kind, conn)
+	switch {
+	case errors.Is(err, engines.ErrNoProbe):
+		return "untested: " + credentialTitle(kind) + " has no free call to test a key with; Test a surface that uses it"
+	case err != nil:
+		return err.Error()
+	}
+	return "ok"
+}
+
+// testGateways calls each gateway base URL a surface in any entity
+// uses, since they all share the key. Several URLs read ok only when every
+// one answered, and otherwise say how each went and which entities use
+// it.
+func (s *Service) testGateways(ctx context.Context, conn engines.Conn) (string, error) {
+	all, err := s.everyEntity(ctx)
+	if err != nil {
+		return "", err
+	}
+	rows, err := s.db.Query(ctx, acrossEntities(all, `SELECT %d, base_url FROM %s.surface WHERE route = 'gateway'`)+` ORDER BY 1, 2`)
+	if err != nil {
+		return "", err
+	}
+	var urls []string
+	usedBy := map[string][]string{}
+	for rows.Next() {
+		var i int
+		var url string
+		if err := rows.Scan(&i, &url); err != nil {
+			return "", err
+		}
+		if !slices.Contains(urls, url) {
+			urls = append(urls, url)
+		}
+		if slug := all[i].slug; !slices.Contains(usedBy[url], slug) {
+			usedBy[url] = append(usedBy[url], slug)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return "", err
+	}
+	switch len(urls) {
+	case 0:
+		return "untested: no surface in any entity uses the gateway yet, and its base URL is set per surface", nil
+	case 1:
+		conn.BaseURL = urls[0]
+		return probe(ctx, engines.CredentialGateway, conn), nil
+	}
+	ok := true
+	each := make([]string, len(urls))
+	for i, url := range urls {
+		conn.BaseURL = url
+		status := probe(ctx, engines.CredentialGateway, conn)
+		ok = ok && status == "ok"
+		each[i] = fmt.Sprintf("%s at %s, used by %s", status, url, strings.Join(usedBy[url], ", "))
+	}
+	if ok {
+		return "ok", nil
+	}
+	return strings.Join(each, "; "), nil
 }
 
 // DeleteCredential removes a key no surface uses.
@@ -196,7 +334,11 @@ func (s *Service) DeleteCredential(ctx context.Context, rawKind string) error {
 		return err
 	}
 	if len(c.UsedBy) > 0 {
-		return fmt.Errorf("%w: %s is used by %s; move those surfaces to another route first", core.ErrConflict, c.Title, joinSurfaces(c.UsedBy))
+		var where []string
+		for _, u := range c.UsedBy {
+			where = append(where, joinSurfaces(u.Surfaces)+" in "+u.Entity)
+		}
+		return fmt.Errorf("%w: %s is used by %s; move those surfaces to another route first", core.ErrConflict, c.Title, strings.Join(where, "; "))
 	}
 	tag, err := s.db.Exec(ctx, `DELETE FROM credential WHERE kind = $1`, kind)
 	if pg := (*pgconn.PgError)(nil); errors.As(err, &pg) && pg.Code == "23503" {

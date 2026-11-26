@@ -10,12 +10,13 @@ import (
 
 	"github.com/unkeyed/byname/internal/config"
 	"github.com/unkeyed/byname/internal/core"
+	"github.com/unkeyed/byname/internal/db"
 	"github.com/unkeyed/byname/internal/engines"
 	"github.com/unkeyed/byname/internal/money"
 )
 
 // lock keeps two replicas from reading the same answers at once.
-const lock = `hashtext('byname.discovery')`
+var lock = db.EntityLock("byname.discovery")
 
 // retryAfter is how long a failed read waits before a pass tries it again.
 const retryAfter = time.Hour
@@ -102,20 +103,11 @@ func (s *Service) StartBackfill(ctx context.Context) (Backfill, error) {
 // for, then reads again the answers whose read failed. It holds an
 // advisory lock and returns at once when another process holds it.
 func (s *Service) Tick(ctx context.Context) error {
-	conn, err := s.db.Acquire(ctx)
-	if err != nil {
+	unlock, ok, err := db.TryLock(ctx, s.db, lock)
+	if err != nil || !ok {
 		return err
 	}
-	defer conn.Release()
-	var got bool
-	if err := conn.QueryRow(ctx, `SELECT pg_try_advisory_lock(`+lock+`)`).Scan(&got); err != nil || !got {
-		return err
-	}
-	defer func() {
-		if _, err := conn.Exec(context.WithoutCancel(ctx), `SELECT pg_advisory_unlock(`+lock+`)`); err != nil {
-			_ = conn.Conn().Close(context.WithoutCancel(ctx))
-		}
-	}()
+	defer unlock()
 	// With the lock held no pass runs anywhere, so a scheduled one still
 	// marked running was cut off. A pass someone asked for carries on.
 	if _, err := s.db.Exec(ctx, `UPDATE job_run SET status = 'failed', finished_at = $1,

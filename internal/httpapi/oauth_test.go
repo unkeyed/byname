@@ -163,27 +163,42 @@ func tokenRequest(t *testing.T, c client, form url.Values, want int) (tokens, oa
 // connect runs the whole flow for a new client and returns its tokens.
 func connect(t *testing.T, anon, person client, name string) (string, tokens) {
 	t.Helper()
+	return connectTo(t, anon, person, name, anon.base+"/mcp")
+}
+
+func connectTo(t *testing.T, anon, person client, name, resource string) (string, tokens) {
+	t.Helper()
 	id := register(t, anon, name, loopbackRedirect)
 	p := authorizeQuery(anon, id, loopbackRedirect)
+	p.query.Set("resource", resource)
 	got := decide(t, person, consentHandle(t, anon, "/oauth/authorize?"+p.query.Encode()), true)
 	tok, _ := tokenRequest(t, anon, url.Values{
 		"grant_type": {"authorization_code"}, "client_id": {id}, "code": {got.Get("code")},
-		"redirect_uri": {loopbackRedirect}, "code_verifier": {p.verifier}, "resource": {anon.base + "/mcp"},
+		"redirect_uri": {loopbackRedirect}, "code_verifier": {p.verifier}, "resource": {resource},
 	}, http.StatusOK)
 	return id, tok
 }
 
 func mcpSession(c client, token string) (*mcp.ClientSession, error) {
+	return mcpSessionAt(c, "/mcp", token)
+}
+
+func mcpSessionAt(c client, path, token string) (*mcp.ClientSession, error) {
 	return mcp.NewClient(&mcp.Implementation{Name: "test", Version: "0"}, nil).Connect(context.Background(), &mcp.StreamableClientTransport{
-		Endpoint: c.base + "/mcp", HTTPClient: &http.Client{Transport: bearer(token)}, DisableStandaloneSSE: true, MaxRetries: -1,
+		Endpoint: c.base + path, HTTPClient: &http.Client{Transport: bearer(token)}, DisableStandaloneSSE: true, MaxRetries: -1,
 	}, nil)
 }
 
 // mcpStatus is the status of a bare tools/list with token.
 func mcpStatus(c client, token string) reply {
 	c.t.Helper()
+	return mcpStatusAt(c, "/mcp", token)
+}
+
+func mcpStatusAt(c client, path, token string) reply {
+	c.t.Helper()
 	body := `{"jsonrpc":"2.0","id":1,"method":"tools/list"}`
-	req, _ := http.NewRequest("POST", c.base+"/mcp", strings.NewReader(body))
+	req, _ := http.NewRequest("POST", c.base+path, strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json, text/event-stream")
 	req.Header.Set("MCP-Protocol-Version", "2025-06-18")
@@ -572,7 +587,8 @@ var mcpExclusions = map[string]string{
 // mcpTools maps each route an API key can call to the MCP tool that does
 // the same, so the two surfaces cannot drift apart unnoticed.
 var mcpTools = map[string]string{
-	"GET /v1/status": "status",
+	"GET /v1/status":   "status",
+	"GET /v1/entities": "list_entities",
 
 	"GET /v1/settings":              "get_settings",
 	"PUT /v1/settings":              "update_settings",

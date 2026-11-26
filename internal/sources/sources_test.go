@@ -16,6 +16,7 @@ import (
 
 	"github.com/unkeyed/byname/internal/checks/checkstest"
 	"github.com/unkeyed/byname/internal/config"
+	"github.com/unkeyed/byname/internal/db"
 	"github.com/unkeyed/byname/internal/engines/tregtest"
 	"github.com/unkeyed/byname/internal/secretbox"
 	"github.com/unkeyed/byname/internal/sources"
@@ -349,5 +350,42 @@ func TestInterruptedRoundIsClosed(t *testing.T) {
 	}
 	if n := e.count(t, `SELECT count(*) FROM job_run WHERE job = 'source_fetch' AND status = 'running'`); n != 0 {
 		t.Errorf("%d source_fetch jobs still running, want the interrupted one marked failed", n)
+	}
+}
+
+// Every entity's jobs share the few lock connections. A round that
+// cannot get one soon skips this tick, as when another process holds the
+// lock, rather than holding up the scheduler until one frees.
+func TestARoundSkipsWhenEveryLockConnectionIsBusy(t *testing.T) {
+	e := setup(t)
+	srv := serve(t, site{"/p": html(`<p>Contoso</p>`)})
+	e.cite(t, srv.URL+"/p")
+	cfg := e.db.Config().Copy()
+	cfg.MaxConns = 1
+	locks, err := pgxpool.NewWithConfig(ctx, cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(locks.Close)
+	held, err := locks.Acquire(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	release := sync.OnceFunc(held.Release)
+	t.Cleanup(release)
+	svc := sources.New(db.Lanes{Web: e.db, Jobs: e.db, Locks: locks}, e.config,
+		sources.Options{AllowPrivate: true, HostDelay: time.Nanosecond, Now: func() time.Time { return e.now }})
+
+	short, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+	if n, err := svc.Run(short); err != nil || n != 0 {
+		t.Fatalf("a round while every lock connection is held = %d, %v; want it skipped", n, err)
+	}
+	if n := e.count(t, `SELECT count(*) FROM job_run WHERE job = 'source_fetch'`); n != 0 {
+		t.Fatalf("%d source_fetch jobs logged by a skipped round, want none", n)
+	}
+	release()
+	if n, err := svc.Run(ctx); err != nil || n != 1 {
+		t.Fatalf("the next round once a lock connection is free = %d, %v; want the page fetched", n, err)
 	}
 }

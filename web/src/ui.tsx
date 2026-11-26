@@ -242,7 +242,7 @@ export function CodeBlock({ code, label }: { code: string; label?: string }) {
   );
 }
 
-function Initials({ label, size, className }: { label: string; size: number; className?: string }) {
+export function Initials({ label, size, className }: { label: string; size: number; className?: string }) {
   return (
     <span
       aria-hidden="true"

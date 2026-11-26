@@ -22,26 +22,16 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/unkeyed/byname/internal/app"
 	"github.com/unkeyed/byname/internal/auth"
-	"github.com/unkeyed/byname/internal/changes"
-	"github.com/unkeyed/byname/internal/checks"
 	instconfig "github.com/unkeyed/byname/internal/config"
 	"github.com/unkeyed/byname/internal/core"
 	"github.com/unkeyed/byname/internal/db"
-	"github.com/unkeyed/byname/internal/discovery"
 	"github.com/unkeyed/byname/internal/engines"
+	"github.com/unkeyed/byname/internal/entities"
 	"github.com/unkeyed/byname/internal/httpapi"
-	"github.com/unkeyed/byname/internal/instance"
-	"github.com/unkeyed/byname/internal/logos"
 	"github.com/unkeyed/byname/internal/mcpserver"
-	"github.com/unkeyed/byname/internal/notify"
-	"github.com/unkeyed/byname/internal/results"
-	"github.com/unkeyed/byname/internal/scheduler"
 	"github.com/unkeyed/byname/internal/search"
 	"github.com/unkeyed/byname/internal/secretbox"
-	"github.com/unkeyed/byname/internal/social"
-	"github.com/unkeyed/byname/internal/sources"
 	"github.com/unkeyed/byname/web"
 )
 
@@ -180,8 +170,11 @@ func fitBudget(ctx context.Context, log *slog.Logger, cfg *pgxpool.Config) {
 }
 
 // openLanes opens the three pools Lanes routes between. Up to four
-// connections hold locks, one for each job the scheduler can run at once,
-// and a small budget gets one, so those jobs take turns. The rest is split
+// connections hold locks, and a small budget gets one, shared by every
+// entity's jobs, which take turns: a job that gets no lock connection
+// within a few seconds skips its tick (db.TryLock). The number stays fixed
+// as entities are added, since they come and go while the process runs
+// and the work under each lock runs on the Jobs pool. The rest is split
 // between requests, which get half rounded up, and background work, with
 // at least 2 each: 5 in all at the least.
 func openLanes(ctx context.Context, cfg *pgxpool.Config) (db.Lanes, error) {
@@ -192,6 +185,7 @@ func openLanes(ctx context.Context, cfg *pgxpool.Config) (db.Lanes, error) {
 		to  **pgxpool.Pool
 		cfg *pgxpool.Config
 	}{{&l.Web, web}, {&l.Jobs, jobs}, {&l.Locks, locks}} {
+		db.RouteSchemas(p.cfg)
 		pool, err := pgxpool.NewWithConfig(ctx, p.cfg)
 		if err != nil {
 			l.Close()
@@ -483,45 +477,32 @@ func run(log *slog.Logger) error {
 	if err != nil {
 		return err
 	}
-	res := results.New(pool)
-	alerts := notify.New(pool, res, notify.Options{
-		Secrets: cfg.Secrets, PublicURL: cfg.Auth.PublicURL, HTTPClient: &http.Client{}, ResendBaseURL: cfg.ResendBaseURL, Log: log,
+	reg, err := entities.Open(ctx, pool, entities.Options{
+		Version: version, Secrets: cfg.Secrets, PublicURL: cfg.Auth.PublicURL, Log: log, MigrateDB: cfg.MigrateDB,
+		Resolve:     engines.HeadResolver(&http.Client{Timeout: 10 * time.Second}),
+		TregBaseURL: cfg.TregBaseURL, ProviderURLs: cfg.ProviderURLs, ResendBaseURL: cfg.ResendBaseURL,
+		GSCClient: cfg.GSCClient, GSCBaseURL: cfg.GSCBaseURL, BingBaseURL: cfg.BingBaseURL, GitHubBaseURL: cfg.GitHubBaseURL,
+		BlueskyBaseURL: cfg.BlueskyBaseURL, SourcesAllowPrivate: cfg.SourcesAllowPrivate,
 	})
-	settings := instconfig.New(pool, instconfig.Options{
-		Secrets: cfg.Secrets, TregBaseURL: cfg.TregBaseURL, BaseURLs: cfg.ProviderURLs,
-		HTTPClient: &http.Client{}, Resolve: engines.HeadResolver(&http.Client{Timeout: 10 * time.Second}),
-		Alerts: alerts,
-	})
-	brands := discovery.New(pool, settings, discovery.Options{Log: log})
-	logoLookups := logos.New(pool, settings, logos.Options{Log: log, Client: sources.PublicClient(cfg.SourcesAllowPrivate)})
-	runs := checks.New(pool, settings, checks.Options{Log: log, Alerts: alerts, Finder: brands})
-	traffic := search.New(pool, search.Options{
-		Secrets: cfg.Secrets, BaseURLs: map[search.Provider]string{search.Google: cfg.GSCBaseURL, search.Bing: cfg.BingBaseURL}, GoogleClient: cfg.GSCClient,
-		PublicURL: cfg.Auth.PublicURL, Terms: settings, Alerts: alerts,
-	})
-	site := changes.New(pool, traffic, changes.Options{Secrets: cfg.Secrets, Alerts: alerts, GitHubBaseURL: cfg.GitHubBaseURL})
-	mentions := social.New(pool, settings, social.Options{Alerts: alerts, BaseURLs: map[social.Network]string{social.Bluesky: cfg.BlueskyBaseURL}})
-	if err := sealSecrets(ctx, log, users, settings, alerts, traffic, site); err != nil {
+	if err != nil {
+		return err
+	}
+	if err := sealShared(ctx, log, users, reg.Default().Services.Config); err != nil {
 		return err
 	}
 	if err := announceSetup(ctx, log, users, cfg.SetupToken); err != nil {
 		return err
 	}
-	if err := settings.MarkBrandQuestions(ctx); err != nil {
-		return err
-	}
 	authn := &auth.Authenticator{Keys: auth.NewKeyStore(pool, cfg.Unkey), Users: users, OAuth: auth.NewOAuthServer(pool, cfg.Auth.PublicURL)}
 
-	services := app.Services{Instance: instance.New(version, pool, settings, mentions, brands), Config: settings, Checks: runs, Results: res, Notify: alerts,
-		Search: traffic, Changes: site, Social: mentions, Discovery: brands, Logos: logoLookups}
-	mux := httpapi.NewMux(services, authn, log)
-	mux.Handle("/mcp", mcpserver.Handler(services, authn.OAuth, version))
+	mux := httpapi.NewMux(reg, authn, log)
+	mux.Handle("/mcp", mcpserver.Handler(reg.Default().Services, reg, authn.OAuth, version))
 	mux.Handle("/", web.Handler())
 
 	// ReadTimeout bounds a slow request body without a proxy in front. There
 	// is no WriteTimeout: an MCP tool call can outlast any fixed limit, and
 	// ReadTimeout does not cancel a handler that has read its body.
-	srv := &http.Server{Addr: ":" + cfg.Port, Handler: httpapi.SecurityHeaders(cfg.Auth.PublicURL, mux),
+	srv := &http.Server{Addr: ":" + cfg.Port, Handler: httpapi.SecurityHeaders(cfg.Auth.PublicURL, httpapi.InEntity(reg, authn, log, mux)),
 		ReadHeaderTimeout: 10 * time.Second, ReadTimeout: 30 * time.Second, IdleTimeout: 2 * time.Minute}
 	served := make(chan error, 1)
 	go func() { served <- srv.ListenAndServe() }()
@@ -552,12 +533,7 @@ func run(log *slog.Logger) error {
 	if cfg.SourcesAllowPrivate {
 		log.Warn("SOURCES_ALLOW_PRIVATE_IPS is set: cited-source fetching and logo downloads may reach private and loopback addresses. Use it only in tests and local development")
 	}
-	cited := sources.New(pool, settings, sources.Options{AllowPrivate: cfg.SourcesAllowPrivate, UserAgent: "Byname/" + version, Log: log})
-	jobs.Go(func() {
-		scheduler.New(runs, settings, scheduler.Options{Log: log, Sources: cited, Search: traffic, Changes: site, Social: mentions,
-			OtherBrands: []scheduler.Ticker{brands, logoLookups}}).Run(db.Background(ctx))
-	})
-	jobs.Go(func() { alerts.Run(db.Background(ctx)) })
+	jobs.Go(func() { reg.Run(db.Background(ctx)) })
 	log.Info("Byname listening", "port", cfg.Port, "version", version, "keys", authn.Keys.Mode(),
 		"public_url", cfg.Auth.PublicURL.String(), "password_login", cfg.Auth.PasswordLogin, "providers", len(cfg.Auth.Providers),
 		"db_pool_web", pool.Web.Config().MaxConns, "db_pool_jobs", pool.Jobs.Config().MaxConns, "db_pool_locks", pool.Locks.Config().MaxConns)
@@ -588,10 +564,7 @@ func run(log *slog.Logger) error {
 	return nil
 }
 
-// sealSecrets reseals TOTP seeds and credentials sealed under
-// ENCRYPTION_KEY_PREVIOUS with ENCRYPTION_KEY, so a rotation finishes with
-// one restart.
-func sealSecrets(ctx context.Context, log *slog.Logger, users *auth.Users, settings *instconfig.Service, alerts *notify.Service, traffic *search.Service, site *changes.Service) error {
+func sealShared(ctx context.Context, log *slog.Logger, users *auth.Users, settings *instconfig.Service) error {
 	totp, err := users.SealTOTPSecrets(ctx)
 	if err != nil {
 		return fmt.Errorf("encrypt TOTP seeds with ENCRYPTION_KEY: %w", err)
@@ -600,22 +573,8 @@ func sealSecrets(ctx context.Context, log *slog.Logger, users *auth.Users, setti
 	if err != nil {
 		return fmt.Errorf("encrypt credentials with ENCRYPTION_KEY: %w", err)
 	}
-	searchCreds, err := traffic.SealSecrets(ctx)
-	if err != nil {
-		return fmt.Errorf("encrypt the search engine credentials with ENCRYPTION_KEY: %w", err)
-	}
-	creds += searchCreds
-	repoCreds, err := site.SealSecrets(ctx)
-	if err != nil {
-		return fmt.Errorf("encrypt the GitHub token with ENCRYPTION_KEY: %w", err)
-	}
-	creds += repoCreds
-	channels, err := alerts.SealChannels(ctx)
-	if err != nil {
-		return fmt.Errorf("encrypt notification channel secrets with ENCRYPTION_KEY: %w", err)
-	}
-	if totp+creds+channels > 0 {
-		log.Info("encrypted stored secrets with the current ENCRYPTION_KEY", "totp_seeds", totp, "credentials", creds, "notification_channels", channels)
+	if totp+creds > 0 {
+		log.Info("encrypted stored secrets with the current ENCRYPTION_KEY", "totp_seeds", totp, "credentials", creds)
 	}
 	return nil
 }

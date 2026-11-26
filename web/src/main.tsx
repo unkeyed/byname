@@ -1,15 +1,10 @@
-import { StrictMode } from "react";
+import { StrictMode, useSyncExternalStore } from "react";
 import { createRoot } from "react-dom/client";
-import { keepPreviousData, MutationCache, QueryCache, QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { createBrowserRouter, Navigate, RouterProvider, useLocation } from "react-router";
-import { ApiError } from "./api";
-import { keys } from "./queries";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { Navigate, RouterProvider, useLocation, type RouteObject } from "react-router";
 import { Layout, NotFound } from "./Layout";
 import { FirstTab, section, Section } from "./nav";
-import { Login } from "./pages/Login";
-import { AcceptInvite } from "./pages/AcceptInvite";
-import { Setup } from "./pages/Setup";
-import { Consent } from "./pages/Consent";
+import { rootClient, rootRouter, entityApp, EntitySlug, entityOf } from "./routing";
 import { ThisWeek } from "./pages/results/ThisWeek";
 import { Competitors } from "./pages/results/Competitors";
 import { Questions } from "./pages/results/Questions";
@@ -45,12 +40,8 @@ function Moved({ to }: { to: string }) {
   return <Navigate to={url.pathname + url.search + hash} replace />;
 }
 
-const router = createBrowserRouter([
+const entityRoutes: RouteObject[] = [
   ...Object.entries(moved).map(([path, to]) => ({ path, element: <Moved to={to} /> })),
-  { path: "/login", element: <Login /> },
-  { path: "/invite/:token", element: <AcceptInvite /> },
-  { path: "/setup/:token", element: <Setup /> },
-  { path: "/oauth/consent", element: <Consent /> },
   { path: "/onboarding/:step?", element: <Onboarding /> },
   {
     element: <Layout />,
@@ -82,37 +73,29 @@ const router = createBrowserRouter([
       { path: "*", element: <NotFound /> },
     ],
   },
-]);
+];
 
-/** Pages for people without a session, where a 401 is an answer rather than an expired session. */
-const signedOutPages = ["/login", "/invite/", "/setup/"];
-
-/** A 401 anywhere means the session ended: go to login and come back after. */
-function onError(err: unknown) {
-  if (!(err instanceof ApiError) || err.status !== 401) return;
-  const { pathname, search } = router.state.location;
-  if (signedOutPages.some((p) => pathname.startsWith(p))) return;
-  queryClient.clear();
-  void router.navigate(`/login?next=${encodeURIComponent(pathname + search)}`, { replace: true });
+function App() {
+  const slug = useSyncExternalStore(rootRouter.subscribe, () => entityOf(rootRouter.state.location.pathname));
+  if (!slug) {
+    return (
+      <QueryClientProvider client={rootClient}>
+        <RouterProvider router={rootRouter} />
+      </QueryClientProvider>
+    );
+  }
+  const app = entityApp(slug, entityRoutes);
+  return (
+    <EntitySlug value={slug}>
+      <QueryClientProvider key={slug} client={app.client}>
+        <RouterProvider router={app.router} />
+      </QueryClientProvider>
+    </EntitySlug>
+  );
 }
-
-const queryClient = new QueryClient({
-  queryCache: new QueryCache({ onError }),
-  mutationCache: new MutationCache({ onError }),
-  defaultOptions: {
-    queries: {
-      staleTime: 10_000,
-      retry: (count, err) => !(err instanceof ApiError && err.status < 500) && count < 2,
-    },
-  },
-});
-
-for (const prefix of [keys.results, keys.search]) queryClient.setQueryDefaults(prefix, { placeholderData: keepPreviousData });
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} />
-    </QueryClientProvider>
+    <App />
   </StrictMode>,
 );

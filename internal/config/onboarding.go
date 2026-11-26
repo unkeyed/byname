@@ -2,6 +2,7 @@ package config
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -11,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/unkeyed/byname/internal/core"
+	"github.com/unkeyed/byname/internal/db"
 	"github.com/unkeyed/byname/internal/engines"
 )
 
@@ -160,7 +162,24 @@ func (s *Service) SaveStep(ctx context.Context, key StepKey) (Onboarding, error)
 		WHERE NOT ($1 = ANY(onboarding_steps))`, string(key)); err != nil {
 		return Onboarding{}, err
 	}
+	if key == StepBrand {
+		if err := s.nameFirstEntity(ctx); err != nil {
+			return Onboarding{}, err
+		}
+	}
 	return s.Onboarding(ctx)
+}
+
+func (s *Service) nameFirstEntity(ctx context.Context) error {
+	var name string
+	err := s.db.QueryRow(ctx, `SELECT name FROM brand WHERE kind = 'self'`).Scan(&name)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	return db.NameFirstEntity(ctx, s.db, name)
 }
 
 // FinishOnboarding ends onboarding once every required step is saved, the

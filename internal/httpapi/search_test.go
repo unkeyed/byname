@@ -120,10 +120,10 @@ func TestSearchOverHTTP(t *testing.T) {
 
 	var start struct{ URL string }
 	keep(person.call("POST", "/v1/search/google/oauth/start", nil, http.StatusOK, &start))
-	if code, loc := returnFromGoogle(t, person, callbackHere(t, c, start.URL)); code != http.StatusSeeOther || loc != "/settings/search-engines?connected=google" {
+	if code, loc := returnFromGoogle(t, person, callbackHere(t, c, start.URL)); code != http.StatusSeeOther || loc != "/e/default/settings/search-engines?connected=google" {
 		t.Fatalf("callback = %d to %q", code, loc)
 	}
-	if _, loc := returnFromGoogle(t, person, callbackHere(t, c, start.URL)+"x"); !strings.HasPrefix(loc, "/settings/search-engines?error=") {
+	if _, loc := returnFromGoogle(t, person, callbackHere(t, c, start.URL)+"x"); !strings.HasPrefix(loc, "/e/default/settings/search-engines?error=") {
 		t.Fatalf("a callback with a bad code redirected to %q, want an error back on the tab", loc)
 	}
 	for _, as := range []client{c, viewer} {
@@ -357,20 +357,47 @@ func TestGoogleSignInReturnsWhereItStarted(t *testing.T) {
 	var start struct{ URL string }
 	person.call("POST", "/v1/search/google/oauth/start", map[string]string{"return_to": "onboarding"}, http.StatusOK, &start)
 	callback := callbackHere(t, c, start.URL)
-	if _, loc := returnFromGoogle(t, person, strings.Replace(callback, "code=", "code=x", 1)); !strings.HasPrefix(loc, "/onboarding/search?error=") {
+	if _, loc := returnFromGoogle(t, person, strings.Replace(callback, "code=", "code=x", 1)); !strings.HasPrefix(loc, "/e/default/onboarding/search?error=") {
 		t.Fatalf("a failed sign-in from onboarding redirected to %q", loc)
 	}
-	if code, loc := returnFromGoogle(t, person, callback); code != http.StatusSeeOther || loc != "/onboarding/search?connected=google" {
+	if code, loc := returnFromGoogle(t, person, callback); code != http.StatusSeeOther || loc != "/e/default/onboarding/search?connected=google" {
 		t.Fatalf("a sign-in from onboarding = %d to %q", code, loc)
 	}
 	forged := "/auth/gsc/callback?state=" + url.QueryEscape(`{"r":"https://evil.example/"}`) + "&code=x"
-	if _, loc := returnFromGoogle(t, person, forged); !strings.HasPrefix(loc, "/settings/search-engines?error=") {
+	if _, loc := returnFromGoogle(t, person, forged); !strings.HasPrefix(loc, "/e/default/settings/search-engines?error=") {
 		t.Fatalf("a callback with a state this instance did not seal redirected to %q", loc)
 	}
 	person.call("POST", "/v1/search/google/oauth/start", nil, http.StatusOK, &start)
-	if _, loc := returnFromGoogle(t, person, callbackHere(t, c, start.URL)); loc != "/settings/search-engines?connected=google" {
+	if _, loc := returnFromGoogle(t, person, callbackHere(t, c, start.URL)); loc != "/e/default/settings/search-engines?connected=google" {
 		t.Fatalf("a sign-in started without return_to redirected to %q", loc)
 	}
 }
 
 func itoa(n int64) string { return strconv.FormatInt(n, 10) }
+
+// A Google sign-in started in one entity connects that entity and
+// returns the browser to its page, through the one callback every
+// entity shares.
+func TestGoogleSignInConnectsTheEntityItStartedIn(t *testing.T) {
+	c := newServer(t)
+	person, agent := login(t, c)
+	person.call("POST", "/v1/entities", map[string]string{"name": "Kyring"}, http.StatusCreated, nil)
+	var start struct{ URL string }
+	person.call("POST", "/e/kyring/v1/search/google/oauth/start", map[string]string{"return_to": "onboarding"}, http.StatusOK, &start)
+	if code, loc := returnFromGoogle(t, person, callbackHere(t, c, start.URL)); code != http.StatusSeeOther || loc != "/e/kyring/onboarding/search?connected=google" {
+		t.Fatalf("callback = %d to %q, want Kyring's onboarding", code, loc)
+	}
+	connected := func(path string) bool {
+		var list struct {
+			Providers []struct {
+				Provider  string `json:"provider"`
+				Connected bool   `json:"connected"`
+			} `json:"providers"`
+		}
+		agent.call("GET", path, nil, http.StatusOK, &list)
+		return list.Providers[0].Provider == "google" && list.Providers[0].Connected
+	}
+	if !connected("/e/kyring/v1/search/providers") || connected("/v1/search/providers") {
+		t.Fatal("Google connected somewhere other than Kyring, where the sign-in started")
+	}
+}

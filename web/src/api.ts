@@ -45,6 +45,21 @@ export interface Actor {
   scopes: Scope[];
 }
 
+/**
+ * One tracked entity, such as a company or product: its own brand,
+ * questions, results and settings, at /e/<slug>. The team, sign-in, API keys
+ * and provider keys are shared by all of them.
+ */
+export interface Entity {
+  id: number;
+  /** Never changes once links use it. */
+  slug: string;
+  name: string;
+  onboarded: boolean;
+  /** Paths without /e/<slug> mean this one, the first made. */
+  default: boolean;
+}
+
 export interface Status {
   version: string;
   /** Whether someone has finished setting up the brand, surfaces and questions. */
@@ -429,7 +444,8 @@ export interface Credential {
   /** "ok", or why it failed, or that the provider has no free test call. */
   last_test_status: string;
   updated_at: Timestamp | null;
-  used_by: SurfaceKey[];
+  /** Every entity shares the key, so this names each one whose AI apps use it. */
+  used_by: { entity: string; slug: string; surfaces: SurfaceKey[] }[];
 }
 
 export type StepKey = "brand" | "competitors" | "questions" | "surfaces" | "search" | "social" | "schedule" | "review";
@@ -866,7 +882,7 @@ export interface BrandLogo {
   version: number;
 }
 
-export const logoURL = (l: BrandLogo) => `/v1/brands/${l.brand_id}/logo?v=${l.version}`;
+export const logoURL = (l: BrandLogo) => inEntity(`/v1/brands/${l.brand_id}/logo?v=${l.version}`);
 
 export interface AnswerSummary {
   id: number;
@@ -1871,12 +1887,55 @@ export class ApiError extends Error {
 
 export const needsReauth = (err: unknown) => err instanceof ApiError && err.code === "reauth_required";
 
-async function request<T>(method: string, path: string, opts: { body?: unknown } = {}): Promise<T> {
-  const res = await fetch(path, {
+const shared = ["me", "account", "keys", "apps", "users", "invites", "credentials", "entities", "oauth"];
+
+let entity = { slug: "", left: new AbortController() };
+
+/**
+ * Follows the address to the entity it is in. Leaving an entity, by
+ * the switcher or by Back and Forward, aborts every request still running
+ * in it, so a save that reads and then writes stops after the read instead
+ * of writing what it read into the entity entered. The router calls
+ * this on every navigation, and each request before it is sent.
+ */
+export function syncEntity() {
+  const slug = /^\/e\/([^/]+)/.exec(location.pathname)?.[1] ?? "";
+  if (slug !== entity.slug) {
+    entity.left.abort(new DOMException(`left /e/${entity.slug}`, "AbortError"));
+    entity = { slug, left: new AbortController() };
+  }
+  return entity;
+}
+
+/** Whether path is one entity's, rather than shared by every entity. */
+function scoped(path: string) {
+  const rest = path.match(/^\/v1\/([^/?]+)/)?.[1];
+  return rest !== undefined && !shared.includes(rest);
+}
+
+/**
+ * The URL that reads or writes path in the entity the page is in: the
+ * page at /e/kyring/settings reads /e/kyring/v1/brands.
+ */
+export function inEntity(path: string): string {
+  const { slug } = syncEntity();
+  return slug && scoped(path) ? `/e/${slug}${path}` : path;
+}
+
+/**
+ * A request in an entity ends when the page leaves it: it rejects with
+ * an AbortError, even when the answer had already arrived.
+ */
+async function request<T>(method: string, path: string, opts: { body?: unknown; signal?: AbortSignal } = {}): Promise<T> {
+  const { slug, left } = syncEntity();
+  const inOne = slug !== "" && scoped(path);
+  const signal = inOne ? (opts.signal ? AbortSignal.any([left.signal, opts.signal]) : left.signal) : opts.signal;
+  const res = await fetch(inOne ? `/e/${slug}${path}` : path, {
     method,
     credentials: "same-origin",
     headers: opts.body === undefined ? undefined : { "Content-Type": "application/json" },
     body: opts.body === undefined ? undefined : JSON.stringify(opts.body),
+    signal,
   });
   if (!res.ok) {
     let message = res.statusText || `HTTP ${res.status}`;
@@ -1888,10 +1947,11 @@ async function request<T>(method: string, path: string, opts: { body?: unknown }
     } catch {
       // Not JSON (a proxy error page, say); keep the status text.
     }
+    signal?.throwIfAborted();
     throw new ApiError(res.status, message, code);
   }
-  if (res.status === 204) return undefined as T;
-  const text = await res.text();
+  const text = res.status === 204 ? "" : await res.text();
+  signal?.throwIfAborted();
   return (text ? JSON.parse(text) : undefined) as T;
 }
 
@@ -1929,6 +1989,14 @@ export const api = {
 
   me: {
     get: () => request<Actor>("GET", "/v1/me"),
+  },
+
+  /** The default first. Adding and renaming are admin only; a slug is taken from the name when left out, and a taken one is 409. */
+  entities: {
+    list: () => request<Entity[]>("GET", "/v1/entities"),
+    create: (body: { name: string; slug?: string }) => request<Entity>("POST", "/v1/entities", { body }),
+    rename: (slug: string, name: string) => request<Entity>("PATCH", `/v1/entities/${enc(slug)}`, { body: { name } }),
+    remove: (slug: string) => request<void>("DELETE", `/v1/entities/${enc(slug)}`),
   },
 
   /** Every change to a sign-in method can fail with reauth_required (see needsReauth). */

@@ -140,7 +140,7 @@ func MonthLookups(ctx context.Context, q interface {
 }
 
 // lock keeps two replicas from looking up the same brands at once.
-const lock = `hashtext('byname.logos')`
+var lock = db.EntityLock("byname.logos")
 
 // due selects the brands to look up, most wanted first: yours, then your
 // competitors, then the brands answers name most that you don't track. A
@@ -168,20 +168,11 @@ type brand struct {
 // are due, as a brand_logos job logged only when there is one. It holds an
 // advisory lock and returns at once when another process holds it.
 func (s *Service) Tick(ctx context.Context) error {
-	conn, err := s.db.Acquire(ctx)
-	if err != nil {
+	unlock, ok, err := db.TryLock(ctx, s.db, lock)
+	if err != nil || !ok {
 		return err
 	}
-	defer conn.Release()
-	var got bool
-	if err := conn.QueryRow(ctx, `SELECT pg_try_advisory_lock(`+lock+`)`).Scan(&got); err != nil || !got {
-		return err
-	}
-	defer func() {
-		if _, err := conn.Exec(context.WithoutCancel(ctx), `SELECT pg_advisory_unlock(`+lock+`)`); err != nil {
-			_ = conn.Conn().Close(context.WithoutCancel(ctx))
-		}
-	}()
+	defer unlock()
 	if _, err := s.db.Exec(ctx, `UPDATE job_run SET status = 'failed', finished_at = $1,
 			error = 'the process stopped before these lookups finished; the logos it stored stay'
 		WHERE job = 'brand_logos' AND status = 'running'`, s.now()); err != nil {

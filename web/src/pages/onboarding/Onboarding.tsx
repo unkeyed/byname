@@ -1,8 +1,9 @@
 import { useState, type ReactNode } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Link, Navigate, useLocation, useNavigate, useParams } from "react-router";
+import { Link, Navigate, useNavigate, useParams } from "react-router";
 import { api, ApiError, type OnboardingStep, type StepKey } from "../../api";
 import { keys, useCan, useMe, useOnboarding } from "../../queries";
+import { go, useEntity } from "../../routing";
 import { useTheme } from "../../theme";
 import { Button, buttonClass, cx, Dialog, EmptyState, ErrorNote, Icon, LoadBoundary, Logo, scrollArea, Spinner, useWide } from "../../ui";
 import { NotificationsSlot } from "../../config/NotificationsSlot";
@@ -130,11 +131,10 @@ export function NotSetUp() {
 export function Onboarding() {
   useTheme();
   const me = useMe();
-  const location = useLocation();
   const canEdit = useCan("config:write");
   const onboarding = useOnboarding();
-  if (me.error instanceof ApiError && me.error.status === 401) return <Navigate to={`/login?next=${encodeURIComponent(location.pathname)}`} replace />;
-  if (me.isPending || (canEdit && onboarding.isPending)) {
+  const entities = useEntity().list;
+  if (me.isPending || entities.isPending || (canEdit && onboarding.isPending) || (me.error instanceof ApiError && me.error.status === 401)) {
     return (
       <div className="grid h-full place-items-center">
         <Spinner />
@@ -166,11 +166,14 @@ export function Onboarding() {
 }
 
 function Shell({ children, aside, header }: { children: ReactNode; aside?: ReactNode; header?: ReactNode }) {
+  const { slug, current } = useEntity();
   return (
     <div className="flex h-full flex-col bg-bg">
       <header className="flex h-12 shrink-0 items-center gap-2 border-b border-line px-3 md:px-5">
         <Logo />
         <span className="text-sm font-semibold">Byname</span>
+        <span className="text-sm text-faint">/</span>
+        <span className="min-w-0 truncate text-sm font-medium">{current?.name ?? slug}</span>
         <span className="text-sm text-faint">/</span>
         <span className="text-sm text-muted">Setup</span>
         <div className="ml-auto flex min-w-0 items-center gap-2">{header}</div>
@@ -187,16 +190,21 @@ function Wizard({ steps, finished }: { steps: OnboardingStep[]; finished: boolea
   const { step: param } = useParams();
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const here = useEntity().current;
   const wide = useWide();
   const [menu, setMenu] = useState(false);
   const index = steps.findIndex((s) => s.key === param);
   const mark = useMutation({
     mutationFn: (key: StepKey) => api.onboarding.markSaved(key),
-    onSuccess: (o, key) => {
+    onSuccess: async (o, key) => {
       qc.setQueryData(keys.onboarding, o);
       const i = steps.findIndex((s) => s.key === key);
-      const next = steps[i + 1];
-      if (next) void navigate(`/onboarding/${next.key}`);
+      const to = `/onboarding/${(steps[i + 1] ?? steps[i]).key}`;
+      if (key === "brand") {
+        const now = (await qc.fetchQuery({ queryKey: keys.entities, queryFn: api.entities.list, staleTime: 0 })).find((w) => w.id === here?.id);
+        if (now && now.slug !== here?.slug) return go(`/e/${now.slug}${to}`, { replace: true });
+      }
+      if (steps[i + 1]) void navigate(to);
     },
   });
 

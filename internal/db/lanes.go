@@ -10,8 +10,9 @@ import (
 
 // Pool is what the services query through. A *pgxpool.Pool is one, and so
 // is Lanes, which keeps background work off the connections requests need.
-// Acquire is only for holding a session advisory lock: the work done under
-// the lock goes through the other methods.
+// Acquire is only for TryLock and Lock, which hold a session advisory lock
+// on the connection: the work done under the lock goes through the other
+// methods.
 type Pool interface {
 	Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
 	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)

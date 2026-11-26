@@ -23,20 +23,13 @@ import (
 	"github.com/unkeyed/byname/internal/app"
 	"github.com/unkeyed/byname/internal/auth"
 	"github.com/unkeyed/byname/internal/authtest"
-	"github.com/unkeyed/byname/internal/changes"
 	"github.com/unkeyed/byname/internal/changes/githubtest"
-	"github.com/unkeyed/byname/internal/checks"
-	"github.com/unkeyed/byname/internal/config"
 	"github.com/unkeyed/byname/internal/core"
-	"github.com/unkeyed/byname/internal/discovery"
 	"github.com/unkeyed/byname/internal/engines/tregtest"
+	"github.com/unkeyed/byname/internal/entities"
 	"github.com/unkeyed/byname/internal/instance"
-	"github.com/unkeyed/byname/internal/logos"
 	"github.com/unkeyed/byname/internal/mcpserver"
-	"github.com/unkeyed/byname/internal/notify"
 	"github.com/unkeyed/byname/internal/notify/notifytest"
-	"github.com/unkeyed/byname/internal/results"
-	"github.com/unkeyed/byname/internal/social"
 	"github.com/unkeyed/byname/internal/testdb"
 )
 
@@ -57,6 +50,7 @@ type client struct {
 	setupToken string
 	passkey    *authtest.Passkey
 	db         *pgxpool.Pool
+	reg        *entities.Registry
 	svc        app.Services
 	treg       *tregtest.Server
 	resend     *notifytest.Resend
@@ -166,7 +160,7 @@ func newServer(t *testing.T, mod ...func(*auth.Config)) client {
 }
 
 // serve starts srv as Byname with PUBLIC_URL publicURL, mounting /mcp the
-// way main does.
+// way main does, and a stand-in for the built app at /.
 func serve(t *testing.T, srv *httptest.Server, publicURL string, mod ...func(*auth.Config)) client {
 	t.Helper()
 	pool := testdb.New(t)
@@ -185,27 +179,30 @@ func serve(t *testing.T, srv *httptest.Server, publicURL string, mod ...func(*au
 	}
 	authn := &auth.Authenticator{Keys: auth.NewKeyStore(pool, auth.UnkeyConfig{}), Users: users, OAuth: auth.NewOAuthServer(pool, u)}
 	treg := tregtest.New(t)
-	settings := config.New(pool, config.Options{Secrets: cfg.Secrets, TregBaseURL: treg.URL})
-	res := results.New(pool)
 	resend, resendSrv := notifytest.NewResend(t, resendKey)
-	alerts := notify.New(pool, res, notify.Options{Secrets: cfg.Secrets, PublicURL: u, ResendBaseURL: resendSrv.URL})
 	google := searchtest.NewGoogle(t)
 	bing := searchtest.NewBing(t, bingKey)
-	traffic := search.New(pool, search.Options{Secrets: cfg.Secrets, BaseURLs: map[search.Provider]string{search.Google: google.URL, search.Bing: bing.URL},
-		GoogleClient: search.OAuthClient{ID: "test-client", Secret: "test-secret"}, PublicURL: u, Terms: settings})
 	github := githubtest.New(t, "northwind", "site", githubToken)
-	site := changes.New(pool, traffic, changes.Options{Secrets: cfg.Secrets, Alerts: alerts, GitHubBaseURL: github.URL})
-	mentions := social.New(pool, settings, social.Options{Alerts: alerts, BaseURLs: map[social.Network]string{social.Bluesky: fakeBluesky(t)}})
-	found := discovery.New(pool, settings, discovery.Options{})
-	svc := app.Services{Instance: instance.New("test", pool, settings, mentions, found), Config: settings,
-		Checks: checks.New(pool, settings, checks.Options{Alerts: alerts, Finder: found}), Results: res, Notify: alerts, Search: traffic, Changes: site, Social: mentions,
-		Discovery: found, Logos: logos.New(pool, settings, logos.Options{})}
-	mux := NewMux(svc, authn, slog.New(slog.DiscardHandler))
-	mux.Handle("/mcp", mcpserver.Handler(svc, authn.OAuth, "test"))
-	srv.Config.Handler = mux
+	reg, err := entities.Open(context.Background(), pool, entities.Options{
+		Version: "test", Secrets: cfg.Secrets, PublicURL: u, Log: slog.New(slog.DiscardHandler),
+		TregBaseURL: treg.URL, ResendBaseURL: resendSrv.URL,
+		GSCClient: search.OAuthClient{ID: "test-client", Secret: "test-secret"}, GSCBaseURL: google.URL, BingBaseURL: bing.URL,
+		GitHubBaseURL: github.URL, BlueskyBaseURL: fakeBluesky(t), SourcesAllowPrivate: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	log := slog.New(slog.DiscardHandler)
+	mux := NewMux(reg, authn, log)
+	mux.Handle("/mcp", mcpserver.Handler(reg.Default().Services, reg, authn.OAuth, "test"))
+	mux.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_, _ = io.WriteString(w, `<div id="root"></div>`)
+	}))
+	srv.Config.Handler = InEntity(reg, authn, log, mux)
 	srv.Start()
 	t.Cleanup(srv.Close)
-	return client{t: t, base: srv.URL, origin: publicURL, setupToken: token, db: pool, svc: svc, treg: treg, resend: resend, google: google, bing: bing, github: github}
+	return client{t: t, base: srv.URL, origin: publicURL, setupToken: token, db: pool, reg: reg, svc: reg.Default().Services, treg: treg, resend: resend, google: google, bing: bing, github: github}
 }
 
 func cookieValue(r reply, name string) string {
@@ -626,7 +623,11 @@ func TestKeyStoreOutageIs503(t *testing.T) {
 		t.Fatal(err)
 	}
 	authn := &auth.Authenticator{Keys: downKeys{}, Users: users, OAuth: auth.NewOAuthServer(pool, u)}
-	srv := httptest.NewServer(NewMux(app.Services{Instance: instance.New("test", nil, nil, nil, nil)}, authn, slog.New(slog.DiscardHandler)))
+	reg, err := entities.Open(context.Background(), pool, entities.Options{Version: "test", Secrets: secretbox.ForTest()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv := httptest.NewServer(NewMux(reg, authn, slog.New(slog.DiscardHandler)))
 	t.Cleanup(srv.Close)
 	r := client{t: t, base: srv.URL, key: "byn_whatever"}.do("GET", "/v1/status", nil)
 	var e struct {
@@ -664,13 +665,17 @@ func TestSettings(t *testing.T) {
 
 func TestSecurityHeaders(t *testing.T) {
 	const csp = "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'; object-src 'none'; base-uri 'none'; form-action 'self'"
+	reg, err := entities.Open(context.Background(), testdb.New(t), entities.Options{Version: "test", Secrets: secretbox.ForTest()})
+	if err != nil {
+		t.Fatal(err)
+	}
 	for _, publicURL := range []string{"http://localhost:8080", "https://byname.example.com"} {
 		u, _ := url.Parse(publicURL)
 		users, err := auth.NewUsers(nil, auth.Config{PublicURL: u, Secrets: secretbox.ForTest()})
 		if err != nil {
 			t.Fatal(err)
 		}
-		mux := NewMux(app.Services{}, &auth.Authenticator{Users: users, OAuth: auth.NewOAuthServer(nil, u)}, slog.New(slog.DiscardHandler))
+		mux := NewMux(reg, &auth.Authenticator{Users: users, OAuth: auth.NewOAuthServer(nil, u)}, slog.New(slog.DiscardHandler))
 		mux.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = io.WriteString(w, "<!doctype html>") }))
 		srv := httptest.NewServer(SecurityHeaders(u, mux))
 		t.Cleanup(srv.Close)
