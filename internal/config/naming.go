@@ -27,7 +27,7 @@ func (s *Service) MarkBrandQuestions(ctx context.Context) error {
 }
 
 func markBrandQuestions(ctx context.Context, q querier) error {
-	if _, err := q.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtext('byname.questions'))`); err != nil {
+	if _, err := q.Exec(ctx, `SELECT pg_advisory_xact_lock(`+questionsLock+`)`); err != nil {
 		return err
 	}
 	brands, mode, err := matchRules(ctx, q)

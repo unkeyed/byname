@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"time"
+
+	"github.com/unkeyed/byname/internal/db"
 )
 
 // jobs is each job this package logs to job_run, with its insert. Each
@@ -16,9 +18,9 @@ var jobs = map[string]string{
 }
 
 // locks keep two replicas from running the same work at once.
-const (
-	pollLock  = `hashtext('byname.changes.poll')`
-	watchLock = `hashtext('byname.changes.watch')`
+var (
+	pollLock  = db.WorkspaceLock("byname.changes.poll")
+	watchLock = db.WorkspaceLock("byname.changes.watch")
 )
 
 // pollEvery is the GitHub poll's period, fixed.

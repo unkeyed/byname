@@ -140,7 +140,7 @@ func MonthLookups(ctx context.Context, q interface {
 }
 
 // lock keeps two replicas from looking up the same brands at once.
-const lock = `hashtext('byname.logos')`
+var lock = db.WorkspaceLock("byname.logos")
 
 // due selects the brands to look up, most wanted first: yours, then your
 // competitors, then the brands answers name most that you don't track. A

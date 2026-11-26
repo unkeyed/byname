@@ -9,11 +9,13 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+
+	"github.com/unkeyed/byname/internal/db"
 )
 
 // syncLock keeps two replicas from syncing at once. Every provider shares
 // it, so one recovery step covers every provider's cut-off syncs.
-const syncLock = `hashtext('byname.search.sync')`
+var syncLock = db.WorkspaceLock("byname.search.sync")
 
 // SyncIfDue syncs each connected site once a day, and at once after a site
 // is picked or the credential replaced, provider by provider in registry

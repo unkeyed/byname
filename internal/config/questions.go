@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/unkeyed/byname/internal/core"
+	"github.com/unkeyed/byname/internal/db"
 )
 
 type Question struct {
@@ -181,6 +182,10 @@ func (s *Service) QuestionSets(ctx context.Context) ([]QuestionSetSummary, error
 	})
 }
 
+// questionsLock serializes changes to a workspace's question sets and to
+// which of its questions name its brand.
+var questionsLock = db.WorkspaceLock("byname.questions")
+
 // PutQuestions makes in the current question set. Sending the current set
 // again changes nothing; any other change creates the next version and
 // records how it carries on the current one.
@@ -190,7 +195,7 @@ func (s *Service) PutQuestions(ctx context.Context, in QuestionsInput) (Question
 	}
 	var out QuestionSet
 	err := pgx.BeginFunc(ctx, s.db, func(tx pgx.Tx) error {
-		if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtext('byname.questions'))`); err != nil {
+		if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(`+questionsLock+`)`); err != nil {
 			return err
 		}
 		cur, err := questionSet(ctx, tx, `(SELECT max(version) FROM question_set)`)

@@ -14,13 +14,14 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/unkeyed/byname/internal/db"
 	"github.com/unkeyed/byname/internal/engines"
 	"github.com/unkeyed/byname/internal/money"
 	"github.com/unkeyed/byname/internal/notify"
 )
 
 // lock keeps two replicas from fetching or sending a digest at once.
-const lock = `hashtext('byname.social')`
+var lock = db.WorkspaceLock("byname.social")
 
 // Tick is the scheduler's call each minute: fetch when the period since
 // the last fetch has passed, then emit the digest of a period that has

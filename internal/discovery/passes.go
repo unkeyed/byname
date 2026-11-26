@@ -10,12 +10,13 @@ import (
 
 	"github.com/unkeyed/byname/internal/config"
 	"github.com/unkeyed/byname/internal/core"
+	"github.com/unkeyed/byname/internal/db"
 	"github.com/unkeyed/byname/internal/engines"
 	"github.com/unkeyed/byname/internal/money"
 )
 
 // lock keeps two replicas from reading the same answers at once.
-const lock = `hashtext('byname.discovery')`
+var lock = db.WorkspaceLock("byname.discovery")
 
 // retryAfter is how long a failed read waits before a pass tries it again.
 const retryAfter = time.Hour
