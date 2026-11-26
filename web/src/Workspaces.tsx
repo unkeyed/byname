@@ -2,9 +2,9 @@ import { useId, useRef, useState, type FormEvent, type MouseEvent } from "react"
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "react-router";
 import { api, ApiError, type Workspace } from "./api";
-import { nav } from "./nav";
 import { keys, useIsAdmin } from "./queries";
-import { go, useWorkspace } from "./routing";
+import { go, openRoutes, useWorkspace } from "./routing";
+import { samePage } from "./samePage";
 import { Badge, Button, Card, CardHeader, cx, Dialog, DialogBody, ErrorNote, Field, Icon, Initials, inputClass, scrollArea } from "./ui";
 
 /** The slug the server gives a name when none is typed, as db.Slug makes it. */
@@ -16,11 +16,6 @@ export function slugify(name: string): string {
     .slice(0, 40)
     .replace(/-+$/, "");
   return s || "default";
-}
-
-function samePage(pathname: string): string {
-  const first = "/" + pathname.split("/")[1];
-  return first !== "/" && (nav.some((n) => n.to === first) || first === "/notifications") ? pathname : "";
 }
 
 function follow(e: MouseEvent<HTMLAnchorElement>, to: string) {
@@ -42,7 +37,7 @@ export function WorkspaceSwitcher({ rail, onNavigate }: { rail?: boolean; onNavi
   const [at, setAt] = useState({ top: 0, left: 0 });
   const [adding, setAdding] = useState(false);
   const name = current?.name ?? slug;
-  const page = samePage(pathname);
+  const page = samePage(pathname, openRoutes());
   const wideOnly = rail ? "hidden lg:block" : "block";
 
   const place = (e: MouseEvent<HTMLButtonElement>) => {

@@ -80,6 +80,9 @@ export function workspaceApp(slug: string, routes: RouteObject[]): WorkspaceApp 
   return open;
 }
 
+/** The open workspace's routes. */
+export const openRoutes = () => open?.router.routes ?? [];
+
 /** Drops everything cached for the session and opens the login page, coming back to next after. */
 export function toLogin(next?: string) {
   open?.router.dispose();
