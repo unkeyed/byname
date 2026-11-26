@@ -1,7 +1,7 @@
 import { createContext, useContext } from "react";
 import { keepPreviousData, MutationCache, QueryCache, QueryClient } from "@tanstack/react-query";
 import { createBrowserRouter, Navigate, useLocation, type RouteObject } from "react-router";
-import { ApiError } from "./api";
+import { ApiError, syncEntity } from "./api";
 import { keys, useWorkspaces } from "./queries";
 import { Button, ErrorNote, Spinner } from "./ui";
 import { Login } from "./pages/Login";
@@ -24,6 +24,10 @@ export const rootRouter = createBrowserRouter([
   { path: "/w/*", element: null },
   { path: "*", element: <ToDefault /> },
 ]);
+
+// Every navigation, Back and Forward included, passes through here, so
+// leaving a workspace ends its requests at once.
+rootRouter.subscribe(() => void syncEntity());
 
 /** The workspace a path is in, or "" for a page outside them. */
 export const workspaceOf = (path: string) => /^\/w\/([^/]+)/.exec(path)?.[1] ?? "";
@@ -48,7 +52,7 @@ function newClient() {
     defaultOptions: {
       queries: {
         staleTime: 10_000,
-        retry: (count, err) => !(err instanceof ApiError && err.status < 500) && count < 2,
+        retry: (count, err) => !(err instanceof ApiError && err.status < 500) && !(err instanceof DOMException && err.name === "AbortError") && count < 2,
       },
     },
   });

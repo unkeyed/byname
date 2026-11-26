@@ -1889,24 +1889,53 @@ export const needsReauth = (err: unknown) => err instanceof ApiError && err.code
 
 const shared = ["me", "account", "keys", "apps", "users", "invites", "credentials", "workspaces", "oauth"];
 
+let entity = { slug: "", left: new AbortController() };
+
 /**
- * The URL that reads or writes path in the workspace the page is in: the
- * page at /w/kyring/settings reads /w/kyring/v1/brands. It reads the address
- * at the time of the call, so a request sent after switching workspaces can
- * never reach the one left.
+ * Follows the address to the workspace it is in. Leaving a workspace, by
+ * the switcher or by Back and Forward, aborts every request still running
+ * in it, so a save that reads and then writes stops after the read instead
+ * of writing what it read into the workspace entered. The router calls
+ * this on every navigation, and each request before it is sent.
  */
-export function inWorkspace(path: string): string {
-  const slug = /^\/w\/([^/]+)/.exec(location.pathname)?.[1];
-  const rest = path.match(/^\/v1\/([^/?]+)/)?.[1];
-  return slug && rest && !shared.includes(rest) ? `/w/${slug}${path}` : path;
+export function syncEntity() {
+  const slug = /^\/w\/([^/]+)/.exec(location.pathname)?.[1] ?? "";
+  if (slug !== entity.slug) {
+    entity.left.abort(new DOMException(`left /w/${entity.slug}`, "AbortError"));
+    entity = { slug, left: new AbortController() };
+  }
+  return entity;
 }
 
-async function request<T>(method: string, path: string, opts: { body?: unknown } = {}): Promise<T> {
-  const res = await fetch(inWorkspace(path), {
+/** Whether path is one workspace's, rather than shared by every workspace. */
+function scoped(path: string) {
+  const rest = path.match(/^\/v1\/([^/?]+)/)?.[1];
+  return rest !== undefined && !shared.includes(rest);
+}
+
+/**
+ * The URL that reads or writes path in the workspace the page is in: the
+ * page at /w/kyring/settings reads /w/kyring/v1/brands.
+ */
+export function inWorkspace(path: string): string {
+  const { slug } = syncEntity();
+  return slug && scoped(path) ? `/w/${slug}${path}` : path;
+}
+
+/**
+ * A request in a workspace ends when the page leaves it: it rejects with
+ * an AbortError, even when the answer had already arrived.
+ */
+async function request<T>(method: string, path: string, opts: { body?: unknown; signal?: AbortSignal } = {}): Promise<T> {
+  const { slug, left } = syncEntity();
+  const inOne = slug !== "" && scoped(path);
+  const signal = inOne ? (opts.signal ? AbortSignal.any([left.signal, opts.signal]) : left.signal) : opts.signal;
+  const res = await fetch(inOne ? `/w/${slug}${path}` : path, {
     method,
     credentials: "same-origin",
     headers: opts.body === undefined ? undefined : { "Content-Type": "application/json" },
     body: opts.body === undefined ? undefined : JSON.stringify(opts.body),
+    signal,
   });
   if (!res.ok) {
     let message = res.statusText || `HTTP ${res.status}`;
@@ -1918,10 +1947,11 @@ async function request<T>(method: string, path: string, opts: { body?: unknown }
     } catch {
       // Not JSON (a proxy error page, say); keep the status text.
     }
+    signal?.throwIfAborted();
     throw new ApiError(res.status, message, code);
   }
-  if (res.status === 204) return undefined as T;
-  const text = await res.text();
+  const text = res.status === 204 ? "" : await res.text();
+  signal?.throwIfAborted();
   return (text ? JSON.parse(text) : undefined) as T;
 }
 
