@@ -117,49 +117,58 @@ func workspaceFiles() ([]workspaceFile, error) {
 	return files, nil
 }
 
-func migrateWorkspaces(ctx context.Context, pool *pgxpool.Pool) error {
-	files, err := workspaceFiles()
+func migrateWorkspaces(ctx context.Context, pool Pool) error {
+	all, err := Workspaces(ctx, pool)
 	if err != nil {
 		return err
 	}
-	rows, err := pool.Query(ctx, `SELECT `+workspaceColumns+`,
-		ARRAY(SELECT name FROM workspace_migration WHERE workspace_id = workspace.id)
-		FROM workspace ORDER BY id`)
-	if err != nil {
-		return err
-	}
-	type state struct {
-		w       Workspace
-		applied []string
-	}
-	all, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (state, error) {
-		var s state
-		var schema string
-		if err := r.Scan(&s.w.ID, &s.w.Slug, &s.w.Name, &schema, &s.w.CreatedAt, &s.applied); err != nil {
-			return s, err
-		}
-		s.w.Schema = parseSchema(schema)
-		return s, nil
-	})
-	if err != nil {
-		return err
-	}
-	for _, s := range all {
-		for _, f := range files {
-			if slices.Contains(s.applied, f.name) {
-				continue
-			}
-			if err := pgx.BeginFunc(ctx, pool, func(tx pgx.Tx) error {
-				if _, err := tx.Exec(ctx, migrateLock); err != nil {
-					return err
-				}
-				return applyWorkspaceLocked(ctx, tx, s.w, f)
-			}); err != nil {
-				return fmt.Errorf("migrate workspace %s with %s: %w", s.w.Slug, f.name, err)
-			}
+	for _, w := range all {
+		if err := MigrateWorkspace(ctx, pool, w); err != nil {
+			return err
 		}
 	}
 	return nil
+}
+
+// MigrateWorkspace applies every migrations/workspace file w has not
+// recorded, each in its own transaction holding the migrate lock, as
+// Migrate does at start. A workspace another replica's older binary made
+// lacks the files only this binary has.
+func MigrateWorkspace(ctx context.Context, pool Pool, w Workspace) error {
+	missing, err := missingWorkspaceFiles(ctx, pool, w.ID)
+	if err != nil {
+		return err
+	}
+	for _, f := range missing {
+		if err := pgx.BeginFunc(ctx, pool, func(tx pgx.Tx) error {
+			if _, err := tx.Exec(ctx, migrateLock); err != nil {
+				return err
+			}
+			return applyWorkspaceLocked(ctx, tx, w, f)
+		}); err != nil {
+			return fmt.Errorf("migrate workspace %s with %s: %w", w.Slug, f.name, err)
+		}
+	}
+	return nil
+}
+
+// WorkspaceMigrated reports whether the workspace with id has recorded
+// every migrations/workspace file this binary has.
+func WorkspaceMigrated(ctx context.Context, pool Pool, id int64) (bool, error) {
+	missing, err := missingWorkspaceFiles(ctx, pool, id)
+	return len(missing) == 0, err
+}
+
+func missingWorkspaceFiles(ctx context.Context, pool Pool, id int64) ([]workspaceFile, error) {
+	files, err := workspaceFiles()
+	if err != nil {
+		return nil, err
+	}
+	var applied []string
+	if err := pool.QueryRow(ctx, `SELECT ARRAY(SELECT name FROM workspace_migration WHERE workspace_id = $1)`, id).Scan(&applied); err != nil {
+		return nil, err
+	}
+	return slices.DeleteFunc(files, func(f workspaceFile) bool { return slices.Contains(applied, f.name) }), nil
 }
 
 func applyWorkspaceLocked(ctx context.Context, tx pgx.Tx, w Workspace, f workspaceFile) error {

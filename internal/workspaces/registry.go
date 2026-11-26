@@ -114,7 +114,10 @@ func (r *Registry) startLocked(l *live) {
 
 // Refresh brings every workspace row live that is not yet, and picks up
 // new names and slugs. Calling it again changes nothing, so a workspace
-// another replica made goes live here on the next call.
+// another replica made goes live here on the next call. A workspace goes
+// live only once it has every workspace migration this binary has: one
+// lacking a file is caught up first, and while that fails it is logged
+// and not served, and the next call tries again.
 func (r *Registry) Refresh(ctx context.Context) error {
 	r.refreshMu.Lock()
 	defer r.refreshMu.Unlock()
@@ -131,6 +134,10 @@ func (r *Registry) Refresh(ctx context.Context) error {
 		}
 		r.mu.Unlock()
 		if ok {
+			continue
+		}
+		if err := r.catchUp(ctx, w); err != nil {
+			r.log.Warn("not serving a workspace until it has every workspace migration; retrying on the next refresh", "workspace", w.Slug, "err", err)
 			continue
 		}
 		svc, run := r.build(w, db.In(r.pool, w.Schema))
@@ -305,26 +312,45 @@ func (r *Registry) Create(ctx context.Context, name, slug string) (Summary, erro
 	return r.summary(ctx, w.ID)
 }
 
-func (r *Registry) createSchema(ctx context.Context, name, slug string) (db.Workspace, error) {
+func (r *Registry) createSchema(ctx context.Context, name, slug string) (w db.Workspace, err error) {
+	err = r.asMigrator(ctx, func(pool db.Pool) error {
+		w, err = db.CreateWorkspace(ctx, pool, name, slug)
+		return err
+	})
+	return w, err
+}
+
+func (r *Registry) catchUp(ctx context.Context, w db.Workspace) error {
+	done, err := db.WorkspaceMigrated(ctx, r.pool, w.ID)
+	if err != nil || done {
+		return err
+	}
+	return r.asMigrator(ctx, func(pool db.Pool) error { return db.MigrateWorkspace(ctx, pool, w) })
+}
+
+// asMigrator runs f on a pool of the role that creates a workspace's
+// tables: MIGRATION_DATABASE_URL's when it is set, else DATABASE_URL's.
+// An error that is not the caller's says which role failed.
+func (r *Registry) asMigrator(ctx context.Context, f func(db.Pool) error) error {
 	if r.opts.MigrateDB == nil {
-		w, err := db.CreateWorkspace(ctx, r.pool, name, slug)
+		err := f(r.pool)
 		if pgErr := (*pgconn.PgError)(nil); errors.As(err, &pgErr) && pgErr.Code == "42501" {
-			return w, fmt.Errorf("%w: DATABASE_URL's role cannot create a workspace's tables; set MIGRATION_DATABASE_URL to a role that can", err)
+			return fmt.Errorf("%w: DATABASE_URL's role cannot create a workspace's tables; set MIGRATION_DATABASE_URL to a role that can", err)
 		}
-		return w, err
+		return err
 	}
 	cfg := r.opts.MigrateDB.Copy()
 	cfg.MaxConns = 1
 	pool, err := pgxpool.NewWithConfig(ctx, cfg)
 	if err != nil {
-		return db.Workspace{}, fmt.Errorf("connect to MIGRATION_DATABASE_URL: %w", err)
+		return fmt.Errorf("connect to MIGRATION_DATABASE_URL: %w", err)
 	}
 	defer pool.Close()
-	w, err := db.CreateWorkspace(ctx, pool, name, slug)
-	if err != nil && !errors.Is(err, db.ErrSlugTaken) {
-		return w, fmt.Errorf("create the workspace's tables at MIGRATION_DATABASE_URL: %w", err)
+	err = f(pool)
+	if err != nil && !errors.Is(err, db.ErrSlugTaken) && !errors.Is(err, db.ErrSlugReserved) {
+		return fmt.Errorf("create the workspace's tables at MIGRATION_DATABASE_URL: %w", err)
 	}
-	return w, err
+	return err
 }
 
 // Rename gives the workspace with slug a new name. Its slug stays.

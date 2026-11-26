@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/unkeyed/byname/internal/app"
@@ -158,27 +159,7 @@ func TestCreateAndRename(t *testing.T) {
 func TestCreateThroughTheMigrationRole(t *testing.T) {
 	ctx := context.Background()
 	admin := testdb.New(t)
-	role := fmt.Sprintf("byname_rw_%d", time.Now().UnixNano())
-	for _, sql := range []string{
-		`CREATE ROLE ` + role + ` LOGIN PASSWORD 'rw'`,
-		`GRANT pg_read_all_data, pg_write_all_data TO ` + role,
-	} {
-		if _, err := admin.Exec(ctx, sql); err != nil {
-			t.Fatal(err)
-		}
-	}
-	t.Cleanup(func() { _, _ = admin.Exec(context.Background(), `DROP ROLE IF EXISTS `+role) })
-	cfg := admin.Config().Copy()
-	cfg.ConnConfig.User, cfg.ConnConfig.Password = role, "rw"
-	db.RouteSchemas(cfg)
-	rw, err := pgxpool.NewWithConfig(ctx, cfg)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(rw.Close)
-	t.Cleanup(func() {
-		_, _ = admin.Exec(context.Background(), `REVOKE pg_read_all_data, pg_write_all_data FROM `+role)
-	})
+	rw := readWriteRole(t, admin)
 
 	r, err := Open(ctx, rw, opts)
 	if err != nil {
@@ -204,6 +185,87 @@ func TestCreateThroughTheMigrationRole(t *testing.T) {
 	if _, err := e.Services.Config.Brands(ctx); err != nil {
 		t.Fatalf("the read/write role cannot read the new workspace's tables: %v", err)
 	}
+}
+
+// A workspace goes live only with every workspace migration this binary
+// has, as one another replica's older binary made would lack a newer
+// file. The registry applies what is missing through the role Create
+// uses, and until that works the workspace is not served at all. Losing a
+// workspace_migration row stands in for the missing file.
+func TestAWorkspaceGoesLiveOnlyWithEveryWorkspaceMigration(t *testing.T) {
+	ctx := context.Background()
+	admin := testdb.New(t)
+	rw := readWriteRole(t, admin)
+	w, err := db.CreateWorkspace(ctx, admin, "Kyring", "kyring")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := admin.Exec(ctx, `DELETE FROM workspace_migration WHERE workspace_id = $1`, w.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	r, err := Open(ctx, rw, opts)
+	if err != nil {
+		t.Fatalf("Open with a workspace it cannot catch up = %v, want the others served", err)
+	}
+	if _, err := r.ByID(ctx, w.ID); !errors.Is(err, core.ErrNotFound) {
+		t.Fatalf("a workspace lacking a migration the read/write role cannot apply: ByID = %v, want not found", err)
+	}
+	if _, err := r.Lookup(ctx, "default"); err != nil {
+		t.Fatalf("the first workspace: %v, want it served", err)
+	}
+
+	schema := pgx.Identifier{w.Schema.String()}.Sanitize()
+	if _, err := admin.Exec(ctx, `DROP SCHEMA `+schema+` CASCADE; CREATE SCHEMA `+schema); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.Refresh(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.ByID(ctx, w.ID); !errors.Is(err, core.ErrNotFound) {
+		t.Fatalf("after another refresh as the read/write role: ByID = %v, want still not found", err)
+	}
+
+	withMigrate := opts
+	withMigrate.MigrateDB = admin.Config()
+	r, err = Open(ctx, rw, withMigrate)
+	if err != nil {
+		t.Fatal(err)
+	}
+	e, err := r.ByID(ctx, w.ID)
+	if err != nil {
+		t.Fatalf("with MIGRATION_DATABASE_URL: ByID = %v, want the workspace caught up and live", err)
+	}
+	if _, err := e.Services.Config.Brands(ctx); err != nil {
+		t.Fatalf("the caught-up workspace's tables: %v", err)
+	}
+}
+
+func readWriteRole(t *testing.T, admin *pgxpool.Pool) *pgxpool.Pool {
+	t.Helper()
+	ctx := context.Background()
+	role := fmt.Sprintf("byname_rw_%d", time.Now().UnixNano())
+	for _, sql := range []string{
+		`CREATE ROLE ` + role + ` LOGIN PASSWORD 'rw'`,
+		`GRANT pg_read_all_data, pg_write_all_data TO ` + role,
+	} {
+		if _, err := admin.Exec(ctx, sql); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Cleanup(func() { _, _ = admin.Exec(context.Background(), `DROP ROLE IF EXISTS `+role) })
+	cfg := admin.Config().Copy()
+	cfg.ConnConfig.User, cfg.ConnConfig.Password = role, "rw"
+	db.RouteSchemas(cfg)
+	rw, err := pgxpool.NewWithConfig(ctx, cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(rw.Close)
+	t.Cleanup(func() {
+		_, _ = admin.Exec(context.Background(), `REVOKE pg_read_all_data, pg_write_all_data FROM `+role)
+	})
+	return rw
 }
 
 // Anyone can ask for a made-up slug, so a lookup this process cannot
