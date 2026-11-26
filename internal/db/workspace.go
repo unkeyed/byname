@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -143,4 +144,64 @@ func CreateWorkspace(ctx context.Context, pool Pool, name, slug string) (Workspa
 		return Workspace{}, err
 	}
 	return w, nil
+}
+
+// SlugPattern is what a workspace slug must match, as the workspace
+// table's CHECK says, with at most MaxSlugLen characters.
+var SlugPattern = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
+
+const MaxSlugLen = 40
+
+var notSlug = regexp.MustCompile(`[^a-z0-9]+`)
+
+// Slug is the slug a workspace named name gets when none is chosen: its
+// letters and digits in lower case, each run of anything else a hyphen,
+// at most MaxSlugLen characters, or "default" when nothing is left. It is
+// what 019_workspaces.sql gave the first workspace.
+func Slug(name string) string {
+	s := strings.Trim(notSlug.ReplaceAllString(strings.ToLower(name), "-"), "-")
+	s = strings.TrimRight(s[:min(len(s), MaxSlugLen)], "-")
+	if s == "" {
+		return "default"
+	}
+	return s
+}
+
+// Workspaces lists every workspace, the first, which has the lowest id,
+// first.
+func Workspaces(ctx context.Context, pool Pool) ([]Workspace, error) {
+	rows, err := pool.Query(ctx, `SELECT `+workspaceColumns+` FROM workspace ORDER BY id`)
+	if err != nil {
+		return nil, err
+	}
+	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (Workspace, error) { return scanWorkspace(r) })
+}
+
+// ErrNoWorkspace is the answer about a slug no workspace has.
+var ErrNoWorkspace = errors.New("db: no workspace has this slug")
+
+// RenameWorkspace names the workspace with slug name. Its slug stays.
+func RenameWorkspace(ctx context.Context, pool Pool, slug, name string) (Workspace, error) {
+	w, err := scanWorkspace(pool.QueryRow(ctx, `UPDATE workspace SET name = $2 WHERE slug = $1 RETURNING `+workspaceColumns, slug, name))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Workspace{}, ErrNoWorkspace
+	}
+	return w, err
+}
+
+// CurrentWorkspace is the workspace pool's queries are bound to with In,
+// or the first workspace when they are bound to none.
+func CurrentWorkspace(ctx context.Context, pool Pool) (Workspace, error) {
+	return scanWorkspace(pool.QueryRow(ctx, `SELECT `+workspaceColumns+` FROM workspace WHERE schema_name = current_schema()`))
+}
+
+// NameFirstWorkspace names the workspace pool is bound to name, and gives
+// it name's Slug, while it still has the name and slug a new instance
+// starts with: Default and default. Any other workspace keeps the name it
+// was given. The slug stays default when another workspace has name's.
+func NameFirstWorkspace(ctx context.Context, pool Pool, name string) error {
+	_, err := pool.Exec(ctx, `UPDATE workspace w SET name = $1,
+			slug = CASE WHEN EXISTS (SELECT 1 FROM workspace o WHERE o.slug = $2) THEN w.slug ELSE $2 END
+		WHERE w.schema_name = current_schema() AND w.slug = 'default' AND w.name = 'Default'`, name, Slug(name))
+	return err
 }

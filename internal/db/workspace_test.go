@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"regexp"
 	"slices"
+	"strings"
 	"sync"
 	"testing"
 
@@ -272,5 +273,87 @@ func TestMigrateCatchesEveryWorkspaceUp(t *testing.T) {
 	}
 	if err := db.Migrate(ctx, pool); err != nil {
 		t.Fatalf("Migrate again: %v, want nothing left to do", err)
+	}
+}
+
+// Slug derives the same slug 019_workspaces.sql gave the first workspace.
+func TestSlugMatchesTheMigration(t *testing.T) {
+	ctx := context.Background()
+	pool := testdb.New(t)
+	for _, name := range []string{"Unkey", "Planet Fall", "  --Kyring & Co.--  ", "Ünïcode", "日本", "", "a" + strings.Repeat("-b", 30)} {
+		var want string
+		if err := pool.QueryRow(ctx, `SELECT coalesce(nullif(btrim(left(btrim(regexp_replace(lower($1), '[^a-z0-9]+', '-', 'g'), '-'), 40), '-'), ''), 'default')`,
+			name).Scan(&want); err != nil {
+			t.Fatal(err)
+		}
+		if got := db.Slug(name); got != want || !db.SlugPattern.MatchString(got) {
+			t.Errorf("Slug(%q) = %q, the migration gives %q", name, got, want)
+		}
+	}
+}
+
+func TestWorkspacesAreListedRenamedAndKnowThemselves(t *testing.T) {
+	ctx := context.Background()
+	pool := testdb.New(t)
+	second, err := db.CreateWorkspace(ctx, pool, "Kyring", "kyring")
+	if err != nil {
+		t.Fatal(err)
+	}
+	all, err := db.Workspaces(ctx, pool)
+	if err != nil || len(all) != 2 || all[0].Schema != db.Public || all[1].ID != second.ID {
+		t.Fatalf("Workspaces = %+v %v, want the first then kyring", all, err)
+	}
+	for _, c := range []struct {
+		pool db.Pool
+		want int64
+	}{{pool, all[0].ID}, {db.In(pool, second.Schema), second.ID}} {
+		if w, err := db.CurrentWorkspace(ctx, c.pool); err != nil || w.ID != c.want {
+			t.Errorf("CurrentWorkspace = %+v %v, want id %d", w, err, c.want)
+		}
+	}
+	w, err := db.RenameWorkspace(ctx, pool, "kyring", "Kyring CRM")
+	if err != nil || w.Name != "Kyring CRM" || w.Slug != "kyring" {
+		t.Fatalf("RenameWorkspace = %+v %v, want the new name and the same slug", w, err)
+	}
+	if _, err := db.RenameWorkspace(ctx, pool, "nope", "x"); !errors.Is(err, db.ErrNoWorkspace) {
+		t.Fatalf("renaming a missing workspace: %v, want ErrNoWorkspace", err)
+	}
+}
+
+// The first workspace takes its brand's name once, and no other workspace
+// ever does.
+func TestNameFirstWorkspace(t *testing.T) {
+	ctx := context.Background()
+	pool := testdb.New(t)
+	taken, err := db.CreateWorkspace(ctx, pool, "Planetfall", "planetfall")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.NameFirstWorkspace(ctx, db.In(pool, taken.Schema), "Something else"); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.NameFirstWorkspace(ctx, pool, "Planetfall"); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.NameFirstWorkspace(ctx, pool, "Unkey"); err != nil {
+		t.Fatal(err)
+	}
+	all, err := db.Workspaces(ctx, pool)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if all[0].Name != "Planetfall" || all[0].Slug != "default" {
+		t.Errorf("first workspace = %+v, want named Planetfall, keeping default as the slug planetfall is taken", all[0])
+	}
+	if all[1].Name != "Planetfall" || all[1].Slug != "planetfall" {
+		t.Errorf("second workspace = %+v, want it untouched", all[1])
+	}
+
+	fresh := testdb.New(t)
+	if err := db.NameFirstWorkspace(ctx, fresh, "Unkey Inc."); err != nil {
+		t.Fatal(err)
+	}
+	if w, err := db.CurrentWorkspace(ctx, fresh); err != nil || w.Name != "Unkey Inc." || w.Slug != "unkey-inc" {
+		t.Fatalf("first workspace = %+v %v, want Unkey Inc. at unkey-inc", w, err)
 	}
 }
