@@ -227,7 +227,10 @@ func (s *Service) TestChannel(ctx context.Context, id int64) (Channel, error) {
 		return Channel{}, err
 	}
 	now := s.now()
-	e := s.envelope(fmt.Sprintf("test-%d/channel-%d", now.UnixNano(), id), testPayload{}, c.Name, now)
+	e, err := s.envelope(ctx, fmt.Sprintf("test-%d/channel-%d", now.UnixNano(), id), testPayload{}, c.Name, now)
+	if err != nil {
+		return Channel{}, err
+	}
 	e.Payload = json.RawMessage(`{}`)
 	status := "ok"
 	if err := t.send(ctx, s, e); err != nil {

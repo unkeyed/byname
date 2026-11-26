@@ -300,7 +300,10 @@ func (s *Service) deliver(ctx context.Context, id, alertID, channelID int64) err
 	if err != nil {
 		return err
 	}
-	e := s.envelope(fmt.Sprintf("alert-%d/channel-%d", alertID, channelID), p, ch.Name, created)
+	e, err := s.envelope(ctx, fmt.Sprintf("alert-%d/channel-%d", alertID, channelID), p, ch.Name, created)
+	if err != nil {
+		return err
+	}
 	e.Payload = payload
 	return t.send(ctx, s, e)
 }
@@ -321,7 +324,7 @@ func (s *Service) record(ctx context.Context, id int64, attempts int, sendErr er
 	return err
 }
 
-func (s *Service) envelope(id string, p Payload, channel string, created time.Time) envelope {
+func (s *Service) envelope(ctx context.Context, id string, p Payload, channel string, created time.Time) (envelope, error) {
 	m := p.message()
 	if m.Lines == nil {
 		m.Lines = []string{}
@@ -329,11 +332,15 @@ func (s *Service) envelope(id string, p Payload, channel string, created time.Ti
 	if m.Action == "" {
 		m.Action = "Open in Byname"
 	}
-	return envelope{ID: id, Kind: p.Kind(), Message: m, URL: s.link(m.Path), All: s.link(NotificationsPath), Settings: s.link(SettingsPath), Channel: channel, CreatedAt: created}
-}
-
-func (s *Service) link(path string) string {
-	return s.public.Scheme + "://" + s.public.Host + path
+	w, err := db.CurrentWorkspace(ctx, s.db)
+	if err != nil {
+		return envelope{}, err
+	}
+	// Every link names its workspace, the default's too, so a message
+	// opens the workspace it is about whichever one the reader last had
+	// open.
+	link := func(path string) string { return s.public.Scheme + "://" + s.public.Host + "/w/" + w.Slug + path }
+	return envelope{ID: id, Kind: p.Kind(), Message: m, URL: link(m.Path), All: link(NotificationsPath), Settings: link(SettingsPath), Channel: channel, CreatedAt: created}, nil
 }
 
 // Alert is one event as the app shows it.

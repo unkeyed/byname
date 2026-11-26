@@ -13,6 +13,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/unkeyed/byname/internal/db"
 	"github.com/unkeyed/byname/internal/notify"
 	"github.com/unkeyed/byname/internal/notify/notifytest"
 	"github.com/unkeyed/byname/internal/results"
@@ -153,7 +154,7 @@ func TestWebhookSignatureVerifiesAndATamperedBodyFails(t *testing.T) {
 		t.Fatalf("requests = %+v, want one whose signature verifies", reqs)
 	}
 	var body notify.WebhookBody
-	if err := json.Unmarshal(reqs[0].Body, &body); err != nil || body.Kind != notify.CheckFailed || body.URL != "https://byname.example/settings/checks" {
+	if err := json.Unmarshal(reqs[0].Body, &body); err != nil || body.Kind != notify.CheckFailed || body.URL != "https://byname.example/w/default/settings/checks" {
 		t.Fatalf("body = %+v, %v", body, err)
 	}
 
@@ -266,12 +267,12 @@ func TestEmailChannels(t *testing.T) {
 			m := mail[0]
 			if m.User != "alerts" || m.TLS != (mode != notifytest.Plain) || m.From != "alerts@northwind.example" || len(m.To) != 2 ||
 				m.Subject != "Check #9 reached its spend cap" || !strings.Contains(m.Body, "the spend cap for one check is $5.00") ||
-				!strings.Contains(m.Body, "Open schedule and limits: https://byname.example/settings/schedule\nEvery notification: https://byname.example/notifications\n") {
+				!strings.Contains(m.Body, "Open schedule and limits: https://byname.example/w/default/settings/schedule\nEvery notification: https://byname.example/w/default/notifications\n") {
 				t.Fatalf("mail = %+v", m)
 			}
 			emails := resend.Emails()
 			if len(emails) != 1 || emails[0].Subject != m.Subject || emails[0].To[0] != "ops@northwind.example" || emails[0].IdempotencyKey == "" ||
-				!strings.Contains(emails[0].Text, "https://byname.example/settings/schedule") {
+				!strings.Contains(emails[0].Text, "https://byname.example/w/default/settings/schedule") {
 				t.Fatalf("Resend got %+v", emails)
 			}
 		})
@@ -308,7 +309,7 @@ func TestSlackGetsBlockKit(t *testing.T) {
 	}
 	if err := json.Unmarshal(reqs[0].Body, &msg); err != nil || msg.Text != "Paused claude-sonnet-5-5 on Claude Code" || len(msg.Blocks) != 2 ||
 		msg.Blocks[0].Type != "section" || !strings.Contains(msg.Blocks[0].Text.Text, "&lt;today&gt;") ||
-		len(msg.Blocks[1].Elements) != 1 || msg.Blocks[1].Elements[0].Text != "<https://byname.example/settings/ai-apps|Open AI apps settings> · <https://byname.example/notifications|Every notification>" {
+		len(msg.Blocks[1].Elements) != 1 || msg.Blocks[1].Elements[0].Text != "<https://byname.example/w/default/settings/ai-apps|Open AI apps settings> · <https://byname.example/w/default/notifications|Every notification>" {
 		t.Fatalf("Slack body = %s, %v", reqs[0].Body, err)
 	}
 }
@@ -364,5 +365,35 @@ func TestAnEditKeepsSecretsItLeavesOut(t *testing.T) {
 	resend.SetAPIKey("re_third")
 	if tested, _ := e.notify.TestChannel(ctx, c.ID); !strings.Contains(tested.LastTestStatus, "401") {
 		t.Fatalf("test with a revoked key = %q, want the 401 recorded", tested.LastTestStatus)
+	}
+}
+
+// Each workspace's messages link into that workspace.
+func TestLinksNameTheWorkspace(t *testing.T) {
+	ctx := context.Background()
+	e := setup(t, notify.Options{})
+	w, err := db.CreateWorkspace(ctx, e.db, "Kyring", "kyring")
+	if err != nil {
+		t.Fatal(err)
+	}
+	pool := db.In(e.db, w.Schema)
+	kyring := notify.New(pool, results.New(pool), notify.Options{Secrets: secretbox.ForTest(), PublicURL: &url.URL{Scheme: "https", Host: "byname.example"}})
+	rec, srv := notifytest.NewReceiver(t)
+	if _, err := kyring.CreateChannel(ctx, webhook("Kyring hook", srv.URL, notify.CheckFailed)); err != nil {
+		t.Fatal(err)
+	}
+	if err := kyring.Emit(ctx, failed(4)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := kyring.DeliverDue(ctx); err != nil {
+		t.Fatal(err)
+	}
+	reqs := rec.Requests()
+	var body notify.WebhookBody
+	if len(reqs) != 1 || json.Unmarshal(reqs[0].Body, &body) != nil || body.URL != "https://byname.example/w/kyring/settings/checks" {
+		t.Fatalf("Kyring's webhook got %+v, want a link into /w/kyring", body)
+	}
+	if n, err := e.notify.DeliverDue(ctx); err != nil || n != 0 {
+		t.Fatalf("the default workspace delivered %d, %v; want nothing of Kyring's", n, err)
 	}
 }
