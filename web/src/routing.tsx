@@ -98,11 +98,6 @@ export function useWorkspace() {
   return { slug, current: list.data?.find((w) => w.slug === slug), list };
 }
 
-/**
- * A path from before workspaces, such as a bookmark or an old notification's
- * link, opens the same page in the default workspace. The workspace's own
- * router then follows any page that moved.
- */
 function ToDefault() {
   const workspaces = useWorkspaces();
   const { pathname, search, hash } = useLocation();

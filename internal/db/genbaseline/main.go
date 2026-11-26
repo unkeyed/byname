@@ -108,9 +108,6 @@ func run(ctx context.Context, out string) error {
 	return os.Rename(tmp, filepath.Clean(out))
 }
 
-// workspaceRelations lists every table and view in public that is not
-// shared, and fails when a shared table is missing, so a typo in
-// db.SharedTables cannot copy a shared table into every workspace.
 func workspaceRelations(ctx context.Context, pool *pgxpool.Pool) ([]string, error) {
 	rows, err := pool.Query(ctx, `SELECT c.relname FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
 		WHERE n.nspname = 'public' AND c.relkind IN ('r', 'p', 'v', 'm', 'f') ORDER BY c.relname`)
@@ -169,9 +166,6 @@ func dump(ctx context.Context, user, database string, tables []string) (string, 
 	return strings.Trim(out.String(), "\n") + "\n", sc.Err()
 }
 
-// seedRows writes an INSERT for every row the migrations put in a
-// workspace table. Columns that default to now() are left to their
-// default, so a new workspace's rows carry the time it was made.
 func seedRows(ctx context.Context, pool *pgxpool.Pool, tables []string) (string, error) {
 	var out strings.Builder
 	for _, t := range tables {

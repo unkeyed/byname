@@ -30,12 +30,10 @@ export function Layout() {
   const theme = useTheme();
   const { slug, current, list } = useWorkspace();
   const canSetUp = useCan("config:write");
-  // Until an entity is set up, people who can finish it go to its onboarding and everyone else sees why the pages are empty. Settings stays open to all.
   const notSetUp = current?.onboarded === false && !location.pathname.startsWith("/settings");
   const missing = list.isSuccess && !current;
   const phoneBar = useMemo(() => (wide ? null : { open: () => setMenuOpen(true), end: <Bell /> }), [wide]);
 
-  // A 401 is already on its way to the login page.
   if (me.isPending || (list.isPending && !me.isError) || (me.error instanceof ApiError && me.error.status === 401)) {
     return (
       <div className="grid h-full place-items-center">

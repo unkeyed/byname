@@ -64,7 +64,6 @@ func TestWorkspacesOverHTTP(t *testing.T) {
 		}
 	}
 
-	// The team and keys are shared: the same under any prefix.
 	for _, path := range []string{"/v1/me", "/v1/keys", "/v1/users"} {
 		here, there := person.call("GET", path, nil, http.StatusOK, nil), person.call("GET", "/w/kyring"+path, nil, http.StatusOK, nil)
 		if !bytes.Equal(here.body, there.body) {

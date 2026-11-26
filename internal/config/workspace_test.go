@@ -20,8 +20,6 @@ import (
 // Each workspace sees only its own brand and questions, and every
 // workspace shares the team and the provider keys.
 func TestWorkspacesKeepTheirOwnSetup(t *testing.T) {
-	// One connection, so every query below runs on it, switching between
-	// the workspaces as it goes.
 	cfg := testdb.New(t).Config()
 	cfg.MaxConns = 1
 	pool, err := pgxpool.NewWithConfig(ctx, cfg)
@@ -90,8 +88,6 @@ func TestWorkspacesKeepTheirOwnSetup(t *testing.T) {
 		SELECT 'claude_code', true, 'provider', id FROM credential WHERE kind = 'anthropic'`); err != nil {
 		t.Fatalf("a workspace's surface on the shared key: %v", err)
 	}
-	// The key is in use whichever workspace asks: Kyring's AI app runs
-	// on it, though Northwind's do not.
 	w, err := db.CurrentWorkspace(ctx, second)
 	if err != nil {
 		t.Fatal(err)

@@ -44,9 +44,6 @@ func TestWorkspaceBaselineMatchesPublic(t *testing.T) {
 	}
 	owned := slices.DeleteFunc(slices.Clone(public), func(r string) bool { return slices.Contains(db.SharedTables, r) })
 
-	// Names are printed schema-qualified, then each schema's own tables are
-	// written as S, so a workspace object that points at public's copy of a
-	// workspace table still differs.
 	qualified := regexp.MustCompile(`\b(public|ws_[0-9]+)\.([a-z_][a-z0-9_]*)`)
 	normalize := func(schema string) func(string) string {
 		return func(s string) string {
@@ -73,11 +70,6 @@ func TestWorkspaceBaselineMatchesPublic(t *testing.T) {
 	}
 }
 
-// describe lists everything about schema's relations that queries can see,
-// one line each: the relations, their columns, constraints, indexes,
-// triggers, view definitions and rows. only limits it to those relations.
-// Columns defaulting to now() are left out of rows, since they hold when
-// each row was made.
 func describe(t *testing.T, pool *pgxpool.Pool, schema string, only []string, normalize func(string) string) []string {
 	t.Helper()
 	ctx := context.Background()
@@ -208,8 +200,6 @@ func TestANewInstanceStartsWithADefaultWorkspace(t *testing.T) {
 	}
 }
 
-// Creating a workspace again, after a crash or from several replicas at
-// once, returns the one workspace.
 func TestCreateWorkspaceIsIdempotent(t *testing.T) {
 	ctx := context.Background()
 	pool := testdb.New(t)
@@ -276,7 +266,6 @@ func TestMigrateCatchesEveryWorkspaceUp(t *testing.T) {
 	}
 }
 
-// Slug derives the same slug 019_workspaces.sql gave the first workspace.
 func TestSlugMatchesTheMigration(t *testing.T) {
 	ctx := context.Background()
 	pool := testdb.New(t)

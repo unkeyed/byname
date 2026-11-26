@@ -182,8 +182,6 @@ func (s *Service) QuestionSets(ctx context.Context) ([]QuestionSetSummary, error
 	})
 }
 
-// questionsLock serializes changes to a workspace's question sets and to
-// which of its questions name its brand.
 var questionsLock = db.WorkspaceLock("byname.questions")
 
 // PutQuestions makes in the current question set. Sending the current set

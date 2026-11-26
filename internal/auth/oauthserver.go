@@ -100,9 +100,6 @@ func (o *OAuthServer) ResourceMetadataURL(slug string) string {
 	return o.issuer + "/.well-known/oauth-protected-resource" + strings.TrimPrefix(o.Resource(slug), o.issuer)
 }
 
-// checkResource refuses a resource other than one of this instance's MCP
-// servers: /mcp, or /w/<slug>/mcp of a workspace that exists. An empty one
-// means the client named none.
 func (o *OAuthServer) checkResource(ctx context.Context, q dbtx, resource string) error {
 	resource = strings.TrimSuffix(resource, "/")
 	if resource == "" || resource == o.resource {

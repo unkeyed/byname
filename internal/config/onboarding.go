@@ -170,10 +170,6 @@ func (s *Service) SaveStep(ctx context.Context, key StepKey) (Onboarding, error)
 	return s.Onboarding(ctx)
 }
 
-// nameFirstWorkspace names the instance's first workspace after its brand
-// when it still has the name and slug a new instance starts with, before
-// any link to it exists. A workspace added later keeps the name it was
-// given.
 func (s *Service) nameFirstWorkspace(ctx context.Context) error {
 	var name string
 	err := s.db.QueryRow(ctx, `SELECT name FROM brand WHERE kind = 'self'`).Scan(&name)

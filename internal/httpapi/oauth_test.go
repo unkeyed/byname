@@ -166,8 +166,6 @@ func connect(t *testing.T, anon, person client, name string) (string, tokens) {
 	return connectTo(t, anon, person, name, anon.base+"/mcp")
 }
 
-// connectTo runs the whole flow for a new client that names resource in
-// its authorization and token requests.
 func connectTo(t *testing.T, anon, person client, name, resource string) (string, tokens) {
 	t.Helper()
 	id := register(t, anon, name, loopbackRedirect)

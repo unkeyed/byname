@@ -49,18 +49,15 @@ type Registry struct {
 	log   *slog.Logger
 	build func(db.Workspace, db.Pool) (app.Services, func(context.Context))
 
-	// refreshing keeps two refreshes from building the same workspace.
-	refreshing sync.Mutex
+	refreshMu sync.Mutex
 
 	mu      sync.RWMutex
 	byID    map[int64]*live
-	jobs    context.Context // Run's, nil until it runs
+	runCtx  context.Context
 	stopped bool
 	running sync.WaitGroup
 
-	now func() time.Time
-	// missedAt is when a lookup last refreshed for a workspace it did not
-	// know, unless that refresh found it.
+	now      func() time.Time
 	missMu   sync.Mutex
 	missedAt time.Time
 }
@@ -84,9 +81,9 @@ func Open(ctx context.Context, pool db.Pool, o Options) (*Registry, error) {
 // When ctx ends it returns once every job has stopped.
 func (r *Registry) Run(ctx context.Context) {
 	r.mu.Lock()
-	r.jobs = ctx
+	r.runCtx = ctx
 	for _, l := range r.byID {
-		r.start(l)
+		r.startLocked(l)
 	}
 	r.mu.Unlock()
 	t := time.NewTicker(refreshEvery)
@@ -107,21 +104,20 @@ func (r *Registry) Run(ctx context.Context) {
 	}
 }
 
-// start runs l's jobs unless they run already. The caller holds mu.
-func (r *Registry) start(l *live) {
-	if l.started || r.jobs == nil || r.stopped {
+func (r *Registry) startLocked(l *live) {
+	if l.started || r.runCtx == nil || r.stopped {
 		return
 	}
 	l.started = true
-	r.running.Go(func() { l.run(r.jobs) })
+	r.running.Go(func() { l.run(r.runCtx) })
 }
 
 // Refresh brings every workspace row live that is not yet, and picks up
 // new names and slugs. Calling it again changes nothing, so a workspace
 // another replica made goes live here on the next call.
 func (r *Registry) Refresh(ctx context.Context) error {
-	r.refreshing.Lock()
-	defer r.refreshing.Unlock()
+	r.refreshMu.Lock()
+	defer r.refreshMu.Unlock()
 	all, err := db.Workspaces(ctx, r.pool)
 	if err != nil {
 		return err
@@ -145,7 +141,7 @@ func (r *Registry) Refresh(ctx context.Context) error {
 		r.mu.Lock()
 		l = &live{Entity: Entity{Workspace: w, Services: svc}, run: run}
 		r.byID[w.ID] = l
-		r.start(l)
+		r.startLocked(l)
 		r.mu.Unlock()
 	}
 	return errors.Join(errs...)
@@ -188,15 +184,8 @@ func (r *Registry) ByID(ctx context.Context, id int64) (Entity, error) {
 	return e, err
 }
 
-// missRefreshEvery bounds how often lookups of workspaces this process
-// does not know refresh from the database. Anyone can send a made-up slug,
-// and each refresh is a query.
 const missRefreshEvery = 3 * time.Second
 
-// find is the live workspace match picks. When none is, it refreshes and
-// looks again, unless a refresh within missRefreshEvery found nothing
-// either. A refresh that finds it does not count: that happens once per
-// workspace.
 func (r *Registry) find(ctx context.Context, match func(db.Workspace) bool) (Entity, bool, error) {
 	inMemory := func() (Entity, bool) {
 		r.mu.RLock()
@@ -309,8 +298,6 @@ func (r *Registry) Create(ctx context.Context, name, slug string) (Summary, erro
 	return r.summary(ctx, w.ID)
 }
 
-// createSchema runs db.CreateWorkspace as MIGRATION_DATABASE_URL's role
-// when it is set, on a connection of its own that closes after.
 func (r *Registry) createSchema(ctx context.Context, name, slug string) (db.Workspace, error) {
 	if r.opts.MigrateDB == nil {
 		w, err := db.CreateWorkspace(ctx, r.pool, name, slug)

@@ -40,7 +40,6 @@ function Moved({ to }: { to: string }) {
   return <Navigate to={url.pathname + url.search + hash} replace />;
 }
 
-/** One workspace's pages, under its /w/<slug>. */
 const workspaceRoutes: RouteObject[] = [
   ...Object.entries(moved).map(([path, to]) => ({ path, element: <Moved to={to} /> })),
   { path: "/onboarding/:step?", element: <Onboarding /> },
@@ -76,7 +75,6 @@ const workspaceRoutes: RouteObject[] = [
   },
 ];
 
-/** The open workspace's pages, or the pages outside any workspace. */
 function App() {
   const slug = useSyncExternalStore(rootRouter.subscribe, () => workspaceOf(rootRouter.state.location.pathname));
   if (!slug) {

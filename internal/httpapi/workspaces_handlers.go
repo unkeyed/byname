@@ -11,8 +11,6 @@ func (s *server) listWorkspaces(w http.ResponseWriter, r *http.Request, _ core.A
 	return respond(w, http.StatusOK, v, err)
 }
 
-// createWorkspace takes {"name": "...", "slug": "..."}; slug is optional
-// and comes from the name when left out.
 func (s *server) createWorkspace(w http.ResponseWriter, r *http.Request, _ core.Actor) error {
 	var b struct {
 		Name string `json:"name"`
@@ -25,7 +23,6 @@ func (s *server) createWorkspace(w http.ResponseWriter, r *http.Request, _ core.
 	return respond(w, http.StatusCreated, v, err)
 }
 
-// renameWorkspace takes {"name": "..."}. A slug never changes.
 func (s *server) renameWorkspace(w http.ResponseWriter, r *http.Request, _ core.Actor) error {
 	var b struct {
 		Name string `json:"name"`

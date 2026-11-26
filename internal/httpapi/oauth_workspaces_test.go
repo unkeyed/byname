@@ -17,16 +17,12 @@ import (
 	"github.com/unkeyed/byname/internal/config"
 )
 
-// twoWorkspaces adds Kyring next to the default workspace, each with its
-// own competitor: Contoso in Kyring, Fabrikam in the default.
 func twoWorkspaces(person client) {
 	person.call("POST", "/v1/workspaces", map[string]string{"name": "Kyring"}, http.StatusCreated, nil)
 	person.call("POST", "/w/kyring/v1/brands", map[string]any{"name": "Contoso", "kind": "competitor"}, http.StatusOK, nil)
 	person.call("POST", "/v1/brands", map[string]any{"name": "Fabrikam", "kind": "competitor"}, http.StatusOK, nil)
 }
 
-// toolBrands calls list_brands and returns the names of the brands it
-// lists.
 func toolBrands(t *testing.T, cs *mcp.ClientSession) []string {
 	t.Helper()
 	res, err := cs.CallTool(context.Background(), &mcp.CallToolParams{Name: "list_brands"})

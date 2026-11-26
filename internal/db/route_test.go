@@ -83,8 +83,6 @@ func TestInRefusesAPoolThatDoesNotRoute(t *testing.T) {
 	db.In(p, db.Public)
 }
 
-// A workspace whose schema is gone gets an error, never the first
-// workspace's rows.
 func TestAMissingWorkspaceSchemaFailsInsteadOfReadingPublic(t *testing.T) {
 	ctx := context.Background()
 	pool := testdb.New(t)

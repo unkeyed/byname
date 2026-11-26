@@ -18,13 +18,11 @@ export function slugify(name: string): string {
   return s || "default";
 }
 
-/** Sections every workspace has, so switching keeps you on the same one. Anything else, such as setup, opens the workspace's home. */
 function samePage(pathname: string): string {
   const first = "/" + pathname.split("/")[1];
   return first !== "/" && (nav.some((n) => n.to === first) || first === "/notifications") ? pathname : "";
 }
 
-/** A plain click switches in place; a modified one opens a tab the browser's way. */
 function follow(e: MouseEvent<HTMLAnchorElement>, to: string) {
   if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
   e.preventDefault();
@@ -125,7 +123,6 @@ export function WorkspaceSwitcher({ rail, onNavigate }: { rail?: boolean; onNavi
   );
 }
 
-/** A taken slug is a 409, which names the slug in the server's words; this names it in the app's. */
 const addError = (err: unknown, slug: string) =>
   err instanceof ApiError && err.status === 409 ? new Error(`Another entity already uses the slug ${slug}. Type a different slug.`) : err;
 

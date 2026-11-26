@@ -48,8 +48,6 @@ type process struct {
 // process is one Byname process on the shared database.
 func (e *env) process(ticks <-chan time.Time) process { return e.processIn(e.db, ticks) }
 
-// processIn is one Byname process's scheduler for the workspace pool is
-// bound to.
 func (e *env) processIn(pool db.Pool, ticks <-chan time.Time) process {
 	clock := func() time.Time { return now }
 	cfg := config.New(pool, config.Options{Secrets: secretbox.ForTest(), TregBaseURL: e.treg.URL, Now: clock})

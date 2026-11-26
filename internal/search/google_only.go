@@ -39,11 +39,6 @@ func ParseReturn(s string) (Return, error) {
 	return "", fmt.Errorf("%w: return_to must be settings or onboarding, got %q", core.ErrInvalid, s)
 }
 
-// oauthState is what the state parameter carries through Google's consent
-// page, sealed so nobody else can mint or read one: who started the
-// connection, the PKCE verifier, when it stops being accepted, where the
-// browser goes back to, and the workspace the connection is for, since
-// every workspace shares the one callback.
 type oauthState struct {
 	UserID    int64  `json:"u"`
 	Verifier  string `json:"v"`

@@ -368,7 +368,6 @@ func TestAnEditKeepsSecretsItLeavesOut(t *testing.T) {
 	}
 }
 
-// Each workspace's messages link into that workspace.
 func TestLinksNameTheWorkspace(t *testing.T) {
 	ctx := context.Background()
 	e := setup(t, notify.Options{})

@@ -1887,7 +1887,6 @@ export class ApiError extends Error {
 
 export const needsReauth = (err: unknown) => err instanceof ApiError && err.code === "reauth_required";
 
-/** Endpoints that answer the same in every workspace, so they work on a page whose workspace is gone. */
 const shared = ["me", "account", "keys", "apps", "users", "invites", "credentials", "workspaces", "oauth"];
 
 /**

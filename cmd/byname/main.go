@@ -561,10 +561,6 @@ func run(log *slog.Logger) error {
 	return nil
 }
 
-// sealShared reseals the TOTP seeds and provider keys, which every
-// workspace shares, sealed under ENCRYPTION_KEY_PREVIOUS with
-// ENCRYPTION_KEY, so a rotation finishes with one restart. Each
-// workspace's own secrets are resealed as it goes live.
 func sealShared(ctx context.Context, log *slog.Logger, users *auth.Users, settings *instconfig.Service) error {
 	totp, err := users.SealTOTPSecrets(ctx)
 	if err != nil {

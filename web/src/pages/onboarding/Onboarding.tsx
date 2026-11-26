@@ -134,7 +134,6 @@ export function Onboarding() {
   const canEdit = useCan("config:write");
   const onboarding = useOnboarding();
   const workspaces = useWorkspace().list;
-  // A 401 is already on its way to the login page.
   if (me.isPending || workspaces.isPending || (canEdit && onboarding.isPending) || (me.error instanceof ApiError && me.error.status === 401)) {
     return (
       <div className="grid h-full place-items-center">
@@ -201,7 +200,6 @@ function Wizard({ steps, finished }: { steps: OnboardingStep[]; finished: boolea
       qc.setQueryData(keys.onboarding, o);
       const i = steps.findIndex((s) => s.key === key);
       const to = `/onboarding/${(steps[i + 1] ?? steps[i]).key}`;
-      // Saving the brand names a new instance's first entity after it, which can change its slug once.
       if (key === "brand") {
         const now = (await qc.fetchQuery({ queryKey: keys.workspaces, queryFn: api.workspaces.list, staleTime: 0 })).find((w) => w.id === here?.id);
         if (now && now.slug !== here?.slug) return go(`/w/${now.slug}${to}`, { replace: true });

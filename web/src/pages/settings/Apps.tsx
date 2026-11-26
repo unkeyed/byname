@@ -6,11 +6,6 @@ import { useWorkspace } from "../../routing";
 import { Badge, Card, CodeBlock, ConfirmButton, EmptyState, ErrorNote, Icon, Pending, RelativeTime } from "../../ui";
 import { SettingsHeader, SettingsSubhead } from "./Settings";
 
-/**
- * base is where the open entity's MCP server and API answer. The default
- * entity's is the bare origin, because its slug can still change once
- * during onboarding.
- */
 function snippets(base: string) {
   return {
     claude: `claude mcp add --transport http byname ${base}/mcp`,

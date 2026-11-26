@@ -15,15 +15,9 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// migrations/*.sql is the global track, applied once per database.
-// migrations/workspace/*.sql is the workspace track, applied to each
-// workspace's tables: public for the first workspace, ws_<id> for others.
-//
 //go:embed migrations/*.sql migrations/workspace/*.sql
 var migrations embed.FS
 
-// migrateLock serializes every migration and workspace creation, across
-// replicas.
 const migrateLock = `SELECT pg_advisory_xact_lock(hashtext('byname.migrate'))`
 
 // Migrate applies every migrations/NNN_*.sql not yet recorded in
@@ -123,9 +117,6 @@ func workspaceFiles() ([]workspaceFile, error) {
 	return files, nil
 }
 
-// migrateWorkspaces applies the workspace track to every workspace missing
-// a file. It reads what is missing first, so a role without DDL rights
-// still starts on an up-to-date database.
 func migrateWorkspaces(ctx context.Context, pool *pgxpool.Pool) error {
 	files, err := workspaceFiles()
 	if err != nil {
@@ -162,7 +153,7 @@ func migrateWorkspaces(ctx context.Context, pool *pgxpool.Pool) error {
 				if _, err := tx.Exec(ctx, migrateLock); err != nil {
 					return err
 				}
-				return applyWorkspace(ctx, tx, s.w, f)
+				return applyWorkspaceLocked(ctx, tx, s.w, f)
 			}); err != nil {
 				return fmt.Errorf("migrate workspace %s with %s: %w", s.w.Slug, f.name, err)
 			}
@@ -171,11 +162,7 @@ func migrateWorkspaces(ctx context.Context, pool *pgxpool.Pool) error {
 	return nil
 }
 
-// applyWorkspace applies f to w's tables unless w has recorded it. The
-// caller holds the migrate lock. The first workspace's file runs on the
-// connection's own search_path, as the global track does; any other's
-// finds its own schema first and the shared tables after it.
-func applyWorkspace(ctx context.Context, tx pgx.Tx, w Workspace, f workspaceFile) error {
+func applyWorkspaceLocked(ctx context.Context, tx pgx.Tx, w Workspace, f workspaceFile) error {
 	var applied bool
 	if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM workspace_migration WHERE workspace_id = $1 AND name = $2)`,
 		w.ID, f.name).Scan(&applied); err != nil {

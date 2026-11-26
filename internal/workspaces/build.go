@@ -102,10 +102,6 @@ func Build(w db.Workspace, pool db.Pool, o Options) (app.Services, func(context.
 	return svc, run
 }
 
-// prepare brings a workspace's stored state up to this release before it
-// serves: questions that name its brand are marked, and its own secrets
-// are resealed with the current ENCRYPTION_KEY. The provider keys are
-// shared, so main reseals them once.
 func prepare(ctx context.Context, w db.Workspace, svc app.Services, log *slog.Logger) error {
 	if err := svc.Config.MarkBrandQuestions(ctx); err != nil {
 		return fmt.Errorf("workspace %s: mark the questions that name its brand: %w", w.Slug, err)
@@ -129,6 +125,4 @@ func prepare(ctx context.Context, w db.Workspace, svc app.Services, log *slog.Lo
 	return nil
 }
 
-// refreshEvery is how often a process looks for workspaces another
-// replica created.
 const refreshEvery = time.Minute

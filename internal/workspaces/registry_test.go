@@ -21,8 +21,6 @@ import (
 
 var opts = Options{Version: "test", Secrets: secretbox.ForTest(), Log: slog.New(slog.DiscardHandler)}
 
-// jobCounter stands in for each workspace's jobs, counting how many are
-// running, per workspace.
 type jobCounter struct {
 	running map[int64]*atomic.Int32
 }
@@ -87,7 +85,6 @@ func TestAWorkspaceAnotherReplicaMadeGoesLiveOnce(t *testing.T) {
 		t.Fatalf("built %d workspaces, want each of the 2 built once", len(jobs.running))
 	}
 
-	// A slug this process has not seen goes live on the lookup itself.
 	if _, err := other.Create(ctx, "Planetfall", "pf"); err != nil {
 		t.Fatal(err)
 	}
@@ -180,7 +177,6 @@ func TestCreateThroughTheMigrationRole(t *testing.T) {
 	}
 	t.Cleanup(rw.Close)
 	t.Cleanup(func() {
-		// The role owns nothing, but its grants must go before it can.
 		_, _ = admin.Exec(context.Background(), `REVOKE pg_read_all_data, pg_write_all_data FROM `+role)
 	})
 
@@ -246,7 +242,6 @@ func TestUnknownSlugsRefreshAtMostOnceAWhile(t *testing.T) {
 	if e, err := r.Lookup(ctx, "kyring"); err != nil || e.Workspace.ID != kyring.ID {
 		t.Fatalf("Lookup(kyring) once the wait is over = %+v %v", e.Workspace, err)
 	}
-	// That refresh found what it looked for, so it holds nothing back.
 	pf, err := other.Create(ctx, "Planetfall", "pf")
 	if err != nil {
 		t.Fatal(err)
@@ -255,7 +250,6 @@ func TestUnknownSlugsRefreshAtMostOnceAWhile(t *testing.T) {
 		t.Fatalf("ByID(pf) right after a refresh that found kyring = %+v %v", e.Workspace, err)
 	}
 
-	// Create answers from its own refresh, whatever a lookup just missed.
 	if _, err := r.Lookup(ctx, "still-nope"); !errors.Is(err, core.ErrNotFound) {
 		t.Fatal(err)
 	}

@@ -117,9 +117,6 @@ type credentialUse struct {
 	CredentialUse
 }
 
-// credentialUses reads every workspace's surfaces, since the keys are
-// shared: a key one workspace no longer uses may still run another's
-// checks. They come in workspace order, then registry order.
 func (s *Service) credentialUses(ctx context.Context) ([]credentialUse, error) {
 	rows, err := s.db.Query(ctx, `SELECT name, slug, schema_name FROM workspace ORDER BY id`)
 	if err != nil {

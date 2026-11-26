@@ -55,9 +55,6 @@ func TestRoleChecksMatchCore(t *testing.T) {
 	}
 }
 
-// checkValues reads the values each single-column IN CHECK on table's
-// column allows, in schema, from the live database: the migrations that
-// set them span both tracks, so no one file says what they are now.
 func checkValues(t *testing.T, pool *pgxpool.Pool, schema, table, column string) [][]string {
 	t.Helper()
 	rows, err := pool.Query(context.Background(), `SELECT pg_get_constraintdef(c.oid) FROM pg_constraint c
@@ -85,7 +82,6 @@ func checkValues(t *testing.T, pool *pgxpool.Pool, schema, table, column string)
 
 var literal = regexp.MustCompile(`'([^']*)'`)
 
-// quoted is the sorted string literals in a constraint or view definition.
 func quoted(def string) []string {
 	var vals []string
 	for _, m := range literal.FindAllStringSubmatch(def, -1) {
@@ -95,8 +91,6 @@ func quoted(def string) []string {
 	return vals
 }
 
-// migratedSchemas is a migrated database and the schemas of its two
-// workspaces: public, the first's, and a later one's.
 func migratedSchemas(t *testing.T) (*pgxpool.Pool, []string) {
 	t.Helper()
 	pool := testdb.New(t)
@@ -160,8 +154,6 @@ func kindStrings(kinds []panel.BrandKind) []string {
 	return out
 }
 
-// TestTrackedBrandMatchesPanel fails when each workspace's tracked_brand
-// view holds other kinds than panel.TrackedKinds.
 func TestTrackedBrandMatchesPanel(t *testing.T) {
 	pool, schemas := migratedSchemas(t)
 	for _, schema := range schemas {
@@ -175,8 +167,6 @@ func TestTrackedBrandMatchesPanel(t *testing.T) {
 	}
 }
 
-// TestCredentialKindsMatchEngines fails when the shared credential table
-// allows other kinds than internal/engines.
 func TestCredentialKindsMatchEngines(t *testing.T) {
 	pool := testdb.New(t)
 	var kinds []string

@@ -11,8 +11,6 @@ import (
 
 type schemaKey struct{}
 
-// pathKey is where a connection remembers which workspace's search_path it
-// has, so switching costs a round trip and staying costs none.
 const pathKey = "byname.schema"
 
 // RouteSchemas points each connection a pool built from cfg hands out at
@@ -27,8 +25,6 @@ func RouteSchemas(cfg *pgxpool.Config) {
 		if have, _ := data[pathKey].(Schema); have == want {
 			return true, nil
 		}
-		// The first workspace's path is the connection's own, so an
-		// instance with one workspace never sets it.
 		if want == Public {
 			if _, err := conn.Exec(ctx, `RESET search_path`); err != nil {
 				return false, err

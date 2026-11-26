@@ -58,7 +58,6 @@ var routes = []route{
 
 	{"GET /v1/status", needs(core.ResultsRead), (*server).status},
 
-	// Workspaces: each brand this instance tracks.
 	{"GET /v1/workspaces", needs(core.ResultsRead), (*server).listWorkspaces},
 	{"POST /v1/workspaces", admin, (*server).createWorkspace},
 	{"PATCH /v1/workspaces/{slug}", admin, (*server).renameWorkspace},
@@ -242,8 +241,6 @@ var routes = []route{
 //go:embed openapi.yaml
 var openapiYAML []byte
 
-// server is shared by every workspace. wrap hands each handler a copy
-// whose svc is the services of the workspace the request is for.
 type server struct {
 	svc   app.Services
 	reg   *workspaces.Registry
@@ -325,8 +322,6 @@ func (s *server) wrap(rt route) http.Handler {
 	})
 }
 
-// workspace is the workspace r is for: the one InWorkspace found from its
-// /w/<slug> prefix, or the default when the path has none.
 func (s *server) workspace(r *http.Request) workspaces.Entity {
 	if e, ok := workspaces.FromContext(r.Context()); ok {
 		return e

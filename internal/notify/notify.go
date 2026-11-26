@@ -339,9 +339,6 @@ func (s *Service) envelope(ctx context.Context, id string, p Payload, channel st
 	// The id is the email API's idempotency key, and two workspaces may
 	// send through one API key.
 	id = db.KeyScope(s.db) + id
-	// Every link names its workspace, the default's too, so a message
-	// opens the workspace it is about whichever one the reader last had
-	// open.
 	link := func(path string) string { return s.public.Scheme + "://" + s.public.Host + "/w/" + w.Slug + path }
 	return envelope{ID: id, Kind: p.Kind(), Message: m, URL: link(m.Path), All: link(NotificationsPath), Settings: link(SettingsPath), Channel: channel, CreatedAt: created}, nil
 }

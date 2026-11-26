@@ -37,8 +37,6 @@ func (s Schema) String() string {
 	return "ws_" + strconv.FormatInt(s.id, 10)
 }
 
-// searchPath finds s's tables first and the shared tables, which exist in
-// public only, after them.
 func (s Schema) searchPath() string {
 	return pgx.Identifier{s.String()}.Sanitize() + ", public"
 }
@@ -134,7 +132,7 @@ func CreateWorkspace(ctx context.Context, pool Pool, name, slug string) (Workspa
 			return ErrSlugTaken
 		}
 		for _, f := range files {
-			if err := applyWorkspace(ctx, tx, w, f); err != nil {
+			if err := applyWorkspaceLocked(ctx, tx, w, f); err != nil {
 				return fmt.Errorf("migrate workspace %s with %s: %w", w.Slug, f.name, err)
 			}
 		}
