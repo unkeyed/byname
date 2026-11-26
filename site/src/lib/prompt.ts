@@ -1,7 +1,7 @@
 // The prompt a coding agent follows to deploy Byname on Unkey through
 // Unkey's MCP server. The landing page shows it with a copy button, and
 // /deploy-prompt.md serves it as plain Markdown for agents.
-export const deployPrompt = `Deploy Byname (https://github.com/unkeyed/byname) to Unkey for me, using Unkey's MCP server. Byname tracks how a brand shows up in AI answers and in Google search. The repository's docs/deploy-unkey.md is the reference for Byname's settings.
+export const deployPrompt = `Deploy Byname (https://github.com/unkeyed/byname) to Unkey for me, using Unkey's MCP server. Byname tracks how a brand shows up in AI answers and in Google and Bing search. The repository's docs/deploy-unkey.md is the reference for Byname's settings.
 
 1. Connect to Unkey
    Check that Unkey's MCP tools are available (for example projects.listProjects). If they are not:
@@ -47,6 +47,6 @@ export const deployPrompt = `Deploy Byname (https://github.com/unkeyed/byname) t
 9. Check and hand over
    - PUBLIC_URL/healthz and PUBLIC_URL/auth/setup/SETUP_TOKEN both answer 200, and PUBLIC_URL/.env answers 403.
    - Give me PUBLIC_URL/setup/SETUP_TOKEN to create the first account with a passkey. Tell me to add a second passkey under Settings > Account.
-   - Tell me the next stop is onboarding: my brand and domain, competitors, questions, the AI apps to ask with a Treg token or my own keys, the search engines to read, social mentions, and the schedule with spend caps. Nothing runs until I finish it.
+   - Tell me the next stop is onboarding: my brand and domain, competitors, questions, the AI apps to ask with a Treg token or my own keys, the search engines to read, social mentions, and the schedule, how many times to ask each question and the spend caps. Nothing runs until I finish it.
    - Tell me that each later deploy leaves the previous deployment running, and to stop it once the new one is current.
    - Finish with a short summary: the URL, the Unkey project, the variables you set, where the encryption key is saved, and anything you could not do.`;

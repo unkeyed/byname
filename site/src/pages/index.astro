@@ -127,15 +127,15 @@ import { repo, summary, title } from "../lib/site";
       <svg class="story-arrow" viewBox="0 0 80 40" aria-hidden="true"><path class="draw" pathLength="1" d="M4 22 C 24 30, 48 28, 70 18 M60 15 L71 18 L64 27" style="--d:.5s" /></svg>
       <figure class="sheet alert" aria-labelledby="alert-cap">
         <header class="alert-head"><span class="alert-av" aria-hidden="true">b</span><span><b id="alert-cap">Byname</b><small>Notification</small></span></header>
-        <p class="alert-title">Check #7: 1 gained, 6 lost</p>
-        <p>Named in 24 of 36 answers.</p>
-        <p>Since check #6: 1 gained, 6 lost, 17 moved, net -5.</p>
+        <p class="alert-title">Check #7: named you less often, 83% → 67%</p>
+        <p>AI apps named you in 24 of 36 answers (67%, likely between 50% and 80%).</p>
+        <p>Since check #6, 6 AI apps stopped naming you on a question and 17 moved your position on one.</p>
+        <p>Chance alone gives a move this large about 4 times in 100.</p>
         <ul>
-          <li>1 gained, 1 lost, 4 moved: What is the easiest way to add API keys and rate limits to an existing API?</li>
-          <li><span class="mk" data-mark="underline" data-tone="instead">3 lost</span>, 3 moved: Which API platform has the most predictable pricing for a startup?</li>
-          <li>1 lost, 5 moved: How do I move an API off a single VPS without downtime?</li>
+          <li>“Which API platform has the most predictable pricing for a startup?”: <span class="mk" data-mark="underline" data-tone="instead">3 AI apps stopped naming you</span> and 3 moved your position.</li>
+          <li>“How do I move an API off a single VPS without downtime?”: 1 AI app stopped naming you and 5 moved your position.</li>
         </ul>
-        <p class="alert-link">Open in Byname</p>
+        <p class="alert-link">See what changed</p>
       </figure>
     </div>
     <div class="proof">
@@ -146,6 +146,33 @@ import { repo, summary, title } from "../lib/site";
           <source media="(prefers-color-scheme: dark)" srcset="/screens/compare-lost-dark.webp" width="1818" height="1066" />
           <img src="/screens/compare-lost.webp" width="1818" height="1066" loading="lazy" decoding="async" alt="Byname's What changed view for check #6 against check #7, showing the 6 lost answers. The pricing question lost Claude Code with claude-sonnet-5-5 (#2, then linked but not named), Codex CLI (#3, then not named) and the ChatGPT app (#2, then not named)." />
         </picture>
+      </figure>
+    </div>
+  </section>
+
+  <section class="sec wrap" id="noise" aria-labelledby="noise-title">
+    <div class="sec-head">
+      <h2 id="noise-title">Answers vary. <em>Know which moves are real.</em></h2>
+    </div>
+    <div class="story story-2" data-reveal>
+      <figure class="sheet clip" aria-labelledby="tries-cap">
+        <header class="sheet-head"><span id="tries-cap"><b>Check #9</b> · ChatGPT app</span><span>Asked 3 times</span></header>
+        <p class="q">Which API platform has the most predictable pricing for a startup?</p>
+        <ol class="tries">
+          <li><span class="try-n">Answer 1</span><span><b class="mk" data-mark="circle">Unkey</b> <span class="note you">named #2</span></span></li>
+          <li><span class="try-n">Answer 2</span><span><b class="mk" data-mark="underline" data-tone="instead">Fly.io</b> <span class="note instead">named instead</span></span></li>
+          <li><span class="try-n">Answer 3</span><span><b class="mk" data-mark="circle">Unkey</b> <span class="note you">named #3</span></span></li>
+        </ol>
+        <footer class="sheet-foot"><span>Named in <b class="you-now">2 of 3</b>, so it counts, at #2</span><span>Check #8: 1 of 3</span></footer>
+      </figure>
+      <svg class="story-arrow" viewBox="0 0 80 40" aria-hidden="true"><path class="draw" pathLength="1" d="M4 24 C 22 10, 46 10, 70 20 M61 13 L71 20 L60 25" /></svg>
+      <figure class="sheet alert" aria-labelledby="noise-cap">
+        <header class="alert-head"><span class="alert-av" aria-hidden="true">b</span><span><b id="noise-cap">Byname</b><small>Notification</small></span></header>
+        <p class="alert-title">Check #9: no real change</p>
+        <p>AI apps named you in 88 of 108 answers (81%, likely between 73% and 88%).</p>
+        <p>Since check #8, 3 AI apps started naming you on a question and 1 stopped naming you on one.</p>
+        <p>Chance alone gives a move this large <span class="mk" data-mark="underline">about 56 times in 100</span>, so it may be noise.</p>
+        <p class="alert-link">See what changed</p>
       </figure>
     </div>
   </section>
@@ -220,8 +247,9 @@ import { repo, summary, title } from "../lib/site";
     </div>
     <div class="chart-block" data-reveal>
       <figure class="chart sheet">
-        <figcaption class="chart-cap"><span>Clicks per day · unkey.com, example data</span><span>Aug 23 to Nov 20, 2026</span></figcaption>
+        <figcaption class="chart-cap"><span>Clicks per day from Google · unkey.com, example data</span><span>Aug 23 to Nov 20, 2026</span></figcaption>
         <SearchChart />
+        <p class="chart-foot">Reads Google Search Console and Bing Webmaster Tools, each engine on its own.</p>
       </figure>
       <div class="verdict">
         <div class="verdict-text">
@@ -248,7 +276,8 @@ import { repo, summary, title } from "../lib/site";
     <figure class="sheet alert social-digest" data-reveal aria-labelledby="digest-cap">
       <header class="alert-head"><span class="alert-av" aria-hidden="true">b</span><span><b id="digest-cap">Byname</b><small>Weekly social digest</small></span></header>
       <p class="alert-title">23 posts named Unkey this week</p>
-      <p>X 9 · Reddit 6 · Hacker News 3 · Bluesky 3 · LinkedIn 2. Your team's own accounts are left out.</p>
+      <p>X 9 · Reddit 6 · Hacker News 3 · Bluesky 3 · LinkedIn 2.</p>
+      <p>Your team's own accounts, and the topics and subreddits you hid, are left out.</p>
       <ul>
         <li><b>Hacker News</b> · “Show HN: we moved our API keys to Unkey and deleted 2,000 lines” · 184 points</li>
         <li><b>Reddit</b> · r/webdev · “Unkey vs rolling your own rate limiter?” · 41 comments</li>
@@ -268,9 +297,9 @@ import { repo, summary, title } from "../lib/site";
         <div class="t-body">
           <p class="t-user"><span aria-hidden="true">&gt;</span> Which questions did we lose in check #7?</p>
           <p class="t-call"><b>byname</b> compare_runs <span>before=6 after=7</span></p>
-          <p class="t-res">1 gained · <span class="mk" data-mark="circle" data-tone="instead" data-pad="8 4">6 lost</span> · 17 moved · net -5</p>
+          <p class="t-res"><span class="mk" data-mark="circle" data-tone="instead" data-pad="8 4">6 lost</span> · 17 moved · net -6 · real move</p>
           <div class="t-say">
-            <p>Check #7 lost 6 answers that check #6 had:</p>
+            <p>In check #7, 6 AI apps stopped naming you on a question, a real drop and not noise:</p>
             <ul>
               <li><q>Which API platform has the most predictable pricing for a startup?</q> on Claude Code with Sonnet, Codex CLI and the ChatGPT app.</li>
               <li><q>What is the easiest way to add API keys and rate limits to an existing API?</q> on the ChatGPT app.</li>
@@ -288,6 +317,40 @@ import { repo, summary, title } from "../lib/site";
 claude mcp add --transport http byname \
   https://byname.example.com/mcp</pre>
         </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec wrap" id="brands" aria-labelledby="brands-title">
+    <div class="sec-head">
+      <h2 id="brands-title">Every brand you run. <em>One install.</em></h2>
+    </div>
+    <div class="brands" data-reveal>
+      <figure class="sheet switcher" aria-labelledby="switcher-cap">
+        <p class="sw-head" id="switcher-cap">Entities</p>
+        <ul>
+          <li class="on"><span class="ini" aria-hidden="true">U</span><span class="sw-name">Unkey</span><span class="sw-path">/e/unkey</span></li>
+          <li><span class="ini" aria-hidden="true">B</span><span class="sw-name">Byname</span><span class="sw-path">/e/byname</span></li>
+          <li><span class="ini" aria-hidden="true">K</span><span class="sw-name">Kyring</span><span class="sw-badge">Not set up</span></li>
+        </ul>
+        <p class="sw-add"><span aria-hidden="true">+</span> Add entity</p>
+      </figure>
+      <div class="sheet split">
+        <div>
+          <h3>Each brand has its own</h3>
+          <ul class="filed">
+            <li>Questions and competitors</li><li>AI apps and schedule</li><li>Results and notifications</li><li>Search engines and social</li><li>MCP server</li>
+          </ul>
+        </div>
+        <div>
+          <h3>Every brand shares</h3>
+          <ul class="filed">
+            <li>Your team and sign-in</li><li>API keys and connected apps</li><li>Treg token and provider keys</li>
+          </ul>
+        </div>
+<pre class="code"><span class="c"># One sign-in covers every brand</span>
+claude mcp add --transport http byname-kyring \
+  https://byname.example.com/e/kyring/mcp</pre>
       </div>
     </div>
   </section>
