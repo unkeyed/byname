@@ -32,9 +32,10 @@ func New(t testing.TB) *pgxpool.Pool {
 	return Through(t, "")
 }
 
-// Through is New applying the migrations through the file named last
-// only, such as 016_social_filters.sql, so a test can seed a database the
-// way an earlier release left it and then upgrade it with db.Migrate.
+// Through is New applying the global migrations through the file named
+// last only, such as 016_social_filters.sql, so a test can seed a database
+// the way an earlier release left it and then upgrade it with db.Migrate.
+// An empty last applies every migration, as New does.
 func Through(t testing.TB, last string) *pgxpool.Pool {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -63,7 +64,11 @@ func Through(t testing.TB, last string) *pgxpool.Pool {
 		t.Fatalf("testdb: connect %s: %v", name, err)
 	}
 	t.Cleanup(pool.Close)
-	if err := db.MigrateThrough(ctx, pool, last); err != nil {
+	migrate := db.Migrate
+	if last != "" {
+		migrate = func(ctx context.Context, pool *pgxpool.Pool) error { return db.MigrateThrough(ctx, pool, last) }
+	}
+	if err := migrate(ctx, pool); err != nil {
 		t.Fatalf("testdb: migrate %s: %v", name, err)
 	}
 	return pool

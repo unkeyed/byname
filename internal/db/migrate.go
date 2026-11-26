@@ -1,4 +1,5 @@
-// Package db applies the embedded SQL migrations at startup.
+// Package db applies the embedded SQL migrations at startup and routes
+// each query to its workspace's tables.
 package db
 
 import (
@@ -6,6 +7,7 @@ import (
 	"embed"
 	"fmt"
 	"io/fs"
+	"path"
 	"slices"
 	"sort"
 
@@ -13,22 +15,35 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-//go:embed migrations/*.sql
+// migrations/*.sql is the global track, applied once per database.
+// migrations/workspace/*.sql is the workspace track, applied to each
+// workspace's tables: public for the first workspace, ws_<id> for others.
+//
+//go:embed migrations/*.sql migrations/workspace/*.sql
 var migrations embed.FS
 
+// migrateLock serializes every migration and workspace creation, across
+// replicas.
+const migrateLock = `SELECT pg_advisory_xact_lock(hashtext('byname.migrate'))`
+
 // Migrate applies every migrations/NNN_*.sql not yet recorded in
-// schema_migrations, in name order, each in its own transaction.
-// It holds pg_advisory_xact_lock(hashtext('byname.migrate')) per file, so
-// replicas booting together apply each file exactly once and the losers
-// wait, then find nothing to do. Files are never edited after release;
-// a change is a new file.
+// schema_migrations, in name order, then every migrations/workspace file
+// to each workspace that has not recorded it in workspace_migration. Each
+// file runs in its own transaction holding the migrate lock, so replicas
+// booting together apply each file exactly once and the losers wait, then
+// find nothing to do. Files are never edited after release; a change is a
+// new file.
 func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
-	return MigrateThrough(ctx, pool, "")
+	if err := MigrateThrough(ctx, pool, ""); err != nil {
+		return err
+	}
+	return migrateWorkspaces(ctx, pool)
 }
 
-// MigrateThrough is Migrate stopping after the file named last, such as
-// 016_social_filters.sql, so a test can build a database as an earlier
-// release left it. An empty last applies every file.
+// MigrateThrough applies the global track only, stopping after the file
+// named last, such as 016_social_filters.sql, so a test can build a
+// database as an earlier release left it. An empty last applies every
+// global file.
 func MigrateThrough(ctx context.Context, pool *pgxpool.Pool, last string) error {
 	names, err := fs.Glob(migrations, "migrations/*.sql")
 	if err != nil {
@@ -57,7 +72,7 @@ func MigrateThrough(ctx context.Context, pool *pgxpool.Pool, last string) error 
 }
 
 func apply(ctx context.Context, tx pgx.Tx, name, sql string) error {
-	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtext('byname.migrate'))`); err != nil {
+	if _, err := tx.Exec(ctx, migrateLock); err != nil {
 		return err
 	}
 	// CREATE TABLE IF NOT EXISTS needs CREATE on the schema even when the
@@ -86,5 +101,97 @@ func apply(ctx context.Context, tx pgx.Tx, name, sql string) error {
 		return err
 	}
 	_, err := tx.Exec(ctx, `INSERT INTO schema_migrations (name) VALUES ($1)`, name)
+	return err
+}
+
+type workspaceFile struct{ name, sql string }
+
+func workspaceFiles() ([]workspaceFile, error) {
+	names, err := fs.Glob(migrations, "migrations/workspace/*.sql")
+	if err != nil {
+		return nil, err
+	}
+	sort.Strings(names)
+	files := make([]workspaceFile, len(names))
+	for i, name := range names {
+		sql, err := migrations.ReadFile(name)
+		if err != nil {
+			return nil, err
+		}
+		files[i] = workspaceFile{path.Base(name), string(sql)}
+	}
+	return files, nil
+}
+
+// migrateWorkspaces applies the workspace track to every workspace missing
+// a file. It reads what is missing first, so a role without DDL rights
+// still starts on an up-to-date database.
+func migrateWorkspaces(ctx context.Context, pool *pgxpool.Pool) error {
+	files, err := workspaceFiles()
+	if err != nil {
+		return err
+	}
+	rows, err := pool.Query(ctx, `SELECT `+workspaceColumns+`,
+		ARRAY(SELECT name FROM workspace_migration WHERE workspace_id = workspace.id)
+		FROM workspace ORDER BY id`)
+	if err != nil {
+		return err
+	}
+	type state struct {
+		w       Workspace
+		applied []string
+	}
+	all, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (state, error) {
+		var s state
+		var schema string
+		if err := r.Scan(&s.w.ID, &s.w.Slug, &s.w.Name, &schema, &s.w.CreatedAt, &s.applied); err != nil {
+			return s, err
+		}
+		s.w.Schema, err = parseSchema(schema)
+		return s, err
+	})
+	if err != nil {
+		return err
+	}
+	for _, s := range all {
+		for _, f := range files {
+			if slices.Contains(s.applied, f.name) {
+				continue
+			}
+			if err := pgx.BeginFunc(ctx, pool, func(tx pgx.Tx) error {
+				if _, err := tx.Exec(ctx, migrateLock); err != nil {
+					return err
+				}
+				return applyWorkspace(ctx, tx, s.w, f)
+			}); err != nil {
+				return fmt.Errorf("migrate workspace %s with %s: %w", s.w.Slug, f.name, err)
+			}
+		}
+	}
+	return nil
+}
+
+// applyWorkspace applies f to w's tables unless w has recorded it. The
+// caller holds the migrate lock. The first workspace's file runs on the
+// connection's own search_path, as the global track does; any other's
+// finds its own schema first and the shared tables after it.
+func applyWorkspace(ctx context.Context, tx pgx.Tx, w Workspace, f workspaceFile) error {
+	var applied bool
+	if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM workspace_migration WHERE workspace_id = $1 AND name = $2)`,
+		w.ID, f.name).Scan(&applied); err != nil {
+		return err
+	}
+	if applied {
+		return nil
+	}
+	if w.Schema != Public {
+		if _, err := tx.Exec(ctx, `SET LOCAL search_path = `+w.Schema.searchPath()); err != nil {
+			return err
+		}
+	}
+	if _, err := tx.Exec(ctx, f.sql); err != nil {
+		return err
+	}
+	_, err := tx.Exec(ctx, `INSERT INTO workspace_migration (workspace_id, name) VALUES ($1, $2)`, w.ID, f.name)
 	return err
 }
