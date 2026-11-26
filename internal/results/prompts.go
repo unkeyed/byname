@@ -22,8 +22,8 @@ type RunRef struct {
 type DotState string
 
 const (
-	DotNamed    DotState = "named"     // at least one pair named you
-	DotCited    DotState = "cited"     // none named you, at least one cited your domains
+	DotNamed    DotState = "named"     // most answers named you on at least one pair
+	DotCited    DotState = "cited"     // on none, but most cited your domains on at least one
 	DotNotNamed DotState = "not_named" // some pair answered, none named or cited you
 	DotFailed   DotState = "failed"    // every call failed
 )
@@ -32,18 +32,18 @@ const (
 type Dot struct {
 	RunID    int64    `json:"run_id"`
 	State    DotState `json:"state"`
-	Named    int      `json:"named" jsonschema:"pairs that named you"`
-	Answered int      `json:"answered" jsonschema:"pairs whose call did not fail"`
+	Named    int      `json:"named" jsonschema:"pairs most answers named you on"`
+	Answered int      `json:"answered" jsonschema:"pairs whose calls did not all fail"`
 }
 
 // PromptRow is one question on the Prompts page.
 type PromptRow struct {
 	Question QuestionRef `json:"question" jsonschema:"as the latest run asked it"`
 	// Answered is how many pairs answered on the latest run, NamedBy the
-	// ones that named you.
+	// ones most answers named you on.
 	Answered     int      `json:"answered"`
 	NamedBy      []Series `json:"named_by"`
-	BestPosition *int     `json:"best_position" jsonschema:"your best position on the latest run; null when no pair named you"`
+	BestPosition *int     `json:"best_position" jsonschema:"your best position on the latest run, among the pairs most answers named you on; null when there are none"`
 	Instead      []string `json:"instead" jsonschema:"competitors named on the latest run by answers that did not name you, most often first"`
 	// Dots line up with Prompts.Runs, null where the question was not asked.
 	Dots []*Dot `json:"dots"`
@@ -94,8 +94,7 @@ func (s *Service) Prompts(ctx context.Context, since *time.Time, sc Scope) (Prom
 			out.Runs = append(out.Runs, RunRef{ID: a.runID, StartedAt: a.started})
 		}
 	}
-	type cell struct{ answered, named, cited, calls int }
-	cells := map[panel.QuestionID]map[int64]*cell{}
+	asked := map[panel.QuestionID]map[int64][]scoredAnswer{}
 	var current []panel.QuestionID
 	onLatest := map[panel.QuestionID][]scoredAnswer{}
 	for _, a := range answers {
@@ -113,24 +112,10 @@ func (s *Service) Prompts(ctx context.Context, since *time.Time, sc Scope) (Prom
 			}
 			onLatest[q] = append(onLatest[q], a)
 		}
-		if cells[q] == nil {
-			cells[q] = map[int64]*cell{}
+		if asked[q] == nil {
+			asked[q] = map[int64][]scoredAnswer{}
 		}
-		c := cells[q][a.runID]
-		if c == nil {
-			c = &cell{}
-			cells[q][a.runID] = c
-		}
-		c.calls++
-		if a.scored.Status != engines.StatusFailed {
-			c.answered++
-		}
-		if a.scored.Mentioned {
-			c.named++
-		}
-		if a.scored.Cited {
-			c.cited++
-		}
+		asked[q][a.runID] = append(asked[q][a.runID], a)
 	}
 	order, err := s.questionOrder(ctx, sets[latest])
 	if err != nil {
@@ -143,28 +128,42 @@ func (s *Service) Prompts(ctx context.Context, since *time.Time, sc Scope) (Prom
 	}
 	for _, q := range current {
 		row := PromptRow{Question: refs[q], NamedBy: []Series{}, Dots: make([]*Dot, len(out.Runs))}
-		for run, c := range cells[q] {
-			d := &Dot{RunID: run, Named: c.named, Answered: c.answered}
+		for run, answers := range asked[q] {
+			d := &Dot{RunID: run}
+			cited := 0
+			for _, cell := range cellsBy(answers, bySeries) {
+				t := panel.TallyOf(scoredOf(cell))
+				if t.Status != engines.StatusFailed {
+					d.Answered++
+				}
+				if t.Mentioned() {
+					d.Named++
+				}
+				if t.MostlyCited() {
+					cited++
+				}
+			}
 			switch {
-			case c.named > 0:
+			case d.Named > 0:
 				d.State = DotNamed
-			case c.cited > 0:
+			case cited > 0:
 				d.State = DotCited
-			case c.answered > 0:
+			case d.Answered > 0:
 				d.State = DotNotNamed
 			default:
 				d.State = DotFailed
 			}
 			row.Dots[runIndex[run]] = d
 		}
-		for _, a := range onLatest[q] {
-			if a.scored.Status != engines.StatusFailed {
+		for _, cell := range cellsBy(onLatest[q], bySeries) {
+			t := panel.TallyOf(scoredOf(cell))
+			if t.Status != engines.StatusFailed {
 				row.Answered++
 			}
-			if a.scored.Mentioned {
-				row.NamedBy = append(row.NamedBy, a.series)
+			if t.Mentioned() {
+				row.NamedBy = append(row.NamedBy, cell[0].series)
 			}
-			if p := a.scored.Position; p > 0 && (row.BestPosition == nil || p < *row.BestPosition) {
+			if p := t.Position; p > 0 && (row.BestPosition == nil || p < *row.BestPosition) {
 				row.BestPosition = &p
 			}
 		}

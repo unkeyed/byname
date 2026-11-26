@@ -1,8 +1,10 @@
 package config_test
 
 import (
+	"encoding/json"
 	"errors"
 	"math"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -242,6 +244,22 @@ func TestEstimate(t *testing.T) {
 		t.Errorf("known = %v, want the sum of both pairs and reading their answers", est.KnownUSD)
 	}
 
+	if _, err := db.Exec(ctx, `UPDATE instance_settings SET samples = 3`); err != nil {
+		t.Fatal(err)
+	}
+	if est, err = svc.Estimate(ctx); err != nil || est.Samples != 3 || est.Calls != 12 || est.FindBrands == nil || est.FindBrands.Answers != 12 ||
+		!near(est.KnownUSD, 3*(2*0.055+2*0.004+find)) {
+		t.Errorf("asking each question 3 times: %+v %v, want 12 answers, each paid for and read", est, err)
+	}
+	for _, r := range est.Rows {
+		if r.Calls != 6 {
+			t.Errorf("%s: %d calls, want 2 questions x 3 times", r.Surface, r.Calls)
+		}
+	}
+	if _, err := db.Exec(ctx, `UPDATE instance_settings SET samples = 1`); err != nil {
+		t.Fatal(err)
+	}
+
 	if _, err := db.Exec(ctx, `WITH r AS (INSERT INTO run (question_set_id, trigger, status) SELECT id, 'run_now', 'completed' FROM question_set RETURNING id)
 		INSERT INTO answer (run_id, question_id, surface_model_id, endpoint, fidelity, status, attempts, mentioned, cited, cost_usd)
 		SELECT r.id, q.id, m.id, $1, 'model_match', 'ok', 1, false, false, c.cost
@@ -268,12 +286,24 @@ func TestEstimate(t *testing.T) {
 	}
 }
 
-func TestDefaultMonthCap(t *testing.T) {
-	for _, c := range []struct{ month, want float64 }{
-		{0, 5}, {1.2, 5}, {1.67, 6}, {4.0 / 3, 5}, {10.0 / 3, 10}, {12.34, 38},
-	} {
-		if got := config.DefaultMonthCap(c.month); got != c.want {
-			t.Errorf("DefaultMonthCap(%v) = %v, want %v", c.month, got, c.want)
+func TestDefaultMonthCapMatchesSharedCases(t *testing.T) {
+	raw, err := os.ReadFile("monthcap.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var cases []struct {
+		Month float64 `json:"month_usd"`
+		Cap   float64 `json:"cap_usd"`
+	}
+	if err := json.Unmarshal(raw, &cases); err != nil {
+		t.Fatal(err)
+	}
+	if len(cases) == 0 {
+		t.Fatal("monthcap.json has no cases")
+	}
+	for _, c := range cases {
+		if got := config.DefaultMonthCap(c.Month); got != c.Cap {
+			t.Errorf("DefaultMonthCap(%v) = %v, want %v", c.Month, got, c.Cap)
 		}
 	}
 }

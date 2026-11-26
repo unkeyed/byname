@@ -12,6 +12,7 @@ import { useFilter, useView } from "../../view";
 import { AgentPromptButton } from "./AgentPrompt";
 import { MarkedPages, MarkHandled, useMarkedPages } from "./Handled";
 import { PageMark } from "./Missed";
+import { NamedOf } from "./QuestionsTable";
 import { Segmented } from "./Header";
 import { CountAnyway, LeftOutBadge, leftOutWhy } from "./Scoring";
 
@@ -53,6 +54,7 @@ function Mark({ point, onClick, selected }: { point: HistoryPoint | undefined; o
   else if (point.mentioned) [body, title] = [<span className="font-semibold text-success">#{point.position ?? "?"}</span>, `Named you at #${point.position}`];
   else if (point.cited) [body, title] = [<span className="text-info">Linked</span>, "Linked to your site without naming you"];
   else [body, title] = [<span className="text-faint">—</span>, "Did not name you"];
+  if (point.answered > 1) title += `. ${point.named} of ${point.answered} answers named you`;
   if (!onClick)
     return (
       <span title={title} className="rounded-inner px-1.5 py-0.5 text-xs tabular-nums">
@@ -86,8 +88,9 @@ function Body({ question, onClose }: { question: number; onClose: () => void }) 
   const runs = [...new Map(series.flatMap((s) => s.points.map((p) => [p.run_id, p.run_started_at] as const))).entries()].sort((a, b) => a[0] - b[0]);
   const qa = Number(view.get("qa")) || 0;
   const raw = view.get("qv") === "raw";
-  const selSeries = series.find((s) => s.points.some((p) => p.answer_id === qa)) ?? series[0];
-  const selPoint = selSeries?.points.find((p) => p.answer_id === qa) ?? selSeries?.points[selSeries.points.length - 1];
+  const selSeries = series.find((s) => s.points.some((p) => p.answer_ids.includes(qa))) ?? series[0];
+  const selPoint = selSeries?.points.find((p) => p.answer_ids.includes(qa)) ?? selSeries?.points[selSeries.points.length - 1];
+  const selAnswer = selPoint?.answer_ids.includes(qa) ? qa : selPoint?.answer_id;
   const pick = (answer: number, patch: { qv?: string | null } = {}) => view.set({ qa: answer, ...patch });
 
   return (
@@ -136,6 +139,15 @@ function Body({ question, onClose }: { question: number; onClose: () => void }) 
               </option>
             ))}
           </select>
+          {selPoint.answer_ids.length > 1 && (
+            <Segmented
+              className="self-start sm:self-auto"
+              label="Answer"
+              value={String(selAnswer)}
+              options={selPoint.answer_ids.map((id, i) => ({ id: String(id), label: `Answer ${i + 1}` }))}
+              onChange={(v) => pick(Number(v))}
+            />
+          )}
           <Segmented className="self-start sm:self-auto" label="View" value={raw ? "raw" : "analysis"} options={[{ id: "analysis", label: "Summary" }, { id: "raw", label: "Full answer" }]} onChange={(v) => view.set({ qv: v === "raw" ? "raw" : null })} />
         </div>
       )}
@@ -156,11 +168,11 @@ function Body({ question, onClose }: { question: number; onClose: () => void }) 
                 ))}
               </select>
             </div>
-            <AnswerView id={selPoint.answer_id} />
+            <AnswerView id={selAnswer!} />
           </section>
         ) : (
           <>
-            <Analysis series={selSeries} point={selPoint} label={labels.line(selSeries.pair)} onRaw={() => view.set({ qv: "raw" })} />
+            <Analysis series={selSeries} point={selPoint} answerID={selAnswer!} label={labels.line(selSeries.pair)} onRaw={() => view.set({ qv: "raw" })} />
 
             <section>
               <h3 className="mb-2 text-sm font-semibold">Check history · {labels.line(selSeries.pair)}</h3>
@@ -177,6 +189,7 @@ function Body({ question, onClose }: { question: number; onClose: () => void }) 
                         #{p.run_id} · {shortDay(p.run_started_at)}
                       </span>
                       <span className="min-w-0 flex-1 text-xs">{p.summary || "No change"}</span>
+                      <NamedOf c={p} />
                       <Mark point={p} />
                     </button>
                   </li>
@@ -249,8 +262,8 @@ function Body({ question, onClose }: { question: number; onClose: () => void }) 
 }
 
 /** The selected AI app's answer in one check: where you stood, who was named instead, and what it linked to. */
-function Analysis({ series: s, point, label, onRaw }: { series: HistorySeries; point: HistoryPoint; label: string; onRaw: () => void }) {
-  const answer = useQuery({ queryKey: keys.answer(point.answer_id), queryFn: () => api.answer(point.answer_id), placeholderData: (prev) => prev });
+function Analysis({ series: s, point, answerID, label, onRaw }: { series: HistorySeries; point: HistoryPoint; answerID: number; label: string; onRaw: () => void }) {
+  const answer = useQuery({ queryKey: keys.answer(answerID), queryFn: () => api.answer(answerID), placeholderData: (prev) => prev });
   const competitors = answer.data?.mentions.filter((m) => m.kind === "competitor") ?? [];
   return (
     <section className="space-y-4">
@@ -264,6 +277,11 @@ function Analysis({ series: s, point, label, onRaw }: { series: HistorySeries; p
         <div className="rounded-surface border border-line bg-surface px-3 py-2">
           <div className="text-xs text-muted">Position in check #{point.run_id}</div>
           <div className="text-lg font-semibold tabular-nums">{point.position ? `#${point.position}` : point.status === "ok" && point.cited ? "Linked" : "–"}</div>
+          {point.answered > 1 && (
+            <div className="text-xs text-muted tabular-nums">
+              Named you in {point.named} of {point.answered} answers
+            </div>
+          )}
         </div>
         <div className="col-span-2 rounded-surface border border-line bg-surface px-3 py-2 sm:col-span-1">
           <div className="text-xs text-muted">Best position</div>

@@ -1,0 +1,10 @@
+[
+  { "month_usd": 0, "cap_usd": 5 },
+  { "month_usd": 1.2, "cap_usd": 5 },
+  { "month_usd": 1.3333333333333333, "cap_usd": 5 },
+  { "month_usd": 1.67, "cap_usd": 6 },
+  { "month_usd": 3.3333333333333335, "cap_usd": 10 },
+  { "month_usd": 3.9963, "cap_usd": 12 },
+  { "month_usd": 11.9888, "cap_usd": 36 },
+  { "month_usd": 12.34, "cap_usd": 38 }
+]

@@ -3,16 +3,17 @@ import type { Costs, Settings, SettingsView } from "../api";
 import { useCan, useCosts, useSettings } from "../queries";
 import { cx, ErrorNote, inputClass, labelClass, Pending } from "../ui";
 import { money } from "../money";
-import { monthOfChecks } from "./costs";
+import { defaultMonthCap, monthOfChecks } from "./costs";
 import { defaultFooter, Disclosure, NumberField, ReadOnlyNote, SubmitButton, useSaveSettings, type Footer } from "./forms";
 import { formatNumber, parseNumber, type NumberKey } from "./rules";
 
-const scheduleKeys = ["check_every_days"] as const satisfies NumberKey[];
+const scheduleKeys = ["check_every_days", "samples"] as const satisfies NumberKey[];
 const capKeys = ["spend_cap_run_usd", "spend_cap_month_usd"] as const satisfies NumberKey[];
 const tuningKeys = ["concurrency", "retries", "timeout_s"] as const satisfies NumberKey[];
 
 const hints: Partial<Record<NumberKey, string>> = {
   check_every_days: "1 to 30. Every question is asked in every AI app this often.",
+  samples: "1 to 5. Default 1. More answers make each score's band tighter and a move between checks easier to trust. Each one is another paid answer.",
   spend_cap_run_usd: "A check stops asking once it has spent this much.",
   spend_cap_month_usd: "Covers AI checks and social searches together. Empty means no monthly cap.",
   concurrency: "1 to 32. Default 8.",
@@ -96,19 +97,24 @@ function Body({
   const timeError = schedule && !/^([01]\d|2[0-3]):[0-5]\d$/.test(checkTime) ? "Give a time as HH:MM, such as 06:00." : undefined;
   const tuningError = tuningKeys.some((k) => errorOf(k));
 
-  // The estimate beside each cap follows the schedule as it is typed.
-  const typedDays = parsed.check_every_days;
-  const days = typedDays && "value" in typedDays && typedDays.value ? typedDays.value : initial.check_every_days;
-  const perCheck = costs?.checks.check.known_usd ?? 0;
+  // The estimate beside each cap follows the schedule and samples as they are typed.
+  const typed = (k: NumberKey, saved: number) => {
+    const p = parsed[k];
+    return p && "value" in p && p.value ? p.value : saved;
+  };
+  const days = typed("check_every_days", initial.check_every_days);
+  const samples = typed("samples", initial.samples);
+  const perCheck = ((costs?.checks.check.known_usd ?? 0) / initial.samples) * samples;
   const checksMonth = monthOfChecks(perCheck, days);
   const socialMonth = costs?.social.month_usd ?? 0;
   const capEmpty = !(values.spend_cap_month_usd ?? "").trim();
   const estimate: Partial<Record<NumberKey, string>> = costs
     ? {
         check_every_days: `${hints.check_every_days} At every ${days === 1 ? "day" : `${days} days`}, checks cost ${money(checksMonth, "about")} a month.`,
+        samples: `${hints.samples} At ${samples === 1 ? "once" : `${samples} times`}, one check costs ${money(perCheck, "about")}.`,
         spend_cap_run_usd: `One check costs ${money(perCheck, "about")}. ${hints.spend_cap_run_usd}`,
         spend_cap_month_usd: `A month costs ${money(checksMonth + socialMonth, "about")}${socialMonth > 0 ? ", social searches included" : ""}. ${
-          capEmpty && !initial.onboarded_at ? `Leave it empty and finishing setup sets ${money(costs.default_month_cap_usd)}, which you can change.` : hints.spend_cap_month_usd
+          capEmpty && !initial.onboarded_at ? `Leave it empty and finishing setup sets ${money(defaultMonthCap(checksMonth + socialMonth))}, which you can change.` : hints.spend_cap_month_usd
         }`,
       }
     : {};
@@ -155,6 +161,7 @@ function Body({
               </label>
               {timeError && <p className="text-xs text-danger">{timeError}</p>}
             </Disclosure>
+            {field("samples")}
           </div>
         )}
         {limits && (

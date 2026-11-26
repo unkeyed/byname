@@ -101,7 +101,7 @@ The container contract is short:
 
 The scheduler runs inside the container, so you need no cron service. Every minute it does each of these that is due:
 
-- Starts the AI check when its time comes. You set how many days apart checks run and the time of day under **Settings > Schedule and limits**, with **Pause** and **Check now**. A check missed while no process was running starts on the next start. A check missed while paused does not.
+- Starts the AI check when its time comes. You set how many days apart checks run, the time of day and how many times each question is asked under **Settings > Schedule and limits**, with **Pause** and **Check now**. A check missed while no process was running starts on the next start. A check missed while paused does not.
 - Syncs each connected search engine, Google Search Console and Bing Webmaster Tools, once a day, and retries an engine an hour after its sync fails. After a sync that succeeds, it raises that engine's **Goal reached** and **Search clicks moved** notifications. After a Google sync, it runs the site changes jobs `recrawl_watch` and `verdicts`. See [Search engines](search.md#the-daily-sync) and [Site changes](changes.md#recrawl-watch).
 - Polls the connected GitHub repository for merged pull requests once an hour, as the `site_changes` job.
 - Refreshes each AI app's model list once a day.

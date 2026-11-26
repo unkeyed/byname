@@ -30,7 +30,9 @@ type Settings struct {
 	Concurrency      int      `json:"concurrency" jsonschema:"1 to 32"`
 	Retries          int      `json:"retries" jsonschema:"0 to 3"`
 	TimeoutS         int      `json:"timeout_s" jsonschema:"30 to 600 seconds per call"`
-	RawRetentionDays *int     `json:"raw_retention_days" jsonschema:"days to keep raw responses, null keeps them forever"`
+	// Samples is read as 1 when a client that predates it leaves it out.
+	Samples          int  `json:"samples" jsonschema:"1 to 5: times a check asks each question on each AI app and model; each time is another paid answer"`
+	RawRetentionDays *int `json:"raw_retention_days" jsonschema:"days to keep raw responses, null keeps them forever"`
 }
 
 // SelfBrand is the instance's own brand. Domains are hostnames, the first
@@ -63,7 +65,7 @@ type SettingsView struct {
 
 const settingsColumns = `match_mode, market, language, time_zone, check_every_days,
 	to_char(check_time, 'HH24:MI'), spend_cap_run_usd::float8, spend_cap_month_usd::float8, concurrency, retries,
-	timeout_s, raw_retention_days, checks_paused, next_check_at, last_check_at, updated_at, onboarded_at`
+	timeout_s, samples, raw_retention_days, checks_paused, next_check_at, last_check_at, updated_at, onboarded_at`
 
 func (s *Service) Settings(ctx context.Context) (SettingsView, error) {
 	return s.settingsView(ctx, s.db)
@@ -94,7 +96,7 @@ func (s *Service) settingsView(ctx context.Context, q querier) (SettingsView, er
 	err := q.QueryRow(ctx, `SELECT `+settingsColumns+` FROM instance_settings`).Scan(
 		&v.MatchMode, &v.Market, &v.Language, &v.TimeZone, &v.CheckEveryDays, &v.CheckTime,
 		&v.SpendCapRunUSD, &v.SpendCapMonthUSD, &v.Concurrency, &v.Retries, &v.TimeoutS,
-		&v.RawRetentionDays, &v.ChecksPaused, &v.NextCheckAt, &v.LastCheckAt, &v.UpdatedAt, &v.OnboardedAt)
+		&v.Samples, &v.RawRetentionDays, &v.ChecksPaused, &v.NextCheckAt, &v.LastCheckAt, &v.UpdatedAt, &v.OnboardedAt)
 	if err != nil {
 		return v, err
 	}
@@ -141,6 +143,9 @@ func (in *Settings) validate() error {
 	if in.MatchMode == "" {
 		in.MatchMode = panel.MatchWholeWord
 	}
+	if in.Samples == 0 {
+		in.Samples = 1
+	}
 	_, clockErr := time.Parse("15:04", in.CheckTime)
 	_, zoneErr := time.LoadLocation(in.TimeZone)
 	for _, c := range []struct {
@@ -160,6 +165,7 @@ func (in *Settings) validate() error {
 		{in.Concurrency < 1 || in.Concurrency > 32, "concurrency must be 1 to 32"},
 		{in.Retries < 0 || in.Retries > 3, "retries must be 0 to 3"},
 		{in.TimeoutS < 30 || in.TimeoutS > 600, "timeout_s must be 30 to 600"},
+		{in.Samples < 1 || in.Samples > 5, "samples must be 1 to 5"},
 		{in.RawRetentionDays != nil && *in.RawRetentionDays < 1, "raw_retention_days must be at least 1, or null to keep raw responses forever"},
 	} {
 		if c.bad {
@@ -202,9 +208,9 @@ func (s *Service) PutSettings(ctx context.Context, in Settings) (SettingsView, e
 		}
 		_, err = tx.Exec(ctx, `UPDATE instance_settings SET match_mode = $1, market = $2, language = $3, time_zone = $4,
 			check_every_days = $5, check_time = $6::time, spend_cap_run_usd = $7, spend_cap_month_usd = $8,
-			concurrency = $9, retries = $10, timeout_s = $11, raw_retention_days = $12, next_check_at = $13, updated_at = now()`,
+			concurrency = $9, retries = $10, timeout_s = $11, raw_retention_days = $12, next_check_at = $13, samples = $14, updated_at = now()`,
 			in.MatchMode, in.Market, in.Language, in.TimeZone, in.CheckEveryDays, in.CheckTime, in.SpendCapRunUSD,
-			in.SpendCapMonthUSD, in.Concurrency, in.Retries, in.TimeoutS, in.RawRetentionDays, next)
+			in.SpendCapMonthUSD, in.Concurrency, in.Retries, in.TimeoutS, in.RawRetentionDays, next, in.Samples)
 		if err != nil {
 			return err
 		}

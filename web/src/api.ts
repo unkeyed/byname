@@ -224,6 +224,8 @@ export interface Settings {
   concurrency: number;
   retries: number;
   timeout_s: number;
+  /** Times a check asks each question on each pair, 1 to 5. */
+  samples: number;
   /** null keeps raw responses forever. */
   raw_retention_days: number | null;
 }
@@ -468,7 +470,9 @@ export interface EstimateRow {
 export interface Estimate {
   questions: number;
   pairs: number;
-  /** Questions times active pairs. */
+  /** Times a check asks each question on each pair, from the settings. */
+  samples: number;
+  /** Questions times active pairs times samples. */
   calls: number;
   /** Over the pairs with a cost per call, plus reading the answers for other brands when that is on. */
   known_usd: number;
@@ -683,12 +687,20 @@ export interface Competitors {
 export type AnswerStatus = "ok" | "no_answer" | "failed";
 export type Outcome = "gained" | "lost" | "moved" | "unchanged" | "not_comparable";
 
+/** One pair's answers to one question: what most of them say. */
 export interface Cell {
+  /** The first sample's answer. */
   answer_id: number;
+  /** Every sample's answer, in sample order. */
+  answer_ids: number[];
   status: AnswerStatus;
   mentioned: boolean;
   cited: boolean;
   position: number | null;
+  /** Answers that did not fail; a check can ask each question more than once. */
+  answered: number;
+  /** Answers that named you. mentioned is whether most did. */
+  named: number;
   outcome: Outcome;
 }
 
@@ -714,10 +726,15 @@ export interface QuestionTable {
 
 export interface Standing {
   answer_id: number;
+  answer_ids: number[];
   status: AnswerStatus;
   mentioned: boolean;
   cited: boolean;
   position: number | null;
+  /** Answers that did not fail; a check can ask each question more than once. */
+  answered: number;
+  /** Answers that named you. mentioned is whether most did. */
+  named: number;
 }
 
 export interface PairChange {
@@ -743,11 +760,16 @@ export interface HistoryPoint {
   run_id: number;
   run_started_at: Timestamp;
   answer_id: number;
+  answer_ids: number[];
   question_id: number;
   status: AnswerStatus;
   mentioned: boolean;
   cited: boolean;
   position: number | null;
+  /** Answers that did not fail; a check can ask each question more than once. */
+  answered: number;
+  /** Answers that named you. mentioned is whether most did. */
+  named: number;
   reported_model: string;
   /** The change since this series' previous run, such as "Gained mention at #1 · Northwind cited". */
   summary: string;
@@ -851,6 +873,8 @@ export interface AnswerSummary {
   run_id: number;
   question: QuestionRef;
   pair: PairRef;
+  /** Which of the times the check asked this question on this pair, from 1. */
+  sample: number;
   endpoint: string;
   fidelity: Fidelity;
   reported_model: string;
@@ -888,9 +912,13 @@ export interface Answer extends AnswerSummary {
 
 export interface GapPair extends Series {
   answer_id: number;
+  answer_ids: number[];
   status: AnswerStatus;
+  /** Most answers named you. */
   named: boolean;
   position: number | null;
+  answered: number;
+  named_answers: number;
   /** The web searches the engine ran; empty where the endpoint does not expose them. */
   fan_out: string[] | null;
   /** The pages the answer linked to, in order, without your own site's. */
@@ -952,11 +980,17 @@ export type LineState = "named_linked" | "named" | "linked" | "missed";
 export interface BriefLine extends Series {
   /** "Claude Code · claude-sonnet-4-5", or "ChatGPT app" for a surface that takes no model. */
   title: string;
+  /** The first of answer_ids. */
   answer_id: number;
-  /** linked: linked to your site without naming you. */
+  /** Every answer the line sums up, in the order asked. */
+  answer_ids: number[];
+  answered: number;
+  named: number;
+  linked: number;
+  /** What most answers did. linked: linked to your site without naming you. */
   state: LineState;
   position: number | null;
-  /** Your brand and competitors the answer named, in the order it named them. */
+  /** Your brand and competitors most answers named, in the order first named. */
   brands: string[];
   fan_out: string[];
   links: string[];
@@ -1602,6 +1636,7 @@ export interface QuestionChange {
 export interface CheckCompletedPayload {
   run_id: number;
   previous_run_id: number;
+  /** gained through not_comparable count questions on one AI app and model, the cells What changed compares, not answers. */
   gained: number;
   lost: number;
   moved: number;
