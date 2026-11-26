@@ -21,7 +21,7 @@ import (
 )
 
 // lock keeps two replicas from fetching or sending a digest at once.
-var lock = db.WorkspaceLock("byname.social")
+var lock = db.EntityLock("byname.social")
 
 // Tick is the scheduler's call each minute: fetch when the period since
 // the last fetch has passed, then emit the digest of a period that has

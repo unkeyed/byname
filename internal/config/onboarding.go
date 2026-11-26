@@ -163,14 +163,14 @@ func (s *Service) SaveStep(ctx context.Context, key StepKey) (Onboarding, error)
 		return Onboarding{}, err
 	}
 	if key == StepBrand {
-		if err := s.nameFirstWorkspace(ctx); err != nil {
+		if err := s.nameFirstEntity(ctx); err != nil {
 			return Onboarding{}, err
 		}
 	}
 	return s.Onboarding(ctx)
 }
 
-func (s *Service) nameFirstWorkspace(ctx context.Context) error {
+func (s *Service) nameFirstEntity(ctx context.Context) error {
 	var name string
 	err := s.db.QueryRow(ctx, `SELECT name FROM brand WHERE kind = 'self'`).Scan(&name)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -179,7 +179,7 @@ func (s *Service) nameFirstWorkspace(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	return db.NameFirstWorkspace(ctx, s.db, name)
+	return db.NameFirstEntity(ctx, s.db, name)
 }
 
 // FinishOnboarding ends onboarding once every required step is saved, the

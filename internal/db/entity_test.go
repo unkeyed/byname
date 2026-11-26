@@ -23,19 +23,19 @@ import (
 	"github.com/unkeyed/byname/internal/testdb"
 )
 
-// TestWorkspaceBaselineMatchesPublic fails when a new workspace's tables
-// differ from the first workspace's in any way a query could notice. A
-// global migration that changes a workspace table, instead of a file in
-// migrations/workspace, fails here.
-func TestWorkspaceBaselineMatchesPublic(t *testing.T) {
+// TestEntityBaselineMatchesPublic fails when a new entity's tables
+// differ from the first entity's in any way a query could notice. A
+// global migration that changes an entity table, instead of a file in
+// migrations/entity, fails here.
+func TestEntityBaselineMatchesPublic(t *testing.T) {
 	ctx := context.Background()
 	pool := testdb.New(t)
-	w, err := db.CreateWorkspace(ctx, pool, "Second", "second")
+	w, err := db.CreateEntity(ctx, pool, "Second", "second")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if w.Schema == db.Home {
-		t.Fatalf("CreateWorkspace = %+v, want a schema of its own", w)
+		t.Fatalf("CreateEntity = %+v, want a schema of its own", w)
 	}
 
 	var public []string
@@ -50,7 +50,7 @@ func TestWorkspaceBaselineMatchesPublic(t *testing.T) {
 	}
 	owned := slices.DeleteFunc(slices.Clone(public), func(r string) bool { return slices.Contains(db.SharedTables, r) })
 
-	qualified := regexp.MustCompile(`\b(public|ws_[0-9]+)\.([a-z_][a-z0-9_]*)`)
+	qualified := regexp.MustCompile(`\b(public|entity_[0-9]+)\.([a-z_][a-z0-9_]*)`)
 	normalize := func(schema string) func(string) string {
 		return func(s string) string {
 			return qualified.ReplaceAllStringFunc(s, func(m string) string {
@@ -156,9 +156,9 @@ func describe(t *testing.T, pool *pgxpool.Pool, schema string, only []string, no
 	return lines
 }
 
-// An instance upgraded from a release before workspaces is the first
-// workspace, named after its own brand, with its tables where they were.
-func TestUpgradeMakesTheInstanceTheFirstWorkspace(t *testing.T) {
+// An instance upgraded from a release before entities is the first
+// entity, named after its own brand, with its tables where they were.
+func TestUpgradeMakesTheInstanceTheFirstEntity(t *testing.T) {
 	ctx := context.Background()
 	pool := testdb.Through(t, "018_samples.sql")
 	var runID int64
@@ -174,12 +174,12 @@ func TestUpgradeMakesTheInstanceTheFirstWorkspace(t *testing.T) {
 
 	var slug, name, schema string
 	var baseline []string
-	if err := pool.QueryRow(ctx, `SELECT slug, name, schema_name, ARRAY(SELECT name FROM workspace_migration m WHERE m.workspace_id = w.id)
-		FROM workspace w`).Scan(&slug, &name, &schema, &baseline); err != nil {
+	if err := pool.QueryRow(ctx, `SELECT slug, name, schema_name, ARRAY(SELECT name FROM entity_migration m WHERE m.entity_id = w.id)
+		FROM entity w`).Scan(&slug, &name, &schema, &baseline); err != nil {
 		t.Fatal(err)
 	}
 	if slug != "northwind-cloud" || name != "Northwind Cloud" || schema != "public" || !slices.Equal(baseline, []string{"000_baseline.sql"}) {
-		t.Fatalf("workspace = %s %q %s %v; want northwind-cloud, named after the brand, in public, with the baseline recorded", slug, name, schema, baseline)
+		t.Fatalf("entity = %s %q %s %v; want northwind-cloud, named after the brand, in public, with the baseline recorded", slug, name, schema, baseline)
 	}
 	var brand, status string
 	var spend float64
@@ -190,31 +190,31 @@ func TestUpgradeMakesTheInstanceTheFirstWorkspace(t *testing.T) {
 		t.Fatalf("after the upgrade: brand %q, run %s spending %v; want both as they were", brand, status, spend)
 	}
 	var schemas int
-	if err := pool.QueryRow(ctx, `SELECT count(*) FROM pg_namespace WHERE nspname LIKE 'ws\_%'`).Scan(&schemas); err != nil || schemas != 0 {
-		t.Fatalf("%d workspace schemas (%v), want none until someone adds a workspace", schemas, err)
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM pg_namespace WHERE nspname LIKE 'entity\_%'`).Scan(&schemas); err != nil || schemas != 0 {
+		t.Fatalf("%d entity schemas (%v), want none until someone adds an entity", schemas, err)
 	}
 }
 
-func TestANewInstanceStartsWithADefaultWorkspace(t *testing.T) {
+func TestANewInstanceStartsWithADefaultEntity(t *testing.T) {
 	pool := testdb.New(t)
 	var slug, name, schema string
-	if err := pool.QueryRow(context.Background(), `SELECT slug, name, schema_name FROM workspace`).Scan(&slug, &name, &schema); err != nil {
+	if err := pool.QueryRow(context.Background(), `SELECT slug, name, schema_name FROM entity`).Scan(&slug, &name, &schema); err != nil {
 		t.Fatal(err)
 	}
 	if slug != "default" || name != "Default" || schema != "public" {
-		t.Fatalf("workspace = %s %q %s, want default in public", slug, name, schema)
+		t.Fatalf("entity = %s %q %s, want default in public", slug, name, schema)
 	}
 }
 
-func TestCreateWorkspaceIsIdempotent(t *testing.T) {
+func TestCreateEntityIsIdempotent(t *testing.T) {
 	ctx := context.Background()
 	pool := testdb.New(t)
 
 	var wg sync.WaitGroup
-	got := make(chan db.Workspace, 3)
+	got := make(chan db.Entity, 3)
 	for range 3 {
 		wg.Go(func() {
-			w, err := db.CreateWorkspace(ctx, pool, "Kyring", "kyring")
+			w, err := db.CreateEntity(ctx, pool, "Kyring", "kyring")
 			if err != nil {
 				t.Error(err)
 			}
@@ -223,74 +223,74 @@ func TestCreateWorkspaceIsIdempotent(t *testing.T) {
 	}
 	wg.Wait()
 	close(got)
-	var first db.Workspace
+	var first db.Entity
 	for w := range got {
 		if first.ID == 0 {
 			first = w
 		}
 		if w != first {
-			t.Fatalf("concurrent creates returned %+v and %+v, want one workspace", first, w)
+			t.Fatalf("concurrent creates returned %+v and %+v, want one entity", first, w)
 		}
 	}
 	var n int
-	if err := pool.QueryRow(ctx, `SELECT count(*) FROM workspace`).Scan(&n); err != nil || n != 2 {
-		t.Fatalf("%d workspaces (%v), want the first and Kyring", n, err)
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM entity`).Scan(&n); err != nil || n != 2 {
+		t.Fatalf("%d entities (%v), want the first and Kyring", n, err)
 	}
-	if _, err := db.CreateWorkspace(ctx, pool, "Kyring Labs", "kyring"); !errors.Is(err, db.ErrSlugTaken) {
+	if _, err := db.CreateEntity(ctx, pool, "Kyring Labs", "kyring"); !errors.Is(err, db.ErrSlugTaken) {
 		t.Fatalf("another name on a taken slug: %v, want ErrSlugTaken", err)
 	}
 }
 
-// No workspace but the first ever has the slug default, and only the
-// first is renamed from it, so a slug never moves from one workspace to
-// another and a replica's stale slug can only name the right workspace.
-func TestOnlyTheFirstWorkspaceIsEverDefault(t *testing.T) {
+// No entity but the first ever has the slug default, and only the
+// first is renamed from it, so a slug never moves from one entity to
+// another and a replica's stale slug can only name the right entity.
+func TestOnlyTheFirstEntityIsEverDefault(t *testing.T) {
 	ctx := context.Background()
 	pool := testdb.New(t)
 	for _, name := range []string{"Default", "Kyring"} {
-		if _, err := db.CreateWorkspace(ctx, pool, name, "default"); !errors.Is(err, db.ErrSlugReserved) {
-			t.Fatalf("CreateWorkspace(%q, default) = %v, want ErrSlugReserved", name, err)
+		if _, err := db.CreateEntity(ctx, pool, name, "default"); !errors.Is(err, db.ErrSlugReserved) {
+			t.Fatalf("CreateEntity(%q, default) = %v, want ErrSlugReserved", name, err)
 		}
 	}
-	if err := db.NameFirstWorkspace(ctx, pool, "Unkey"); err != nil {
+	if err := db.NameFirstEntity(ctx, pool, "Unkey"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.CreateWorkspace(ctx, pool, "Default", "default"); !errors.Is(err, db.ErrSlugReserved) {
-		t.Fatalf("CreateWorkspace(Default, default) once the first is renamed = %v, want ErrSlugReserved", err)
+	if _, err := db.CreateEntity(ctx, pool, "Default", "default"); !errors.Is(err, db.ErrSlugReserved) {
+		t.Fatalf("CreateEntity(Default, default) once the first is renamed = %v, want ErrSlugReserved", err)
 	}
-	if _, err := db.CreateWorkspace(ctx, pool, "Unkey", "unkey"); !errors.Is(err, db.ErrSlugTaken) {
-		t.Fatalf("CreateWorkspace with the first workspace's name and slug = %v, want ErrSlugTaken", err)
+	if _, err := db.CreateEntity(ctx, pool, "Unkey", "unkey"); !errors.Is(err, db.ErrSlugTaken) {
+		t.Fatalf("CreateEntity with the first entity's name and slug = %v, want ErrSlugTaken", err)
 	}
 
-	w, err := db.CreateWorkspace(ctx, pool, "Kyring", "kyring")
+	w, err := db.CreateEntity(ctx, pool, "Kyring", "kyring")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := pool.Exec(ctx, `UPDATE workspace SET name = 'Default', slug = 'default' WHERE id = $1`, w.ID); err != nil {
+	if _, err := pool.Exec(ctx, `UPDATE entity SET name = 'Default', slug = 'default' WHERE id = $1`, w.ID); err != nil {
 		t.Fatal(err)
 	}
 	kyring := db.In(pool, w.Schema)
-	if err := db.NameFirstWorkspace(ctx, kyring, "Planetfall"); err != nil {
+	if err := db.NameFirstEntity(ctx, kyring, "Planetfall"); err != nil {
 		t.Fatal(err)
 	}
-	if got, err := db.CurrentWorkspace(ctx, kyring); err != nil || got.Slug != "default" || got.Name != "Default" {
-		t.Fatalf("a later workspace at default after NameFirstWorkspace = %+v %v, want it left as it was", got, err)
+	if got, err := db.CurrentEntity(ctx, kyring); err != nil || got.Slug != "default" || got.Name != "Default" {
+		t.Fatalf("a later entity at default after NameFirstEntity = %+v %v, want it left as it was", got, err)
 	}
 }
 
-// Migrate applies the workspace track to a workspace that lacks a file.
-// Losing the baseline's record and tables stands in for a workspace made
-// before a later workspace migration.
-func TestMigrateCatchesEveryWorkspaceUp(t *testing.T) {
+// Migrate applies the entity track to an entity that lacks a file.
+// Losing the baseline's record and tables stands in for an entity made
+// before a later entity migration.
+func TestMigrateCatchesEveryEntityUp(t *testing.T) {
 	ctx := context.Background()
 	pool := testdb.New(t)
-	w, err := db.CreateWorkspace(ctx, pool, "Planetfall", "planetfall")
+	w, err := db.CreateEntity(ctx, pool, "Planetfall", "planetfall")
 	if err != nil {
 		t.Fatal(err)
 	}
 	schema := pgx.Identifier{w.Schema.String()}.Sanitize()
 	if _, err := pool.Exec(ctx, `DROP SCHEMA `+schema+` CASCADE; CREATE SCHEMA `+schema+`;
-		DELETE FROM workspace_migration WHERE workspace_id = `+fmt.Sprint(w.ID)); err != nil {
+		DELETE FROM entity_migration WHERE entity_id = `+fmt.Sprint(w.ID)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -321,76 +321,76 @@ func TestSlugMatchesTheMigration(t *testing.T) {
 	}
 }
 
-func TestWorkspacesAreListedRenamedAndKnowThemselves(t *testing.T) {
+func TestEntitiesAreListedRenamedAndKnowThemselves(t *testing.T) {
 	ctx := context.Background()
 	pool := testdb.New(t)
-	second, err := db.CreateWorkspace(ctx, pool, "Kyring", "kyring")
+	second, err := db.CreateEntity(ctx, pool, "Kyring", "kyring")
 	if err != nil {
 		t.Fatal(err)
 	}
-	all, err := db.Workspaces(ctx, pool)
+	all, err := db.Entities(ctx, pool)
 	if err != nil || len(all) != 2 || all[0].Schema != db.Home || all[1].ID != second.ID {
-		t.Fatalf("Workspaces = %+v %v, want the first then kyring", all, err)
+		t.Fatalf("Entities = %+v %v, want the first then kyring", all, err)
 	}
 	for _, c := range []struct {
 		pool db.Pool
 		want int64
 	}{{pool, all[0].ID}, {db.In(pool, second.Schema), second.ID}} {
-		if w, err := db.CurrentWorkspace(ctx, c.pool); err != nil || w.ID != c.want {
-			t.Errorf("CurrentWorkspace = %+v %v, want id %d", w, err, c.want)
+		if w, err := db.CurrentEntity(ctx, c.pool); err != nil || w.ID != c.want {
+			t.Errorf("CurrentEntity = %+v %v, want id %d", w, err, c.want)
 		}
 	}
-	w, err := db.RenameWorkspace(ctx, pool, "kyring", "Kyring CRM")
+	w, err := db.RenameEntity(ctx, pool, "kyring", "Kyring CRM")
 	if err != nil || w.Name != "Kyring CRM" || w.Slug != "kyring" {
-		t.Fatalf("RenameWorkspace = %+v %v, want the new name and the same slug", w, err)
+		t.Fatalf("RenameEntity = %+v %v, want the new name and the same slug", w, err)
 	}
-	if _, err := db.RenameWorkspace(ctx, pool, "nope", "x"); !errors.Is(err, db.ErrNoWorkspace) {
-		t.Fatalf("renaming a missing workspace: %v, want ErrNoWorkspace", err)
+	if _, err := db.RenameEntity(ctx, pool, "nope", "x"); !errors.Is(err, db.ErrNoEntity) {
+		t.Fatalf("renaming a missing entity: %v, want ErrNoEntity", err)
 	}
 }
 
-// The first workspace takes its brand's name once, and no other workspace
+// The first entity takes its brand's name once, and no other entity
 // ever does.
-func TestNameFirstWorkspace(t *testing.T) {
+func TestNameFirstEntity(t *testing.T) {
 	ctx := context.Background()
 	pool := testdb.New(t)
-	taken, err := db.CreateWorkspace(ctx, pool, "Planetfall", "planetfall")
+	taken, err := db.CreateEntity(ctx, pool, "Planetfall", "planetfall")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := db.NameFirstWorkspace(ctx, db.In(pool, taken.Schema), "Something else"); err != nil {
+	if err := db.NameFirstEntity(ctx, db.In(pool, taken.Schema), "Something else"); err != nil {
 		t.Fatal(err)
 	}
-	if err := db.NameFirstWorkspace(ctx, pool, "Planetfall"); err != nil {
+	if err := db.NameFirstEntity(ctx, pool, "Planetfall"); err != nil {
 		t.Fatal(err)
 	}
-	if err := db.NameFirstWorkspace(ctx, pool, "Unkey"); err != nil {
+	if err := db.NameFirstEntity(ctx, pool, "Unkey"); err != nil {
 		t.Fatal(err)
 	}
-	all, err := db.Workspaces(ctx, pool)
+	all, err := db.Entities(ctx, pool)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if all[0].Name != "Planetfall" || all[0].Slug != "default" {
-		t.Errorf("first workspace = %+v, want named Planetfall, keeping default as the slug planetfall is taken", all[0])
+		t.Errorf("first entity = %+v, want named Planetfall, keeping default as the slug planetfall is taken", all[0])
 	}
 	if all[1].Name != "Planetfall" || all[1].Slug != "planetfall" {
-		t.Errorf("second workspace = %+v, want it untouched", all[1])
+		t.Errorf("second entity = %+v, want it untouched", all[1])
 	}
 
 	fresh := testdb.New(t)
-	if err := db.NameFirstWorkspace(ctx, fresh, "Unkey Inc."); err != nil {
+	if err := db.NameFirstEntity(ctx, fresh, "Unkey Inc."); err != nil {
 		t.Fatal(err)
 	}
-	if w, err := db.CurrentWorkspace(ctx, fresh); err != nil || w.Name != "Unkey Inc." || w.Slug != "unkey-inc" {
-		t.Fatalf("first workspace = %+v %v, want Unkey Inc. at unkey-inc", w, err)
+	if w, err := db.CurrentEntity(ctx, fresh); err != nil || w.Name != "Unkey Inc." || w.Slug != "unkey-inc" {
+		t.Fatalf("first entity = %+v %v, want Unkey Inc. at unkey-inc", w, err)
 	}
 }
 
 // An install whose tables are not in public, because DATABASE_URL sets
 // search_path or the role has a schema of its own, upgrades with its
-// tables where they are: the first workspace is that schema, its locks
-// keep the keys earlier releases took, and a new workspace reaches the
+// tables where they are: the first entity is that schema, its locks
+// keep the keys earlier releases took, and a new entity reaches the
 // shared tables and functions there.
 func TestAnInstallOutsidePublicUpgrades(t *testing.T) {
 	ctx := context.Background()
@@ -402,9 +402,9 @@ func TestAnInstallOutsidePublicUpgrades(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	first, err := db.CurrentWorkspace(ctx, pool)
+	first, err := db.CurrentEntity(ctx, pool)
 	if err != nil || first.Slug != "northwind-cloud" {
-		t.Fatalf("CurrentWorkspace = %+v, %v; want the install as northwind-cloud", first, err)
+		t.Fatalf("CurrentEntity = %+v, %v; want the install as northwind-cloud", first, err)
 	}
 
 	alerts := notify.New(pool, results.New(pool), notify.Options{Secrets: secretbox.ForTest(), PublicURL: &url.URL{Scheme: "https", Host: "byname.example"}})
@@ -421,11 +421,11 @@ func TestAnInstallOutsidePublicUpgrades(t *testing.T) {
 	}
 
 	var sameKey bool
-	if err := pool.QueryRow(ctx, `SELECT `+db.WorkspaceLock("byname.test")+` = hashtext('byname.test')`).Scan(&sameKey); err != nil || !sameKey {
-		t.Fatalf("the first workspace's lock key is hashtext(name): %v, %v; want true, as releases before workspaces took it", sameKey, err)
+	if err := pool.QueryRow(ctx, `SELECT `+db.EntityLock("byname.test")+` = hashtext('byname.test')`).Scan(&sameKey); err != nil || !sameKey {
+		t.Fatalf("the first entity's lock key is hashtext(name): %v, %v; want true, as releases before entities took it", sameKey, err)
 	}
 
-	w, err := db.CreateWorkspace(ctx, pool, "Kyring", "kyring")
+	w, err := db.CreateEntity(ctx, pool, "Kyring", "kyring")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -436,7 +436,7 @@ func TestAnInstallOutsidePublicUpgrades(t *testing.T) {
 		Scan(&key, &users, &brands); err != nil || key != "example.com/a" || brands != 0 {
 		t.Fatalf("Kyring: page_key %q, %d users, %d brands, %v; want app's page_key and users and its own empty brand table", key, users, brands, err)
 	}
-	if got, err := db.CurrentWorkspace(ctx, kyring); err != nil || got.ID != w.ID {
-		t.Fatalf("CurrentWorkspace in Kyring = %+v, %v; want Kyring", got, err)
+	if got, err := db.CurrentEntity(ctx, kyring); err != nil || got.ID != w.ID {
+		t.Fatalf("CurrentEntity in Kyring = %+v, %v; want Kyring", got, err)
 	}
 }

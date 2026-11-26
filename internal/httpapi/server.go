@@ -22,7 +22,7 @@ import (
 	"github.com/unkeyed/byname/internal/app"
 	"github.com/unkeyed/byname/internal/auth"
 	"github.com/unkeyed/byname/internal/core"
-	"github.com/unkeyed/byname/internal/workspaces"
+	"github.com/unkeyed/byname/internal/entities"
 )
 
 // access is who may call a route: one of the classes below, or the one
@@ -59,9 +59,9 @@ var routes = []route{
 
 	{"GET /v1/status", needs(core.ResultsRead), (*server).status},
 
-	{"GET /v1/workspaces", needs(core.ResultsRead), (*server).listWorkspaces},
-	{"POST /v1/workspaces", admin, (*server).createWorkspace},
-	{"PATCH /v1/workspaces/{slug}", admin, (*server).renameWorkspace},
+	{"GET /v1/entities", needs(core.ResultsRead), (*server).listEntities},
+	{"POST /v1/entities", admin, (*server).createEntity},
+	{"PATCH /v1/entities/{slug}", admin, (*server).renameEntity},
 
 	{"GET /v1/settings", needs(core.ResultsRead), (*server).getSettings},
 	{"PUT /v1/settings", needs(core.ConfigWrite), (*server).putSettings},
@@ -244,7 +244,7 @@ var openapiYAML []byte
 
 type server struct {
 	svc   app.Services
-	reg   *workspaces.Registry
+	reg   *entities.Registry
 	authn *auth.Authenticator
 	keys  auth.KeyStore
 	users *auth.Users
@@ -254,12 +254,12 @@ type server struct {
 
 // NewMux mounts every route and the OAuth endpoints (mountOAuth) on a new
 // mux; main adds /mcp and the UI's "/" to the same mux, and serves it
-// through InWorkspace. Unmatched /v1/ paths get a JSON 405 with Allow when
+// through InEntity. Unmatched /v1/ paths get a JSON 405 with Allow when
 // another method serves the path, else a JSON 404, instead of falling
 // through to the UI. Browser-reachable routes are wrapped in
 // http.CrossOriginProtection, which rejects cross-site unsafe requests and
 // lets non-browser clients (no Sec-Fetch-Site / Origin) through.
-func NewMux(reg *workspaces.Registry, authn *auth.Authenticator, log *slog.Logger) *http.ServeMux {
+func NewMux(reg *entities.Registry, authn *auth.Authenticator, log *slog.Logger) *http.ServeMux {
 	s := &server{reg: reg, authn: authn, keys: authn.Keys, users: authn.Users, oauth: authn.OAuth, log: log}
 	csrf := http.NewCrossOriginProtection()
 	mux := http.NewServeMux()
@@ -316,26 +316,26 @@ func (s *server) wrap(rt route) http.Handler {
 			actor = a
 		}
 		in := *s
-		in.svc = s.workspace(r).Services
+		in.svc = s.entity(r).Services
 		if err := rt.handle(&in, w, r, actor); err != nil {
 			s.writeError(w, r, err)
 		}
 	})
 }
 
-func (s *server) workspace(r *http.Request) workspaces.Entity {
-	if e, ok := workspaces.FromContext(r.Context()); ok {
+func (s *server) entity(r *http.Request) entities.Live {
+	if e, ok := entities.FromContext(r.Context()); ok {
 		return e
 	}
 	return s.reg.Default()
 }
 
-// InWorkspace serves a path that starts with /w/<slug> as the same path
-// without it, for that workspace: /w/kyring/v1/brands is GET /v1/brands in
-// Kyring. Paths without the prefix are the default workspace's, as every
-// path was before there were workspaces, so existing keys, links and
-// bookmarks keep working. /w/kyring/mcp is Kyring's MCP server. Sign-in,
-// OAuth and its metadata belong to the instance, not a workspace, so they
+// InEntity serves a path that starts with /e/<slug> as the same path
+// without it, for that entity: /e/kyring/v1/brands is GET /v1/brands in
+// Kyring. Paths without the prefix are the default entity's, as every
+// path was before there were entities, so existing keys, links and
+// bookmarks keep working. /e/kyring/mcp is Kyring's MCP server. Sign-in,
+// OAuth and its metadata belong to the instance, not an entity, so they
 // answer the same under any prefix, and the metadata only ever names the
 // paths without one.
 //
@@ -343,12 +343,12 @@ func (s *server) workspace(r *http.Request) workspaces.Entity {
 // anyone without credentials: the instance's own routes answer, a browser
 // loading a page gets the app, and every other route is 401, without
 // asking the database whether the slug exists. Only a signed-in caller
-// makes it look, for a workspace another replica made, and gets a JSON
-// 404 for a slug no workspace has.
-func InWorkspace(reg *workspaces.Registry, authn *auth.Authenticator, log *slog.Logger, next http.Handler) http.Handler {
+// makes it look, for an entity another replica made, and gets a JSON
+// 404 for a slug no entity has.
+func InEntity(reg *entities.Registry, authn *auth.Authenticator, log *slog.Logger, next http.Handler) http.Handler {
 	s := &server{reg: reg, authn: authn, keys: authn.Keys, users: authn.Users, oauth: authn.OAuth, log: log}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		rest, ok := strings.CutPrefix(r.URL.Path, "/w/")
+		rest, ok := strings.CutPrefix(r.URL.Path, "/e/")
 		if !ok {
 			next.ServeHTTP(w, r)
 			return
@@ -359,7 +359,7 @@ func InWorkspace(reg *workspaces.Registry, authn *auth.Authenticator, log *slog.
 			r2 := r.Clone(ctx)
 			r2.URL.Path = path
 			if r.URL.RawPath != "" {
-				r2.URL.RawPath = strings.TrimPrefix(r.URL.RawPath, "/w/"+slug)
+				r2.URL.RawPath = strings.TrimPrefix(r.URL.RawPath, "/e/"+slug)
 			}
 			return r2
 		}
@@ -384,13 +384,13 @@ func InWorkspace(reg *workspaces.Registry, authn *auth.Authenticator, log *slog.
 				return
 			}
 		}
-		next.ServeHTTP(w, strip(workspaces.NewContext(r.Context(), e)))
+		next.ServeHTTP(w, strip(entities.NewContext(r.Context(), e)))
 	})
 }
 
-// instancePath is whether path belongs to the instance rather than a
-// workspace: sign-in, OAuth and its metadata, health and this API's
-// description. They answer the same under any /w/<slug>.
+// instancePath is whether path belongs to the instance rather than an
+// entity: sign-in, OAuth and its metadata, health and this API's
+// description. They answer the same under any /e/<slug>.
 func instancePath(path string) bool {
 	for _, p := range []string{"/auth/", "/oauth/", "/.well-known/"} {
 		if strings.HasPrefix(path, p) {

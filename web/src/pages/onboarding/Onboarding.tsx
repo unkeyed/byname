@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, Navigate, useNavigate, useParams } from "react-router";
 import { api, ApiError, type OnboardingStep, type StepKey } from "../../api";
 import { keys, useCan, useMe, useOnboarding } from "../../queries";
-import { go, useWorkspace } from "../../routing";
+import { go, useEntity } from "../../routing";
 import { useTheme } from "../../theme";
 import { Button, buttonClass, cx, Dialog, EmptyState, ErrorNote, Icon, LoadBoundary, Logo, scrollArea, Spinner, useWide } from "../../ui";
 import { NotificationsSlot } from "../../config/NotificationsSlot";
@@ -133,8 +133,8 @@ export function Onboarding() {
   const me = useMe();
   const canEdit = useCan("config:write");
   const onboarding = useOnboarding();
-  const workspaces = useWorkspace().list;
-  if (me.isPending || workspaces.isPending || (canEdit && onboarding.isPending) || (me.error instanceof ApiError && me.error.status === 401)) {
+  const entities = useEntity().list;
+  if (me.isPending || entities.isPending || (canEdit && onboarding.isPending) || (me.error instanceof ApiError && me.error.status === 401)) {
     return (
       <div className="grid h-full place-items-center">
         <Spinner />
@@ -166,7 +166,7 @@ export function Onboarding() {
 }
 
 function Shell({ children, aside, header }: { children: ReactNode; aside?: ReactNode; header?: ReactNode }) {
-  const { slug, current } = useWorkspace();
+  const { slug, current } = useEntity();
   return (
     <div className="flex h-full flex-col bg-bg">
       <header className="flex h-12 shrink-0 items-center gap-2 border-b border-line px-3 md:px-5">
@@ -190,7 +190,7 @@ function Wizard({ steps, finished }: { steps: OnboardingStep[]; finished: boolea
   const { step: param } = useParams();
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const here = useWorkspace().current;
+  const here = useEntity().current;
   const wide = useWide();
   const [menu, setMenu] = useState(false);
   const index = steps.findIndex((s) => s.key === param);
@@ -201,8 +201,8 @@ function Wizard({ steps, finished }: { steps: OnboardingStep[]; finished: boolea
       const i = steps.findIndex((s) => s.key === key);
       const to = `/onboarding/${(steps[i + 1] ?? steps[i]).key}`;
       if (key === "brand") {
-        const now = (await qc.fetchQuery({ queryKey: keys.workspaces, queryFn: api.workspaces.list, staleTime: 0 })).find((w) => w.id === here?.id);
-        if (now && now.slug !== here?.slug) return go(`/w/${now.slug}${to}`, { replace: true });
+        const now = (await qc.fetchQuery({ queryKey: keys.entities, queryFn: api.entities.list, staleTime: 0 })).find((w) => w.id === here?.id);
+        if (now && now.slug !== here?.slug) return go(`/e/${now.slug}${to}`, { replace: true });
       }
       if (steps[i + 1]) void navigate(to);
     },

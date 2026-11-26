@@ -1,5 +1,5 @@
 // Package mcpserver exposes Byname's services as MCP tools over stateless
-// Streamable HTTP at /mcp and each workspace's /w/<slug>/mcp, authenticated with OAuth access tokens that act
+// Streamable HTTP at /mcp and each entity's /e/<slug>/mcp, authenticated with OAuth access tokens that act
 // as the person who approved the client, with the scopes they chose.
 // Each tool is an input struct and a few lines that call one service
 // method, and names the one scope a caller needs to run it.
@@ -28,8 +28,8 @@ import (
 	"github.com/unkeyed/byname/internal/app"
 	"github.com/unkeyed/byname/internal/auth"
 	"github.com/unkeyed/byname/internal/core"
+	"github.com/unkeyed/byname/internal/entities"
 	"github.com/unkeyed/byname/internal/instance"
-	"github.com/unkeyed/byname/internal/workspaces"
 )
 
 const actorKey = "actor"
@@ -47,36 +47,36 @@ type AccessTokens interface {
 	// wrapping auth.ErrInvalidToken. Any other error means it could not decide.
 	VerifyAccessToken(ctx context.Context, token string) (core.Actor, time.Time, error)
 	// ResourceMetadataURL is the RFC 9728 metadata of the MCP server at
-	// /w/<slug>/mcp, or at /mcp when slug is empty.
+	// /e/<slug>/mcp, or at /mcp when slug is empty.
 	ResourceMetadataURL(slug string) string
 }
 
-// Handler returns the MCP handler. A request without a workspace on its
-// context, which is /mcp, gets svc, the default workspace's services. One
-// that has one, which is /w/<slug>/mcp, gets that workspace's. Every
-// workspace also gets the list of every workspace. Stateless, so any
+// Handler returns the MCP handler. A request without an entity on its
+// context, which is /mcp, gets svc, the default entity's services. One
+// that has one, which is /e/<slug>/mcp, gets that entity's. Every
+// entity also gets the list of every entity. Stateless, so any
 // replica serves any request without sticky sessions.
-func Handler(svc app.Services, ws Workspaces, tokens AccessTokens, version string) http.Handler {
+func Handler(svc app.Services, ws Entities, tokens AccessTokens, version string) http.Handler {
 	build := func(svc app.Services) *mcp.Server {
 		srv := mcp.NewServer(&mcp.Implementation{Name: "byname", Version: version}, &mcp.ServerOptions{Instructions: instructions})
 		addTools(srv, svc)
-		addWorkspaceTools(srv, ws)
+		addEntityTools(srv, ws)
 		return srv
 	}
 	unprefixed := build(svc)
 	var mu sync.Mutex
-	byWorkspace := map[int64]*mcp.Server{}
+	byEntity := map[int64]*mcp.Server{}
 	server := func(r *http.Request) *mcp.Server {
-		e, ok := workspaces.FromContext(r.Context())
+		e, ok := entities.FromContext(r.Context())
 		if !ok {
 			return unprefixed
 		}
 		mu.Lock()
 		defer mu.Unlock()
-		srv, ok := byWorkspace[e.Workspace.ID]
+		srv, ok := byEntity[e.Entity.ID]
 		if !ok {
 			srv = build(e.Services)
-			byWorkspace[e.Workspace.ID] = srv
+			byEntity[e.Entity.ID] = srv
 		}
 		return srv
 	}
@@ -117,8 +117,8 @@ func requireToken(tokens AccessTokens, next http.Handler) http.Handler {
 	}, nil)(next)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		slug := ""
-		if e, ok := workspaces.FromContext(r.Context()); ok {
-			slug = e.Workspace.Slug
+		if e, ok := entities.FromContext(r.Context()); ok {
+			slug = e.Entity.Slug
 		}
 		challenge := fmt.Sprintf("Bearer resource_metadata=%q", tokens.ResourceMetadataURL(slug))
 		scheme, token, _ := strings.Cut(r.Header.Get("Authorization"), " ")

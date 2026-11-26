@@ -26,15 +26,15 @@ type Credential struct {
 	LastTestedAt   *time.Time             `json:"last_tested_at"`
 	LastTestStatus string                 `json:"last_test_status" jsonschema:"ok, or why the last test failed"`
 	UpdatedAt      *time.Time             `json:"updated_at"`
-	UsedBy         []CredentialUse        `json:"used_by" jsonschema:"each workspace with AI apps whose route calls with this key, and those apps; every workspace shares the key"`
+	UsedBy         []CredentialUse        `json:"used_by" jsonschema:"each entity with AI apps whose route calls with this key, and those apps; every entity shares the key"`
 }
 
-// CredentialUse is the surfaces in one workspace whose route calls with a
+// CredentialUse is the surfaces in one entity whose route calls with a
 // key.
 type CredentialUse struct {
-	Workspace string            `json:"workspace" jsonschema:"the workspace's name"`
-	Slug      string            `json:"slug" jsonschema:"the workspace's slug"`
-	Surfaces  []engines.Surface `json:"surfaces"`
+	Entity   string            `json:"entity" jsonschema:"the entity's name"`
+	Slug     string            `json:"slug" jsonschema:"the entity's slug"`
+	Surfaces []engines.Surface `json:"surfaces"`
 }
 
 var credentialHints = map[engines.CredentialKind]string{
@@ -117,25 +117,25 @@ type credentialUse struct {
 	CredentialUse
 }
 
-type workspaceRef struct{ name, slug, schema string }
+type entityRef struct{ name, slug, schema string }
 
-// everyWorkspace is every workspace, in the order they were made, with the
+// everyEntity is every entity, in the order they were made, with the
 // schema its tables are in, for a query that reads all of them.
-func (s *Service) everyWorkspace(ctx context.Context) ([]workspaceRef, error) {
-	rows, err := s.db.Query(ctx, `SELECT name, slug, schema_name FROM workspace ORDER BY id`)
+func (s *Service) everyEntity(ctx context.Context) ([]entityRef, error) {
+	rows, err := s.db.Query(ctx, `SELECT name, slug, schema_name FROM entity ORDER BY id`)
 	if err != nil {
 		return nil, err
 	}
-	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (workspaceRef, error) {
-		var w workspaceRef
+	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (entityRef, error) {
+		var w entityRef
 		return w, r.Scan(&w.name, &w.slug, &w.schema)
 	})
 }
 
-// acrossWorkspaces is query run on each workspace's table, as one UNION
-// ALL whose rows start with the workspace's index in all. query has one
+// acrossEntities is query run on each entity's table, as one UNION
+// ALL whose rows start with the entity's index in all. query has one
 // %s, the schema, and its first column is %d, the index.
-func acrossWorkspaces(all []workspaceRef, query string) string {
+func acrossEntities(all []entityRef, query string) string {
 	union := make([]string, len(all))
 	for i, w := range all {
 		union[i] = fmt.Sprintf(query, i, pgx.Identifier{w.schema}.Sanitize())
@@ -144,11 +144,11 @@ func acrossWorkspaces(all []workspaceRef, query string) string {
 }
 
 func (s *Service) credentialUses(ctx context.Context) ([]credentialUse, error) {
-	all, err := s.everyWorkspace(ctx)
+	all, err := s.everyEntity(ctx)
 	if err != nil {
 		return nil, err
 	}
-	rows, err := s.db.Query(ctx, acrossWorkspaces(all, `SELECT %d, key, enabled, route FROM %s.surface`))
+	rows, err := s.db.Query(ctx, acrossEntities(all, `SELECT %d, key, enabled, route FROM %s.surface`))
 	if err != nil {
 		return nil, err
 	}
@@ -183,7 +183,7 @@ func (s *Service) credentialUses(ctx context.Context) ([]credentialUse, error) {
 			}
 			u := byKind[rs.Credential()]
 			if u == nil {
-				u = &credentialUse{kind: rs.Credential(), CredentialUse: CredentialUse{Workspace: w.name, Slug: w.slug}}
+				u = &credentialUse{kind: rs.Credential(), CredentialUse: CredentialUse{Entity: w.name, Slug: w.slug}}
 				byKind[u.kind] = u
 				kinds = append(kinds, u.kind)
 			}
@@ -271,16 +271,16 @@ func probe(ctx context.Context, kind engines.CredentialKind, conn engines.Conn) 
 	return "ok"
 }
 
-// testGateways calls each gateway base URL a surface in any workspace
+// testGateways calls each gateway base URL a surface in any entity
 // uses, since they all share the key. Several URLs read ok only when every
-// one answered, and otherwise say how each went and which workspaces use
+// one answered, and otherwise say how each went and which entities use
 // it.
 func (s *Service) testGateways(ctx context.Context, conn engines.Conn) (string, error) {
-	all, err := s.everyWorkspace(ctx)
+	all, err := s.everyEntity(ctx)
 	if err != nil {
 		return "", err
 	}
-	rows, err := s.db.Query(ctx, acrossWorkspaces(all, `SELECT %d, base_url FROM %s.surface WHERE route = 'gateway'`)+` ORDER BY 1, 2`)
+	rows, err := s.db.Query(ctx, acrossEntities(all, `SELECT %d, base_url FROM %s.surface WHERE route = 'gateway'`)+` ORDER BY 1, 2`)
 	if err != nil {
 		return "", err
 	}
@@ -304,7 +304,7 @@ func (s *Service) testGateways(ctx context.Context, conn engines.Conn) (string, 
 	}
 	switch len(urls) {
 	case 0:
-		return "untested: no surface in any workspace uses the gateway yet, and its base URL is set per surface", nil
+		return "untested: no surface in any entity uses the gateway yet, and its base URL is set per surface", nil
 	case 1:
 		conn.BaseURL = urls[0]
 		return probe(ctx, engines.CredentialGateway, conn), nil
@@ -336,7 +336,7 @@ func (s *Service) DeleteCredential(ctx context.Context, rawKind string) error {
 	if len(c.UsedBy) > 0 {
 		var where []string
 		for _, u := range c.UsedBy {
-			where = append(where, joinSurfaces(u.Surfaces)+" in "+u.Workspace)
+			where = append(where, joinSurfaces(u.Surfaces)+" in "+u.Entity)
 		}
 		return fmt.Errorf("%w: %s is used by %s; move those surfaces to another route first", core.ErrConflict, c.Title, strings.Join(where, "; "))
 	}

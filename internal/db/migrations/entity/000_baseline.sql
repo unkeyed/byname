@@ -1,7 +1,7 @@
--- The workspace baseline: every table and view a workspace owns, as the
+-- The entity baseline: every table and view an entity owns, as the
 -- global migrations leave them in public, with their seed rows. Generated
--- by make workspace-baseline; never edit it.
--- Migrations apply it with search_path set to the workspace's schema and
+-- by make entity-baseline; never edit it.
+-- Migrations apply it with search_path set to the entity's schema and
 -- then public, so its references to shared tables, such as users and
 -- credential, reach public's.
 

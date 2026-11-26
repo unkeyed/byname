@@ -1,6 +1,6 @@
 # Connect agents to Byname
 
-Agents reach Byname in two ways. The MCP servers, at `/mcp` and at `/w/<slug>/mcp` for each workspace, give an agent tools to read results and, with the right scopes, change the setup or start a check. The REST API under `/v1` does the same over plain HTTP. Both call the same code as the web UI, so an agent sees exactly what your team sees.
+Agents reach Byname in two ways. The MCP servers, at `/mcp` and at `/e/<slug>/mcp` for each entity, give an agent tools to read results and, with the right scopes, change the setup or start a check. The REST API under `/v1` does the same over plain HTTP. Both call the same code as the web UI, so an agent sees exactly what your team sees.
 
 They sign in differently. An MCP client signs in as you, in your browser, and needs no key. The REST API takes an API key. Both carry scopes, so you decide what each agent can do.
 
@@ -32,7 +32,7 @@ claude mcp add --transport http byname https://byname.example.com/mcp
 
 Then run `/mcp` in Claude Code, pick `byname`, and choose **Authenticate**.
 
-Each section below adds the first workspace. [Connect to one workspace](#connect-to-one-workspace) adds any other.
+Each section below adds the first entity. [Connect to one entity](#connect-to-one-entity) adds any other.
 
 ### Cursor
 
@@ -70,12 +70,12 @@ Claude Desktop connects through [`mcp-remote`](https://www.npmjs.com/package/mcp
 
 3. Restart Claude Desktop.
 
-### Connect to one workspace
+### Connect to one entity
 
-Each workspace has its own MCP server at `/w/<slug>/mcp`, with the same tools. `GET /v1/workspaces` and the `list_workspaces` tool give each slug. Add one server per workspace an agent works on, each under its own name. For a workspace with the slug `kyring`:
+Each entity has its own MCP server at `/e/<slug>/mcp`, with the same tools. `GET /v1/entities` and the `list_entities` tool give each slug. Add one server per entity an agent works on, each under its own name. For an entity with the slug `kyring`:
 
 ```sh
-claude mcp add --transport http byname-kyring https://byname.example.com/w/kyring/mcp
+claude mcp add --transport http byname-kyring https://byname.example.com/e/kyring/mcp
 ```
 
 In Cursor's `mcp.json`:
@@ -84,7 +84,7 @@ In Cursor's `mcp.json`:
 {
 	"mcpServers": {
 		"byname-kyring": {
-			"url": "https://byname.example.com/w/kyring/mcp"
+			"url": "https://byname.example.com/e/kyring/mcp"
 		}
 	}
 }
@@ -97,19 +97,19 @@ In Claude Desktop's `claude_desktop_config.json`:
 	"mcpServers": {
 		"byname-kyring": {
 			"command": "npx",
-			"args": ["-y", "mcp-remote", "https://byname.example.com/w/kyring/mcp"]
+			"args": ["-y", "mcp-remote", "https://byname.example.com/e/kyring/mcp"]
 		}
 	}
 }
 ```
 
-One sign-in covers every workspace. The team, its roles and the scopes you approve are the same in each, and a connection's tokens work at every workspace's URL. Most clients still keep a sign-in per server you add, so each one asks you to approve it once, and **Settings > Apps** lists each as its own connection.
+One sign-in covers every entity. The team, its roles and the scopes you approve are the same in each, and a connection's tokens work at every entity's URL. Most clients still keep a sign-in per server you add, so each one asks you to approve it once, and **Settings > Apps** lists each as its own connection.
 
-`/mcp` stays the first workspace's, so a client you connected before there were workspaces keeps working without a change.
+`/mcp` stays the first entity's, so a client you connected before there were entities keeps working without a change.
 
 ### What happens when you connect
 
-1. The client calls the MCP URL without a token. Byname answers `401` with a `WWW-Authenticate` header that points to `/.well-known/oauth-protected-resource/mcp`, or to `/.well-known/oauth-protected-resource/w/<slug>/mcp` for a workspace's URL. That document names the URL the client called as the resource.
+1. The client calls the MCP URL without a token. Byname answers `401` with a `WWW-Authenticate` header that points to `/.well-known/oauth-protected-resource/mcp`, or to `/.well-known/oauth-protected-resource/e/<slug>/mcp` for an entity's URL. That document names the URL the client called as the resource.
 2. The client reads that document and the authorization server metadata at `/.well-known/oauth-authorization-server`, registers itself at `/oauth/register`, and opens your browser at `/oauth/authorize`. Byname refuses a request without a PKCE `S256` code challenge.
 3. You sign in to Byname if you are not signed in already. Byname then shows the app's name marked **Unverified**, where your browser goes after you approve, such as `127.0.0.1:33418` for an app on your computer, and the scopes the app asked for. Only `results:read` is ticked at first. Tick more only when the agent needs them.
 4. You approve, and the browser hands a one-time code back to the client. The code lasts 5 minutes. The client trades it at `/oauth/token` for an access token, which lasts an hour, and a refresh token, which lasts 30 days.
@@ -126,7 +126,7 @@ Every tool names the scope it needs in its `_meta`, under `byname.dev/scope`. A 
 
 ### Disconnect an app
 
-**Settings > Apps** lists every connected app, who approved it, its scopes, and when it was last used. **Disconnect** stops its tokens at once, in every workspace. Byname also ends a connection in these cases:
+**Settings > Apps** lists every connected app, who approved it, its scopes, and when it was last used. **Disconnect** stops its tokens at once, in every entity. Byname also ends a connection in these cases:
 
 - The client signs out through `/oauth/revoke`.
 - A refresh token is used twice.
@@ -156,16 +156,16 @@ curl -X DELETE https://byname.example.com/v1/keys/current -H "Authorization: Bea
 
 Keys live in Postgres by default, or in Unkey when `UNKEY_ROOT_KEY` and `UNKEY_API_ID` are set. See [Configuration](configuration.md#unkey_root_key-and-unkey_api_id).
 
-## Reach each workspace
+## Reach each entity
 
-Each brand Byname tracks is a workspace with its own setup and results. One API key reaches every workspace. Put `/w/<slug>` in front of a path to call it in that workspace. A path without it calls the first workspace, as every path did before there were workspaces:
+Each brand Byname tracks is an entity with its own setup and results. One API key reaches every entity. Put `/e/<slug>` in front of a path to call it in that entity. A path without it calls the first entity, as every path did before there were entities:
 
 ```sh
-curl https://byname.example.com/v1/workspaces -H "Authorization: Bearer $BYNAME_API_KEY"
-curl https://byname.example.com/w/kyring/v1/runs -H "Authorization: Bearer $BYNAME_API_KEY"
+curl https://byname.example.com/v1/entities -H "Authorization: Bearer $BYNAME_API_KEY"
+curl https://byname.example.com/e/kyring/v1/runs -H "Authorization: Bearer $BYNAME_API_KEY"
 ```
 
-`GET /v1/workspaces` lists each workspace's slug and whether its onboarding is finished. The team, API keys, apps and provider keys are shared, so their routes answer the same in every workspace. MCP works the same way: `/mcp` serves the first workspace and `/w/<slug>/mcp` the one with that slug. See [Connect to one workspace](#connect-to-one-workspace).
+`GET /v1/entities` lists each entity's slug and whether its onboarding is finished. The team, API keys, apps and provider keys are shared, so their routes answer the same in every entity. MCP works the same way: `/mcp` serves the first entity and `/e/<slug>/mcp` the one with that slug. See [Connect to one entity](#connect-to-one-entity).
 
 ## MCP tools
 
@@ -206,7 +206,7 @@ Byname's MCP server has 91 tools. Every REST route an API key can call has one w
 | `update_other_brands_settings` | `config:write` | `PUT /v1/other-brands/settings` | Turn reading answers for other brands and logo lookups on or off, and set the monthly limit on new lookups. |
 | `start_brand_backfill` | `runs:write` | `POST /v1/other-brands/backfill` | Read every past answer never read for other brands, as one job in Check history, within the monthly spend cap. |
 | `status` | `results:read` | `GET /v1/status` | Byname's version and whether onboarding is done. |
-| `list_workspaces` | `results:read` | `GET /v1/workspaces` | Every brand this instance tracks, each a workspace, and whether its onboarding is finished. A connection reads and changes one workspace: the first at `/mcp`, any other at `/w/<slug>/mcp`. |
+| `list_entities` | `results:read` | `GET /v1/entities` | Every brand this instance tracks, each an entity, and whether its onboarding is finished. A connection reads and changes one entity: the first at `/mcp`, any other at `/e/<slug>/mcp`. |
 | `get_costs` | `results:read` | `GET /v1/costs` | What Byname costs, in US dollars: one answer in each AI app, one check, a month of checks and of social searches, and what this month has spent against the monthly cap. See [Treg](engines/treg.md#cost). |
 | `list_alerts` | `results:read` | `GET /v1/alerts` | Notifications newest first, the ones the app shows under the bell: finished checks with the AI apps that started or stopped naming you on a question, refused or failed checks, spend caps reached, paused models, search goals reached and search clicks that moved on Google or Bing, change results, an expiring GitHub token and social digests, each with whether the person this connection acts for has read it, and the unread count. |
 | `mark_alerts_read` | `results:read` | `POST /v1/alerts/read` | Mark notifications read for the person this connection acts for, by id or all at once. |

@@ -40,11 +40,11 @@ func ParseReturn(s string) (Return, error) {
 }
 
 type oauthState struct {
-	UserID    int64  `json:"u"`
-	Verifier  string `json:"v"`
-	Expires   int64  `json:"e"`
-	Return    Return `json:"r,omitempty"`
-	Workspace int64  `json:"w,omitempty"`
+	UserID   int64  `json:"u"`
+	Verifier string `json:"v"`
+	Expires  int64  `json:"e"`
+	Return   Return `json:"r,omitempty"`
+	Entity   int64  `json:"w,omitempty"`
 }
 
 // stateSeal is Search Console's own label from before Bing joined, so a
@@ -59,11 +59,11 @@ func (s *Service) StartGoogleOAuth(ctx context.Context, a core.Actor, back Retur
 	if !s.google.client.set() {
 		return "", fmt.Errorf("%w: Sign in with Google needs this instance's own Google OAuth client; set GSC_GOOGLE_CLIENT_ID and GSC_GOOGLE_CLIENT_SECRET, or connect a service account instead", core.ErrInvalid)
 	}
-	w, err := db.CurrentWorkspace(ctx, s.db)
+	w, err := db.CurrentEntity(ctx, s.db)
 	if err != nil {
 		return "", err
 	}
-	st := oauthState{UserID: a.UserID, Verifier: oauth2.GenerateVerifier(), Expires: s.now().Add(15 * time.Minute).Unix(), Return: back, Workspace: w.ID}
+	st := oauthState{UserID: a.UserID, Verifier: oauth2.GenerateVerifier(), Expires: s.now().Add(15 * time.Minute).Unix(), Return: back, Entity: w.ID}
 	raw, err := json.Marshal(st)
 	if err != nil {
 		return "", err
@@ -72,16 +72,16 @@ func (s *Service) StartGoogleOAuth(ctx context.Context, a core.Actor, back Retur
 	return s.google.oauthConfig().AuthCodeURL(state, oauth2.AccessTypeOffline, oauth2.ApprovalForce, oauth2.S256ChallengeOption(st.Verifier)), nil
 }
 
-// OAuthOrigin is where a Google sign-in started: the workspace it
-// connects, 0 for one started before there were workspaces, which is the
+// OAuthOrigin is where a Google sign-in started: the entity it
+// connects, 0 for one started before there were entities, which is the
 // first's, and the page the browser goes back to.
 type OAuthOrigin struct {
-	Workspace int64
-	Return    Return
+	Entity int64
+	Return Return
 }
 
 // GoogleOAuthOrigin reads where the sign-in that state belongs to started:
-// what is sealed in it, or ReturnSettings in the first workspace when state
+// what is sealed in it, or ReturnSettings in the first entity when state
 // is not one this instance sealed.
 func (s *Service) GoogleOAuthOrigin(state string) OAuthOrigin {
 	var st oauthState
@@ -93,7 +93,7 @@ func (s *Service) GoogleOAuthOrigin(state string) OAuthOrigin {
 	if err != nil {
 		back = ReturnSettings
 	}
-	return OAuthOrigin{Workspace: st.Workspace, Return: back}
+	return OAuthOrigin{Entity: st.Entity, Return: back}
 }
 
 // OAuthCallback is what Google sends the browser back with.

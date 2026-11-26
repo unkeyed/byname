@@ -12,13 +12,13 @@ import (
 	"github.com/unkeyed/byname/internal/testdb"
 )
 
-// Two workspaces never hold each other's locks, and the first workspace's
-// key is the one releases before workspaces took.
-func TestWorkspaceLocksAreTheirOwn(t *testing.T) {
+// Two entities never hold each other's locks, and the first entity's
+// key is the one releases before entities took.
+func TestEntityLocksAreTheirOwn(t *testing.T) {
 	ctx := context.Background()
 	pool := testdb.New(t)
-	other := testdb.Workspace(t, pool)
-	key := db.WorkspaceLock("byname.test")
+	other := testdb.Entity(t, pool)
+	key := db.EntityLock("byname.test")
 
 	var first, released, second int32
 	if err := pool.QueryRow(ctx, `SELECT `+key+`, hashtext('byname.test')`).Scan(&first, &released); err != nil {
@@ -28,7 +28,7 @@ func TestWorkspaceLocksAreTheirOwn(t *testing.T) {
 		t.Fatal(err)
 	}
 	if first != released || second == first {
-		t.Fatalf("keys: first workspace %d, released %d, second workspace %d; want the first two equal and the third apart", first, released, second)
+		t.Fatalf("keys: first entity %d, released %d, second entity %d; want the first two equal and the third apart", first, released, second)
 	}
 
 	held, err := pool.Acquire(ctx)
@@ -43,7 +43,7 @@ func TestWorkspaceLocksAreTheirOwn(t *testing.T) {
 		name string
 		p    db.Pool
 		want bool
-	}{{"another connection in the first workspace", pool, false}, {"the second workspace", other, true}} {
+	}{{"another connection in the first entity", pool, false}, {"the second entity", other, true}} {
 		conn, err := c.p.Acquire(ctx)
 		if err != nil {
 			t.Fatal(err)
@@ -53,7 +53,7 @@ func TestWorkspaceLocksAreTheirOwn(t *testing.T) {
 			t.Fatal(err)
 		}
 		if got != c.want {
-			t.Errorf("%s took the lock the first workspace holds: %v, want %v", c.name, got, c.want)
+			t.Errorf("%s took the lock the first entity holds: %v, want %v", c.name, got, c.want)
 		}
 		if got {
 			_, _ = conn.Exec(ctx, `SELECT pg_advisory_unlock(`+key+`)`)
@@ -63,8 +63,8 @@ func TestWorkspaceLocksAreTheirOwn(t *testing.T) {
 }
 
 // TestOnlySharedWorkTakesAGlobalLock fails when code outside sign-in and
-// migrations keys an advisory lock without db.WorkspaceLock, which would
-// make every workspace wait on, or skip, the others' work.
+// migrations keys an advisory lock without db.EntityLock, which would
+// make every entity wait on, or skip, the others' work.
 func TestOnlySharedWorkTakesAGlobalLock(t *testing.T) {
 	root := filepath.Join("..", "..")
 	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
@@ -87,7 +87,7 @@ func TestOnlySharedWorkTakesAGlobalLock(t *testing.T) {
 			return err
 		}
 		if strings.Contains(string(src), "hashtext(") {
-			t.Errorf("%s keys a lock with hashtext; use db.WorkspaceLock, or move the shared work to internal/auth", rel)
+			t.Errorf("%s keys a lock with hashtext; use db.EntityLock, or move the shared work to internal/auth", rel)
 		}
 		return nil
 	})

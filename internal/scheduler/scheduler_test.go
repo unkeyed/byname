@@ -348,13 +348,13 @@ func TestNothingPaidRunsBeforeOnboarding(t *testing.T) {
 	}
 }
 
-// Each workspace's scheduler runs that workspace's due check and no
-// other's, and a workspace that has not finished onboarding never queues
+// Each entity's scheduler runs that entity's due check and no
+// other's, and an entity that has not finished onboarding never queues
 // one.
-func TestEachWorkspaceRunsItsOwnChecks(t *testing.T) {
+func TestEachEntityRunsItsOwnChecks(t *testing.T) {
 	ctx := context.Background()
 	e := setup(t)
-	second, fresh := testdb.Workspace(t, e.db), testdb.Workspace(t, e.db)
+	second, fresh := testdb.Entity(t, e.db), testdb.Entity(t, e.db)
 	checkstest.Seed(t, e.processIn(second, nil).cfg, e.treg, nil)
 	count := func(pool db.Pool, sql string) int {
 		t.Helper()
@@ -365,7 +365,7 @@ func TestEachWorkspaceRunsItsOwnChecks(t *testing.T) {
 		return n
 	}
 	if n := count(fresh, `SELECT count(*) FROM instance_settings WHERE next_check_at IS NULL AND onboarded_at IS NULL`); n != 1 {
-		t.Fatal("a new workspace has a check scheduled before its onboarding is finished")
+		t.Fatal("a new entity has a check scheduled before its onboarding is finished")
 	}
 	for _, pool := range []db.Pool{e.db, second} {
 		if _, err := pool.Exec(ctx, `UPDATE instance_settings SET next_check_at = $1`, now.Add(-time.Minute)); err != nil {
@@ -389,16 +389,16 @@ func TestEachWorkspaceRunsItsOwnChecks(t *testing.T) {
 		runs, asks int
 	}{{"first", e.db, 1, 12}, {"second", second, 1, 12}, {"not onboarded", fresh, 0, 0}} {
 		if n := count(c.pool, `SELECT count(*) FROM run WHERE status = 'completed' AND trigger = 'scheduled'`); n != c.runs {
-			t.Errorf("%s workspace: %d completed scheduled runs, want %d", c.name, n, c.runs)
+			t.Errorf("%s entity: %d completed scheduled runs, want %d", c.name, n, c.runs)
 		}
 		if n := count(c.pool, `SELECT count(*) FROM answer`); n != c.asks {
-			t.Errorf("%s workspace: %d answers, want %d", c.name, n, c.asks)
+			t.Errorf("%s entity: %d answers, want %d", c.name, n, c.asks)
 		}
 	}
 	if n := count(fresh, `SELECT count(*) FROM instance_settings WHERE next_check_at IS NULL`); n != 1 {
-		t.Error("ticking a workspace that has not finished onboarding scheduled a check")
+		t.Error("ticking an entity that has not finished onboarding scheduled a check")
 	}
 	if e.treg.Answers() != 24 {
-		t.Fatalf("Treg answered %d calls, want 12 for each onboarded workspace", e.treg.Answers())
+		t.Fatalf("Treg answered %d calls, want 12 for each onboarded entity", e.treg.Answers())
 	}
 }

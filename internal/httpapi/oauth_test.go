@@ -587,8 +587,8 @@ var mcpExclusions = map[string]string{
 // mcpTools maps each route an API key can call to the MCP tool that does
 // the same, so the two surfaces cannot drift apart unnoticed.
 var mcpTools = map[string]string{
-	"GET /v1/status":     "status",
-	"GET /v1/workspaces": "list_workspaces",
+	"GET /v1/status":   "status",
+	"GET /v1/entities": "list_entities",
 
 	"GET /v1/settings":              "get_settings",
 	"PUT /v1/settings":              "update_settings",

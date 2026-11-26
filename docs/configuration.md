@@ -50,19 +50,19 @@ Byname exits with an error that names the variable when one of these rules fails
 
 Any Postgres that accepts a connection URL works: a local container, Neon, Supabase, PlanetScale Postgres, RDS, or another managed service. Byname needs no extensions and keeps nothing on disk.
 
-On start, Byname applies its migrations from `internal/db/migrations`. Each migration runs in its own transaction under a Postgres advisory lock, so several replicas can start at the same time. A migration to the tables every workspace shares is recorded in `schema_migrations`. A migration to the tables each workspace has of its own is applied to every workspace and recorded per workspace in `workspace_migration`.
+On start, Byname applies its migrations from `internal/db/migrations`. Each migration runs in its own transaction under a Postgres advisory lock, so several replicas can start at the same time. A migration to the tables every entity shares is recorded in `schema_migrations`. A migration to the tables each entity has of its own is applied to every entity and recorded per entity in `entity_migration`.
 
-Each brand Byname tracks is a workspace. The first workspace's tables are in the install's own schema: the first schema on the role's `search_path`, which is `public` unless `DATABASE_URL` or the role sets another. Adding a workspace creates a schema for it, `ws_<id>`, with its own copy of those tables. Its queries find the shared tables through the role's `search_path`, after its own schema.
+Each brand Byname tracks is an entity. The first entity's tables are in the install's own schema: the first schema on the role's `search_path`, which is `public` unless `DATABASE_URL` or the role sets another. Adding an entity creates a schema for it, `entity_<id>`, with its own copy of those tables. Its queries find the shared tables through the role's `search_path`, after its own schema.
 
 ## `MIGRATION_DATABASE_URL`
 
 Some providers, such as PlanetScale Postgres, give you a role that can only read and write data, and a separate admin role that can create tables. Set `DATABASE_URL` to the read/write role and `MIGRATION_DATABASE_URL` to the admin role. Byname opens the admin connection at start, applies the migrations, closes it, and then serves every request through `DATABASE_URL`.
 
-Adding a workspace creates tables too, so Byname also opens the admin connection then, creates the workspace's schema and tables through it, and closes it.
+Adding an entity creates tables too, so Byname also opens the admin connection then, creates the entity's schema and tables through it, and closes it.
 
-The read/write role needs `SELECT`, `INSERT`, `UPDATE` and `DELETE` on the tables the admin role creates, and `USAGE` on each workspace's schema. Granting it the `pg_read_all_data` and `pg_write_all_data` roles covers that, including tables added by later migrations and the schemas of workspaces added later.
+The read/write role needs `SELECT`, `INSERT`, `UPDATE` and `DELETE` on the tables the admin role creates, and `USAGE` on each entity's schema. Granting it the `pg_read_all_data` and `pg_write_all_data` roles covers that, including tables added by later migrations and the schemas of entities added later.
 
-When it is unset, Byname migrates through `DATABASE_URL`. A role that cannot create tables still starts when every migration is already applied. When a migration is pending, Byname exits with an error that names `MIGRATION_DATABASE_URL` and `byname migrate`. Adding a workspace through such a role fails with an error that names `MIGRATION_DATABASE_URL`.
+When it is unset, Byname migrates through `DATABASE_URL`. A role that cannot create tables still starts when every migration is already applied. When a migration is pending, Byname exits with an error that names `MIGRATION_DATABASE_URL` and `byname migrate`. Adding an entity through such a role fails with an error that names `MIGRATION_DATABASE_URL`.
 
 To keep the admin URL out of the deployment, leave `MIGRATION_DATABASE_URL` unset there and apply migrations yourself before you deploy a release that adds one:
 

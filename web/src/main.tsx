@@ -4,7 +4,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Navigate, RouterProvider, useLocation, type RouteObject } from "react-router";
 import { Layout, NotFound } from "./Layout";
 import { FirstTab, section, Section } from "./nav";
-import { rootClient, rootRouter, workspaceApp, WorkspaceSlug, workspaceOf } from "./routing";
+import { rootClient, rootRouter, entityApp, EntitySlug, entityOf } from "./routing";
 import { ThisWeek } from "./pages/results/ThisWeek";
 import { Competitors } from "./pages/results/Competitors";
 import { Questions } from "./pages/results/Questions";
@@ -40,7 +40,7 @@ function Moved({ to }: { to: string }) {
   return <Navigate to={url.pathname + url.search + hash} replace />;
 }
 
-const workspaceRoutes: RouteObject[] = [
+const entityRoutes: RouteObject[] = [
   ...Object.entries(moved).map(([path, to]) => ({ path, element: <Moved to={to} /> })),
   { path: "/onboarding/:step?", element: <Onboarding /> },
   {
@@ -76,7 +76,7 @@ const workspaceRoutes: RouteObject[] = [
 ];
 
 function App() {
-  const slug = useSyncExternalStore(rootRouter.subscribe, () => workspaceOf(rootRouter.state.location.pathname));
+  const slug = useSyncExternalStore(rootRouter.subscribe, () => entityOf(rootRouter.state.location.pathname));
   if (!slug) {
     return (
       <QueryClientProvider client={rootClient}>
@@ -84,13 +84,13 @@ function App() {
       </QueryClientProvider>
     );
   }
-  const app = workspaceApp(slug, workspaceRoutes);
+  const app = entityApp(slug, entityRoutes);
   return (
-    <WorkspaceSlug value={slug}>
+    <EntitySlug value={slug}>
       <QueryClientProvider key={slug} client={app.client}>
         <RouterProvider router={app.router} />
       </QueryClientProvider>
-    </WorkspaceSlug>
+    </EntitySlug>
   );
 }
 

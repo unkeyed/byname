@@ -11,14 +11,14 @@ import (
 	"github.com/unkeyed/byname/internal/testdb"
 )
 
-// A pool bound to a workspace keeps Lanes' routing: background work still
+// A pool bound to an entity keeps Lanes' routing: background work still
 // waits for a Jobs connection, and every lane, the lock lane included,
-// reaches the workspace's tables, then the first workspace's again once
+// reaches the entity's tables, then the first entity's again once
 // unbound.
-func TestBoundLanesReachTheWorkspace(t *testing.T) {
+func TestBoundLanesReachTheEntity(t *testing.T) {
 	ctx := context.Background()
 	base := testdb.New(t)
-	w, err := db.CreateWorkspace(ctx, base, "Kyring", "kyring")
+	w, err := db.CreateEntity(ctx, base, "Kyring", "kyring")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -77,16 +77,16 @@ func TestInRefusesAPoolThatDoesNotRoute(t *testing.T) {
 	t.Cleanup(p.Close)
 	defer func() {
 		if recover() == nil {
-			t.Fatal("db.In bound a pool that would read the first workspace's tables, want a panic")
+			t.Fatal("db.In bound a pool that would read the first entity's tables, want a panic")
 		}
 	}()
 	db.In(p, db.Home)
 }
 
-func TestAMissingWorkspaceSchemaFailsInsteadOfReadingPublic(t *testing.T) {
+func TestAMissingEntitySchemaFailsInsteadOfReadingPublic(t *testing.T) {
 	ctx := context.Background()
 	pool := testdb.New(t)
-	w, err := db.CreateWorkspace(ctx, pool, "Planetfall", "planetfall")
+	w, err := db.CreateEntity(ctx, pool, "Planetfall", "planetfall")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -95,6 +95,6 @@ func TestAMissingWorkspaceSchemaFailsInsteadOfReadingPublic(t *testing.T) {
 	}
 	var samples int
 	if err := db.In(pool, w.Schema).QueryRow(ctx, `SELECT samples FROM instance_settings`).Scan(&samples); err == nil {
-		t.Fatal("a query bound to a dropped workspace read instance_settings, want an error")
+		t.Fatal("a query bound to a dropped entity read instance_settings, want an error")
 	}
 }

@@ -38,7 +38,7 @@ const (
 // robotsToken is the product token robots.txt groups name Byname by.
 const robotsToken = "byname"
 
-var lock = db.WorkspaceLock("byname.sources.fetch")
+var lock = db.EntityLock("byname.sources.fetch")
 
 type Options struct {
 	// AllowPrivate lets fetches reach private and loopback addresses. Only

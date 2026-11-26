@@ -27,11 +27,11 @@ import (
 	"github.com/unkeyed/byname/internal/core"
 	"github.com/unkeyed/byname/internal/db"
 	"github.com/unkeyed/byname/internal/engines"
+	"github.com/unkeyed/byname/internal/entities"
 	"github.com/unkeyed/byname/internal/httpapi"
 	"github.com/unkeyed/byname/internal/mcpserver"
 	"github.com/unkeyed/byname/internal/search"
 	"github.com/unkeyed/byname/internal/secretbox"
-	"github.com/unkeyed/byname/internal/workspaces"
 	"github.com/unkeyed/byname/web"
 )
 
@@ -171,9 +171,9 @@ func fitBudget(ctx context.Context, log *slog.Logger, cfg *pgxpool.Config) {
 
 // openLanes opens the three pools Lanes routes between. Up to four
 // connections hold locks, and a small budget gets one, shared by every
-// workspace's jobs, which take turns: a job that gets no lock connection
+// entity's jobs, which take turns: a job that gets no lock connection
 // within a few seconds skips its tick (db.TryLock). The number stays fixed
-// as workspaces are added, since they come and go while the process runs
+// as entities are added, since they come and go while the process runs
 // and the work under each lock runs on the Jobs pool. The rest is split
 // between requests, which get half rounded up, and background work, with
 // at least 2 each: 5 in all at the least.
@@ -477,7 +477,7 @@ func run(log *slog.Logger) error {
 	if err != nil {
 		return err
 	}
-	reg, err := workspaces.Open(ctx, pool, workspaces.Options{
+	reg, err := entities.Open(ctx, pool, entities.Options{
 		Version: version, Secrets: cfg.Secrets, PublicURL: cfg.Auth.PublicURL, Log: log, MigrateDB: cfg.MigrateDB,
 		Resolve:     engines.HeadResolver(&http.Client{Timeout: 10 * time.Second}),
 		TregBaseURL: cfg.TregBaseURL, ProviderURLs: cfg.ProviderURLs, ResendBaseURL: cfg.ResendBaseURL,
@@ -502,7 +502,7 @@ func run(log *slog.Logger) error {
 	// ReadTimeout bounds a slow request body without a proxy in front. There
 	// is no WriteTimeout: an MCP tool call can outlast any fixed limit, and
 	// ReadTimeout does not cancel a handler that has read its body.
-	srv := &http.Server{Addr: ":" + cfg.Port, Handler: httpapi.SecurityHeaders(cfg.Auth.PublicURL, httpapi.InWorkspace(reg, authn, log, mux)),
+	srv := &http.Server{Addr: ":" + cfg.Port, Handler: httpapi.SecurityHeaders(cfg.Auth.PublicURL, httpapi.InEntity(reg, authn, log, mux)),
 		ReadHeaderTimeout: 10 * time.Second, ReadTimeout: 30 * time.Second, IdleTimeout: 2 * time.Minute}
 	served := make(chan error, 1)
 	go func() { served <- srv.ListenAndServe() }()

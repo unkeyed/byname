@@ -182,7 +182,7 @@ func (s *Service) QuestionSets(ctx context.Context) ([]QuestionSetSummary, error
 	})
 }
 
-var questionsLock = db.WorkspaceLock("byname.questions")
+var questionsLock = db.EntityLock("byname.questions")
 
 // PutQuestions makes in the current question set. Sending the current set
 // again changes nothing; any other change creates the next version and

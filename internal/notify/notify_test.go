@@ -154,7 +154,7 @@ func TestWebhookSignatureVerifiesAndATamperedBodyFails(t *testing.T) {
 		t.Fatalf("requests = %+v, want one whose signature verifies", reqs)
 	}
 	var body notify.WebhookBody
-	if err := json.Unmarshal(reqs[0].Body, &body); err != nil || body.Kind != notify.CheckFailed || body.URL != "https://byname.example/w/default/settings/checks" {
+	if err := json.Unmarshal(reqs[0].Body, &body); err != nil || body.Kind != notify.CheckFailed || body.URL != "https://byname.example/e/default/settings/checks" {
 		t.Fatalf("body = %+v, %v", body, err)
 	}
 
@@ -267,12 +267,12 @@ func TestEmailChannels(t *testing.T) {
 			m := mail[0]
 			if m.User != "alerts" || m.TLS != (mode != notifytest.Plain) || m.From != "alerts@northwind.example" || len(m.To) != 2 ||
 				m.Subject != "Check #9 reached its spend cap" || !strings.Contains(m.Body, "the spend cap for one check is $5.00") ||
-				!strings.Contains(m.Body, "Open schedule and limits: https://byname.example/w/default/settings/schedule\nEvery notification: https://byname.example/w/default/notifications\n") {
+				!strings.Contains(m.Body, "Open schedule and limits: https://byname.example/e/default/settings/schedule\nEvery notification: https://byname.example/e/default/notifications\n") {
 				t.Fatalf("mail = %+v", m)
 			}
 			emails := resend.Emails()
 			if len(emails) != 1 || emails[0].Subject != m.Subject || emails[0].To[0] != "ops@northwind.example" || emails[0].IdempotencyKey == "" ||
-				!strings.Contains(emails[0].Text, "https://byname.example/w/default/settings/schedule") {
+				!strings.Contains(emails[0].Text, "https://byname.example/e/default/settings/schedule") {
 				t.Fatalf("Resend got %+v", emails)
 			}
 		})
@@ -309,7 +309,7 @@ func TestSlackGetsBlockKit(t *testing.T) {
 	}
 	if err := json.Unmarshal(reqs[0].Body, &msg); err != nil || msg.Text != "Paused claude-sonnet-5-5 on Claude Code" || len(msg.Blocks) != 2 ||
 		msg.Blocks[0].Type != "section" || !strings.Contains(msg.Blocks[0].Text.Text, "&lt;today&gt;") ||
-		len(msg.Blocks[1].Elements) != 1 || msg.Blocks[1].Elements[0].Text != "<https://byname.example/w/default/settings/ai-apps|Open AI apps settings> · <https://byname.example/w/default/notifications|Every notification>" {
+		len(msg.Blocks[1].Elements) != 1 || msg.Blocks[1].Elements[0].Text != "<https://byname.example/e/default/settings/ai-apps|Open AI apps settings> · <https://byname.example/e/default/notifications|Every notification>" {
 		t.Fatalf("Slack body = %s, %v", reqs[0].Body, err)
 	}
 }
@@ -368,10 +368,10 @@ func TestAnEditKeepsSecretsItLeavesOut(t *testing.T) {
 	}
 }
 
-func TestLinksNameTheWorkspace(t *testing.T) {
+func TestLinksNameTheEntity(t *testing.T) {
 	ctx := context.Background()
 	e := setup(t, notify.Options{})
-	w, err := db.CreateWorkspace(ctx, e.db, "Kyring", "kyring")
+	w, err := db.CreateEntity(ctx, e.db, "Kyring", "kyring")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -389,13 +389,13 @@ func TestLinksNameTheWorkspace(t *testing.T) {
 	}
 	reqs := rec.Requests()
 	var body notify.WebhookBody
-	if len(reqs) != 1 || json.Unmarshal(reqs[0].Body, &body) != nil || body.URL != "https://byname.example/w/kyring/settings/checks" {
-		t.Fatalf("Kyring's webhook got %+v, want a link into /w/kyring", body)
+	if len(reqs) != 1 || json.Unmarshal(reqs[0].Body, &body) != nil || body.URL != "https://byname.example/e/kyring/settings/checks" {
+		t.Fatalf("Kyring's webhook got %+v, want a link into /e/kyring", body)
 	}
 	if want := w.Schema.String() + "/alert-1/channel-1"; body.ID != want {
-		t.Fatalf("Kyring's first message has id %q, want %q, apart from the first workspace's alert-1/channel-1", body.ID, want)
+		t.Fatalf("Kyring's first message has id %q, want %q, apart from the first entity's alert-1/channel-1", body.ID, want)
 	}
 	if n, err := e.notify.DeliverDue(ctx); err != nil || n != 0 {
-		t.Fatalf("the default workspace delivered %d, %v; want nothing of Kyring's", n, err)
+		t.Fatalf("the default entity delivered %d, %v; want nothing of Kyring's", n, err)
 	}
 }

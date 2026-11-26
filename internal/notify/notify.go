@@ -332,14 +332,14 @@ func (s *Service) envelope(ctx context.Context, id string, p Payload, channel st
 	if m.Action == "" {
 		m.Action = "Open in Byname"
 	}
-	w, err := db.CurrentWorkspace(ctx, s.db)
+	w, err := db.CurrentEntity(ctx, s.db)
 	if err != nil {
 		return envelope{}, err
 	}
-	// The id is the email API's idempotency key, and two workspaces may
+	// The id is the email API's idempotency key, and two entities may
 	// send through one API key.
 	id = db.KeyScope(s.db) + id
-	link := func(path string) string { return s.public.Scheme + "://" + s.public.Host + "/w/" + w.Slug + path }
+	link := func(path string) string { return s.public.Scheme + "://" + s.public.Host + "/e/" + w.Slug + path }
 	return envelope{ID: id, Kind: p.Kind(), Message: m, URL: link(m.Path), All: link(NotificationsPath), Settings: link(SettingsPath), Channel: channel, CreatedAt: created}, nil
 }
 

@@ -26,11 +26,11 @@ import (
 	"github.com/unkeyed/byname/internal/changes/githubtest"
 	"github.com/unkeyed/byname/internal/core"
 	"github.com/unkeyed/byname/internal/engines/tregtest"
+	"github.com/unkeyed/byname/internal/entities"
 	"github.com/unkeyed/byname/internal/instance"
 	"github.com/unkeyed/byname/internal/mcpserver"
 	"github.com/unkeyed/byname/internal/notify/notifytest"
 	"github.com/unkeyed/byname/internal/testdb"
-	"github.com/unkeyed/byname/internal/workspaces"
 )
 
 const (
@@ -50,7 +50,7 @@ type client struct {
 	setupToken string
 	passkey    *authtest.Passkey
 	db         *pgxpool.Pool
-	reg        *workspaces.Registry
+	reg        *entities.Registry
 	svc        app.Services
 	treg       *tregtest.Server
 	resend     *notifytest.Resend
@@ -183,7 +183,7 @@ func serve(t *testing.T, srv *httptest.Server, publicURL string, mod ...func(*au
 	google := searchtest.NewGoogle(t)
 	bing := searchtest.NewBing(t, bingKey)
 	github := githubtest.New(t, "northwind", "site", githubToken)
-	reg, err := workspaces.Open(context.Background(), pool, workspaces.Options{
+	reg, err := entities.Open(context.Background(), pool, entities.Options{
 		Version: "test", Secrets: cfg.Secrets, PublicURL: u, Log: slog.New(slog.DiscardHandler),
 		TregBaseURL: treg.URL, ResendBaseURL: resendSrv.URL,
 		GSCClient: search.OAuthClient{ID: "test-client", Secret: "test-secret"}, GSCBaseURL: google.URL, BingBaseURL: bing.URL,
@@ -199,7 +199,7 @@ func serve(t *testing.T, srv *httptest.Server, publicURL string, mod ...func(*au
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		_, _ = io.WriteString(w, `<div id="root"></div>`)
 	}))
-	srv.Config.Handler = InWorkspace(reg, authn, log, mux)
+	srv.Config.Handler = InEntity(reg, authn, log, mux)
 	srv.Start()
 	t.Cleanup(srv.Close)
 	return client{t: t, base: srv.URL, origin: publicURL, setupToken: token, db: pool, reg: reg, svc: reg.Default().Services, treg: treg, resend: resend, google: google, bing: bing, github: github}
@@ -623,7 +623,7 @@ func TestKeyStoreOutageIs503(t *testing.T) {
 		t.Fatal(err)
 	}
 	authn := &auth.Authenticator{Keys: downKeys{}, Users: users, OAuth: auth.NewOAuthServer(pool, u)}
-	reg, err := workspaces.Open(context.Background(), pool, workspaces.Options{Version: "test", Secrets: secretbox.ForTest()})
+	reg, err := entities.Open(context.Background(), pool, entities.Options{Version: "test", Secrets: secretbox.ForTest()})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -665,7 +665,7 @@ func TestSettings(t *testing.T) {
 
 func TestSecurityHeaders(t *testing.T) {
 	const csp = "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'; object-src 'none'; base-uri 'none'; form-action 'self'"
-	reg, err := workspaces.Open(context.Background(), testdb.New(t), workspaces.Options{Version: "test", Secrets: secretbox.ForTest()})
+	reg, err := entities.Open(context.Background(), testdb.New(t), entities.Options{Version: "test", Secrets: secretbox.ForTest()})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -28,11 +28,11 @@ import (
 // Access tokens act as the person who approved, through the client, with
 // the scopes the person chose.
 //
-// The instance has one MCP server per workspace: /mcp for the default and
-// /w/<slug>/mcp for each. A client may name any of them as its resource,
+// The instance has one MCP server per entity: /mcp for the default and
+// /e/<slug>/mcp for each. A client may name any of them as its resource,
 // and its tokens work at all of them, since the team signs in once for
-// every workspace. Each grant records /mcp as its resource whichever one
-// the client named, so tokens issued before there were workspaces keep
+// every entity. Each grant records /mcp as its resource whichever one
+// the client named, so tokens issued before there were entities keep
 // working.
 //
 // Every client is public and unverified: anyone can register any name. The
@@ -84,14 +84,14 @@ func NewOAuthServer(db db.Pool, publicURL *url.URL) *OAuthServer {
 // Issuer is the authorization server's identifier: PUBLIC_URL's origin.
 func (o *OAuthServer) Issuer() string { return o.issuer }
 
-// Resource is the resource identifier of the MCP server for the workspace
-// with slug, PUBLIC_URL/w/<slug>/mcp, or of PUBLIC_URL/mcp when slug is
+// Resource is the resource identifier of the MCP server for the entity
+// with slug, PUBLIC_URL/e/<slug>/mcp, or of PUBLIC_URL/mcp when slug is
 // empty: the URL a client connects to.
 func (o *OAuthServer) Resource(slug string) string {
 	if slug == "" {
 		return o.resource
 	}
-	return o.issuer + "/w/" + slug + "/mcp"
+	return o.issuer + "/e/" + slug + "/mcp"
 }
 
 // ResourceMetadataURL is where RFC 9728 puts the metadata for
@@ -105,16 +105,16 @@ func (o *OAuthServer) checkResource(ctx context.Context, q dbtx, resource string
 	if resource == "" || resource == o.resource {
 		return nil
 	}
-	slug, prefixed := strings.CutPrefix(resource, o.issuer+"/w/")
+	slug, prefixed := strings.CutPrefix(resource, o.issuer+"/e/")
 	slug, mcp := strings.CutSuffix(slug, "/mcp")
 	found := false
 	if prefixed && mcp && db.SlugPattern.MatchString(slug) {
-		if err := q.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM workspace WHERE slug = $1)`, slug).Scan(&found); err != nil {
+		if err := q.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM entity WHERE slug = $1)`, slug).Scan(&found); err != nil {
 			return err
 		}
 	}
 	if !found {
-		return oauthErr("invalid_target", "resource must be "+o.resource+", or "+o.Resource("<slug>")+" for a workspace that exists")
+		return oauthErr("invalid_target", "resource must be "+o.resource+", or "+o.Resource("<slug>")+" for an entity that exists")
 	}
 	return nil
 }

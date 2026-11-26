@@ -6,12 +6,12 @@ import (
 	"github.com/unkeyed/byname/internal/core"
 )
 
-func (s *server) listWorkspaces(w http.ResponseWriter, r *http.Request, _ core.Actor) error {
+func (s *server) listEntities(w http.ResponseWriter, r *http.Request, _ core.Actor) error {
 	v, err := s.reg.List(r.Context())
 	return respond(w, http.StatusOK, v, err)
 }
 
-func (s *server) createWorkspace(w http.ResponseWriter, r *http.Request, _ core.Actor) error {
+func (s *server) createEntity(w http.ResponseWriter, r *http.Request, _ core.Actor) error {
 	var b struct {
 		Name string `json:"name"`
 		Slug string `json:"slug"`
@@ -23,7 +23,7 @@ func (s *server) createWorkspace(w http.ResponseWriter, r *http.Request, _ core.
 	return respond(w, http.StatusCreated, v, err)
 }
 
-func (s *server) renameWorkspace(w http.ResponseWriter, r *http.Request, _ core.Actor) error {
+func (s *server) renameEntity(w http.ResponseWriter, r *http.Request, _ core.Actor) error {
 	var b struct {
 		Name string `json:"name"`
 	}

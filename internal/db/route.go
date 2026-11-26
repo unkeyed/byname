@@ -14,8 +14,8 @@ type schemaKey struct{}
 const pathKey = "byname.schema"
 
 // RouteSchemas points each connection a pool built from cfg hands out at
-// the tables of the workspace its query is bound to with In, or at the
-// first workspace's when it is bound to none, as sign-in is. Code that
+// the tables of the entity its query is bound to with In, or at the
+// first entity's when it is bound to none, as sign-in is. Code that
 // queries through such a pool must never SET search_path outside a
 // transaction; SET LOCAL is fine.
 func RouteSchemas(cfg *pgxpool.Config) {
@@ -34,13 +34,13 @@ func RouteSchemas(cfg *pgxpool.Config) {
 		}
 		// A schema that is missing, or that the role cannot use, would
 		// leave the install's own schema first on the path and hand out
-		// the first workspace's rows, so that fails here instead.
+		// the first entity's rows, so that fails here instead.
 		var first string
 		if err := conn.QueryRow(ctx, setPath, pgx.Identifier{want.String()}.Sanitize(), false).Scan(nil, &first); err != nil {
 			return false, err
 		}
 		if first != want.String() {
-			return false, fmt.Errorf("db: workspace schema %s is missing or not usable", want)
+			return false, fmt.Errorf("db: entity schema %s is missing or not usable", want)
 		}
 		data[pathKey] = want
 		return true, nil
@@ -48,9 +48,9 @@ func RouteSchemas(cfg *pgxpool.Config) {
 }
 
 // In is p with every query, transaction and lock connection bound to
-// schema's workspace. p's pools must come from a config RouteSchemas
+// schema's entity. p's pools must come from a config RouteSchemas
 // prepared; In panics on a pool that was not, since its queries would
-// silently read the first workspace's tables.
+// silently read the first entity's tables.
 func In(p Pool, schema Schema) Pool {
 	if b, ok := p.(bound); ok {
 		p = b.p
@@ -95,10 +95,10 @@ func (b bound) Begin(ctx context.Context) (pgx.Tx, error) { return b.p.Begin(b.b
 
 func (b bound) Acquire(ctx context.Context) (*pgxpool.Conn, error) { return b.p.Acquire(b.bind(ctx)) }
 
-// KeyScope keeps keys a workspace sends to a service every workspace
-// shares, such as Treg's idempotency keys, apart from another workspace's
-// same key: "" for the first workspace, whose keys predate workspaces and
-// must not change, and "ws_<id>/" for a pool In bound to any other.
+// KeyScope keeps keys an entity sends to a service every entity
+// shares, such as Treg's idempotency keys, apart from another entity's
+// same key: "" for the first entity, whose keys predate entities and
+// must not change, and "entity_<id>/" for a pool In bound to any other.
 func KeyScope(p Pool) string {
 	if b, ok := p.(bound); ok && b.schema != Home {
 		return b.schema.String() + "/"

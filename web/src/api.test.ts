@@ -26,17 +26,17 @@ const settled = (p: Promise<unknown>) =>
   Promise.race([p.then(() => "resolved", (e: unknown) => e), new Promise((r) => setTimeout(() => r("still running"), 100))]);
 
 test("leaving an entity ends its requests, and the next request goes to the entity entered", async () => {
-  const { sent, go } = fakeBrowser("/w/a/settings");
+  const { sent, go } = fakeBrowser("/e/a/settings");
   const inA = api.settings.get();
   const shared = api.me.get();
-  assert.equal(sent[0].url, "/w/a/v1/settings");
+  assert.equal(sent[0].url, "/e/a/v1/settings");
 
-  go("/w/b/settings");
+  go("/e/b/settings");
   const ended = await settled(inA);
   assert.ok(ended instanceof Error && ended.name === "AbortError", `a request in a after leaving it: ${String(ended)}`);
 
   const inB = api.settings.get();
-  assert.equal(sent.at(-1)!.url, "/w/b/v1/settings");
+  assert.equal(sent.at(-1)!.url, "/e/b/v1/settings");
   sent.at(-1)!.answer();
   assert.equal(await settled(inB), "resolved");
 
@@ -45,26 +45,26 @@ test("leaving an entity ends its requests, and the next request goes to the enti
 });
 
 test("a save that reads, then writes, stops when the entity is left in between", async () => {
-  const { sent, go } = fakeBrowser("/w/a/settings");
+  const { sent, go } = fakeBrowser("/e/a/settings");
   const save = (async () => {
     const current = await api.settings.get();
     return api.settings.put(current as never);
   })();
-  go("/w/b/settings");
+  go("/e/b/settings");
   assert.notEqual(await settled(save), "still running");
   assert.deepEqual(
     sent.map((s) => `${s.method} ${s.url}`),
-    ["GET /w/a/v1/settings"],
+    ["GET /e/a/v1/settings"],
     "nothing is written to b, or to a",
   );
 });
 
 test("Back to an entity left before opens it afresh", async () => {
-  const { sent, go } = fakeBrowser("/w/a/settings");
-  go("/w/b/settings");
-  go("/w/a/settings");
+  const { sent, go } = fakeBrowser("/e/a/settings");
+  go("/e/b/settings");
+  go("/e/a/settings");
   const again = api.settings.get();
-  assert.equal(sent.at(-1)!.url, "/w/a/v1/settings");
+  assert.equal(sent.at(-1)!.url, "/e/a/v1/settings");
   sent.at(-1)!.answer();
   assert.equal(await settled(again), "resolved");
 });

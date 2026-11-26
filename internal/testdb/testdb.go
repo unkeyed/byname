@@ -95,14 +95,14 @@ func ThroughIn(t testing.TB, last, schema string) *pgxpool.Pool {
 	return pool
 }
 
-// Workspace adds a workspace to pool's database and returns pool bound to
-// it, for tests that check one workspace never sees another's rows.
-func Workspace(t testing.TB, pool *pgxpool.Pool) db.Pool {
+// Entity adds an entity to pool's database and returns pool bound to
+// it, for tests that check one entity never sees another's rows.
+func Entity(t testing.TB, pool *pgxpool.Pool) db.Pool {
 	t.Helper()
 	slug := "ws-" + randomHex(4)
-	w, err := db.CreateWorkspace(context.Background(), pool, slug, slug)
+	w, err := db.CreateEntity(context.Background(), pool, slug, slug)
 	if err != nil {
-		t.Fatalf("testdb: create workspace: %v", err)
+		t.Fatalf("testdb: create entity: %v", err)
 	}
 	return db.In(pool, w.Schema)
 }

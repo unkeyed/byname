@@ -19,9 +19,9 @@ import (
 	"github.com/unkeyed/byname/internal/db"
 )
 
-func twoWorkspaces(person client) {
-	person.call("POST", "/v1/workspaces", map[string]string{"name": "Kyring"}, http.StatusCreated, nil)
-	person.call("POST", "/w/kyring/v1/brands", map[string]any{"name": "Contoso", "kind": "competitor"}, http.StatusOK, nil)
+func twoEntities(person client) {
+	person.call("POST", "/v1/entities", map[string]string{"name": "Kyring"}, http.StatusCreated, nil)
+	person.call("POST", "/e/kyring/v1/brands", map[string]any{"name": "Contoso", "kind": "competitor"}, http.StatusOK, nil)
 	person.call("POST", "/v1/brands", map[string]any{"name": "Fabrikam", "kind": "competitor"}, http.StatusOK, nil)
 }
 
@@ -43,22 +43,22 @@ func toolBrands(t *testing.T, cs *mcp.ClientSession) []string {
 	return names
 }
 
-// An MCP client given /w/kyring/mcp finds everything from the 401 alone,
+// An MCP client given /e/kyring/mcp finds everything from the 401 alone,
 // as Claude Code does, signs in for that URL, and reads Kyring's data.
-func TestMCPClientConnectsToAWorkspace(t *testing.T) {
+func TestMCPClientConnectsToAnEntity(t *testing.T) {
 	anon, person := newLocalServer(t)
-	twoWorkspaces(person)
+	twoEntities(person)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	resource := anon.base + "/w/kyring/mcp"
+	resource := anon.base + "/e/kyring/mcp"
 
-	r := mcpStatusAt(anon, "/w/kyring/mcp", "")
-	want := fmt.Sprintf(`Bearer resource_metadata="%s/.well-known/oauth-protected-resource/w/kyring/mcp"`, anon.base)
+	r := mcpStatusAt(anon, "/e/kyring/mcp", "")
+	want := fmt.Sprintf(`Bearer resource_metadata="%s/.well-known/oauth-protected-resource/e/kyring/mcp"`, anon.base)
 	if r.code != http.StatusUnauthorized || r.header.Get("WWW-Authenticate") != want {
-		t.Fatalf("/w/kyring/mcp without a token = %d with WWW-Authenticate %q, want 401 with %q", r.code, r.header.Get("WWW-Authenticate"), want)
+		t.Fatalf("/e/kyring/mcp without a token = %d with WWW-Authenticate %q, want 401 with %q", r.code, r.header.Get("WWW-Authenticate"), want)
 	}
 	var prm oauthex.ProtectedResourceMetadata
-	anon.call("GET", "/.well-known/oauth-protected-resource/w/kyring/mcp", nil, http.StatusOK, &prm)
+	anon.call("GET", "/.well-known/oauth-protected-resource/e/kyring/mcp", nil, http.StatusOK, &prm)
 	if prm.Resource != resource || !slices.Equal(prm.AuthorizationServers, []string{anon.base}) {
 		t.Fatalf("Kyring's protected resource metadata = %+v, want resource %s on the instance's authorization server", prm, resource)
 	}
@@ -95,25 +95,25 @@ func TestMCPClientConnectsToAWorkspace(t *testing.T) {
 		t.Fatalf("tools/list = %v, %v", list, err)
 	}
 	if got := toolBrands(t, cs); !slices.Equal(got, []string{"Contoso"}) {
-		t.Fatalf("list_brands at /w/kyring/mcp = %v, want Kyring's Contoso only", got)
+		t.Fatalf("list_brands at /e/kyring/mcp = %v, want Kyring's Contoso only", got)
 	}
 }
 
-// One sign-in covers every workspace: a token for any of the instance's
+// One sign-in covers every entity: a token for any of the instance's
 // MCP servers works at each, and only those servers are a resource.
-func TestOneMCPSignInCoversEveryWorkspace(t *testing.T) {
+func TestOneMCPSignInCoversEveryEntity(t *testing.T) {
 	anon, person := newLocalServer(t)
-	twoWorkspaces(person)
+	twoEntities(person)
 
 	_, forDefault := connectTo(t, anon, person, "Claude Code", anon.base+"/mcp")
-	_, forKyring := connectTo(t, anon, person, "Cursor", anon.base+"/w/kyring/mcp")
+	_, forKyring := connectTo(t, anon, person, "Cursor", anon.base+"/e/kyring/mcp")
 	for _, c := range []struct {
 		name, token, path string
 		want              []string
 	}{
-		{"a /mcp token at /w/kyring/mcp", forDefault.AccessToken, "/w/kyring/mcp", []string{"Contoso"}},
-		{"a /w/kyring/mcp token at /mcp", forKyring.AccessToken, "/mcp", []string{"Fabrikam"}},
-		{"a /w/kyring/mcp token at /w/default/mcp", forKyring.AccessToken, "/w/default/mcp", []string{"Fabrikam"}},
+		{"a /mcp token at /e/kyring/mcp", forDefault.AccessToken, "/e/kyring/mcp", []string{"Contoso"}},
+		{"a /e/kyring/mcp token at /mcp", forKyring.AccessToken, "/mcp", []string{"Fabrikam"}},
+		{"a /e/kyring/mcp token at /e/default/mcp", forKyring.AccessToken, "/e/default/mcp", []string{"Fabrikam"}},
 	} {
 		cs, err := mcpSessionAt(anon, c.path, c.token)
 		if err != nil {
@@ -129,11 +129,11 @@ func TestOneMCPSignInCoversEveryWorkspace(t *testing.T) {
 	p := authorizeQuery(anon, id, loopbackRedirect)
 	code := decide(t, person, consentHandle(t, anon, "/oauth/authorize?"+p.query.Encode()), true).Get("code")
 	for _, bad := range []string{
-		anon.base + "/w/nope/mcp",
-		anon.base + "/w/kyring/v1",
-		anon.base + "/w/Kyring/mcp",
+		anon.base + "/e/nope/mcp",
+		anon.base + "/e/kyring/v1",
+		anon.base + "/e/Kyring/mcp",
 		"https://other.example/mcp",
-		"https://other.example/w/kyring/mcp",
+		"https://other.example/e/kyring/mcp",
 	} {
 		q := authorizeQuery(anon, id, loopbackRedirect).query
 		q.Set("resource", bad)
@@ -150,44 +150,44 @@ func TestOneMCPSignInCoversEveryWorkspace(t *testing.T) {
 	}
 }
 
-// Someone without credentials cannot tell a workspace's slug from a
+// Someone without credentials cannot tell an entity's slug from a
 // made-up one, and cannot make the server look for either. Only a
-// signed-in caller, or an MCP client with a token, brings a workspace
+// signed-in caller, or an MCP client with a token, brings an entity
 // another replica made live here.
 func TestAnonymousCallersCannotTellWhichSlugsExist(t *testing.T) {
 	anon, person := newLocalServer(t)
-	if _, err := db.CreateWorkspace(context.Background(), anon.db, "Kyring", "kyring"); err != nil {
+	if _, err := db.CreateEntity(context.Background(), anon.db, "Kyring", "kyring"); err != nil {
 		t.Fatal(err)
 	}
 	for _, path := range []string{"/v1/brands", "/v1/nothing-here", "/auth/options"} {
-		real, made := anon.do("GET", "/w/default"+path, nil), anon.do("GET", "/w/nope"+path, nil)
+		real, made := anon.do("GET", "/e/default"+path, nil), anon.do("GET", "/e/nope"+path, nil)
 		if real.code != made.code || !bytes.Equal(real.body, made.body) {
 			t.Errorf("GET %s under a real slug = %d %s, under a made-up one %d %s; want the same", path, real.code, real.body, made.code, made.body)
 		}
 	}
-	if r := anon.do("GET", "/w/kyring/v1/brands", nil); r.code != http.StatusUnauthorized {
+	if r := anon.do("GET", "/e/kyring/v1/brands", nil); r.code != http.StatusUnauthorized {
 		t.Fatalf("an anonymous GET under a slug this replica has not seen = %d, want 401", r.code)
 	}
-	if r := anon.do("GET", "/.well-known/oauth-protected-resource/w/kyring/mcp", nil); r.code != http.StatusNotFound {
+	if r := anon.do("GET", "/.well-known/oauth-protected-resource/e/kyring/mcp", nil); r.code != http.StatusNotFound {
 		t.Fatalf("anonymous metadata for a slug this replica has not seen = %d, want 404 without looking", r.code)
 	}
 	if _, ok := anon.reg.Live("kyring"); ok {
-		t.Fatal("an anonymous request brought kyring live, want only signed-in callers to look for new workspaces")
+		t.Fatal("an anonymous request brought kyring live, want only signed-in callers to look for new entities")
 	}
 
-	_, token := connectTo(t, anon, person, "Cursor", anon.base+"/w/kyring/mcp")
-	cs, err := mcpSessionAt(anon, "/w/kyring/mcp", token.AccessToken)
+	_, token := connectTo(t, anon, person, "Cursor", anon.base+"/e/kyring/mcp")
+	cs, err := mcpSessionAt(anon, "/e/kyring/mcp", token.AccessToken)
 	if err != nil {
-		t.Fatalf("an MCP client with a token at a workspace another replica made: %v", err)
+		t.Fatalf("an MCP client with a token at an entity another replica made: %v", err)
 	}
 	if got := toolBrands(t, cs); len(got) != 0 {
 		t.Errorf("Kyring's brands = %v, want none", got)
 	}
 	cs.Close()
-	anon.call("GET", "/.well-known/oauth-protected-resource/w/kyring/mcp", nil, http.StatusOK, nil)
+	anon.call("GET", "/.well-known/oauth-protected-resource/e/kyring/mcp", nil, http.StatusOK, nil)
 
-	if _, err := db.CreateWorkspace(context.Background(), anon.db, "Planetfall", "planetfall"); err != nil {
+	if _, err := db.CreateEntity(context.Background(), anon.db, "Planetfall", "planetfall"); err != nil {
 		t.Fatal(err)
 	}
-	person.call("GET", "/w/planetfall/v1/brands", nil, http.StatusOK, nil)
+	person.call("GET", "/e/planetfall/v1/brands", nil, http.StatusOK, nil)
 }

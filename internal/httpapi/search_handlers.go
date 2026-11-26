@@ -192,10 +192,10 @@ var googleBack = map[search.Return]string{
 
 // googleOAuthCallback is where Google sends the browser back. Its path
 // stays /auth/gsc/callback, the redirect URI registered on each instance's
-// Google OAuth client, for every workspace: the state names the workspace
+// Google OAuth client, for every entity: the state names the entity
 // the sign-in started in, and the connection lands there. It is public so
 // that it can always redirect to the page the sign-in started from
-// (Settings > Search engines or onboarding, in that workspace), with
+// (Settings > Search engines or onboarding, in that entity), with
 // ?error= when connecting failed, including when the admin's session ended
 // during Google's consent page; it checks for that session itself.
 func (s *server) googleOAuthCallback(w http.ResponseWriter, r *http.Request, _ core.Actor) error {
@@ -203,14 +203,14 @@ func (s *server) googleOAuthCallback(w http.ResponseWriter, r *http.Request, _ c
 	origin := s.svc.Search.GoogleOAuthOrigin(q.Get("state"))
 	e := s.reg.Default()
 	var err error
-	if origin.Workspace != 0 {
-		if found, ferr := s.reg.ByID(r.Context(), origin.Workspace); ferr != nil {
+	if origin.Entity != 0 {
+		if found, ferr := s.reg.ByID(r.Context(), origin.Entity); ferr != nil {
 			err = ferr
 		} else {
 			e = found
 		}
 	}
-	back := "/w/" + e.Workspace.Slug + googleBack[origin.Return]
+	back := "/e/" + e.Entity.Slug + googleBack[origin.Return]
 	a, aerr := s.authn.Caller(r)
 	switch {
 	case err != nil:

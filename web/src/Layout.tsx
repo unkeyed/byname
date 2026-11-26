@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link, Navigate, NavLink, Outlet, useLocation } from "react-router";
 import { api, ApiError } from "./api";
 import { useCan, useMe } from "./queries";
-import { go, toLogin, useWorkspace } from "./routing";
-import { WorkspaceSwitcher } from "./Workspaces";
+import { go, toLogin, useEntity } from "./routing";
+import { EntitySwitcher } from "./Entities";
 import { NotSetUp } from "./pages/onboarding/Onboarding";
 import { Toaster } from "./components/Toaster";
 import { QuestionDrawer } from "./pages/results/QuestionDrawer";
@@ -37,7 +37,7 @@ export function Layout() {
   // Here, not in NavBody: NavBody moves between the rail and the phone menu
   // as the window resizes, and the theme must follow the system throughout.
   const theme = useTheme();
-  const { slug, current, list } = useWorkspace();
+  const { slug, current, list } = useEntity();
   const canSetUp = useCan("config:write");
   const notSetUp = current?.onboarded === false && !location.pathname.startsWith("/settings");
   const missing = list.isSuccess && !current;
@@ -61,10 +61,10 @@ export function Layout() {
 
   if (notSetUp && canSetUp) return <Navigate to="/onboarding" replace />;
   const first = list.data?.find((w) => w.default);
-  // Only the first entity is ever at /w/default, so a link from before it
+  // Only the first entity is ever at /e/default, so a link from before it
   // took its brand's name still means it.
   if (missing && slug === "default" && first) {
-    return <ToFirst to={`/w/${first.slug}${location.pathname === "/" ? "" : location.pathname}${location.search}${location.hash}`} />;
+    return <ToFirst to={`/e/${first.slug}${location.pathname === "/" ? "" : location.pathname}${location.search}${location.hash}`} />;
   }
 
   return (
@@ -88,13 +88,13 @@ export function Layout() {
                     icon="building"
                     title="No entity here"
                     action={
-                      <Button onClick={() => go(`/w/${first?.slug ?? ""}`)}>
+                      <Button onClick={() => go(`/e/${first?.slug ?? ""}`)}>
                         <Icon name="left" className="size-3.5" />
                         Open {first?.name}
                       </Button>
                     }
                   >
-                    Nothing is tracked at /w/{slug}. Pick an entity from the switcher.
+                    Nothing is tracked at /e/{slug}. Pick an entity from the switcher.
                   </EmptyState>
                 </div>
               </>
@@ -158,7 +158,7 @@ function NavBody({ label, theme: [theme, setTheme], rail, onNavigate, close }: {
   return (
     <>
       <div className={cx("flex h-12 shrink-0 items-center gap-2", rail ? "justify-center lg:justify-start lg:px-2.5" : "pr-2 pl-2.5")}>
-        <WorkspaceSwitcher rail={rail} onNavigate={onNavigate} />
+        <EntitySwitcher rail={rail} onNavigate={onNavigate} />
         {close && <span className="flex items-center gap-1">{close}</span>}
       </div>
       <nav aria-label="Main" className="flex flex-col gap-0.5 px-2 py-2">

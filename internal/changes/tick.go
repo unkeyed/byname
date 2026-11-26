@@ -19,8 +19,8 @@ var jobs = map[string]string{
 
 // locks keep two replicas from running the same work at once.
 var (
-	pollLock  = db.WorkspaceLock("byname.changes.poll")
-	watchLock = db.WorkspaceLock("byname.changes.watch")
+	pollLock  = db.EntityLock("byname.changes.poll")
+	watchLock = db.EntityLock("byname.changes.watch")
 )
 
 // pollEvery is the GitHub poll's period, fixed.

@@ -137,8 +137,8 @@ func (s *Service) Wake() <-chan struct{} { return s.wake }
 // Lock keys, each held for one short transaction. claimLock serializes
 // creating runs, leaseLock taking a lease on one.
 var (
-	claimLock = db.WorkspaceLock("byname.checks.claim")
-	leaseLock = db.WorkspaceLock("byname.checks.lease")
+	claimLock = db.EntityLock("byname.checks.claim")
+	leaseLock = db.EntityLock("byname.checks.lease")
 )
 
 const runColumns = `id, status, trigger, question_set_id, queued_at`

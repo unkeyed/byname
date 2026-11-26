@@ -1,5 +1,5 @@
 // Package db applies the embedded SQL migrations at startup and routes
-// each query to its workspace's tables.
+// each query to its entity's tables.
 package db
 
 import (
@@ -15,14 +15,14 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-//go:embed migrations/*.sql migrations/workspace/*.sql
+//go:embed migrations/*.sql migrations/entity/*.sql
 var migrations embed.FS
 
 const migrateLock = `SELECT pg_advisory_xact_lock(hashtext('byname.migrate'))`
 
 // Migrate applies every migrations/NNN_*.sql not yet recorded in
-// schema_migrations, in name order, then every migrations/workspace file
-// to each workspace that has not recorded it in workspace_migration. Each
+// schema_migrations, in name order, then every migrations/entity file
+// to each entity that has not recorded it in entity_migration. Each
 // file runs in its own transaction holding the migrate lock, so replicas
 // booting together apply each file exactly once and the losers wait, then
 // find nothing to do. Files are never edited after release; a change is a
@@ -31,7 +31,7 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 	if err := MigrateThrough(ctx, pool, ""); err != nil {
 		return err
 	}
-	return migrateWorkspaces(ctx, pool)
+	return migrateEntities(ctx, pool)
 }
 
 // MigrateThrough applies the global track only, stopping after the file
@@ -98,44 +98,44 @@ func apply(ctx context.Context, tx pgx.Tx, name, sql string) error {
 	return err
 }
 
-type workspaceFile struct{ name, sql string }
+type entityFile struct{ name, sql string }
 
-func workspaceFiles() ([]workspaceFile, error) {
-	names, err := fs.Glob(migrations, "migrations/workspace/*.sql")
+func entityFiles() ([]entityFile, error) {
+	names, err := fs.Glob(migrations, "migrations/entity/*.sql")
 	if err != nil {
 		return nil, err
 	}
 	sort.Strings(names)
-	files := make([]workspaceFile, len(names))
+	files := make([]entityFile, len(names))
 	for i, name := range names {
 		sql, err := migrations.ReadFile(name)
 		if err != nil {
 			return nil, err
 		}
-		files[i] = workspaceFile{path.Base(name), string(sql)}
+		files[i] = entityFile{path.Base(name), string(sql)}
 	}
 	return files, nil
 }
 
-func migrateWorkspaces(ctx context.Context, pool Pool) error {
-	all, err := Workspaces(ctx, pool)
+func migrateEntities(ctx context.Context, pool Pool) error {
+	all, err := Entities(ctx, pool)
 	if err != nil {
 		return err
 	}
 	for _, w := range all {
-		if err := MigrateWorkspace(ctx, pool, w); err != nil {
+		if err := MigrateEntity(ctx, pool, w); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-// MigrateWorkspace applies every migrations/workspace file w has not
+// MigrateEntity applies every migrations/entity file w has not
 // recorded, each in its own transaction holding the migrate lock, as
-// Migrate does at start. A workspace another replica's older binary made
+// Migrate does at start. An entity another replica's older binary made
 // lacks the files only this binary has.
-func MigrateWorkspace(ctx context.Context, pool Pool, w Workspace) error {
-	missing, err := missingWorkspaceFiles(ctx, pool, w.ID)
+func MigrateEntity(ctx context.Context, pool Pool, w Entity) error {
+	missing, err := missingEntityFiles(ctx, pool, w.ID)
 	if err != nil {
 		return err
 	}
@@ -144,36 +144,36 @@ func MigrateWorkspace(ctx context.Context, pool Pool, w Workspace) error {
 			if _, err := tx.Exec(ctx, migrateLock); err != nil {
 				return err
 			}
-			return applyWorkspaceLocked(ctx, tx, w, f)
+			return applyEntityLocked(ctx, tx, w, f)
 		}); err != nil {
-			return fmt.Errorf("migrate workspace %s with %s: %w", w.Slug, f.name, err)
+			return fmt.Errorf("migrate entity %s with %s: %w", w.Slug, f.name, err)
 		}
 	}
 	return nil
 }
 
-// WorkspaceMigrated reports whether the workspace with id has recorded
-// every migrations/workspace file this binary has.
-func WorkspaceMigrated(ctx context.Context, pool Pool, id int64) (bool, error) {
-	missing, err := missingWorkspaceFiles(ctx, pool, id)
+// EntityMigrated reports whether the entity with id has recorded
+// every migrations/entity file this binary has.
+func EntityMigrated(ctx context.Context, pool Pool, id int64) (bool, error) {
+	missing, err := missingEntityFiles(ctx, pool, id)
 	return len(missing) == 0, err
 }
 
-func missingWorkspaceFiles(ctx context.Context, pool Pool, id int64) ([]workspaceFile, error) {
-	files, err := workspaceFiles()
+func missingEntityFiles(ctx context.Context, pool Pool, id int64) ([]entityFile, error) {
+	files, err := entityFiles()
 	if err != nil {
 		return nil, err
 	}
 	var applied []string
-	if err := pool.QueryRow(ctx, `SELECT ARRAY(SELECT name FROM workspace_migration WHERE workspace_id = $1)`, id).Scan(&applied); err != nil {
+	if err := pool.QueryRow(ctx, `SELECT ARRAY(SELECT name FROM entity_migration WHERE entity_id = $1)`, id).Scan(&applied); err != nil {
 		return nil, err
 	}
-	return slices.DeleteFunc(files, func(f workspaceFile) bool { return slices.Contains(applied, f.name) }), nil
+	return slices.DeleteFunc(files, func(f entityFile) bool { return slices.Contains(applied, f.name) }), nil
 }
 
-func applyWorkspaceLocked(ctx context.Context, tx pgx.Tx, w Workspace, f workspaceFile) error {
+func applyEntityLocked(ctx context.Context, tx pgx.Tx, w Entity, f entityFile) error {
 	var applied bool
-	if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM workspace_migration WHERE workspace_id = $1 AND name = $2)`,
+	if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM entity_migration WHERE entity_id = $1 AND name = $2)`,
 		w.ID, f.name).Scan(&applied); err != nil {
 		return err
 	}
@@ -188,6 +188,6 @@ func applyWorkspaceLocked(ctx context.Context, tx pgx.Tx, w Workspace, f workspa
 	if _, err := tx.Exec(ctx, f.sql); err != nil {
 		return err
 	}
-	_, err := tx.Exec(ctx, `INSERT INTO workspace_migration (workspace_id, name) VALUES ($1, $2)`, w.ID, f.name)
+	_, err := tx.Exec(ctx, `INSERT INTO entity_migration (entity_id, name) VALUES ($1, $2)`, w.ID, f.name)
 	return err
 }

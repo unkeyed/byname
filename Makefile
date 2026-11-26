@@ -3,7 +3,7 @@ BASE_URL ?= http://localhost:8080
 GO_TEST_SKIP ?=
 E2E_SETUP_TOKEN ?=
 
-.PHONY: dev test lint build web e2e workspace-baseline
+.PHONY: dev test lint build web e2e entity-baseline
 
 # make dev keeps a local ENCRYPTION_KEY in .byname-dev-key (gitignored), so
 # secrets stored while developing stay readable across restarts.
@@ -34,8 +34,8 @@ build: web
 e2e:
 	BASE_URL='$(BASE_URL)' E2E_SETUP_TOKEN='$(E2E_SETUP_TOKEN)' go test -tags e2e -count=1 -v ./e2e/
 
-# Rewrites the workspace track's baseline from the global migrations, on
+# Rewrites the entity track's baseline from the global migrations, on
 # the docker compose Postgres. Run it only before the baseline is released.
-workspace-baseline:
+entity-baseline:
 	docker compose up -d --wait db
-	DATABASE_URL='$(DATABASE_URL)' go run ./internal/db/genbaseline internal/db/migrations/workspace/000_baseline.sql
+	DATABASE_URL='$(DATABASE_URL)' go run ./internal/db/genbaseline internal/db/migrations/entity/000_baseline.sql

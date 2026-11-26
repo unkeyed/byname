@@ -16,7 +16,7 @@ import (
 )
 
 // lock keeps two replicas from reading the same answers at once.
-var lock = db.WorkspaceLock("byname.discovery")
+var lock = db.EntityLock("byname.discovery")
 
 // retryAfter is how long a failed read waits before a pass tries it again.
 const retryAfter = time.Hour

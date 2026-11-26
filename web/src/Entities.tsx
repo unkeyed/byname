@@ -1,9 +1,9 @@
 import { useId, useRef, useState, type FormEvent, type MouseEvent } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "react-router";
-import { api, ApiError, type Workspace } from "./api";
+import { api, ApiError, type Entity } from "./api";
 import { keys, useIsAdmin } from "./queries";
-import { go, openRoutes, useWorkspace } from "./routing";
+import { go, openRoutes, useEntity } from "./routing";
 import { samePage } from "./samePage";
 import { Badge, Button, Card, CardHeader, cx, Dialog, DialogBody, ErrorNote, Field, Icon, Initials, inputClass, scrollArea } from "./ui";
 
@@ -28,8 +28,8 @@ function follow(e: MouseEvent<HTMLAnchorElement>, to: string) {
  * The open entity's name, at the top of the navigation. It opens a list of
  * every entity, with Add entity at the end for admins.
  */
-export function WorkspaceSwitcher({ rail, onNavigate }: { rail?: boolean; onNavigate?: () => void }) {
-  const { slug, current, list } = useWorkspace();
+export function EntitySwitcher({ rail, onNavigate }: { rail?: boolean; onNavigate?: () => void }) {
+  const { slug, current, list } = useEntity();
   const admin = useIsAdmin();
   const { pathname } = useLocation();
   const id = useId();
@@ -71,13 +71,13 @@ export function WorkspaceSwitcher({ rail, onNavigate }: { rail?: boolean; onNavi
           {(list.data ?? []).map((w) => (
             <li key={w.id}>
               <a
-                href={`/w/${w.slug}${page}`}
+                href={`/e/${w.slug}${page}`}
                 aria-current={w.slug === slug ? "page" : undefined}
                 onClick={(e) => {
                   menu.current?.hidePopover();
                   onNavigate?.();
                   if (w.slug === slug) e.preventDefault();
-                  else follow(e, `/w/${w.slug}${page}`);
+                  else follow(e, `/e/${w.slug}${page}`);
                 }}
                 className="flex h-11 items-center gap-2 rounded-control px-2 text-sm transition-colors hover:bg-subtle md:h-9"
               >
@@ -106,11 +106,11 @@ export function WorkspaceSwitcher({ rail, onNavigate }: { rail?: boolean; onNavi
         )}
       </div>
       <Dialog open={adding} onClose={() => setAdding(false)} title="Add entity">
-        <AddWorkspace
+        <AddEntity
           onAdded={(w) => {
             setAdding(false);
             onNavigate?.();
-            go(`/w/${w.slug}/onboarding`);
+            go(`/e/${w.slug}/onboarding`);
           }}
         />
       </Dialog>
@@ -121,15 +121,15 @@ export function WorkspaceSwitcher({ rail, onNavigate }: { rail?: boolean; onNavi
 const addError = (err: unknown, slug: string) =>
   err instanceof ApiError && err.status === 409 ? new Error(`Another entity already uses the slug ${slug}. Type a different slug.`) : err;
 
-function AddWorkspace({ onAdded }: { onAdded: (w: Workspace) => void }) {
+function AddEntity({ onAdded }: { onAdded: (w: Entity) => void }) {
   const qc = useQueryClient();
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
   const derived = slugify(name.trim());
   const add = useMutation({
-    mutationFn: () => api.workspaces.create({ name: name.trim(), slug: slug.trim() || undefined }),
+    mutationFn: () => api.entities.create({ name: name.trim(), slug: slug.trim() || undefined }),
     onSuccess: (w) => {
-      qc.setQueryData<Workspace[]>(keys.workspaces, (l) => l && [...l, w]);
+      qc.setQueryData<Entity[]>(keys.entities, (l) => l && [...l, w]);
       onAdded(w);
     },
   });
@@ -144,7 +144,7 @@ function AddWorkspace({ onAdded }: { onAdded: (w: Workspace) => void }) {
         <Field label="Name">
           <input data-autofocus required maxLength={80} value={name} onChange={(e) => setName(e.target.value)} placeholder="Acme" className={inputClass} />
         </Field>
-        <Field label="Slug (optional)" hint={<>Its pages live at /w/{slug.trim() || derived}. The slug never changes.</>}>
+        <Field label="Slug (optional)" hint={<>Its pages live at /e/{slug.trim() || derived}. The slug never changes.</>}>
           <input
             value={slug}
             onChange={(e) => setSlug(e.target.value)}
@@ -168,28 +168,28 @@ function AddWorkspace({ onAdded }: { onAdded: (w: Workspace) => void }) {
 }
 
 /** Settings > General, for admins: the open entity's name. Its slug, and so its links, stay. */
-export function RenameWorkspace() {
-  const { current } = useWorkspace();
+export function RenameEntity() {
+  const { current } = useEntity();
   const admin = useIsAdmin();
   if (!admin || !current) return null;
-  return <RenameForm key={current.id} workspace={current} />;
+  return <RenameForm key={current.id} entity={current} />;
 }
 
-function RenameForm({ workspace }: { workspace: Workspace }) {
+function RenameForm({ entity }: { entity: Entity }) {
   const qc = useQueryClient();
-  const [name, setName] = useState(workspace.name);
+  const [name, setName] = useState(entity.name);
   const rename = useMutation({
-    mutationFn: () => api.workspaces.rename(workspace.slug, name.trim()),
-    onSuccess: (w) => qc.setQueryData<Workspace[]>(keys.workspaces, (l) => l?.map((x) => (x.id === w.id ? w : x))),
+    mutationFn: () => api.entities.rename(entity.slug, name.trim()),
+    onSuccess: (w) => qc.setQueryData<Entity[]>(keys.entities, (l) => l?.map((x) => (x.id === w.id ? w : x))),
   });
-  const changed = name.trim() !== workspace.name;
+  const changed = name.trim() !== entity.name;
   const submit = (e: FormEvent) => {
     e.preventDefault();
     if (name.trim() && changed) rename.mutate();
   };
   return (
     <Card className="mb-6">
-      <CardHeader title="Entity" description={`What the entity switcher calls it. Its pages stay at /w/${workspace.slug}.`} />
+      <CardHeader title="Entity" description={`What the entity switcher calls it. Its pages stay at /e/${entity.slug}.`} />
       <form onSubmit={submit} className="space-y-2 p-4">
         <div className="flex flex-col gap-2 sm:flex-row">
           <input aria-label="Entity name" required maxLength={80} value={name} onChange={(e) => setName(e.target.value)} className={inputClass} />

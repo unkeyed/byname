@@ -23,7 +23,7 @@ func (s *server) mountOAuth(mux *http.ServeMux) {
 	prm := mcpauth.ProtectedResourceMetadataHandler(s.resourceMetadata(""))
 	mux.Handle("/.well-known/oauth-protected-resource", prm)
 	mux.Handle("/.well-known/oauth-protected-resource/mcp", prm)
-	mux.HandleFunc("/.well-known/oauth-protected-resource/w/{slug}/mcp", s.workspaceResourceMetadata)
+	mux.HandleFunc("/.well-known/oauth-protected-resource/e/{slug}/mcp", s.entityResourceMetadata)
 	mux.Handle("/.well-known/oauth-authorization-server", anyOrigin(http.MethodGet, s.authServerMetadata))
 	mux.Handle("/oauth/register", anyOrigin(http.MethodPost, s.registerClient))
 	mux.Handle("/oauth/token", anyOrigin(http.MethodPost, s.token))
@@ -32,7 +32,7 @@ func (s *server) mountOAuth(mux *http.ServeMux) {
 }
 
 // resourceMetadata is RFC 9728 metadata for the MCP server at
-// /w/<slug>/mcp, or at /mcp when slug is empty. Clients reject a document
+// /e/<slug>/mcp, or at /mcp when slug is empty. Clients reject a document
 // whose resource is not the URL they connect to, so each has its own.
 func (s *server) resourceMetadata(slug string) *oauthex.ProtectedResourceMetadata {
 	return &oauthex.ProtectedResourceMetadata{
@@ -44,11 +44,11 @@ func (s *server) resourceMetadata(slug string) *oauthex.ProtectedResourceMetadat
 	}
 }
 
-// workspaceResourceMetadata answers anyone, as MCP clients ask before
+// entityResourceMetadata answers anyone, as MCP clients ask before
 // signing in, so it says which slugs this process serves: that is the
 // document's purpose. A slug it does not serve yet is looked for only for
 // a signed-in caller.
-func (s *server) workspaceResourceMetadata(w http.ResponseWriter, r *http.Request) {
+func (s *server) entityResourceMetadata(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
 	e, ok := s.reg.Live(slug)
 	if !ok {
@@ -56,14 +56,14 @@ func (s *server) workspaceResourceMetadata(w http.ResponseWriter, r *http.Reques
 		if s.signedIn(r) == nil {
 			e, err = s.reg.Lookup(r.Context(), slug)
 		} else {
-			err = fmt.Errorf("%w: no workspace %q", core.ErrNotFound, slug)
+			err = fmt.Errorf("%w: no entity %q", core.ErrNotFound, slug)
 		}
 		if err != nil {
 			s.writeError(w, r, err)
 			return
 		}
 	}
-	mcpauth.ProtectedResourceMetadataHandler(s.resourceMetadata(e.Workspace.Slug)).ServeHTTP(w, r)
+	mcpauth.ProtectedResourceMetadataHandler(s.resourceMetadata(e.Entity.Slug)).ServeHTTP(w, r)
 }
 
 // anyOrigin serves method with CORS open to every origin, for MCP clients

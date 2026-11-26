@@ -47,16 +47,16 @@ export interface Actor {
 
 /**
  * One tracked entity, such as a company or product: its own brand,
- * questions, results and settings, at /w/<slug>. The team, sign-in, API keys
+ * questions, results and settings, at /e/<slug>. The team, sign-in, API keys
  * and provider keys are shared by all of them.
  */
-export interface Workspace {
+export interface Entity {
   id: number;
   /** Never changes once links use it. */
   slug: string;
   name: string;
   onboarded: boolean;
-  /** Paths without /w/<slug> mean this one, the first made. */
+  /** Paths without /e/<slug> mean this one, the first made. */
   default: boolean;
 }
 
@@ -444,8 +444,8 @@ export interface Credential {
   /** "ok", or why it failed, or that the provider has no free test call. */
   last_test_status: string;
   updated_at: Timestamp | null;
-  /** Every workspace shares the key, so this names each one whose AI apps use it. */
-  used_by: { workspace: string; slug: string; surfaces: SurfaceKey[] }[];
+  /** Every entity shares the key, so this names each one whose AI apps use it. */
+  used_by: { entity: string; slug: string; surfaces: SurfaceKey[] }[];
 }
 
 export type StepKey = "brand" | "competitors" | "questions" | "surfaces" | "search" | "social" | "schedule" | "review";
@@ -882,7 +882,7 @@ export interface BrandLogo {
   version: number;
 }
 
-export const logoURL = (l: BrandLogo) => inWorkspace(`/v1/brands/${l.brand_id}/logo?v=${l.version}`);
+export const logoURL = (l: BrandLogo) => inEntity(`/v1/brands/${l.brand_id}/logo?v=${l.version}`);
 
 export interface AnswerSummary {
   id: number;
@@ -1887,50 +1887,50 @@ export class ApiError extends Error {
 
 export const needsReauth = (err: unknown) => err instanceof ApiError && err.code === "reauth_required";
 
-const shared = ["me", "account", "keys", "apps", "users", "invites", "credentials", "workspaces", "oauth"];
+const shared = ["me", "account", "keys", "apps", "users", "invites", "credentials", "entities", "oauth"];
 
 let entity = { slug: "", left: new AbortController() };
 
 /**
- * Follows the address to the workspace it is in. Leaving a workspace, by
+ * Follows the address to the entity it is in. Leaving an entity, by
  * the switcher or by Back and Forward, aborts every request still running
  * in it, so a save that reads and then writes stops after the read instead
- * of writing what it read into the workspace entered. The router calls
+ * of writing what it read into the entity entered. The router calls
  * this on every navigation, and each request before it is sent.
  */
 export function syncEntity() {
-  const slug = /^\/w\/([^/]+)/.exec(location.pathname)?.[1] ?? "";
+  const slug = /^\/e\/([^/]+)/.exec(location.pathname)?.[1] ?? "";
   if (slug !== entity.slug) {
-    entity.left.abort(new DOMException(`left /w/${entity.slug}`, "AbortError"));
+    entity.left.abort(new DOMException(`left /e/${entity.slug}`, "AbortError"));
     entity = { slug, left: new AbortController() };
   }
   return entity;
 }
 
-/** Whether path is one workspace's, rather than shared by every workspace. */
+/** Whether path is one entity's, rather than shared by every entity. */
 function scoped(path: string) {
   const rest = path.match(/^\/v1\/([^/?]+)/)?.[1];
   return rest !== undefined && !shared.includes(rest);
 }
 
 /**
- * The URL that reads or writes path in the workspace the page is in: the
- * page at /w/kyring/settings reads /w/kyring/v1/brands.
+ * The URL that reads or writes path in the entity the page is in: the
+ * page at /e/kyring/settings reads /e/kyring/v1/brands.
  */
-export function inWorkspace(path: string): string {
+export function inEntity(path: string): string {
   const { slug } = syncEntity();
-  return slug && scoped(path) ? `/w/${slug}${path}` : path;
+  return slug && scoped(path) ? `/e/${slug}${path}` : path;
 }
 
 /**
- * A request in a workspace ends when the page leaves it: it rejects with
+ * A request in an entity ends when the page leaves it: it rejects with
  * an AbortError, even when the answer had already arrived.
  */
 async function request<T>(method: string, path: string, opts: { body?: unknown; signal?: AbortSignal } = {}): Promise<T> {
   const { slug, left } = syncEntity();
   const inOne = slug !== "" && scoped(path);
   const signal = inOne ? (opts.signal ? AbortSignal.any([left.signal, opts.signal]) : left.signal) : opts.signal;
-  const res = await fetch(inOne ? `/w/${slug}${path}` : path, {
+  const res = await fetch(inOne ? `/e/${slug}${path}` : path, {
     method,
     credentials: "same-origin",
     headers: opts.body === undefined ? undefined : { "Content-Type": "application/json" },
@@ -1992,10 +1992,10 @@ export const api = {
   },
 
   /** The default first. Adding and renaming are admin only; a slug is taken from the name when left out, and a taken one is 409. */
-  workspaces: {
-    list: () => request<Workspace[]>("GET", "/v1/workspaces"),
-    create: (body: { name: string; slug?: string }) => request<Workspace>("POST", "/v1/workspaces", { body }),
-    rename: (slug: string, name: string) => request<Workspace>("PATCH", `/v1/workspaces/${enc(slug)}`, { body: { name } }),
+  entities: {
+    list: () => request<Entity[]>("GET", "/v1/entities"),
+    create: (body: { name: string; slug?: string }) => request<Entity>("POST", "/v1/entities", { body }),
+    rename: (slug: string, name: string) => request<Entity>("PATCH", `/v1/entities/${enc(slug)}`, { body: { name } }),
   },
 
   /** Every change to a sign-in method can fail with reauth_required (see needsReauth). */

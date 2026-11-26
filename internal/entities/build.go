@@ -1,7 +1,7 @@
-// Package workspaces keeps every workspace an instance tracks live: its
+// Package entities keeps every entity an instance tracks live: its
 // services, bound to its own tables, and its scheduler and notification
 // delivery, each running once per process.
-package workspaces
+package entities
 
 import (
 	"context"
@@ -32,7 +32,7 @@ import (
 	"github.com/unkeyed/byname/internal/sources"
 )
 
-// Options is what every workspace's services are built with. The base URL
+// Options is what every entity's services are built with. The base URL
 // overrides are for tests and local development against fakes; empty means
 // the real service.
 type Options struct {
@@ -40,7 +40,7 @@ type Options struct {
 	Secrets   *secretbox.Box
 	PublicURL *url.URL
 	Log       *slog.Logger
-	// MigrateDB, when set, is the role that creates a new workspace's
+	// MigrateDB, when set, is the role that creates a new entity's
 	// tables: MIGRATION_DATABASE_URL's.
 	MigrateDB *pgxpool.Config
 	// Resolve follows redirect links in citations; nil keeps them as sent.
@@ -59,15 +59,15 @@ type Options struct {
 	SourcesAllowPrivate bool
 }
 
-// Build makes the services of the workspace pool is bound to, and run,
-// which runs that workspace's scheduler and notification delivery until
-// ctx ends. It is the only place a workspace's services are put together.
-func Build(w db.Workspace, pool db.Pool, o Options) (app.Services, func(context.Context)) {
+// Build makes the services of the entity pool is bound to, and run,
+// which runs that entity's scheduler and notification delivery until
+// ctx ends. It is the only place an entity's services are put together.
+func Build(w db.Entity, pool db.Pool, o Options) (app.Services, func(context.Context)) {
 	log := o.Log
 	if log == nil {
 		log = slog.Default()
 	}
-	log = log.With("workspace", w.Slug)
+	log = log.With("entity", w.Slug)
 	res := results.New(pool)
 	alerts := notify.New(pool, res, notify.Options{
 		Secrets: o.Secrets, PublicURL: o.PublicURL, HTTPClient: &http.Client{}, ResendBaseURL: o.ResendBaseURL, Log: log,
@@ -102,24 +102,24 @@ func Build(w db.Workspace, pool db.Pool, o Options) (app.Services, func(context.
 	return svc, run
 }
 
-func prepare(ctx context.Context, w db.Workspace, svc app.Services, log *slog.Logger) error {
+func prepare(ctx context.Context, w db.Entity, svc app.Services, log *slog.Logger) error {
 	if err := svc.Config.MarkBrandQuestions(ctx); err != nil {
-		return fmt.Errorf("workspace %s: mark the questions that name its brand: %w", w.Slug, err)
+		return fmt.Errorf("entity %s: mark the questions that name its brand: %w", w.Slug, err)
 	}
 	search, err := svc.Search.SealSecrets(ctx)
 	if err != nil {
-		return fmt.Errorf("workspace %s: encrypt the search engine credentials with ENCRYPTION_KEY: %w", w.Slug, err)
+		return fmt.Errorf("entity %s: encrypt the search engine credentials with ENCRYPTION_KEY: %w", w.Slug, err)
 	}
 	repo, err := svc.Changes.SealSecrets(ctx)
 	if err != nil {
-		return fmt.Errorf("workspace %s: encrypt the GitHub token with ENCRYPTION_KEY: %w", w.Slug, err)
+		return fmt.Errorf("entity %s: encrypt the GitHub token with ENCRYPTION_KEY: %w", w.Slug, err)
 	}
 	channels, err := svc.Notify.SealChannels(ctx)
 	if err != nil {
-		return fmt.Errorf("workspace %s: encrypt notification channel secrets with ENCRYPTION_KEY: %w", w.Slug, err)
+		return fmt.Errorf("entity %s: encrypt notification channel secrets with ENCRYPTION_KEY: %w", w.Slug, err)
 	}
 	if search+repo+channels > 0 {
-		log.Info("encrypted stored secrets with the current ENCRYPTION_KEY", "workspace", w.Slug,
+		log.Info("encrypted stored secrets with the current ENCRYPTION_KEY", "entity", w.Slug,
 			"credentials", search+repo, "notification_channels", channels)
 	}
 	return nil

@@ -5,7 +5,7 @@ import { api, type Grouping, type Line, type ResultsFilter, type Run, type Scope
 /** Query keys in one place, so a mutation can invalidate exactly what it touched. */
 export const keys = {
   me: ["me"] as const,
-  workspaces: ["workspaces"] as const,
+  entities: ["entities"] as const,
   keys: ["keys"] as const,
   apps: ["apps"] as const,
   consent: (request: string) => ["consent", request] as const,
@@ -138,7 +138,7 @@ export const useLogos = () =>
 
 export const useMe = () => useQuery({ queryKey: keys.me, queryFn: api.me.get, staleTime: Infinity });
 
-export const useWorkspaces = () => useQuery({ queryKey: keys.workspaces, queryFn: api.workspaces.list, staleTime: 60_000 });
+export const useEntities = () => useQuery({ queryKey: keys.entities, queryFn: api.entities.list, staleTime: 60_000 });
 
 export const useAuthOptions = () => useQuery({ queryKey: keys.authOptions, queryFn: api.auth.options, staleTime: 60_000 });
 

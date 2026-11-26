@@ -2,7 +2,7 @@ import { Link } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../api";
 import { keys } from "../../queries";
-import { useWorkspace } from "../../routing";
+import { useEntity } from "../../routing";
 import { Badge, Card, CodeBlock, ConfirmButton, EmptyState, ErrorNote, Icon, Pending, RelativeTime } from "../../ui";
 import { SettingsHeader, SettingsSubhead } from "./Settings";
 
@@ -15,8 +15,8 @@ function snippets(base: string) {
 }
 
 export function Apps() {
-  const { slug, current } = useWorkspace();
-  const s = snippets(current?.default ? location.origin : `${location.origin}/w/${slug}`);
+  const { slug, current } = useEntity();
+  const s = snippets(current?.default ? location.origin : `${location.origin}/e/${slug}`);
 
   return (
     <>

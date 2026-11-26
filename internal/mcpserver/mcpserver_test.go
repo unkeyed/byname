@@ -24,7 +24,7 @@ func listTools(t *testing.T) []*mcp.Tool {
 	ctx := context.Background()
 	srv := mcp.NewServer(&mcp.Implementation{Name: "byname", Version: "test"}, nil)
 	addTools(srv, app.Services{Instance: instance.New("test", nil, notOnboarded{}, nil, nil)})
-	addWorkspaceTools(srv, nil)
+	addEntityTools(srv, nil)
 	st, ct := mcp.NewInMemoryTransports()
 	if _, err := srv.Connect(ctx, st, nil); err != nil {
 		t.Fatal(err)

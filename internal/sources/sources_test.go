@@ -353,7 +353,7 @@ func TestInterruptedRoundIsClosed(t *testing.T) {
 	}
 }
 
-// Every workspace's jobs share the few lock connections. A round that
+// Every entity's jobs share the few lock connections. A round that
 // cannot get one soon skips this tick, as when another process holds the
 // lock, rather than holding up the scheduler until one frees.
 func TestARoundSkipsWhenEveryLockConnectionIsBusy(t *testing.T) {

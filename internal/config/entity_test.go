@@ -21,9 +21,9 @@ import (
 	"github.com/unkeyed/byname/internal/testdb"
 )
 
-// Each workspace sees only its own brand and questions, and every
-// workspace shares the team and the provider keys.
-func TestWorkspacesKeepTheirOwnSetup(t *testing.T) {
+// Each entity sees only its own brand and questions, and every
+// entity shares the team and the provider keys.
+func TestEntitiesKeepTheirOwnSetup(t *testing.T) {
 	cfg := testdb.New(t).Config()
 	cfg.MaxConns = 1
 	pool, err := pgxpool.NewWithConfig(ctx, cfg)
@@ -31,7 +31,7 @@ func TestWorkspacesKeepTheirOwnSetup(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(pool.Close)
-	second := testdb.Workspace(t, pool)
+	second := testdb.Entity(t, pool)
 	opts := config.Options{Secrets: secretbox.ForTest(), TregBaseURL: tregtest.New(t).URL, Now: time.Now}
 	northwind, kyring := config.New(pool, opts), config.New(second, opts)
 
@@ -86,17 +86,17 @@ func TestWorkspacesKeepTheirOwnSetup(t *testing.T) {
 	}
 	cred, err := kyring.Credential(ctx, "anthropic")
 	if err != nil || !cred.Set {
-		t.Fatalf("the key one workspace set, read from another: %+v %v, want it set", cred, err)
+		t.Fatalf("the key one entity set, read from another: %+v %v, want it set", cred, err)
 	}
 	if _, err := second.Exec(ctx, `INSERT INTO surface (key, enabled, route, credential_id)
 		SELECT 'claude_code', true, 'provider', id FROM credential WHERE kind = 'anthropic'`); err != nil {
-		t.Fatalf("a workspace's surface on the shared key: %v", err)
+		t.Fatalf("an entity's surface on the shared key: %v", err)
 	}
-	w, err := db.CurrentWorkspace(ctx, second)
+	w, err := db.CurrentEntity(ctx, second)
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []config.CredentialUse{{Workspace: w.Name, Slug: w.Slug, Surfaces: []engines.Surface{engines.ClaudeCode}}}
+	want := []config.CredentialUse{{Entity: w.Name, Slug: w.Slug, Surfaces: []engines.Surface{engines.ClaudeCode}}}
 	for _, svc := range []*config.Service{northwind, kyring} {
 		if cred, err := svc.Credential(ctx, "anthropic"); err != nil || !reflect.DeepEqual(cred.UsedBy, want) {
 			t.Fatalf("used by %+v %v, want %+v", cred.UsedBy, err, want)
@@ -105,7 +105,7 @@ func TestWorkspacesKeepTheirOwnSetup(t *testing.T) {
 	err = northwind.DeleteCredential(ctx, "anthropic")
 	is(t, err, core.ErrConflict)
 	if !strings.Contains(err.Error(), "Claude Code in "+w.Name) {
-		t.Fatalf("deleting a key another workspace uses: %v, want it to name the workspace", err)
+		t.Fatalf("deleting a key another entity uses: %v, want it to name the entity", err)
 	}
 
 	var userID int64
@@ -113,22 +113,22 @@ func TestWorkspacesKeepTheirOwnSetup(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err := kyring.MarkHandled(ctx, core.Actor{UserID: userID}, ks.Questions[0].ID, config.QuestionPageInput{URL: "kyring.example/crm"}); err != nil {
-		t.Fatalf("a teammate marking a page in another workspace: %v", err)
+		t.Fatalf("a teammate marking a page in another entity: %v", err)
 	}
 	var pages int
 	if err := pool.QueryRow(ctx, `SELECT count(*) FROM question_page`).Scan(&pages); err != nil || pages != 0 {
-		t.Fatalf("the first workspace has %d marked pages (%v), want none", pages, err)
+		t.Fatalf("the first entity has %d marked pages (%v), want none", pages, err)
 	}
 }
 
-// Saving the brand step names a new instance's first workspace after the
-// brand, once, and leaves every other workspace's name alone.
-func TestTheBrandStepNamesTheFirstWorkspace(t *testing.T) {
+// Saving the brand step names a new instance's first entity after the
+// brand, once, and leaves every other entity's name alone.
+func TestTheBrandStepNamesTheFirstEntity(t *testing.T) {
 	pool := testdb.New(t)
-	second := testdb.Workspace(t, pool)
+	second := testdb.Entity(t, pool)
 	opts := config.Options{Secrets: secretbox.ForTest(), Now: time.Now}
 	first, later := config.New(pool, opts), config.New(second, opts)
-	before, err := db.CurrentWorkspace(ctx, second)
+	before, err := db.CurrentEntity(ctx, second)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -145,11 +145,11 @@ func TestTheBrandStepNamesTheFirstWorkspace(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if w, err := db.CurrentWorkspace(ctx, pool); err != nil || w.Name != "Northwind Cloud" || w.Slug != "northwind-cloud" {
-		t.Fatalf("first workspace = %+v %v, want it named after its brand", w, err)
+	if w, err := db.CurrentEntity(ctx, pool); err != nil || w.Name != "Northwind Cloud" || w.Slug != "northwind-cloud" {
+		t.Fatalf("first entity = %+v %v, want it named after its brand", w, err)
 	}
-	if w, err := db.CurrentWorkspace(ctx, second); err != nil || w != before {
-		t.Fatalf("a later workspace = %+v %v, want it as made, %+v", w, err, before)
+	if w, err := db.CurrentEntity(ctx, second); err != nil || w != before {
+		t.Fatalf("a later entity = %+v %v, want it as made, %+v", w, err, before)
 	}
 
 	s := settings()
@@ -160,17 +160,17 @@ func TestTheBrandStepNamesTheFirstWorkspace(t *testing.T) {
 	if _, err := first.SaveStep(ctx, config.StepBrand); err != nil {
 		t.Fatal(err)
 	}
-	if w, err := db.CurrentWorkspace(ctx, pool); err != nil || w.Slug != "northwind-cloud" {
+	if w, err := db.CurrentEntity(ctx, pool); err != nil || w.Slug != "northwind-cloud" {
 		t.Fatalf("saving the brand step again = %+v %v, want the slug links already use", w, err)
 	}
 }
 
-// The gateway key is shared, and each workspace's surfaces set the
+// The gateway key is shared, and each entity's surfaces set the
 // gateway's base URL, so testing the key calls every base URL any
-// workspace uses and says how each went.
-func TestTestingTheGatewayKeyCallsEveryWorkspacesGateway(t *testing.T) {
+// entity uses and says how each went.
+func TestTestingTheGatewayKeyCallsEveryEntitiesGateway(t *testing.T) {
 	pool := testdb.New(t)
-	second, err := db.CreateWorkspace(ctx, pool, "Kyring", "kyring")
+	second, err := db.CreateEntity(ctx, pool, "Kyring", "kyring")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -206,7 +206,7 @@ func TestTestingTheGatewayKeyCallsEveryWorkspacesGateway(t *testing.T) {
 		t.Fatal(err)
 	}
 	if goodCalls.Load() != 1 || badCalls.Load() != 1 {
-		t.Fatalf("gateway calls: %d to the first workspace's, %d to Kyring's; want one each (status %q)", goodCalls.Load(), badCalls.Load(), c.LastTestStatus)
+		t.Fatalf("gateway calls: %d to the first entity's, %d to Kyring's; want one each (status %q)", goodCalls.Load(), badCalls.Load(), c.LastTestStatus)
 	}
 	if !strings.Contains(c.LastTestStatus, "kyring") || !strings.Contains(c.LastTestStatus, bad.URL) || c.LastTestStatus == "ok" {
 		t.Fatalf("last_test_status = %q, want Kyring's gateway at %s named as failing", c.LastTestStatus, bad.URL)
@@ -216,6 +216,6 @@ func TestTestingTheGatewayKeyCallsEveryWorkspacesGateway(t *testing.T) {
 		t.Fatal(err)
 	}
 	if c, err := svc.TestCredential(ctx, "gateway"); err != nil || c.LastTestStatus != "ok" || goodCalls.Load() != 2 {
-		t.Fatalf("both workspaces on one working gateway: %q, %v, %d calls to it; want ok from one call", c.LastTestStatus, err, goodCalls.Load())
+		t.Fatalf("both entities on one working gateway: %q, %v, %d calls to it; want ok from one call", c.LastTestStatus, err, goodCalls.Load())
 	}
 }

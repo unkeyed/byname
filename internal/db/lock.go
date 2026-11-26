@@ -8,23 +8,23 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// WorkspaceLock is the SQL for the advisory lock key named name in the
-// workspace the connection is bound to, so work in one workspace never
-// waits on or skips the same work in another. The first workspace, the
-// one whose schema is not ws_<id>, keeps hashtext(name), the key releases
-// before workspaces took, so the old and new copies running side by side
+// EntityLock is the SQL for the advisory lock key named name in the
+// entity the connection is bound to, so work in one entity never
+// waits on or skips the same work in another. The first entity, the
+// one whose schema is not entity_<id>, keeps hashtext(name), the key releases
+// before entities took, so the old and new copies running side by side
 // during a deploy still keep each other out. name is a constant such as
 // byname.checks.claim.
-func WorkspaceLock(name string) string {
-	return `hashtext(CASE WHEN current_schema() ~ '^ws_[0-9]+$' THEN '` + name + `:' || current_schema() ELSE '` + name + `' END)`
+func EntityLock(name string) string {
+	return `hashtext(CASE WHEN current_schema() ~ '^entity_[0-9]+$' THEN '` + name + `:' || current_schema() ELSE '` + name + `' END)`
 }
 
 // lockConnWait is how long TryLock waits for a lock connection. Every
-// workspace's jobs share the few the Locks pool has, so one workspace's
+// entity's jobs share the few the Locks pool has, so one entity's
 // long sync can hold one for minutes.
 var lockConnWait = 3 * time.Second
 
-// TryLock takes the session advisory lock key, a WorkspaceLock, on a
+// TryLock takes the session advisory lock key, an EntityLock, on a
 // connection of its own, so the lock dies with the process, and returns
 // unlock. ok is false when another process holds the lock, or when no lock
 // connection frees up within a few seconds: a background job then skips

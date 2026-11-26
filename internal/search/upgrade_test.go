@@ -182,7 +182,7 @@ func TestSignInStartedBeforeUpgradeFinishes(t *testing.T) {
 	back := followConsent(t, consent)
 
 	if o := e.svc.GoogleOAuthOrigin(state); o != (search.OAuthOrigin{Return: search.ReturnOnboarding}) {
-		t.Fatalf("the sign-in started at %+v, want onboarding in the first workspace, where v0.2.0 started it", o)
+		t.Fatalf("the sign-in started at %+v, want onboarding in the first entity, where v0.2.0 started it", o)
 	}
 	if err := e.svc.FinishGoogleOAuth(e.ctx, admin, search.OAuthCallback{State: back.Query().Get("state"), Code: back.Query().Get("code")}); err != nil {
 		t.Fatalf("finishing a sign-in v0.2.0 started: %v", err)

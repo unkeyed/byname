@@ -94,7 +94,7 @@ func quoted(def string) []string {
 func migratedSchemas(t *testing.T) (*pgxpool.Pool, []string) {
 	t.Helper()
 	pool := testdb.New(t)
-	w, err := db.CreateWorkspace(context.Background(), pool, "Second", "second")
+	w, err := db.CreateEntity(context.Background(), pool, "Second", "second")
 	if err != nil {
 		t.Fatal(err)
 	}

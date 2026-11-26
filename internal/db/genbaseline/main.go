@@ -1,13 +1,13 @@
-// Command genbaseline writes the workspace track's baseline: every table
-// and view a workspace owns, with their indexes, constraints and seed
+// Command genbaseline writes the entity track's baseline: every table
+// and view an entity owns, with their indexes, constraints and seed
 // rows, as the global migrations leave them in public. It migrates a
-// scratch database on the docker compose Postgres, dumps the workspace
+// scratch database on the docker compose Postgres, dumps the entity
 // tables with that server's pg_dump, and drops the schema qualifiers, so
 // the file builds them in whichever schema search_path names first.
 //
-//	make workspace-baseline
+//	make entity-baseline
 //
-// TestWorkspaceBaselineMatchesPublic fails when the file and the global
+// TestEntityBaselineMatchesPublic fails when the file and the global
 // migrations disagree.
 package main
 
@@ -33,10 +33,10 @@ import (
 
 const defaultURL = "postgres://byname:byname@localhost:5432/byname?sslmode=disable"
 
-const header = `-- The workspace baseline: every table and view a workspace owns, as the
+const header = `-- The entity baseline: every table and view an entity owns, as the
 -- global migrations leave them in public, with their seed rows. Generated
--- by make workspace-baseline; never edit it.
--- Migrations apply it with search_path set to the workspace's schema and
+-- by make entity-baseline; never edit it.
+-- Migrations apply it with search_path set to the entity's schema and
 -- then public, so its references to shared tables, such as users and
 -- credential, reach public's.
 `
@@ -85,7 +85,7 @@ func run(ctx context.Context, out string) error {
 		return err
 	}
 
-	tables, err := workspaceRelations(ctx, pool)
+	tables, err := entityRelations(ctx, pool)
 	if err != nil {
 		return err
 	}
@@ -99,7 +99,7 @@ func run(ctx context.Context, out string) error {
 	}
 	sql := header + "\n" + schema + seeds
 	if m := regexp.MustCompile(`(?i)\bpublic\b`).FindString(sql[len(header):]); m != "" {
-		return fmt.Errorf("the dump still names public, so a workspace would read the first workspace's tables")
+		return fmt.Errorf("the dump still names public, so an entity would read the first entity's tables")
 	}
 	tmp := out + ".tmp"
 	if err := os.WriteFile(tmp, []byte(sql), 0o644); err != nil {
@@ -108,7 +108,7 @@ func run(ctx context.Context, out string) error {
 	return os.Rename(tmp, filepath.Clean(out))
 }
 
-func workspaceRelations(ctx context.Context, pool *pgxpool.Pool) ([]string, error) {
+func entityRelations(ctx context.Context, pool *pgxpool.Pool) ([]string, error) {
 	rows, err := pool.Query(ctx, `SELECT c.relname FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
 		WHERE n.nspname = 'public' AND c.relkind IN ('r', 'p', 'v', 'm', 'f') ORDER BY c.relname`)
 	if err != nil {

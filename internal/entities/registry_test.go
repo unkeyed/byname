@@ -1,4 +1,4 @@
-package workspaces
+package entities
 
 import (
 	"context"
@@ -26,7 +26,7 @@ type jobCounter struct {
 	running map[int64]*atomic.Int32
 }
 
-func (c *jobCounter) build(w db.Workspace, p db.Pool) (app.Services, func(context.Context)) {
+func (c *jobCounter) build(w db.Entity, p db.Pool) (app.Services, func(context.Context)) {
 	svc, _ := Build(w, p, opts)
 	n := &atomic.Int32{}
 	c.running[w.ID] = n
@@ -44,10 +44,10 @@ func (c *jobCounter) waitFor(t *testing.T, id int64, want int32) {
 			return
 		}
 	}
-	t.Fatalf("workspace %d: jobs running %v, want %d", id, c.running[id], want)
+	t.Fatalf("entity %d: jobs running %v, want %d", id, c.running[id], want)
 }
 
-func TestAWorkspaceAnotherReplicaMadeGoesLiveOnce(t *testing.T) {
+func TestAnEntityAnotherReplicaMadeGoesLiveOnce(t *testing.T) {
 	ctx := context.Background()
 	pool := testdb.New(t)
 	jobs := &jobCounter{running: map[int64]*atomic.Int32{}}
@@ -59,7 +59,7 @@ func TestAWorkspaceAnotherReplicaMadeGoesLiveOnce(t *testing.T) {
 	runCtx, stop := context.WithCancel(ctx)
 	ran := make(chan struct{})
 	go func() { r.Run(runCtx); close(ran) }()
-	jobs.waitFor(t, first.Workspace.ID, 1)
+	jobs.waitFor(t, first.Entity.ID, 1)
 
 	other, err := Open(ctx, pool, opts)
 	if err != nil {
@@ -73,7 +73,7 @@ func TestAWorkspaceAnotherReplicaMadeGoesLiveOnce(t *testing.T) {
 		t.Fatalf("Create = %+v, want kyring, not the default, not onboarded", made)
 	}
 	if _, err := r.ByID(ctx, made.ID); err != nil {
-		t.Fatalf("the workspace another replica made did not go live: %v", err)
+		t.Fatalf("the entity another replica made did not go live: %v", err)
 	}
 	for range 3 {
 		if err := r.Refresh(ctx); err != nil {
@@ -81,25 +81,25 @@ func TestAWorkspaceAnotherReplicaMadeGoesLiveOnce(t *testing.T) {
 		}
 	}
 	jobs.waitFor(t, made.ID, 1)
-	jobs.waitFor(t, first.Workspace.ID, 1)
+	jobs.waitFor(t, first.Entity.ID, 1)
 	if len(jobs.running) != 2 {
-		t.Fatalf("built %d workspaces, want each of the 2 built once", len(jobs.running))
+		t.Fatalf("built %d entities, want each of the 2 built once", len(jobs.running))
 	}
 
 	if _, err := other.Create(ctx, "Planetfall", "pf"); err != nil {
 		t.Fatal(err)
 	}
 	pf, err := r.Lookup(ctx, "pf")
-	if err != nil || pf.Workspace.Name != "Planetfall" {
-		t.Fatalf("Lookup(pf) = %+v %v", pf.Workspace, err)
+	if err != nil || pf.Entity.Name != "Planetfall" {
+		t.Fatalf("Lookup(pf) = %+v %v", pf.Entity, err)
 	}
-	jobs.waitFor(t, pf.Workspace.ID, 1)
+	jobs.waitFor(t, pf.Entity.ID, 1)
 	if _, err := r.Lookup(ctx, "nope"); !errors.Is(err, core.ErrNotFound) {
 		t.Fatalf("Lookup(nope) = %v, want not found", err)
 	}
 
 	list, err := r.List(ctx)
-	if err != nil || len(list) != 3 || !list[0].Default || list[0].ID != first.Workspace.ID || list[1].Default || list[2].Slug != "pf" {
+	if err != nil || len(list) != 3 || !list[0].Default || list[0].ID != first.Entity.ID || list[1].Default || list[2].Slug != "pf" {
 		t.Fatalf("List = %+v %v, want the first as default, then kyring and pf", list, err)
 	}
 
@@ -126,7 +126,7 @@ func TestCreateAndRename(t *testing.T) {
 	}
 	again, err := r.Create(ctx, "Unkey", "unkey")
 	if err != nil || again.ID != a.ID {
-		t.Fatalf("creating it again = %+v %v, want the same workspace", again, err)
+		t.Fatalf("creating it again = %+v %v, want the same entity", again, err)
 	}
 	for _, c := range []struct {
 		name, slug string
@@ -145,16 +145,16 @@ func TestCreateAndRename(t *testing.T) {
 	if err != nil || renamed.Name != "Unkey API" || renamed.Slug != "unkey" {
 		t.Fatalf("Rename = %+v %v", renamed, err)
 	}
-	if e, err := r.Lookup(ctx, "unkey"); err != nil || e.Workspace.Name != "Unkey API" {
-		t.Fatalf("Lookup after rename = %+v %v", e.Workspace, err)
+	if e, err := r.Lookup(ctx, "unkey"); err != nil || e.Entity.Name != "Unkey API" {
+		t.Fatalf("Lookup after rename = %+v %v", e.Entity, err)
 	}
 	if _, err := r.Rename(ctx, "nope", "x"); !errors.Is(err, core.ErrNotFound) {
-		t.Fatalf("renaming a missing workspace = %v, want not found", err)
+		t.Fatalf("renaming a missing entity = %v, want not found", err)
 	}
 }
 
-// A DATABASE_URL role that only reads and writes data cannot make a
-// workspace; MIGRATION_DATABASE_URL's role makes it, and the read/write
+// A DATABASE_URL role that only reads and writes data cannot make an
+// entity; MIGRATION_DATABASE_URL's role makes it, and the read/write
 // role then serves it.
 func TestCreateThroughTheMigrationRole(t *testing.T) {
 	ctx := context.Background()
@@ -183,36 +183,36 @@ func TestCreateThroughTheMigrationRole(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err := e.Services.Config.Brands(ctx); err != nil {
-		t.Fatalf("the read/write role cannot read the new workspace's tables: %v", err)
+		t.Fatalf("the read/write role cannot read the new entity's tables: %v", err)
 	}
 }
 
-// A workspace goes live only with every workspace migration this binary
+// An entity goes live only with every entity migration this binary
 // has, as one another replica's older binary made would lack a newer
 // file. The registry applies what is missing through the role Create
-// uses, and until that works the workspace is not served at all. Losing a
-// workspace_migration row stands in for the missing file.
-func TestAWorkspaceGoesLiveOnlyWithEveryWorkspaceMigration(t *testing.T) {
+// uses, and until that works the entity is not served at all. Losing an
+// entity_migration row stands in for the missing file.
+func TestAnEntityGoesLiveOnlyWithEveryEntityMigration(t *testing.T) {
 	ctx := context.Background()
 	admin := testdb.New(t)
 	rw := readWriteRole(t, admin)
-	w, err := db.CreateWorkspace(ctx, admin, "Kyring", "kyring")
+	w, err := db.CreateEntity(ctx, admin, "Kyring", "kyring")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := admin.Exec(ctx, `DELETE FROM workspace_migration WHERE workspace_id = $1`, w.ID); err != nil {
+	if _, err := admin.Exec(ctx, `DELETE FROM entity_migration WHERE entity_id = $1`, w.ID); err != nil {
 		t.Fatal(err)
 	}
 
 	r, err := Open(ctx, rw, opts)
 	if err != nil {
-		t.Fatalf("Open with a workspace it cannot catch up = %v, want the others served", err)
+		t.Fatalf("Open with an entity it cannot catch up = %v, want the others served", err)
 	}
 	if _, err := r.ByID(ctx, w.ID); !errors.Is(err, core.ErrNotFound) {
-		t.Fatalf("a workspace lacking a migration the read/write role cannot apply: ByID = %v, want not found", err)
+		t.Fatalf("an entity lacking a migration the read/write role cannot apply: ByID = %v, want not found", err)
 	}
 	if _, err := r.Lookup(ctx, "default"); err != nil {
-		t.Fatalf("the first workspace: %v, want it served", err)
+		t.Fatalf("the first entity: %v, want it served", err)
 	}
 
 	schema := pgx.Identifier{w.Schema.String()}.Sanitize()
@@ -234,10 +234,10 @@ func TestAWorkspaceGoesLiveOnlyWithEveryWorkspaceMigration(t *testing.T) {
 	}
 	e, err := r.ByID(ctx, w.ID)
 	if err != nil {
-		t.Fatalf("with MIGRATION_DATABASE_URL: ByID = %v, want the workspace caught up and live", err)
+		t.Fatalf("with MIGRATION_DATABASE_URL: ByID = %v, want the entity caught up and live", err)
 	}
 	if _, err := e.Services.Config.Brands(ctx); err != nil {
-		t.Fatalf("the caught-up workspace's tables: %v", err)
+		t.Fatalf("the caught-up entity's tables: %v", err)
 	}
 }
 
@@ -270,7 +270,7 @@ func readWriteRole(t *testing.T, admin *pgxpool.Pool) *pgxpool.Pool {
 
 // Anyone can ask for a made-up slug, so a lookup this process cannot
 // answer refreshes from the database at most once every missRefreshEvery.
-// A workspace another replica made in that window goes live once it ends.
+// An entity another replica made in that window goes live once it ends.
 func TestUnknownSlugsRefreshAtMostOnceAWhile(t *testing.T) {
 	ctx := context.Background()
 	pool := testdb.New(t)
@@ -301,15 +301,15 @@ func TestUnknownSlugsRefreshAtMostOnceAWhile(t *testing.T) {
 	}
 
 	clock = clock.Add(time.Millisecond)
-	if e, err := r.Lookup(ctx, "kyring"); err != nil || e.Workspace.ID != kyring.ID {
-		t.Fatalf("Lookup(kyring) once the wait is over = %+v %v", e.Workspace, err)
+	if e, err := r.Lookup(ctx, "kyring"); err != nil || e.Entity.ID != kyring.ID {
+		t.Fatalf("Lookup(kyring) once the wait is over = %+v %v", e.Entity, err)
 	}
 	pf, err := other.Create(ctx, "Planetfall", "pf")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if e, err := r.ByID(ctx, pf.ID); err != nil || e.Workspace.Slug != "pf" {
-		t.Fatalf("ByID(pf) right after a refresh that found kyring = %+v %v", e.Workspace, err)
+	if e, err := r.ByID(ctx, pf.ID); err != nil || e.Entity.Slug != "pf" {
+		t.Fatalf("ByID(pf) right after a refresh that found kyring = %+v %v", e.Entity, err)
 	}
 
 	if _, err := r.Lookup(ctx, "still-nope"); !errors.Is(err, core.ErrNotFound) {
