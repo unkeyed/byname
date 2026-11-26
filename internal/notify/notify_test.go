@@ -393,6 +393,9 @@ func TestLinksNameTheWorkspace(t *testing.T) {
 	if len(reqs) != 1 || json.Unmarshal(reqs[0].Body, &body) != nil || body.URL != "https://byname.example/w/kyring/settings/checks" {
 		t.Fatalf("Kyring's webhook got %+v, want a link into /w/kyring", body)
 	}
+	if want := w.Schema.String() + "/alert-1/channel-1"; body.ID != want {
+		t.Fatalf("Kyring's first message has id %q, want %q, apart from the first workspace's alert-1/channel-1", body.ID, want)
+	}
 	if n, err := e.notify.DeliverDue(ctx); err != nil || n != 0 {
 		t.Fatalf("the default workspace delivered %d, %v; want nothing of Kyring's", n, err)
 	}

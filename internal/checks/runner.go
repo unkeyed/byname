@@ -14,6 +14,7 @@ import (
 
 	"github.com/unkeyed/byname/internal/config"
 	"github.com/unkeyed/byname/internal/core"
+	"github.com/unkeyed/byname/internal/db"
 	"github.com/unkeyed/byname/internal/engines"
 	"github.com/unkeyed/byname/internal/money"
 	"github.com/unkeyed/byname/internal/panel"
@@ -282,7 +283,7 @@ func (s *Service) ask(ctx context.Context, p plan, c call, out *outcome) error {
 	var res engines.Result
 	var err error
 	attempt, backoffs := 1, 0
-	cell := fmt.Sprintf("byname/run-%d/q-%d/sm-%d", p.runID, c.question.ID, c.pair.ID)
+	cell := fmt.Sprintf("byname/%srun-%d/q-%d/sm-%d", db.KeyScope(s.db), p.runID, c.question.ID, c.pair.ID)
 	// The first sample keeps the key from before samples, so a call in
 	// flight across the upgrade replays instead of being paid twice.
 	if c.sample > 1 {

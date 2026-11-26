@@ -336,6 +336,9 @@ func (s *Service) envelope(ctx context.Context, id string, p Payload, channel st
 	if err != nil {
 		return envelope{}, err
 	}
+	// The id is the email API's idempotency key, and two workspaces may
+	// send through one API key.
+	id = db.KeyScope(s.db) + id
 	// Every link names its workspace, the default's too, so a message
 	// opens the workspace it is about whichever one the reader last had
 	// open.

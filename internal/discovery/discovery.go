@@ -190,7 +190,7 @@ func (s *Service) find(ctx context.Context, treg engines.Treg, r read, c call) (
 	parts, _ := engines.SplitForLLM("The question asked: " + question + "\n\nThe answer:\n" + r.text)
 	res, err := treg.Ask(ctx, engines.LLMTask{
 		Tool: engines.BrandFinder, System: system, Context: parts, Prompt: prompt, MaxOutputTokens: 1500,
-		IdempotencyKey: fmt.Sprintf("byname/find/answer-%d/%d", r.answer, attempt),
+		IdempotencyKey: fmt.Sprintf("byname/%sfind/answer-%d/%d", db.KeyScope(s.db), r.answer, attempt),
 	})
 	if ctx.Err() != nil {
 		return nil, ctx.Err()

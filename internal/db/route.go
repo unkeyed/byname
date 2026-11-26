@@ -98,3 +98,14 @@ func (b bound) QueryRow(ctx context.Context, sql string, args ...any) pgx.Row {
 func (b bound) Begin(ctx context.Context) (pgx.Tx, error) { return b.p.Begin(b.bind(ctx)) }
 
 func (b bound) Acquire(ctx context.Context) (*pgxpool.Conn, error) { return b.p.Acquire(b.bind(ctx)) }
+
+// KeyScope keeps keys a workspace sends to a service every workspace
+// shares, such as Treg's idempotency keys, apart from another workspace's
+// same key: "" for the first workspace, whose keys predate workspaces and
+// must not change, and "ws_<id>/" for a pool In bound to any other.
+func KeyScope(p Pool) string {
+	if b, ok := p.(bound); ok && b.schema != Public {
+		return b.schema.String() + "/"
+	}
+	return ""
+}
