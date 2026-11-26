@@ -21,6 +21,7 @@ import (
 	"github.com/unkeyed/byname/internal/app"
 	"github.com/unkeyed/byname/internal/auth"
 	"github.com/unkeyed/byname/internal/core"
+	"github.com/unkeyed/byname/internal/workspaces"
 )
 
 // access is who may call a route: one of the classes below, or the one
@@ -56,6 +57,11 @@ var routes = []route{
 	{"GET /v1/openapi.yaml", public, (*server).openapi},
 
 	{"GET /v1/status", needs(core.ResultsRead), (*server).status},
+
+	// Workspaces: each brand this instance tracks.
+	{"GET /v1/workspaces", needs(core.ResultsRead), (*server).listWorkspaces},
+	{"POST /v1/workspaces", admin, (*server).createWorkspace},
+	{"PATCH /v1/workspaces/{slug}", admin, (*server).renameWorkspace},
 
 	{"GET /v1/settings", needs(core.ResultsRead), (*server).getSettings},
 	{"PUT /v1/settings", needs(core.ConfigWrite), (*server).putSettings},
@@ -236,8 +242,11 @@ var routes = []route{
 //go:embed openapi.yaml
 var openapiYAML []byte
 
+// server is shared by every workspace. wrap hands each handler a copy
+// whose svc is the services of the workspace the request is for.
 type server struct {
 	svc   app.Services
+	reg   *workspaces.Registry
 	authn *auth.Authenticator
 	keys  auth.KeyStore
 	users *auth.Users
@@ -246,13 +255,14 @@ type server struct {
 }
 
 // NewMux mounts every route and the OAuth endpoints (mountOAuth) on a new
-// mux; main adds /mcp and the UI's "/" to the same mux. Unmatched /v1/ paths get a JSON 405 with Allow when
+// mux; main adds /mcp and the UI's "/" to the same mux, and serves it
+// through InWorkspace. Unmatched /v1/ paths get a JSON 405 with Allow when
 // another method serves the path, else a JSON 404, instead of falling
 // through to the UI. Browser-reachable routes are wrapped in
 // http.CrossOriginProtection, which rejects cross-site unsafe requests and
 // lets non-browser clients (no Sec-Fetch-Site / Origin) through.
-func NewMux(svc app.Services, authn *auth.Authenticator, log *slog.Logger) *http.ServeMux {
-	s := &server{svc: svc, authn: authn, keys: authn.Keys, users: authn.Users, oauth: authn.OAuth, log: log}
+func NewMux(reg *workspaces.Registry, authn *auth.Authenticator, log *slog.Logger) *http.ServeMux {
+	s := &server{reg: reg, authn: authn, keys: authn.Keys, users: authn.Users, oauth: authn.OAuth, log: log}
 	csrf := http.NewCrossOriginProtection()
 	mux := http.NewServeMux()
 	for _, rt := range routes {
@@ -307,9 +317,56 @@ func (s *server) wrap(rt route) http.Handler {
 			}
 			actor = a
 		}
-		if err := rt.handle(s, w, r, actor); err != nil {
+		in := *s
+		in.svc = s.workspace(r).Services
+		if err := rt.handle(&in, w, r, actor); err != nil {
 			s.writeError(w, r, err)
 		}
+	})
+}
+
+// workspace is the workspace r is for: the one InWorkspace found from its
+// /w/<slug> prefix, or the default when the path has none.
+func (s *server) workspace(r *http.Request) workspaces.Entity {
+	if e, ok := workspaces.FromContext(r.Context()); ok {
+		return e
+	}
+	return s.reg.Default()
+}
+
+// InWorkspace serves a path that starts with /w/<slug> as the same path
+// without it, for that workspace: /w/kyring/v1/brands is GET /v1/brands in
+// Kyring. Paths without the prefix are the default workspace's, as every
+// path was before there were workspaces, so existing keys, links and
+// bookmarks keep working. An unknown slug is a JSON 404.
+func InWorkspace(reg *workspaces.Registry, log *slog.Logger, next http.Handler) http.Handler {
+	s := &server{reg: reg, log: log}
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		rest, ok := strings.CutPrefix(r.URL.Path, "/w/")
+		if !ok {
+			next.ServeHTTP(w, r)
+			return
+		}
+		slug, path, _ := strings.Cut(rest, "/")
+		path = "/" + path
+		// /mcp's OAuth resource is the instance's own address, so until it
+		// has one per workspace, /w/<slug>/mcp would answer from the
+		// default workspace.
+		if path == "/mcp" || strings.HasPrefix(path, "/mcp/") {
+			writeJSON(w, http.StatusNotFound, map[string]string{"error": "MCP serves the default workspace at /mcp only"})
+			return
+		}
+		e, err := reg.Lookup(r.Context(), slug)
+		if err != nil {
+			s.writeError(w, r, err)
+			return
+		}
+		r2 := r.Clone(workspaces.NewContext(r.Context(), e))
+		r2.URL.Path = path
+		if r.URL.RawPath != "" {
+			r2.URL.RawPath = strings.TrimPrefix(r.URL.RawPath, "/w/"+slug)
+		}
+		next.ServeHTTP(w, r2)
 	})
 }
 

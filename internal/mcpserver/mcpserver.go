@@ -47,11 +47,13 @@ type AccessTokens interface {
 	ResourceMetadataURL() string
 }
 
-// Handler returns the /mcp handler. Stateless, so any replica serves any
-// request without sticky sessions.
-func Handler(svc app.Services, tokens AccessTokens, version string) http.Handler {
+// Handler returns the /mcp handler, serving svc, the default workspace's
+// services, and the list of every workspace. Stateless, so any replica
+// serves any request without sticky sessions.
+func Handler(svc app.Services, ws Workspaces, tokens AccessTokens, version string) http.Handler {
 	srv := mcp.NewServer(&mcp.Implementation{Name: "byname", Version: version}, &mcp.ServerOptions{Instructions: instructions})
 	addTools(srv, svc)
+	addWorkspaceTools(srv, ws)
 	h := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server { return srv },
 		&mcp.StreamableHTTPOptions{Stateless: true})
 	return anyOrigin(requireToken(tokens, h))

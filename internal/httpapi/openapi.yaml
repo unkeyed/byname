@@ -36,15 +36,33 @@ info:
     browser. The OAuth endpoints are described by
     `/.well-known/oauth-authorization-server` and
     `/.well-known/oauth-protected-resource/mcp`, not here.
+
+    Workspaces. Each brand this instance tracks is a workspace with its own
+    settings, brands, questions, AI apps, schedule, checks, results, search
+    engines, site changes, social mentions and notifications. Every path
+    below also works under `/w/{workspace}`, which serves it for the
+    workspace with that slug: `GET /w/kyring/v1/brands` lists Kyring's
+    brands. A path without the prefix is the default workspace's, the first
+    one made. An unknown slug is 404. The team, sign-in, API keys, apps and
+    the provider keys under `/v1/credentials` are shared, so they answer the
+    same under any prefix. `/mcp` serves the default workspace only.
   license:
     name: MIT
     identifier: MIT
 servers:
   - url: /
-    description: The Byname instance serving this document.
+    description: The Byname instance serving this document, in its default workspace.
+  - url: /w/{workspace}
+    description: The same instance, in the workspace with this slug. GET /v1/workspaces lists the slugs.
+    variables:
+      workspace:
+        default: default
+        description: A workspace's slug.
 tags:
   - name: system
     description: Health, status and this document.
+  - name: workspaces
+    description: The brands this instance tracks. results:read lists them; a signed-in admin adds and renames them.
   - name: config
     description: Your brand, competitors, questions, surfaces and schedule. results:read reads them and config:write changes them.
   - name: runs
@@ -139,6 +157,116 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /v1/workspaces:
+    get:
+      tags: [workspaces]
+      operationId: listWorkspaces
+      summary: Every workspace, the default first, with whether each has finished onboarding. The MCP list_workspaces tool returns the same.
+      security:
+        - apiKey: [results:read]
+        - session: [results:read]
+      responses:
+        "200":
+          description: The workspaces.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Workspace"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+    post:
+      tags: [workspaces]
+      operationId: createWorkspace
+      summary: >-
+        Add a workspace for another brand, with onboarding not started. Its
+        paths are /w/{slug}/v1/... Adding it again with the same name and
+        slug returns the same workspace.
+      security:
+        - session: [admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              additionalProperties: false
+              properties:
+                name:
+                  type: string
+                  minLength: 1
+                  maxLength: 80
+                slug:
+                  type: string
+                  maxLength: 40
+                  pattern: "^[a-z0-9]+(-[a-z0-9]+)*$"
+                  description: Its name in paths. Left out, it comes from the name, such as planet-fall for Planet Fall. It never changes.
+      responses:
+        "201":
+          description: The workspace.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Workspace"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /v1/workspaces/{slug}:
+    patch:
+      tags: [workspaces]
+      operationId: renameWorkspace
+      summary: Rename a workspace. Its slug stays, so its paths keep working.
+      security:
+        - session: [admin]
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              additionalProperties: false
+              properties:
+                name:
+                  type: string
+                  minLength: 1
+                  maxLength: 80
+      responses:
+        "200":
+          description: The workspace.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Workspace"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
         "503":
           $ref: "#/components/responses/Unavailable"
   /v1/settings:
@@ -5001,6 +5129,24 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Scope"
+    Workspace:
+      type: object
+      required: [id, slug, name, onboarded, default]
+      properties:
+        id:
+          type: integer
+          format: int64
+        slug:
+          type: string
+          description: Its name in paths, /w/{slug}/v1/...
+        name:
+          type: string
+        onboarded:
+          type: boolean
+          description: Whether its onboarding is finished. Until then nothing runs on schedule.
+        default:
+          type: boolean
+          description: Whether paths without /w/{slug} are this workspace's. Only the first workspace made is.
     Status:
       type: object
       required: [version, onboarded]

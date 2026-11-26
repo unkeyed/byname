@@ -24,6 +24,7 @@ func listTools(t *testing.T) []*mcp.Tool {
 	ctx := context.Background()
 	srv := mcp.NewServer(&mcp.Implementation{Name: "byname", Version: "test"}, nil)
 	addTools(srv, app.Services{Instance: instance.New("test", nil, notOnboarded{}, nil, nil)})
+	addWorkspaceTools(srv, nil)
 	st, ct := mcp.NewInMemoryTransports()
 	if _, err := srv.Connect(ctx, st, nil); err != nil {
 		t.Fatal(err)
@@ -133,7 +134,7 @@ func TestStatusNeedsResultsRead(t *testing.T) {
 	reader, writer := client, client
 	reader.Scopes = []core.Scope{core.ResultsRead}
 	writer.Scopes = []core.Scope{core.RunsWrite}
-	srv := httptest.NewServer(Handler(app.Services{Instance: instance.New("v1.2.3", nil, notOnboarded{}, nil, nil)}, tokens{"byn_at_reader": reader, "byn_at_writer": writer}, "test"))
+	srv := httptest.NewServer(Handler(app.Services{Instance: instance.New("v1.2.3", nil, notOnboarded{}, nil, nil)}, nil, tokens{"byn_at_reader": reader, "byn_at_writer": writer}, "test"))
 	t.Cleanup(srv.Close)
 
 	cs, err := connect(ctx, srv.URL, "byn_at_reader")
