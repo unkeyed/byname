@@ -54,7 +54,10 @@ type Registry struct {
 	log   *slog.Logger
 	build func(db.Entity, db.Pool) (app.Services, func(context.Context))
 
-	refreshMu sync.Mutex
+	// refreshing holds a token while a Refresh or Delete runs. A channel
+	// rather than a mutex, so a request waiting behind a refresh stuck on
+	// the database gives up when it ends.
+	refreshing chan struct{}
 
 	mu       sync.RWMutex
 	byID     map[int64]*entry
@@ -75,7 +78,7 @@ type Registry struct {
 // Open builds every entity in the database on pool, which must not be
 // bound to one. Nothing runs in the background until Run.
 func Open(ctx context.Context, pool db.Pool, o Options) (*Registry, error) {
-	r := &Registry{pool: pool, opts: o, log: o.Log, byID: map[int64]*entry{}, now: time.Now, grace: deleteGrace}
+	r := &Registry{pool: pool, opts: o, log: o.Log, byID: map[int64]*entry{}, refreshing: make(chan struct{}, 1), now: time.Now, grace: deleteGrace}
 	if r.log == nil {
 		r.log = slog.Default()
 	}
@@ -174,8 +177,26 @@ func (r *Registry) remove(ids ...int64) {
 // lacking a file is caught up first, and while that fails it is logged
 // and not served, and the next call tries again.
 func (r *Registry) Refresh(ctx context.Context) error {
-	r.refreshMu.Lock()
-	defer r.refreshMu.Unlock()
+	unlock, err := r.lockRefresh(ctx)
+	if err != nil {
+		return err
+	}
+	defer unlock()
+	return r.refresh(ctx)
+}
+
+// lockRefresh waits for the Refresh or Delete running now to end, as
+// long as ctx allows, and returns what ends this one's turn.
+func (r *Registry) lockRefresh(ctx context.Context) (unlock func(), err error) {
+	select {
+	case r.refreshing <- struct{}{}:
+		return func() { <-r.refreshing }, nil
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+}
+
+func (r *Registry) refresh(ctx context.Context) error {
 	all, err := db.Entities(ctx, r.pool)
 	if err != nil {
 		return err
@@ -300,9 +321,18 @@ func (r *Registry) find(ctx context.Context, match func(db.Entity) bool) (Live, 
 
 // List is every entity, the default first, with whether each has
 // finished onboarding.
+// When a refresh is running already, such as the background one waiting
+// on a busy database, it lists what is live instead of waiting: that
+// refresh brings the rest live.
 func (r *Registry) List(ctx context.Context) ([]Summary, error) {
-	if err := r.Refresh(ctx); err != nil {
-		return nil, err
+	select {
+	case r.refreshing <- struct{}{}:
+		err := r.refresh(ctx)
+		<-r.refreshing
+		if err != nil {
+			return nil, err
+		}
+	default:
 	}
 	r.mu.RLock()
 	all := make([]Live, 0, len(r.byID))
@@ -449,8 +479,11 @@ func (r *Registry) Rename(ctx context.Context, slug, name string) (Summary, erro
 // once. Other replicas stop at their next Refresh, and Sweep drops its
 // tables once deleteGrace has passed. The first entity is never deleted.
 func (r *Registry) Delete(ctx context.Context, slug string) error {
-	r.refreshMu.Lock()
-	defer r.refreshMu.Unlock()
+	unlock, err := r.lockRefresh(ctx)
+	if err != nil {
+		return err
+	}
+	defer unlock()
 	w, err := db.DeleteEntity(ctx, r.pool, slug)
 	switch {
 	case errors.Is(err, db.ErrNoEntity):

@@ -598,3 +598,34 @@ func TestOnlyBrandsOfferedForEnoughQuestionsAreListed(t *testing.T) {
 		t.Error("no read sent the question with the answer, so the model cannot tell a choice from a passing mention")
 	}
 }
+
+// Reading an answer for other brands never holds a connection while it
+// waits for another: on a pool of one, as a small database's background
+// lane can be, a check that reads every answer still finishes.
+func TestReadingAnswersNeedsOneConnectionAtATime(t *testing.T) {
+	e := setup(t, nil)
+	cfg := e.db.Config().Copy()
+	cfg.MaxConns = 1
+	one, err := pgxpool.NewWithConfig(ctx, cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(one.Close)
+	settings := config.New(one, config.Options{Secrets: secretbox.ForTest(), TregBaseURL: e.treg.URL})
+	svc := checks.New(one, settings, checks.Options{
+		Sleep:  func(context.Context, time.Duration) error { return nil },
+		Finder: discovery.New(one, settings, discovery.Options{Now: func() time.Time { return e.now }}),
+	})
+	run, _, err := svc.RunNow(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bounded, cancel := context.WithTimeout(ctx, 20*time.Second)
+	defer cancel()
+	if err := svc.Work(bounded); err != nil || bounded.Err() != nil {
+		t.Fatalf("the check did not finish within 20s on one connection (err %v): reading an answer waits for a second connection while it holds the only one", err)
+	}
+	if got := e.count(t, `SELECT count(*) FROM discovered_mention d JOIN answer a ON a.id = d.answer_id WHERE a.run_id = $1`, run.ID); got == 0 {
+		t.Error("the check found no other brands, want the untracked brands in its answers")
+	}
+}

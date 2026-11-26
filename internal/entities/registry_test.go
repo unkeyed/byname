@@ -51,7 +51,7 @@ func TestAnEntityAnotherReplicaMadeGoesLiveOnce(t *testing.T) {
 	ctx := context.Background()
 	pool := testdb.New(t)
 	jobs := &jobCounter{running: map[int64]*atomic.Int32{}}
-	r := &Registry{pool: pool, opts: opts, log: opts.Log, byID: map[int64]*entry{}, build: jobs.build, now: time.Now}
+	r := &Registry{pool: pool, opts: opts, log: opts.Log, byID: map[int64]*entry{}, refreshing: make(chan struct{}, 1), build: jobs.build, now: time.Now}
 	if err := r.Refresh(ctx); err != nil {
 		t.Fatal(err)
 	}
@@ -328,7 +328,7 @@ func TestADeletedEntityStopsEverywhereThenItsTablesGo(t *testing.T) {
 	ctx := context.Background()
 	pool := testdb.New(t)
 	jobs := &jobCounter{running: map[int64]*atomic.Int32{}}
-	r := &Registry{pool: pool, opts: opts, log: opts.Log, byID: map[int64]*entry{}, build: jobs.build, now: time.Now, grace: time.Hour}
+	r := &Registry{pool: pool, opts: opts, log: opts.Log, byID: map[int64]*entry{}, refreshing: make(chan struct{}, 1), build: jobs.build, now: time.Now, grace: time.Hour}
 	removed := make(chan int64, 4)
 	r.OnRemove(func(id int64) { removed <- id })
 	other, err := Open(ctx, pool, opts)
@@ -430,4 +430,33 @@ func TestADeletedEntityStopsEverywhereThenItsTablesGo(t *testing.T) {
 
 	stop()
 	<-ran
+}
+
+// A refresh stuck on the database, such as the background one waiting for
+// a connection, never holds up a request: the list answers with what is
+// live, and a request that must refresh gives up when its context ends.
+func TestAStuckRefreshHoldsUpNoRequest(t *testing.T) {
+	ctx := context.Background()
+	r, err := Open(ctx, testdb.New(t), opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.refreshing <- struct{}{}
+	defer func() { <-r.refreshing }()
+
+	bounded, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+	list, err := r.List(bounded)
+	if err != nil || len(list) != 1 || !list[0].Default || bounded.Err() != nil {
+		t.Fatalf("List while a refresh is stuck = %+v, %v (context %v); want the first entity at once", list, err, bounded.Err())
+	}
+
+	short, cancel := context.WithTimeout(ctx, 50*time.Millisecond)
+	defer cancel()
+	if err := r.Refresh(short); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("Refresh while another is stuck = %v, want it to give up when its context ends", err)
+	}
+	if err := r.Delete(short, "kyring"); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("Delete while a refresh is stuck = %v, want it to give up when its context ends", err)
+	}
 }

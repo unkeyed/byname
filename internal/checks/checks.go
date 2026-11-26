@@ -204,6 +204,12 @@ func (s *Service) ClaimDue(ctx context.Context) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
+	// Read before the transaction opens: it holds a connection, and on a
+	// small pool none may be left for a read beside it.
+	notReady := s.config.Ready(ctx)
+	if notReady != nil && !errors.Is(notReady, core.ErrInvalid) {
+		return 0, notReady
+	}
 	var runID int64
 	err = pgx.BeginFunc(ctx, s.db, func(tx pgx.Tx) error {
 		var locked, paused bool
@@ -233,11 +239,8 @@ func (s *Service) ClaimDue(ctx context.Context) (int64, error) {
 		if open {
 			return skip("a check was already queued or running")
 		}
-		if err := s.config.Ready(ctx); err != nil {
-			if errors.Is(err, core.ErrInvalid) {
-				return skip(err.Error())
-			}
-			return err
+		if notReady != nil {
+			return skip(notReady.Error())
 		}
 		run, err := queue(ctx, tx, Scheduled)
 		runID = run.ID

@@ -224,7 +224,12 @@ func (s *Service) find(ctx context.Context, treg engines.Treg, r read, c call) (
 	if status != "ok" {
 		return refusal, nil
 	}
-	err = pgx.BeginFunc(ctx, s.db, func(tx pgx.Tx) error { return s.record(ctx, tx, r.answer, found) })
+	// Read before the transaction opens: it holds a connection, and on a
+	// small pool none may be left for a read beside it.
+	tracked, mode, err := s.config.MatchRules(ctx)
+	if err == nil {
+		err = pgx.BeginFunc(ctx, s.db, func(tx pgx.Tx) error { return record(ctx, tx, r.answer, found, tracked, mode) })
+	}
 	if err != nil && ctx.Err() == nil {
 		_, uerr := s.db.Exec(ctx, `UPDATE brand_call SET status = 'failed', error = $2 WHERE id = $1`, call, "storing the brands it found: "+err.Error())
 		return refusal, uerr
@@ -235,11 +240,7 @@ func (s *Service) find(ctx context.Context, treg engines.Treg, r read, c call) (
 // record stores the found brands of one answer that no tracked brand
 // covers, as untracked brands, and which of them the answer named.
 // Technologies are dropped.
-func (s *Service) record(ctx context.Context, tx pgx.Tx, answerID int64, found []Found) error {
-	tracked, mode, err := s.config.MatchRules(ctx)
-	if err != nil {
-		return err
-	}
+func record(ctx context.Context, tx pgx.Tx, answerID int64, found []Found, tracked []panel.Brand, mode panel.MatchMode) error {
 	seen := map[string]bool{}
 	ord := 0
 	for _, f := range found {
