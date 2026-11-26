@@ -6,6 +6,7 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/unkeyed/byname/internal/checks/checkstest"
 	"github.com/unkeyed/byname/internal/config"
 	"github.com/unkeyed/byname/internal/workspaces"
 )
@@ -88,4 +89,23 @@ func TestWorkspacesOverHTTP(t *testing.T) {
 
 func json404(r reply) bool {
 	return r.header.Get("Content-Type") == "application/json"
+}
+
+// A new instance's first workspace takes its brand's name when onboarding
+// saves the brand step, and is reachable at the new slug at once.
+func TestTheFirstWorkspaceTakesItsBrandsName(t *testing.T) {
+	c := newServer(t)
+	_, agent := login(t, c)
+	agent.call("PUT", "/v1/settings", checkstest.Settings(), http.StatusOK, nil)
+	agent.call("PUT", "/v1/onboarding/steps/brand", nil, http.StatusOK, nil)
+	var onboarding config.Onboarding
+	agent.call("GET", "/w/northwind/v1/onboarding", nil, http.StatusOK, &onboarding)
+	if !onboarding.Steps[0].Saved {
+		t.Fatalf("onboarding at /w/northwind = %+v, want the brand step saved", onboarding)
+	}
+	var list []workspaces.Summary
+	agent.call("GET", "/v1/workspaces", nil, http.StatusOK, &list)
+	if len(list) != 1 || list[0].Name != "Northwind" || list[0].Slug != "northwind" || !list[0].Default {
+		t.Fatalf("GET /v1/workspaces = %+v, want the default named Northwind", list)
+	}
 }

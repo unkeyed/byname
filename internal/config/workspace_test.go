@@ -120,3 +120,47 @@ func TestWorkspacesKeepTheirOwnSetup(t *testing.T) {
 		t.Fatalf("the first workspace has %d marked pages (%v), want none", pages, err)
 	}
 }
+
+// Saving the brand step names a new instance's first workspace after the
+// brand, once, and leaves every other workspace's name alone.
+func TestTheBrandStepNamesTheFirstWorkspace(t *testing.T) {
+	pool := testdb.New(t)
+	second := testdb.Workspace(t, pool)
+	opts := config.Options{Secrets: secretbox.ForTest(), Now: time.Now}
+	first, later := config.New(pool, opts), config.New(second, opts)
+	before, err := db.CurrentWorkspace(ctx, second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range []struct {
+		svc   *config.Service
+		brand string
+	}{{first, "Northwind Cloud"}, {later, "Kyring"}} {
+		s := settings()
+		s.Brand.Name = c.brand
+		if _, err := c.svc.PutSettings(ctx, s); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := c.svc.SaveStep(ctx, config.StepBrand); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if w, err := db.CurrentWorkspace(ctx, pool); err != nil || w.Name != "Northwind Cloud" || w.Slug != "northwind-cloud" {
+		t.Fatalf("first workspace = %+v %v, want it named after its brand", w, err)
+	}
+	if w, err := db.CurrentWorkspace(ctx, second); err != nil || w != before {
+		t.Fatalf("a later workspace = %+v %v, want it as made, %+v", w, err, before)
+	}
+
+	s := settings()
+	s.Brand.Name = "Renamed"
+	if _, err := first.PutSettings(ctx, s); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := first.SaveStep(ctx, config.StepBrand); err != nil {
+		t.Fatal(err)
+	}
+	if w, err := db.CurrentWorkspace(ctx, pool); err != nil || w.Slug != "northwind-cloud" {
+		t.Fatalf("saving the brand step again = %+v %v, want the slug links already use", w, err)
+	}
+}
