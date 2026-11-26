@@ -319,3 +319,115 @@ func TestUnknownSlugsRefreshAtMostOnceAWhile(t *testing.T) {
 		t.Fatalf("Create right after a miss = %+v %v", made, err)
 	}
 }
+
+// Deleting an entity stops it at once on the replica that deleted it,
+// and on another replica at that one's next Refresh, jobs included.
+// Its tables stay through the grace, then one Sweep drops them however
+// many replicas sweep, and its slug is free throughout.
+func TestADeletedEntityStopsEverywhereThenItsTablesGo(t *testing.T) {
+	ctx := context.Background()
+	pool := testdb.New(t)
+	jobs := &jobCounter{running: map[int64]*atomic.Int32{}}
+	r := &Registry{pool: pool, opts: opts, log: opts.Log, byID: map[int64]*entry{}, build: jobs.build, now: time.Now, grace: time.Hour}
+	removed := make(chan int64, 4)
+	r.OnRemove(func(id int64) { removed <- id })
+	other, err := Open(ctx, pool, opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	made, err := other.Create(ctx, "Kyring", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := r.Refresh(ctx); err != nil {
+		t.Fatal(err)
+	}
+	first := r.Default()
+	runCtx, stop := context.WithCancel(ctx)
+	ran := make(chan struct{})
+	go func() { r.Run(runCtx); close(ran) }()
+	jobs.waitFor(t, made.ID, 1)
+	kyring, err := r.ByID(ctx, made.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := other.Delete(ctx, first.Entity.Slug); !errors.Is(err, core.ErrConflict) {
+		t.Fatalf("deleting the first entity = %v, want a conflict", err)
+	}
+	if err := other.Delete(ctx, "kyring"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := other.Lookup(ctx, "kyring"); !errors.Is(err, core.ErrNotFound) {
+		t.Fatalf("Lookup on the replica that deleted it = %v, want not found", err)
+	}
+	if err := other.Delete(ctx, "kyring"); !errors.Is(err, core.ErrNotFound) {
+		t.Fatalf("deleting it again = %v, want not found", err)
+	}
+
+	if err := r.Refresh(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.ByID(ctx, made.ID); !errors.Is(err, core.ErrNotFound) {
+		t.Fatalf("ByID on the other replica after its refresh = %v, want not found", err)
+	}
+	jobs.waitFor(t, made.ID, 0)
+	jobs.waitFor(t, first.Entity.ID, 1)
+	if got := <-removed; got != made.ID {
+		t.Fatalf("OnRemove got %d, want %d", got, made.ID)
+	}
+	if _, err := kyring.Services.Config.Brands(ctx); !errors.Is(err, db.ErrRetired) {
+		t.Fatalf("a query through the deleted entity's services = %v, want db.ErrRetired", err)
+	}
+	if list, err := r.List(ctx); err != nil || len(list) != 1 || list[0].ID != first.Entity.ID {
+		t.Fatalf("List = %+v %v, want the first entity only", list, err)
+	}
+
+	schemaExists := func() bool {
+		var found bool
+		if err := pool.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = $1)`, kyring.Entity.Schema.String()).Scan(&found); err != nil {
+			t.Fatal(err)
+		}
+		return found
+	}
+	if err := r.Sweep(ctx); err != nil || !schemaExists() {
+		t.Fatalf("Sweep within the grace = %v, schema there %v, want it kept", err, schemaExists())
+	}
+	other.grace = 0
+	third, err := Open(ctx, pool, opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	third.grace = 0
+	swept := make(chan error, 2)
+	for _, x := range []*Registry{other, third} {
+		go func() { swept <- x.Sweep(ctx) }()
+	}
+	for range 2 {
+		if err := <-swept; err != nil {
+			t.Fatalf("Sweep on two replicas at once: %v", err)
+		}
+	}
+	var rows int
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM entity WHERE id = $1`, made.ID).Scan(&rows); err != nil || rows != 0 || schemaExists() {
+		t.Fatalf("after the sweep: %d rows %v, schema there %v, want both gone", rows, err, schemaExists())
+	}
+	if err := other.Sweep(ctx); err != nil {
+		t.Fatalf("sweeping again = %v, want nothing to do", err)
+	}
+
+	again, err := other.Create(ctx, "Kyring", "")
+	if err != nil || again.ID == made.ID || again.Slug != "kyring" {
+		t.Fatalf("Create at the deleted slug = %+v %v, want a new kyring", again, err)
+	}
+	if err := r.Refresh(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.Lookup(ctx, "kyring"); err != nil {
+		t.Fatalf("the new kyring on the other replica: %v", err)
+	}
+	jobs.waitFor(t, again.ID, 1)
+
+	stop()
+	<-ran
+}

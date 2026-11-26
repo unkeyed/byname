@@ -66,6 +66,11 @@ func Handler(svc app.Services, all Entities, tokens AccessTokens, version string
 	unprefixed := build(svc)
 	var mu sync.Mutex
 	byEntity := map[int64]*mcp.Server{}
+	all.OnRemove(func(id int64) {
+		mu.Lock()
+		defer mu.Unlock()
+		delete(byEntity, id)
+	})
 	server := func(r *http.Request) *mcp.Server {
 		e, ok := entities.FromContext(r.Context())
 		if !ok {

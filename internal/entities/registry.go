@@ -37,12 +37,17 @@ type Summary struct {
 
 type entry struct {
 	Live
-	run     func(context.Context)
-	started bool
+	pool db.Pool
+	run  func(context.Context)
+	// stop and done are set once its jobs start: stop ends them, and done
+	// closes when they have.
+	stop context.CancelFunc
+	done chan struct{}
 }
 
 // Registry is every entity this process serves. Each is built once,
-// and its jobs start once, when Run is running.
+// and its jobs start once, when Run is running. A deleted entity stops
+// being served, and its jobs stop, at the next Refresh.
 type Registry struct {
 	pool  db.Pool
 	opts  Options
@@ -51,11 +56,16 @@ type Registry struct {
 
 	refreshMu sync.Mutex
 
-	mu      sync.RWMutex
-	byID    map[int64]*entry
-	runCtx  context.Context
-	stopped bool
-	running sync.WaitGroup
+	mu       sync.RWMutex
+	byID     map[int64]*entry
+	runCtx   context.Context
+	stopped  bool
+	running  sync.WaitGroup
+	onRemove []func(id int64)
+
+	// grace is how long a deleted entity's schema stays: long enough
+	// that every replica has refreshed and stopped serving it.
+	grace time.Duration
 
 	now      func() time.Time
 	missMu   sync.Mutex
@@ -65,7 +75,7 @@ type Registry struct {
 // Open builds every entity in the database on pool, which must not be
 // bound to one. Nothing runs in the background until Run.
 func Open(ctx context.Context, pool db.Pool, o Options) (*Registry, error) {
-	r := &Registry{pool: pool, opts: o, log: o.Log, byID: map[int64]*entry{}, now: time.Now}
+	r := &Registry{pool: pool, opts: o, log: o.Log, byID: map[int64]*entry{}, now: time.Now, grace: deleteGrace}
 	if r.log == nil {
 		r.log = slog.Default()
 	}
@@ -77,7 +87,8 @@ func Open(ctx context.Context, pool db.Pool, o Options) (*Registry, error) {
 }
 
 // Run starts every entity's jobs, and each new entity's as it goes
-// live, then looks for entities another replica made every minute.
+// live, then every minute looks for entities another replica made or
+// deleted, and drops the schemas of entities deleted long enough ago.
 // When ctx ends it returns once every job has stopped.
 func (r *Registry) Run(ctx context.Context) {
 	r.mu.Lock()
@@ -100,21 +111,65 @@ func (r *Registry) Run(ctx context.Context) {
 			if err := r.Refresh(ctx); err != nil && ctx.Err() == nil {
 				r.log.Warn("bringing new entities live failed; retrying in a minute", "err", err)
 			}
+			if err := r.Sweep(ctx); err != nil && ctx.Err() == nil {
+				r.log.Warn("dropping deleted entities failed; retrying in a minute", "err", err)
+			}
 		}
 	}
 }
 
 func (r *Registry) startLocked(l *entry) {
-	if l.started || r.runCtx == nil || r.stopped {
+	if l.stop != nil || r.runCtx == nil || r.stopped {
 		return
 	}
-	l.started = true
-	r.running.Go(func() { l.run(r.runCtx) })
+	ctx, stop := context.WithCancel(r.runCtx)
+	l.stop, l.done = stop, make(chan struct{})
+	r.running.Go(func() {
+		defer close(l.done)
+		l.run(ctx)
+	})
 }
 
-// Refresh brings every entity row live that is not yet, and picks up
-// new names and slugs. Calling it again changes nothing, so an entity
-// another replica made goes live here on the next call. An entity goes
+// OnRemove has f called with the id of each entity this process stops
+// serving, once its jobs have stopped, so a cache of anything built for
+// it can let go.
+func (r *Registry) OnRemove(f func(id int64)) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.onRemove = append(r.onRemove, f)
+}
+
+// remove stops serving the entities with ids: Lookup and ByID no longer
+// find them, their jobs stop and are waited for, and any query still
+// running through their services fails from then on instead of reaching
+// a schema that is about to go.
+func (r *Registry) remove(ids ...int64) {
+	r.mu.Lock()
+	var gone []*entry
+	for _, id := range ids {
+		if l, ok := r.byID[id]; ok {
+			delete(r.byID, id)
+			gone = append(gone, l)
+		}
+	}
+	hooks := slices.Clone(r.onRemove)
+	r.mu.Unlock()
+	for _, l := range gone {
+		if l.stop != nil {
+			l.stop()
+			<-l.done
+		}
+		db.Retire(l.pool)
+		for _, f := range hooks {
+			f(l.Entity.ID)
+		}
+	}
+}
+
+// Refresh brings every entity row live that is not yet, picks up new
+// names and slugs, and stops serving every entity that was deleted.
+// Calling it again changes nothing, so an entity another replica made
+// goes live here on the next call, and one it deleted stops. An entity goes
 // live only once it has every entity migration this binary has: one
 // lacking a file is caught up first, and while that fails it is logged
 // and not served, and the next call tries again.
@@ -125,6 +180,15 @@ func (r *Registry) Refresh(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	r.mu.RLock()
+	var gone []int64
+	for id := range r.byID {
+		if !slices.ContainsFunc(all, func(w db.Entity) bool { return w.ID == id }) {
+			gone = append(gone, id)
+		}
+	}
+	r.mu.RUnlock()
+	r.remove(gone...)
 	var errs []error
 	for _, w := range all {
 		r.mu.Lock()
@@ -140,13 +204,14 @@ func (r *Registry) Refresh(ctx context.Context) error {
 			r.log.Warn("not serving an entity until it has every entity migration; retrying on the next refresh", "entity", w.Slug, "err", err)
 			continue
 		}
-		svc, run := r.build(w, db.In(r.pool, w.Schema))
+		pool := db.In(r.pool, w.Schema)
+		svc, run := r.build(w, pool)
 		if err := prepare(ctx, w, svc, r.log); err != nil {
 			errs = append(errs, err)
 			continue
 		}
 		r.mu.Lock()
-		l = &entry{Live: Live{Entity: w, Services: svc}, run: run}
+		l = &entry{Live: Live{Entity: w, Services: svc}, pool: pool, run: run}
 		r.byID[w.ID] = l
 		r.startLocked(l)
 		r.mu.Unlock()
@@ -335,14 +400,15 @@ func (r *Registry) catchUp(ctx context.Context, w db.Entity) error {
 	return r.asMigrator(ctx, func(pool db.Pool) error { return db.MigrateEntity(ctx, pool, w) })
 }
 
-// asMigrator runs f on a pool of the role that creates an entity's
-// tables: MIGRATION_DATABASE_URL's when it is set, else DATABASE_URL's.
+// asMigrator runs f on a pool of the role that creates and drops an
+// entity's tables: MIGRATION_DATABASE_URL's when it is set, else
+// DATABASE_URL's.
 // An error that is not the caller's says which role failed.
 func (r *Registry) asMigrator(ctx context.Context, f func(db.Pool) error) error {
 	if r.opts.MigrateDB == nil {
 		err := f(r.pool)
 		if pgErr := (*pgconn.PgError)(nil); errors.As(err, &pgErr) && pgErr.Code == "42501" {
-			return fmt.Errorf("%w: DATABASE_URL's role cannot create an entity's tables; set MIGRATION_DATABASE_URL to a role that can", err)
+			return fmt.Errorf("%w: DATABASE_URL's role cannot create or drop an entity's tables; set MIGRATION_DATABASE_URL to a role that can", err)
 		}
 		return err
 	}
@@ -355,7 +421,7 @@ func (r *Registry) asMigrator(ctx context.Context, f func(db.Pool) error) error 
 	defer pool.Close()
 	err = f(pool)
 	if err != nil && !errors.Is(err, db.ErrSlugTaken) && !errors.Is(err, db.ErrSlugReserved) {
-		return fmt.Errorf("create the entity's tables at MIGRATION_DATABASE_URL: %w", err)
+		return fmt.Errorf("change the entity's tables at MIGRATION_DATABASE_URL: %w", err)
 	}
 	return err
 }
@@ -377,6 +443,55 @@ func (r *Registry) Rename(ctx context.Context, slug, name string) (Summary, erro
 		return Summary{}, err
 	}
 	return r.summary(ctx, w.ID)
+}
+
+// Delete marks the entity with slug deleted and stops serving it here at
+// once. Other replicas stop at their next Refresh, and Sweep drops its
+// tables once deleteGrace has passed. The first entity is never deleted.
+func (r *Registry) Delete(ctx context.Context, slug string) error {
+	r.refreshMu.Lock()
+	defer r.refreshMu.Unlock()
+	w, err := db.DeleteEntity(ctx, r.pool, slug)
+	switch {
+	case errors.Is(err, db.ErrNoEntity):
+		return fmt.Errorf("%w: no entity %q; GET /v1/entities lists them", core.ErrNotFound, slug)
+	case errors.Is(err, db.ErrFirstEntity):
+		return fmt.Errorf("%w: %s is the first entity, which /v1 and /mcp without /e/<slug> mean, and its tables share a schema with the team, keys and sign-in, so it cannot be deleted", core.ErrConflict, slug)
+	case err != nil:
+		return err
+	}
+	r.remove(w.ID)
+	return nil
+}
+
+// deleteGrace is how long Sweep leaves a deleted entity's tables, well
+// past refreshEvery, so that by then no replica serves it any more.
+const deleteGrace = 5 * time.Minute
+
+// Sweep drops the schema and row of every entity deleted at least
+// r.grace ago. Every replica runs it; the migration lock lets one drop
+// each entity and the rest find nothing left.
+func (r *Registry) Sweep(ctx context.Context) error {
+	due, err := db.DeletedEntities(ctx, r.pool, r.grace)
+	if err != nil || len(due) == 0 {
+		return err
+	}
+	for _, w := range due {
+		r.remove(w.ID)
+	}
+	return r.asMigrator(ctx, func(pool db.Pool) error {
+		var errs []error
+		for _, w := range due {
+			dropped, err := db.DropEntity(ctx, pool, w)
+			if err != nil {
+				errs = append(errs, fmt.Errorf("drop entity %s (%s): %w", w.Slug, w.Schema, err))
+			}
+			if dropped {
+				r.log.Info("dropped a deleted entity's tables", "entity", w.Slug, "schema", w.Schema.String())
+			}
+		}
+		return errors.Join(errs...)
+	})
 }
 
 type entityKey struct{}

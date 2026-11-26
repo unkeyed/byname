@@ -12,6 +12,8 @@ import (
 // Entities lists the brands this instance tracks: entities.Registry.
 type Entities interface {
 	List(context.Context) ([]entities.Summary, error)
+	// OnRemove has f called with the id of each entity no longer served.
+	OnRemove(f func(id int64))
 }
 
 type entityList struct {
