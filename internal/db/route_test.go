@@ -82,3 +82,21 @@ func TestInRefusesAPoolThatDoesNotRoute(t *testing.T) {
 	}()
 	db.In(p, db.Public)
 }
+
+// A workspace whose schema is gone gets an error, never the first
+// workspace's rows.
+func TestAMissingWorkspaceSchemaFailsInsteadOfReadingPublic(t *testing.T) {
+	ctx := context.Background()
+	pool := testdb.New(t)
+	w, err := db.CreateWorkspace(ctx, pool, "Planetfall", "planetfall")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, `DROP SCHEMA `+w.Schema.String()+` CASCADE`); err != nil {
+		t.Fatal(err)
+	}
+	var samples int
+	if err := db.In(pool, w.Schema).QueryRow(ctx, `SELECT samples FROM instance_settings`).Scan(&samples); err == nil {
+		t.Fatal("a query bound to a dropped workspace read instance_settings, want an error")
+	}
+}

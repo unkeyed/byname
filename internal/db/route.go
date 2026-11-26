@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -28,12 +29,22 @@ func RouteSchemas(cfg *pgxpool.Config) {
 		}
 		// The first workspace's path is the connection's own, so an
 		// instance with one workspace never sets it.
-		sql := `RESET search_path`
-		if want != Public {
-			sql = `SET search_path = ` + want.searchPath()
+		if want == Public {
+			if _, err := conn.Exec(ctx, `RESET search_path`); err != nil {
+				return false, err
+			}
+			delete(data, pathKey)
+			return true, nil
 		}
-		if _, err := conn.Exec(ctx, sql); err != nil {
+		// A schema that is missing, or that the role cannot use, would
+		// leave public first on the path and hand out the first
+		// workspace's rows, so that fails here instead.
+		var first string
+		if err := conn.QueryRow(ctx, `SELECT set_config('search_path', $1, false), current_schema()`, want.searchPath()).Scan(nil, &first); err != nil {
 			return false, err
+		}
+		if first != want.String() {
+			return false, fmt.Errorf("db: workspace schema %s is missing or not usable", want)
 		}
 		data[pathKey] = want
 		return true, nil
