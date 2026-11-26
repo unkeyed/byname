@@ -1,0 +1,60 @@
+---
+import Page from "../../layouts/Page.astro";
+import BynameDiff from "../../components/BynameDiff.astro";
+import Related from "../../components/Related.astro";
+import Sources from "../../components/Sources.astro";
+import { guide } from "../../lib/reading";
+import { faqNode, graph, webPageNode } from "../../lib/seo";
+import { origin } from "../../lib/site";
+
+const page = guide("/alternatives/otterly");
+const faqs = [
+  {
+    q: "Who is OtterlyAI a better fit for?",
+    a: "A marketer who wants OtterlyAI to monitor the seven AI search engines it lists, with content audits and GEO recommendations, on a hosted plan. Agencies can use workspaces. Standard and Premium include the API and MCP.",
+  },
+  {
+    q: "Who is Byname a better fit for?",
+    a: "A team that wants the tracker in its own network, on its own keys, including Claude Code and Codex CLI for developer-tools buyers. You also want Search Console, Bing, and seven social networks in the same app.",
+  },
+];
+const jsonLd = graph(
+  webPageNode({ title: page.title, description: page.description, url: origin + page.path, date: "2026-11-26" }),
+  faqNode(faqs),
+);
+---
+<Page title={page.title} description={page.description} path={page.path} kicker="Alternatives" kickerHref="/alternatives" section="alternatives" jsonLd={jsonLd}>
+  <h1>Byname and OtterlyAI</h1>
+  <p class="byline">Updated <time datetime="2026-11-26">November 26, 2026</time></p>
+  <p>OtterlyAI is a hosted content and monitoring product for AI search. Byname is an open source AI visibility tracker (AEO / GEO) you run yourself. OtterlyAI's site calls the product OtterlyAI. This page uses that name.</p>
+  <p>This page is a description, not a ranking.</p>
+
+  <h2>What OtterlyAI does well</h2>
+  <p>OtterlyAI's features page says it tracks brand and website visibility, citations, sentiment, and share of voice. The engines named on its November 10, 2026 pricing post are ChatGPT, Google AI Overviews, Google AI Mode, Gemini, Perplexity, Microsoft Copilot, and Claude. You pick at least three, per workspace.</p>
+  <p>It also does prompt research, crawlability checks, content audits, content briefs, and GEO recommendations. The features page says it monitors 65 or more countries and languages. The help center says every plan includes unlimited brands, competitors, team members, countries, and languages.</p>
+  <p>Workspaces split brands and clients. The help center lists 1 workspace on Lite, and unlimited workspaces on Standard, Premium, and Enterprise. It lists the API and MCP on Standard and Premium, and not on Lite. Reports export, and Standard and Premium include a Looker Studio connector.</p>
+
+  <h2>What OtterlyAI publishes for price</h2>
+  <p>A post dated November 10, 2026 lists Lite at $29 a month, Standard at $189 a month, and Premium at $489 a month, with Enterprise custom. The same post says annual billing saves 15%. The pricing page also shows euro prices, and the help center says the currency depends on where you are. Check otterly.ai/pricing for the number you would pay.</p>
+  <p>Prompt counts are left off this page. OtterlyAI's blog and its help center, both from that pricing change, do not list the same counts. Use their pricing page.</p>
+  <p>Byname has no subscription. A check of 390 answers cost $2.96 in provider calls. That is not a like-for-like price against an OtterlyAI plan.</p>
+
+  <BynameDiff />
+
+  <h2>{faqs[0].q}</h2>
+  <p>{faqs[0].a}</p>
+
+  <h2>{faqs[1].q}</h2>
+  <p>{faqs[1].a}</p>
+
+  <Sources
+    links={[
+      { href: "https://otterly.ai/", label: "otterly.ai" },
+      { href: "https://otterly.ai/features", label: "OtterlyAI features" },
+      { href: "https://otterly.ai/pricing", label: "OtterlyAI pricing" },
+      { href: "https://otterly.ai/blog/new-pricing-choose-your-ai-search-engines/", label: "OtterlyAI pricing post, November 10, 2026" },
+      { href: "https://help.otterly.ai/pricing-of-otterlyai", label: "OtterlyAI help: plans and pricing" },
+    ]}
+  />
+  <Related paths={["/cost", "/alternatives", "/alternatives/peec-ai", "/blog/seo-social-and-ai-visibility"]} />
+</Page>

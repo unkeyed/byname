@@ -1,0 +1,11 @@
+---
+interface Props {
+  links: { href: string; label: string }[];
+}
+const { links } = Astro.props;
+---
+<h2>Sources</h2>
+<p>Read on November 26, 2026. These pages can change. If a price or a limit matters, check the live page before you rely on it.</p>
+<ul>
+  {links.map((l) => <li><a href={l.href}>{l.label}</a></li>)}
+</ul>

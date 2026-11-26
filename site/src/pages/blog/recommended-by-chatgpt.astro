@@ -1,0 +1,54 @@
+---
+import Page from "../../layouts/Page.astro";
+import Related from "../../components/Related.astro";
+import { guide } from "../../lib/reading";
+import { articleNode, faqNode, graph } from "../../lib/seo";
+import { origin } from "../../lib/site";
+
+const page = guide("/blog/recommended-by-chatgpt");
+const date = page.date!;
+const faqs = [
+  {
+    q: "How do I get my product recommended by ChatGPT?",
+    a: "Publish a page on your site that answers the buyer's question in the first paragraph, in the words they would use, and leave that page open for crawlers to read. Then check later ChatGPT answers to see if they link to the page and name you. A page does not force a recommendation. It gives ChatGPT something it can cite.",
+  },
+  {
+    q: "Does publishing a page guarantee a mention?",
+    a: "No. Byname can count later answers that link to the page, and whether the question starts naming you. It cannot promise that ChatGPT will do either.",
+  },
+];
+const jsonLd = graph(
+  articleNode({ title: page.title, description: page.description, url: origin + page.path, date }),
+  faqNode(faqs),
+);
+---
+<Page title={page.title} description={page.description} path={page.path} kicker="Post" kickerHref="/blog" section="blog" published={date} jsonLd={jsonLd}>
+  <h1>{page.title}</h1>
+  <p class="byline"><time datetime={date}>November 26, 2026</time> · James Perkins</p>
+  <p>{faqs[0].a}</p>
+
+  <h2>Start from the question, not from your brand</h2>
+  <p>ChatGPT answers a question. It names a few products and links a few pages. If your site has no page that answers that question, there is nothing of yours to cite.</p>
+  <p>Write the question the way a buyer asks it. "How do I add rate limits to an existing API?" is a buyer question. "Why our product is the best rate limiter" is not. Track the buyer question. In Byname you type it in, and Byname asks it as written. It does not prepend your brand.</p>
+
+  <h2>See who gets named, and which pages get linked</h2>
+  <p>Run the question in the ChatGPT app. Read the answer. Note the brands named ahead of you, and the URLs in the links. Those pages are what the answer drew on. They are often a doc, a comparison, or a post that answers the question directly.</p>
+  <p>On a check run November 26, 2026, answers to this question ("How do I get my product recommended by ChatGPT?") did not name the AI visibility tools that check was tracking. Pages it linked included HubSpot, Impact Plus, Importify, and Market Provider. That is one check, not a law. It is a reason to look at the pages, not at a slogan.</p>
+
+  <h2>Write the page</h2>
+  <p>Put the answer in the first paragraph. Use the words from the question. State the facts you can stand behind, and link to the docs a developer would need. Say what the product does. Skip a long introduction about the industry.</p>
+  <p>Keep the page on your own site, at a URL you can leave up. Allow crawlers to read it. A robots.txt that allows the public pages looks like this:</p>
+<pre><code>User-agent: *
+Allow: /</code></pre>
+  <p>Byname's own robots.txt allows every crawler to read the whole site, and the sitemap lists the public pages.</p>
+
+  <h2>Check whether it worked</h2>
+  <p>{faqs[1].a}</p>
+  <p>In Byname, open the missed question, write the page, then mark the question handled and paste the URL. Later checks count answers that link to that URL, from any AI app, and show whether the question starts naming you. The <a href="/docs/handled">handled questions</a> doc describes that count.</p>
+  <p>If the next answers still link somewhere else, read those pages and see what they answer that yours does not. Then change your page. The loop is the work. There is no switch that turns on a recommendation.</p>
+
+  <Related
+    paths={["/blog/seo-social-and-ai-visibility", "/blog/developer-tools-startup", "/cost"]}
+    links={[{ href: "/docs/handled", title: "Handled questions" }]}
+  />
+</Page>

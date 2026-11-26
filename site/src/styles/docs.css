@@ -14,6 +14,10 @@
 
 .docs-main { position: relative; min-width: 0; max-width: 860px; padding: 48px 56px 40px; background: var(--sheet); border-radius: var(--radius); box-shadow: var(--shadow); }
 .docs-kicker { margin: 0 0 18px; font: italic 400 14px/1 var(--mono); color: var(--you); }
+.docs-kicker a { color: inherit; text-decoration: none; }
+.docs-kicker a:hover { text-decoration: underline; text-underline-offset: 3px; }
+.article-layout { grid-template-columns: minmax(0, 860px); justify-content: center; }
+.byline { margin: -8px 0 22px; color: var(--ink-3); font: 400 13.5px/1.4 var(--mono); }
 .docs-back { display: none; margin-bottom: 18px; color: var(--ink-3); font-size: 14px; text-decoration: none; }
 .docs-back:hover { color: var(--ink); }
 
@@ -34,6 +38,8 @@
 .prose li::marker { color: var(--ink-3); }
 .prose strong { color: var(--ink); font-weight: 600; }
 .prose a { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; text-decoration-color: var(--you); transition: text-decoration-thickness .1s; }
+.prose a.index-card { text-decoration: none; }
+.prose a.index-card:hover { text-decoration: none; }
 .prose a:hover { text-decoration-thickness: 2px; }
 .prose code { padding: 1px 5px; border-radius: 5px; background: var(--sheet-2); box-shadow: inset 0 0 0 1px var(--rule); color: var(--ink); font-size: .86em; overflow-wrap: anywhere; }
 .prose pre { padding: 16px 18px; border-radius: 10px; background: var(--sheet-2); box-shadow: inset 0 0 0 1px var(--rule); overflow-x: auto; line-height: 1.6; tab-size: 4; }
@@ -58,6 +64,7 @@
 .lede-doc { color: var(--ink-2) !important; font-size: 18px; max-width: 600px; }
 .index-title { margin: 44px 0 6px; font: italic 400 24px/1.2 var(--serif); color: var(--ink); }
 .index-grid { display: grid; }
+.index-stack .index-card { grid-template-columns: minmax(0, 1fr); gap: 4px; }
 .index-card { display: grid; grid-template-columns: minmax(0, 210px) minmax(0, 1fr); gap: 4px 28px; padding: 14px 0; border-top: 1px dashed var(--rule); text-decoration: none; }
 .index-name { font: 500 16.5px/1.4 var(--sans); color: var(--ink); }
 .index-name::after { content: " \2192"; color: var(--ink-3); transition: color .15s; }

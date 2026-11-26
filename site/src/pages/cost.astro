@@ -1,0 +1,80 @@
+---
+import Page from "../layouts/Page.astro";
+import Related from "../components/Related.astro";
+import { guide } from "../lib/reading";
+import { faqNode, graph, webPageNode } from "../lib/seo";
+import { origin } from "../lib/site";
+
+const page = guide("/cost");
+const updated = "2026-11-26";
+const faqs = [
+  {
+    q: "What does Byname cost?",
+    a: "Byname is free and open source. You pay your own AI provider call costs, and you pay for the computer and the Postgres database you run it on. There is no seat price and no hosted plan.",
+  },
+  {
+    q: "What did one check cost?",
+    a: "A check on November 26, 2026 ran 390 answers and cost $2.96. Answers on the apps used in that check cost $0.0024 to $0.015 each. The estimate for a check of that size every 3 days is $44.12 a month.",
+  },
+  {
+    q: "Is there a seat price or a hosted plan?",
+    a: "No. Byname does not sell seats, and it does not sell a hosted plan. Deploying on Unkey still means you run Byname. Unkey is not a Byname subscription.",
+  },
+];
+const jsonLd = graph(
+  webPageNode({ title: page.title, description: page.description, url: origin + page.path, date: updated }),
+  faqNode(faqs),
+);
+---
+<Page title={page.title} description={page.description} path={page.path} kicker="Cost" section="cost" jsonLd={jsonLd}>
+  <h1>What Byname costs</h1>
+  <p class="byline">Updated <time datetime={updated}>November 26, 2026</time></p>
+  <h2>{faqs[0].q}</h2>
+  <p>{faqs[0].a}</p>
+
+  <h2>{faqs[1].q}</h2>
+  <p>{faqs[1].a}</p>
+  <p>That check asked 13 questions in 10 AI app lines, 3 times each. The default schedule in Byname is every 3 days. A spend cap per check stops a check that passes it. The default cap is $5, so a check of this size fits under it.</p>
+  <p>The $2.96 is what that check cost. It is not a price Byname charges. If you use <a href="https://treg.to">Treg</a>, Treg bills you per answer. If you use your own provider key or gateway, that provider bills you.</p>
+
+  <h2>A month</h2>
+  <p>The estimate for running a check of that size every 3 days is $44.12 a month. Your number will differ if you change the questions, the AI apps, how many times each question is asked, or the schedule.</p>
+  <p>Token-billed apps cost a different amount on every answer. The developer tools are the expensive ones. In the sample below, Claude Code is $55 per 1,000 answers and Codex CLI is $73 per 1,000. They are off until you turn them on.</p>
+
+  <h2>Sample cost per AI app</h2>
+  <p>Byname shows this sample before your first check. It is what 1,000 calls cost at the price one call cost in a sample on November 21, 2026. The <a href="/docs/engines/surfaces">AI apps page</a> is the list the app follows, and <code>GET /v1/costs</code> returns the current sample.</p>
+  <table>
+    <thead>
+      <tr><th>AI app</th><th>Label</th><th>Sample per 1,000 answers</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>ChatGPT app</td><td>Real app answer</td><td>$4.00</td></tr>
+      <tr><td>Gemini app</td><td>Real app answer</td><td>$2.40</td></tr>
+      <tr><td>Google AI Mode</td><td>Real app answer</td><td>$2.40</td></tr>
+      <tr><td>Google AI Overview</td><td>Real app answer</td><td>$2.80</td></tr>
+      <tr><td>Microsoft Copilot</td><td>Real app answer</td><td>$15.00</td></tr>
+      <tr><td>Bing AI Mode</td><td>Real app answer</td><td>$2.40</td></tr>
+      <tr><td>Brave AI answers</td><td>Real app answer</td><td>$15.00</td></tr>
+      <tr><td>Claude Code</td><td>Same model, not the full tool</td><td>$55.00</td></tr>
+      <tr><td>Gemini CLI</td><td>Same model, not the full tool</td><td>$60.00</td></tr>
+      <tr><td>Codex CLI</td><td>Same model, not the full tool</td><td>$73.00</td></tr>
+      <tr><td>Claude app</td><td>Stand-in, not the real app</td><td>$55.00</td></tr>
+      <tr><td>Perplexity app</td><td>Stand-in, not the real app</td><td>$6.10</td></tr>
+    </tbody>
+  </table>
+  <p>The ChatGPT app, the Gemini app, and Google AI Mode are on by default. No developer tool is on by default.</p>
+
+  <h2>Social search</h2>
+  <p>Social search is off until you turn it on. Six networks are searched through Treg, so those calls are extra. Bluesky is searched through its public API and costs nothing. The prices Byname uses were checked on November 22, 2026, and they are listed on the <a href="/docs/social">social page</a>.</p>
+
+  <h2>Hosting</h2>
+  <p>You run one container and Postgres, on your own machine, on Unkey, or on any host that runs containers. What the machine and the database cost is between you and that host. The software stays MIT licensed either way.</p>
+
+  <h2>{faqs[2].q}</h2>
+  <p>{faqs[2].a}</p>
+
+  <Related
+    paths={["/alternatives", "/blog/seo-social-and-ai-visibility", "/blog/developer-tools-startup"]}
+    links={[{ href: "/docs/self-hosting", title: "Self-host Byname" }]}
+  />
+</Page>

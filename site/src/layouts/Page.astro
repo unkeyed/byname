@@ -1,0 +1,36 @@
+---
+// A prose page: cost, a comparison, or a post. Same paper sheet as the docs.
+import Base from "./Base.astro";
+import "../styles/docs.css";
+
+interface Props {
+  title: string;
+  description: string;
+  path: string;
+  kicker: string;
+  kickerHref?: string;
+  section: "cost" | "alternatives" | "blog";
+  published?: string;
+  jsonLd?: unknown;
+}
+const { title, description, path, kicker, kickerHref, section, published, jsonLd } = Astro.props;
+---
+<Base
+  title={`${title} · Byname`}
+  description={description}
+  path={path}
+  type={published ? "article" : "website"}
+  published={published}
+  jsonLd={jsonLd}
+  section={section}
+  bodyClass="docs"
+>
+  <main class="wrap docs-layout article-layout" id="main">
+    <article class="docs-main">
+      <p class="docs-kicker">{kickerHref ? <a href={kickerHref}>{kicker}</a> : kicker}</p>
+      <div class="prose">
+        <slot />
+      </div>
+    </article>
+  </main>
+</Base>

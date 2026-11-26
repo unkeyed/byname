@@ -1,0 +1,24 @@
+---
+import { guides } from "../lib/reading";
+
+interface Link {
+  href: string;
+  title: string;
+}
+interface Props {
+  /** Paths from the guides list. */
+  paths?: string[];
+  /** Any other page, such as a doc. */
+  links?: Link[];
+}
+const fromGuides = (Astro.props.paths ?? []).map((p) => {
+  const found = guides.find((g) => g.path === p);
+  if (!found) throw new Error(`related path ${p} is not a guide; pass it in links`);
+  return { href: found.path, title: found.title };
+});
+const items = [...fromGuides, ...(Astro.props.links ?? [])];
+---
+<h2>Related</h2>
+<ul>
+  {items.map((item) => <li><a href={item.href}>{item.title}</a></li>)}
+</ul>

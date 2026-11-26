@@ -1,0 +1,24 @@
+---
+import Page from "../../layouts/Page.astro";
+import { childGuides, guide } from "../../lib/reading";
+import { graph, webPageNode } from "../../lib/seo";
+import { origin } from "../../lib/site";
+
+const page = guide("/alternatives");
+const pages = childGuides("alternatives");
+const jsonLd = graph(webPageNode({ title: page.title, description: page.description, url: origin + page.path, date: "2026-11-26" }));
+---
+<Page title={page.title} description={page.description} path={page.path} kicker="Alternatives" section="alternatives" jsonLd={jsonLd}>
+  <h1>Alternatives</h1>
+  <p class="byline">Updated <time datetime="2026-11-26">November 26, 2026</time></p>
+  <p>Byname is an open source AI visibility tracker (AEO / GEO). You run it yourself. These pages describe five hosted products people already compare, what each does well, and who each is a better fit for. They are descriptions, not a ranking.</p>
+  <p>Facts about the other products come from their public sites, read on November 26, 2026. If a page did not say something, it is left out. Prices change. <a href="/cost">What Byname costs</a> uses Byname's own numbers only.</p>
+  <div class="index-grid">
+    {pages.map((item) => (
+      <a class="index-card" href={item.path}>
+        <span class="index-name">{item.title.replace("Byname and ", "")}</span>
+        <span class="index-desc">{item.description}</span>
+      </a>
+    ))}
+  </div>
+</Page>
