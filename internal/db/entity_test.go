@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -438,5 +439,86 @@ func TestAnInstallOutsidePublicUpgrades(t *testing.T) {
 	}
 	if got, err := db.CurrentEntity(ctx, kyring); err != nil || got.ID != w.ID {
 		t.Fatalf("CurrentEntity in Kyring = %+v, %v; want Kyring", got, err)
+	}
+}
+
+func schemaExists(t *testing.T, pool db.Pool, schema string) bool {
+	t.Helper()
+	var found bool
+	if err := pool.QueryRow(context.Background(), `SELECT EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = $1)`, schema).Scan(&found); err != nil {
+		t.Fatal(err)
+	}
+	return found
+}
+
+// Deleting an entity frees its slug at once and keeps its tables until
+// DropEntity, which takes them and its row, once, and never touches the
+// first entity, which cannot be deleted at all.
+func TestDeleteThenDropAnEntity(t *testing.T) {
+	ctx := context.Background()
+	pool := testdb.New(t)
+	if _, err := pool.Exec(ctx, `INSERT INTO brand (name, kind) VALUES ('Fabrikam', 'competitor')`); err != nil {
+		t.Fatal(err)
+	}
+	w, err := db.CreateEntity(ctx, pool, "Kyring", "kyring")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.In(pool, w.Schema).Exec(ctx, `INSERT INTO brand (name, kind) VALUES ('Contoso', 'competitor')`); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := db.DeleteEntity(ctx, pool, "default"); !errors.Is(err, db.ErrFirstEntity) {
+		t.Fatalf("deleting the first entity: %v, want ErrFirstEntity", err)
+	}
+	if _, err := pool.Exec(ctx, `UPDATE entity SET deleted_at = now() WHERE slug = 'default'`); err == nil {
+		t.Fatal("marking the first entity deleted in SQL succeeded, want the CHECK to refuse it")
+	}
+	if _, err := db.DeleteEntity(ctx, pool, "nope"); !errors.Is(err, db.ErrNoEntity) {
+		t.Fatalf("deleting a missing entity: %v, want ErrNoEntity", err)
+	}
+	if _, err := db.DeleteEntity(ctx, pool, "kyring"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.DeleteEntity(ctx, pool, "kyring"); !errors.Is(err, db.ErrNoEntity) {
+		t.Fatalf("deleting it again: %v, want ErrNoEntity", err)
+	}
+	if _, err := db.RenameEntity(ctx, pool, "kyring", "x"); !errors.Is(err, db.ErrNoEntity) {
+		t.Fatalf("renaming a deleted entity: %v, want ErrNoEntity", err)
+	}
+	if all, err := db.Entities(ctx, pool); err != nil || len(all) != 1 || all[0].Schema != db.Home {
+		t.Fatalf("Entities = %+v %v, want the first only", all, err)
+	}
+
+	again, err := db.CreateEntity(ctx, pool, "Kyring", "kyring")
+	if err != nil || again.ID == w.ID || again.Schema == w.Schema {
+		t.Fatalf("CreateEntity at a deleted entity's slug = %+v %v, want a new entity with its own schema", again, err)
+	}
+
+	if due, err := db.DeletedEntities(ctx, pool, time.Hour); err != nil || len(due) != 0 {
+		t.Fatalf("DeletedEntities within the grace = %+v %v, want none", due, err)
+	}
+	due, err := db.DeletedEntities(ctx, pool, 0)
+	if err != nil || len(due) != 1 || due[0].ID != w.ID {
+		t.Fatalf("DeletedEntities = %+v %v, want kyring's first entity", due, err)
+	}
+	if !schemaExists(t, pool, w.Schema.String()) {
+		t.Fatal("the deleted entity's schema went before DropEntity")
+	}
+	for i, want := range []bool{true, false} {
+		if dropped, err := db.DropEntity(ctx, pool, due[0]); err != nil || dropped != want {
+			t.Fatalf("DropEntity call %d = %v %v, want %v", i+1, dropped, err, want)
+		}
+	}
+	var rows int
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM entity WHERE id = $1`, w.ID).Scan(&rows); err != nil || rows != 0 {
+		t.Fatalf("the dropped entity's rows = %d %v, want 0", rows, err)
+	}
+	if schemaExists(t, pool, w.Schema.String()) || !schemaExists(t, pool, again.Schema.String()) {
+		t.Fatal("DropEntity left the deleted entity's schema, or took the new kyring's")
+	}
+	var brands []string
+	if err := pool.QueryRow(ctx, `SELECT array_agg(name ORDER BY name) FROM brand WHERE kind = 'competitor'`).Scan(&brands); err != nil || !slices.Equal(brands, []string{"Fabrikam"}) {
+		t.Fatalf("the first entity's competitors = %v %v, want Fabrikam only", brands, err)
 	}
 }

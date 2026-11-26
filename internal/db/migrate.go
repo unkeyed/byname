@@ -181,8 +181,15 @@ func applyEntityLocked(ctx context.Context, tx pgx.Tx, w Entity, f entityFile) e
 		return nil
 	}
 	if w.Schema != Home {
-		if _, err := tx.Exec(ctx, setPath, pgx.Identifier{w.Schema.String()}.Sanitize(), true); err != nil {
+		// A schema dropped since w was read would leave the install's own
+		// first on the path, and the file would change the first entity's
+		// tables instead.
+		var first string
+		if err := tx.QueryRow(ctx, setPath, pgx.Identifier{w.Schema.String()}.Sanitize(), true).Scan(nil, &first); err != nil {
 			return err
+		}
+		if first != w.Schema.String() {
+			return fmt.Errorf("db: entity schema %s is missing or not usable", w.Schema)
 		}
 	}
 	if _, err := tx.Exec(ctx, f.sql); err != nil {

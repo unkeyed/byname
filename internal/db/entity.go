@@ -128,7 +128,7 @@ func CreateEntity(ctx context.Context, pool Pool, name, slug string) (Entity, er
 		if _, err := tx.Exec(ctx, migrateLock); err != nil {
 			return err
 		}
-		w, err = scanEntity(tx.QueryRow(ctx, `SELECT `+entityColumns+` FROM entity WHERE slug = $1`, slug))
+		w, err = scanEntity(tx.QueryRow(ctx, `SELECT `+entityColumns+` FROM entity WHERE slug = $1 AND deleted_at IS NULL`, slug))
 		switch {
 		case errors.Is(err, pgx.ErrNoRows):
 			w, err = scanEntity(tx.QueryRow(ctx, `INSERT INTO entity (id, slug, name, schema_name) OVERRIDING SYSTEM VALUE
@@ -179,10 +179,10 @@ func Slug(name string) string {
 	return s
 }
 
-// Entities lists every entity, the first, which has the lowest id,
-// first.
+// Entities lists every entity not deleted, the first, which has the
+// lowest id, first.
 func Entities(ctx context.Context, pool Pool) ([]Entity, error) {
-	rows, err := pool.Query(ctx, `SELECT `+entityColumns+` FROM entity ORDER BY id`)
+	rows, err := pool.Query(ctx, `SELECT `+entityColumns+` FROM entity WHERE deleted_at IS NULL ORDER BY id`)
 	if err != nil {
 		return nil, err
 	}
@@ -194,7 +194,7 @@ var ErrNoEntity = errors.New("db: no entity has this slug")
 
 // RenameEntity names the entity with slug name. Its slug stays.
 func RenameEntity(ctx context.Context, pool Pool, slug, name string) (Entity, error) {
-	w, err := scanEntity(pool.QueryRow(ctx, `UPDATE entity SET name = $2 WHERE slug = $1 RETURNING `+entityColumns, slug, name))
+	w, err := scanEntity(pool.QueryRow(ctx, `UPDATE entity SET name = $2 WHERE slug = $1 AND deleted_at IS NULL RETURNING `+entityColumns, slug, name))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Entity{}, ErrNoEntity
 	}
@@ -204,7 +204,7 @@ func RenameEntity(ctx context.Context, pool Pool, slug, name string) (Entity, er
 // CurrentEntity is the entity pool's queries are bound to with In,
 // or the first entity when they are bound to none.
 func CurrentEntity(ctx context.Context, pool Pool) (Entity, error) {
-	return scanEntity(pool.QueryRow(ctx, `SELECT `+entityColumns+` FROM entity WHERE schema_name = current_schema()`))
+	return scanEntity(pool.QueryRow(ctx, `SELECT `+entityColumns+` FROM entity WHERE schema_name = current_schema() AND deleted_at IS NULL`))
 }
 
 // NameFirstEntity names the entity pool is bound to name, and gives
@@ -214,7 +214,77 @@ func CurrentEntity(ctx context.Context, pool Pool) (Entity, error) {
 // another entity has name's.
 func NameFirstEntity(ctx context.Context, pool Pool, name string) error {
 	_, err := pool.Exec(ctx, `UPDATE entity w SET name = $1,
-			slug = CASE WHEN EXISTS (SELECT 1 FROM entity o WHERE o.slug = $2) THEN w.slug ELSE $2 END
+			slug = CASE WHEN EXISTS (SELECT 1 FROM entity o WHERE o.slug = $2 AND o.deleted_at IS NULL) THEN w.slug ELSE $2 END
 		WHERE w.schema_name = current_schema() AND w.schema_name !~ '^entity_[0-9]+$' AND w.slug = 'default' AND w.name = 'Default'`, name, Slug(name))
 	return err
+}
+
+// ErrFirstEntity is DeleteEntity's answer about the first entity, whose
+// tables share the install's own schema with the tables every entity
+// shares, and which /v1 and /mcp mean.
+var ErrFirstEntity = errors.New("db: the first entity cannot be deleted")
+
+// DeleteEntity marks the entity with slug deleted and returns it. Its slug
+// is free at once. Its schema and row stay until DropEntity, which must
+// wait until no replica serves it any more.
+func DeleteEntity(ctx context.Context, pool Pool, slug string) (Entity, error) {
+	w, err := scanEntity(pool.QueryRow(ctx, `SELECT `+entityColumns+` FROM entity WHERE slug = $1 AND deleted_at IS NULL`, slug))
+	switch {
+	case errors.Is(err, pgx.ErrNoRows):
+		return Entity{}, ErrNoEntity
+	case err != nil:
+		return Entity{}, err
+	case w.Schema == Home:
+		return Entity{}, ErrFirstEntity
+	}
+	tag, err := pool.Exec(ctx, `UPDATE entity SET deleted_at = now() WHERE id = $1 AND deleted_at IS NULL`, w.ID)
+	if err == nil && tag.RowsAffected() == 0 {
+		err = ErrNoEntity
+	}
+	return w, err
+}
+
+// DeletedEntities are the entities marked deleted at least grace ago, by
+// the database's clock, so every replica's clock agrees on them.
+func DeletedEntities(ctx context.Context, pool Pool, grace time.Duration) ([]Entity, error) {
+	rows, err := pool.Query(ctx, `SELECT `+entityColumns+` FROM entity
+		WHERE deleted_at <= now() - make_interval(secs => $1) ORDER BY id`, grace.Seconds())
+	if err != nil {
+		return nil, err
+	}
+	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (Entity, error) { return scanEntity(r) })
+}
+
+// DropEntity drops the schema of w, an entity DeleteEntity marked, with
+// every table in it, and then its row, in one transaction under the
+// migration lock, and reports whether it did. It does nothing when w's
+// row is gone or not marked, so running it again, or on two replicas at
+// once, ends in the same state.
+func DropEntity(ctx context.Context, pool Pool, w Entity) (dropped bool, err error) {
+	err = pgx.BeginFunc(ctx, pool, func(tx pgx.Tx) error {
+		if _, err := tx.Exec(ctx, migrateLock); err != nil {
+			return err
+		}
+		var schema string
+		err := tx.QueryRow(ctx, `SELECT schema_name FROM entity WHERE id = $1 AND deleted_at IS NOT NULL AND schema_name <> current_schema() FOR UPDATE`, w.ID).Scan(&schema)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		// The CHECKs on entity already keep the first entity from being
+		// marked, but dropping the install's own schema would take every
+		// shared table with it, so the name is checked here too.
+		if parseSchema(schema).String() != schema || schema != "entity_"+strconv.FormatInt(w.ID, 10) {
+			return fmt.Errorf("db: refusing to drop schema %q of entity %d", schema, w.ID)
+		}
+		if _, err := tx.Exec(ctx, `DROP SCHEMA IF EXISTS `+pgx.Identifier{schema}.Sanitize()+` CASCADE`); err != nil {
+			return err
+		}
+		_, err = tx.Exec(ctx, `DELETE FROM entity WHERE id = $1`, w.ID)
+		dropped = err == nil
+		return err
+	})
+	return dropped && err == nil, err
 }

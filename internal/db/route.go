@@ -2,7 +2,9 @@ package db
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"sync/atomic"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -18,14 +20,26 @@ const pathKey = "byname.schema"
 // first entity's when it is bound to none, as sign-in is. Code that
 // queries through such a pool must never SET search_path outside a
 // transaction; SET LOCAL is fine.
+//
+// A connection remembers which binding it last served and skips the
+// server for the next query of that binding. Once a deleted entity's
+// schema is dropped, its path on such a connection would lead to the
+// first entity's tables, so a binding Retire ended fails instead, and
+// every new binding checks its schema on each connection it first uses.
 func RouteSchemas(cfg *pgxpool.Config) {
 	cfg.PrepareConn = func(ctx context.Context, conn *pgx.Conn) (bool, error) {
-		want, _ := ctx.Value(schemaKey{}).(Schema)
+		want, _ := ctx.Value(schemaKey{}).(*binding)
+		if want != nil && want.retired.Load() {
+			return true, ErrRetired
+		}
+		if want != nil && want.schema == Home {
+			want = nil
+		}
 		data := conn.PgConn().CustomData()
-		if have, _ := data[pathKey].(Schema); have == want {
+		if have, _ := data[pathKey].(*binding); have == want {
 			return true, nil
 		}
-		if want == Home {
+		if want == nil {
 			if _, err := conn.Exec(ctx, `RESET search_path`); err != nil {
 				return false, err
 			}
@@ -36,11 +50,11 @@ func RouteSchemas(cfg *pgxpool.Config) {
 		// leave the install's own schema first on the path and hand out
 		// the first entity's rows, so that fails here instead.
 		var first string
-		if err := conn.QueryRow(ctx, setPath, pgx.Identifier{want.String()}.Sanitize(), false).Scan(nil, &first); err != nil {
+		if err := conn.QueryRow(ctx, setPath, pgx.Identifier{want.schema.String()}.Sanitize(), false).Scan(nil, &first); err != nil {
 			return false, err
 		}
-		if first != want.String() {
-			return false, fmt.Errorf("db: entity schema %s is missing or not usable", want)
+		if first != want.schema.String() {
+			return false, fmt.Errorf("db: entity schema %s is missing or not usable", want.schema)
 		}
 		data[pathKey] = want
 		return true, nil
@@ -67,16 +81,33 @@ func In(p Pool, schema Schema) Pool {
 			panic("db.In: the pool's config did not go through db.RouteSchemas")
 		}
 	}
-	return bound{p, schema}
+	return bound{p, &binding{schema: schema}}
+}
+
+// ErrRetired is the answer to every query through a pool Retire ended.
+var ErrRetired = errors.New("db: this entity was deleted")
+
+// Retire ends p, a pool In bound to a deleted entity: every query through
+// it from then on fails with ErrRetired. Pools In made for other entities,
+// and other pools bound to the same one, are unaffected.
+func Retire(p Pool) {
+	if b, ok := p.(bound); ok {
+		b.retired.Store(true)
+	}
 }
 
 type bound struct {
-	p      Pool
-	schema Schema
+	p Pool
+	*binding
+}
+
+type binding struct {
+	schema  Schema
+	retired atomic.Bool
 }
 
 func (b bound) bind(ctx context.Context) context.Context {
-	return context.WithValue(ctx, schemaKey{}, b.schema)
+	return context.WithValue(ctx, schemaKey{}, b.binding)
 }
 
 func (b bound) Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error) {

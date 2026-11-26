@@ -109,7 +109,7 @@ func (o *OAuthServer) checkResource(ctx context.Context, q dbtx, resource string
 	slug, mcp := strings.CutSuffix(slug, "/mcp")
 	found := false
 	if prefixed && mcp && db.SlugPattern.MatchString(slug) {
-		if err := q.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM entity WHERE slug = $1)`, slug).Scan(&found); err != nil {
+		if err := q.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM entity WHERE slug = $1 AND deleted_at IS NULL)`, slug).Scan(&found); err != nil {
 			return err
 		}
 	}

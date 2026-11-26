@@ -2,6 +2,7 @@ package db_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -96,5 +97,40 @@ func TestAMissingEntitySchemaFailsInsteadOfReadingPublic(t *testing.T) {
 	var samples int
 	if err := db.In(pool, w.Schema).QueryRow(ctx, `SELECT samples FROM instance_settings`).Scan(&samples); err == nil {
 		t.Fatal("a query bound to a dropped entity read instance_settings, want an error")
+	}
+}
+
+// A connection skips the server for a binding it served last. Once a
+// deleted entity's schema is dropped, neither the binding Retire ended
+// nor a new one for the same schema may reach the first entity's tables
+// through such a connection.
+func TestADroppedSchemaNeverRoutesToTheFirstEntity(t *testing.T) {
+	ctx := context.Background()
+	pool := testdb.New(t)
+	w, err := db.CreateEntity(ctx, pool, "Planetfall", "planetfall")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg := pool.Config()
+	cfg.MaxConns = 1
+	one, err := pgxpool.NewWithConfig(ctx, cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(one.Close)
+	in := db.In(one, w.Schema)
+	var samples int
+	if err := in.QueryRow(ctx, `SELECT samples FROM instance_settings`).Scan(&samples); err != nil {
+		t.Fatal(err)
+	}
+	db.Retire(in)
+	if _, err := pool.Exec(ctx, `DROP SCHEMA `+w.Schema.String()+` CASCADE`); err != nil {
+		t.Fatal(err)
+	}
+	if err := in.QueryRow(ctx, `SELECT samples FROM instance_settings`).Scan(&samples); !errors.Is(err, db.ErrRetired) {
+		t.Fatalf("a query through a retired binding = %v, want ErrRetired", err)
+	}
+	if err := db.In(one, w.Schema).QueryRow(ctx, `SELECT samples FROM instance_settings`).Scan(&samples); err == nil {
+		t.Fatal("a new binding to the dropped schema read instance_settings on a connection that had its path, want an error")
 	}
 }

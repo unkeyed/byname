@@ -122,7 +122,7 @@ type entityRef struct{ name, slug, schema string }
 // everyEntity is every entity, in the order they were made, with the
 // schema its tables are in, for a query that reads all of them.
 func (s *Service) everyEntity(ctx context.Context) ([]entityRef, error) {
-	rows, err := s.db.Query(ctx, `SELECT name, slug, schema_name FROM entity ORDER BY id`)
+	rows, err := s.db.Query(ctx, `SELECT name, slug, schema_name FROM entity WHERE deleted_at IS NULL ORDER BY id`)
 	if err != nil {
 		return nil, err
 	}

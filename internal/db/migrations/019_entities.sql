@@ -14,13 +14,20 @@
 
 -- slug is the entity's name in URLs. schema_name is the install's own
 -- schema for exactly one entity, the first, and entity_<id> for every other.
+-- deleted_at marks an entity deleted: it is no longer served, and its
+-- schema and row go once every replica has stopped serving it. Its slug is
+-- free from the moment it is marked. The first entity's tables share the
+-- install's schema with the shared tables, so it is never deleted.
 CREATE TABLE entity (
     id          bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    slug        text NOT NULL UNIQUE CHECK (slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$' AND char_length(slug) <= 40),
+    slug        text NOT NULL CHECK (slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$' AND char_length(slug) <= 40),
     name        text NOT NULL CHECK (char_length(name) BETWEEN 1 AND 80),
     schema_name text NOT NULL UNIQUE CHECK (schema_name !~ '^entity_[0-9]+$' OR schema_name = 'entity_' || id),
-    created_at  timestamptz NOT NULL DEFAULT now()
+    created_at  timestamptz NOT NULL DEFAULT now(),
+    deleted_at  timestamptz CHECK (deleted_at IS NULL OR schema_name ~ '^entity_[0-9]+$')
 );
+
+CREATE UNIQUE INDEX entity_slug ON entity (slug) WHERE deleted_at IS NULL;
 
 -- Which entity migrations each entity has. It lives in the install's
 -- own schema only, so no entity's schema can hide it.
