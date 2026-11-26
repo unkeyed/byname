@@ -45,6 +45,21 @@ export interface Actor {
   scopes: Scope[];
 }
 
+/**
+ * One tracked entity, such as a company or product: its own brand,
+ * questions, results and settings, at /w/<slug>. The team, sign-in, API keys
+ * and provider keys are shared by all of them.
+ */
+export interface Workspace {
+  id: number;
+  /** Never changes once links use it. */
+  slug: string;
+  name: string;
+  onboarded: boolean;
+  /** Paths without /w/<slug> mean this one, the first made. */
+  default: boolean;
+}
+
 export interface Status {
   version: string;
   /** Whether someone has finished setting up the brand, surfaces and questions. */
@@ -867,7 +882,7 @@ export interface BrandLogo {
   version: number;
 }
 
-export const logoURL = (l: BrandLogo) => `/v1/brands/${l.brand_id}/logo?v=${l.version}`;
+export const logoURL = (l: BrandLogo) => inWorkspace(`/v1/brands/${l.brand_id}/logo?v=${l.version}`);
 
 export interface AnswerSummary {
   id: number;
@@ -1872,8 +1887,23 @@ export class ApiError extends Error {
 
 export const needsReauth = (err: unknown) => err instanceof ApiError && err.code === "reauth_required";
 
+/** Endpoints that answer the same in every workspace, so they work on a page whose workspace is gone. */
+const shared = ["me", "account", "keys", "apps", "users", "invites", "credentials", "workspaces", "oauth"];
+
+/**
+ * The URL that reads or writes path in the workspace the page is in: the
+ * page at /w/kyring/settings reads /w/kyring/v1/brands. It reads the address
+ * at the time of the call, so a request sent after switching workspaces can
+ * never reach the one left.
+ */
+export function inWorkspace(path: string): string {
+  const slug = /^\/w\/([^/]+)/.exec(location.pathname)?.[1];
+  const rest = path.match(/^\/v1\/([^/?]+)/)?.[1];
+  return slug && rest && !shared.includes(rest) ? `/w/${slug}${path}` : path;
+}
+
 async function request<T>(method: string, path: string, opts: { body?: unknown } = {}): Promise<T> {
-  const res = await fetch(path, {
+  const res = await fetch(inWorkspace(path), {
     method,
     credentials: "same-origin",
     headers: opts.body === undefined ? undefined : { "Content-Type": "application/json" },
@@ -1930,6 +1960,13 @@ export const api = {
 
   me: {
     get: () => request<Actor>("GET", "/v1/me"),
+  },
+
+  /** The default first. Adding and renaming are admin only; a slug is taken from the name when left out, and a taken one is 409. */
+  workspaces: {
+    list: () => request<Workspace[]>("GET", "/v1/workspaces"),
+    create: (body: { name: string; slug?: string }) => request<Workspace>("POST", "/v1/workspaces", { body }),
+    rename: (slug: string, name: string) => request<Workspace>("PATCH", `/v1/workspaces/${enc(slug)}`, { body: { name } }),
   },
 
   /** Every change to a sign-in method can fail with reauth_required (see needsReauth). */
