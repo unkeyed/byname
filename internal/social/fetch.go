@@ -360,21 +360,12 @@ func (s *Service) job(ctx context.Context, f func() error) error {
 // fetch runs anywhere, so one still marked running was cut off; its calls
 // and posts are stored and the next fetch carries on from them.
 func (s *Service) locked(ctx context.Context, f func() error) error {
-	conn, err := s.db.Acquire(ctx)
-	if err != nil {
+	unlock, ok, err := db.TryLock(ctx, s.db, lock)
+	if err != nil || !ok {
 		return err
 	}
-	defer conn.Release()
-	var got bool
-	if err := conn.QueryRow(ctx, `SELECT pg_try_advisory_lock(`+lock+`)`).Scan(&got); err != nil || !got {
-		return err
-	}
-	defer func() {
-		if _, err := conn.Exec(context.WithoutCancel(ctx), `SELECT pg_advisory_unlock(`+lock+`)`); err != nil {
-			_ = conn.Conn().Close(context.WithoutCancel(ctx))
-		}
-	}()
-	if _, err := conn.Exec(ctx, `UPDATE job_run SET status = 'failed', finished_at = $1,
+	defer unlock()
+	if _, err := s.db.Exec(ctx, `UPDATE job_run SET status = 'failed', finished_at = $1,
 			error = 'the process stopped before this fetch finished; the posts it stored stay and the next fetch carries on'
 		WHERE job = 'social_fetch' AND status = 'running'`, s.now()); err != nil {
 		return err

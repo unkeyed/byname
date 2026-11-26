@@ -170,8 +170,11 @@ func fitBudget(ctx context.Context, log *slog.Logger, cfg *pgxpool.Config) {
 }
 
 // openLanes opens the three pools Lanes routes between. Up to four
-// connections hold locks, one for each job the scheduler can run at once,
-// and a small budget gets one, so those jobs take turns. The rest is split
+// connections hold locks, and a small budget gets one, shared by every
+// workspace's jobs, which take turns: a job that gets no lock connection
+// within a few seconds skips its tick (db.TryLock). The number stays fixed
+// as workspaces are added, since they come and go while the process runs
+// and the work under each lock runs on the Jobs pool. The rest is split
 // between requests, which get half rounded up, and background work, with
 // at least 2 each: 5 in all at the least.
 func openLanes(ctx context.Context, cfg *pgxpool.Config) (db.Lanes, error) {

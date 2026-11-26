@@ -103,20 +103,11 @@ func (s *Service) StartBackfill(ctx context.Context) (Backfill, error) {
 // for, then reads again the answers whose read failed. It holds an
 // advisory lock and returns at once when another process holds it.
 func (s *Service) Tick(ctx context.Context) error {
-	conn, err := s.db.Acquire(ctx)
-	if err != nil {
+	unlock, ok, err := db.TryLock(ctx, s.db, lock)
+	if err != nil || !ok {
 		return err
 	}
-	defer conn.Release()
-	var got bool
-	if err := conn.QueryRow(ctx, `SELECT pg_try_advisory_lock(`+lock+`)`).Scan(&got); err != nil || !got {
-		return err
-	}
-	defer func() {
-		if _, err := conn.Exec(context.WithoutCancel(ctx), `SELECT pg_advisory_unlock(`+lock+`)`); err != nil {
-			_ = conn.Conn().Close(context.WithoutCancel(ctx))
-		}
-	}()
+	defer unlock()
 	// With the lock held no pass runs anywhere, so a scheduled one still
 	// marked running was cut off. A pass someone asked for carries on.
 	if _, err := s.db.Exec(ctx, `UPDATE job_run SET status = 'failed', finished_at = $1,

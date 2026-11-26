@@ -126,21 +126,12 @@ func (s *Service) job(ctx context.Context, job string, f func() error) error {
 // connection, so the lock dies with the process. With the lock held none
 // of jobs runs anywhere, so one still marked running was cut off.
 func (s *Service) locked(ctx context.Context, key string, names []string, f func() error) error {
-	conn, err := s.db.Acquire(ctx)
-	if err != nil {
+	unlock, ok, err := db.TryLock(ctx, s.db, key)
+	if err != nil || !ok {
 		return err
 	}
-	defer conn.Release()
-	var got bool
-	if err := conn.QueryRow(ctx, `SELECT pg_try_advisory_lock(`+key+`)`).Scan(&got); err != nil || !got {
-		return err
-	}
-	defer func() {
-		if _, err := conn.Exec(context.WithoutCancel(ctx), `SELECT pg_advisory_unlock(`+key+`)`); err != nil {
-			_ = conn.Conn().Close(context.WithoutCancel(ctx))
-		}
-	}()
-	if _, err := conn.Exec(ctx, `UPDATE job_run SET status = 'failed', finished_at = $1,
+	defer unlock()
+	if _, err := s.db.Exec(ctx, `UPDATE job_run SET status = 'failed', finished_at = $1,
 			error = 'the process stopped before this job finished; the next run starts over'
 		WHERE job = ANY ($2) AND status = 'running'`, s.now(), names); err != nil {
 		return err
