@@ -279,13 +279,20 @@ func (r *Registry) Create(ctx context.Context, name, slug string) (Summary, erro
 	if err != nil {
 		return Summary{}, err
 	}
-	if slug == "" {
+	derived := slug == ""
+	if derived {
 		slug = db.Slug(name)
 	}
 	if len(slug) > db.MaxSlugLen || !db.SlugPattern.MatchString(slug) {
 		return Summary{}, fmt.Errorf("%w: slug must be lower-case letters and digits joined by single hyphens, at most %d characters, got %q", core.ErrInvalid, db.MaxSlugLen, slug)
 	}
 	w, err := r.createSchema(ctx, name, slug)
+	if errors.Is(err, db.ErrSlugReserved) {
+		if derived {
+			return Summary{}, fmt.Errorf("%w: %q has no letters or digits to make a slug from; choose a slug", core.ErrInvalid, name)
+		}
+		return Summary{}, fmt.Errorf("%w: the slug %s is kept for the first workspace; choose another", core.ErrInvalid, db.ReservedSlug)
+	}
 	if errors.Is(err, db.ErrSlugTaken) {
 		return Summary{}, fmt.Errorf("%w: another workspace has the slug %q; choose another", core.ErrConflict, slug)
 	}

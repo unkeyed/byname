@@ -212,7 +212,7 @@ paths:
                   type: string
                   maxLength: 40
                   pattern: "^[a-z0-9]+(-[a-z0-9]+)*$"
-                  description: Its name in paths. Left out, it comes from the name, such as planet-fall for Planet Fall. It never changes.
+                  description: Its name in paths. Left out, it comes from the name, such as planet-fall for Planet Fall. It never changes. default is the first workspace's alone, and is refused with 400, as is a name with no letters or digits to make a slug from.
       responses:
         "201":
           description: The workspace.

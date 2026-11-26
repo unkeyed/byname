@@ -34,6 +34,8 @@ func TestWorkspacesOverHTTP(t *testing.T) {
 	editor.call("POST", "/v1/workspaces", map[string]string{"name": "Kyring"}, http.StatusForbidden, nil)
 	agent.call("POST", "/v1/workspaces", map[string]string{"name": "Kyring"}, http.StatusForbidden, nil)
 	person.call("POST", "/v1/workspaces", map[string]string{"name": "Kyring", "slug": "Not A Slug"}, http.StatusBadRequest, nil)
+	person.call("POST", "/v1/workspaces", map[string]string{"name": "Kyring", "slug": "default"}, http.StatusBadRequest, nil)
+	person.call("POST", "/v1/workspaces", map[string]string{"name": "日本"}, http.StatusBadRequest, nil)
 
 	var kyring workspaces.Summary
 	person.call("POST", "/v1/workspaces", map[string]string{"name": "Kyring"}, http.StatusCreated, &kyring)

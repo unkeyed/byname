@@ -102,11 +102,23 @@ func scanWorkspace(row pgx.Row) (Workspace, error) {
 // slug.
 var ErrSlugTaken = errors.New("db: another workspace has this slug")
 
+// ErrSlugReserved is CreateWorkspace's answer for the slug default, which
+// only the first workspace ever has: a new instance's first workspace
+// starts there, and old links to /w/default mean it.
+var ErrSlugReserved = errors.New("db: the slug default is the first workspace's")
+
+// ReservedSlug is the slug only the first workspace ever has.
+const ReservedSlug = "default"
+
 // CreateWorkspace adds a workspace, creates its schema and applies every
 // workspace migration to it, all in one transaction under the migration
 // lock. Calling it again with the same name and slug returns the same
-// workspace, so a retry after any failure ends in the same state.
+// workspace, so a retry after any failure ends in the same state. The
+// first workspace is never made here, so its slug is always taken.
 func CreateWorkspace(ctx context.Context, pool Pool, name, slug string) (Workspace, error) {
+	if slug == ReservedSlug {
+		return Workspace{}, ErrSlugReserved
+	}
 	files, err := workspaceFiles()
 	if err != nil {
 		return Workspace{}, err
@@ -130,7 +142,7 @@ func CreateWorkspace(ctx context.Context, pool Pool, name, slug string) (Workspa
 			}
 		case err != nil:
 			return err
-		case w.Name != name:
+		case w.Name != name, w.Schema == Home:
 			return ErrSlugTaken
 		}
 		for _, f := range files {
@@ -196,12 +208,13 @@ func CurrentWorkspace(ctx context.Context, pool Pool) (Workspace, error) {
 }
 
 // NameFirstWorkspace names the workspace pool is bound to name, and gives
-// it name's Slug, while it still has the name and slug a new instance
-// starts with: Default and default. Any other workspace keeps the name it
-// was given. The slug stays default when another workspace has name's.
+// it name's Slug, when it is the first workspace and still has the name
+// and slug a new instance starts with: Default and default. Any other
+// workspace keeps the name it was given. The slug stays default when
+// another workspace has name's.
 func NameFirstWorkspace(ctx context.Context, pool Pool, name string) error {
 	_, err := pool.Exec(ctx, `UPDATE workspace w SET name = $1,
 			slug = CASE WHEN EXISTS (SELECT 1 FROM workspace o WHERE o.slug = $2) THEN w.slug ELSE $2 END
-		WHERE w.schema_name = current_schema() AND w.slug = 'default' AND w.name = 'Default'`, name, Slug(name))
+		WHERE w.schema_name = current_schema() AND w.schema_name !~ '^ws_[0-9]+$' AND w.slug = 'default' AND w.name = 'Default'`, name, Slug(name))
 	return err
 }

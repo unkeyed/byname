@@ -239,8 +239,42 @@ func TestCreateWorkspaceIsIdempotent(t *testing.T) {
 	if _, err := db.CreateWorkspace(ctx, pool, "Kyring Labs", "kyring"); !errors.Is(err, db.ErrSlugTaken) {
 		t.Fatalf("another name on a taken slug: %v, want ErrSlugTaken", err)
 	}
-	if _, err := db.CreateWorkspace(ctx, pool, "Default", "default"); err != nil {
-		t.Fatalf("the first workspace's own name and slug: %v, want it returned", err)
+}
+
+// No workspace but the first ever has the slug default, and only the
+// first is renamed from it, so a slug never moves from one workspace to
+// another and a replica's stale slug can only name the right workspace.
+func TestOnlyTheFirstWorkspaceIsEverDefault(t *testing.T) {
+	ctx := context.Background()
+	pool := testdb.New(t)
+	for _, name := range []string{"Default", "Kyring"} {
+		if _, err := db.CreateWorkspace(ctx, pool, name, "default"); !errors.Is(err, db.ErrSlugReserved) {
+			t.Fatalf("CreateWorkspace(%q, default) = %v, want ErrSlugReserved", name, err)
+		}
+	}
+	if err := db.NameFirstWorkspace(ctx, pool, "Unkey"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.CreateWorkspace(ctx, pool, "Default", "default"); !errors.Is(err, db.ErrSlugReserved) {
+		t.Fatalf("CreateWorkspace(Default, default) once the first is renamed = %v, want ErrSlugReserved", err)
+	}
+	if _, err := db.CreateWorkspace(ctx, pool, "Unkey", "unkey"); !errors.Is(err, db.ErrSlugTaken) {
+		t.Fatalf("CreateWorkspace with the first workspace's name and slug = %v, want ErrSlugTaken", err)
+	}
+
+	w, err := db.CreateWorkspace(ctx, pool, "Kyring", "kyring")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, `UPDATE workspace SET name = 'Default', slug = 'default' WHERE id = $1`, w.ID); err != nil {
+		t.Fatal(err)
+	}
+	kyring := db.In(pool, w.Schema)
+	if err := db.NameFirstWorkspace(ctx, kyring, "Planetfall"); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := db.CurrentWorkspace(ctx, kyring); err != nil || got.Slug != "default" || got.Name != "Default" {
+		t.Fatalf("a later workspace at default after NameFirstWorkspace = %+v %v, want it left as it was", got, err)
 	}
 }
 
