@@ -3542,7 +3542,7 @@ paths:
       tags: [settings]
       operationId: testCredential
       summary: Test a stored key with one free call, where the provider has one, and record how it went.
-      description: A failed test is a result, not an error, and last_test_status says why. Providers with no free call record that instead. 400 when no key of that kind is set.
+      description: A failed test is a result, not an error, and last_test_status says why. Providers with no free call record that instead. The gateway key is tested at every base URL any workspace's surfaces use; with several, last_test_status is ok only when all answered, and otherwise says how each went and which workspaces use it. 400 when no key of that kind is set.
       security:
         - session: [admin]
       responses:

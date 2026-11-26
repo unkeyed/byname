@@ -1,8 +1,12 @@
 package config_test
 
 import (
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"reflect"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -158,5 +162,60 @@ func TestTheBrandStepNamesTheFirstWorkspace(t *testing.T) {
 	}
 	if w, err := db.CurrentWorkspace(ctx, pool); err != nil || w.Slug != "northwind-cloud" {
 		t.Fatalf("saving the brand step again = %+v %v, want the slug links already use", w, err)
+	}
+}
+
+// The gateway key is shared, and each workspace's surfaces set the
+// gateway's base URL, so testing the key calls every base URL any
+// workspace uses and says how each went.
+func TestTestingTheGatewayKeyCallsEveryWorkspacesGateway(t *testing.T) {
+	pool := testdb.New(t)
+	second, err := db.CreateWorkspace(ctx, pool, "Kyring", "kyring")
+	if err != nil {
+		t.Fatal(err)
+	}
+	kyringDB := db.In(pool, second.Schema)
+	gateway := func(code int) (*httptest.Server, *atomic.Int32) {
+		var calls atomic.Int32
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			calls.Add(1)
+			w.WriteHeader(code)
+			fmt.Fprint(w, `{"data":[{"id":"m"}],"error":{"message":"bad key"}}`)
+		}))
+		t.Cleanup(srv.Close)
+		return srv, &calls
+	}
+	svc := config.New(pool, config.Options{Secrets: secretbox.ForTest(), Now: time.Now})
+	if _, err := svc.SetCredential(ctx, "gateway", "gw-secret", ""); err != nil {
+		t.Fatal(err)
+	}
+	good, goodCalls := gateway(http.StatusOK)
+	bad, badCalls := gateway(http.StatusUnauthorized)
+	for _, c := range []struct {
+		pool db.Pool
+		url  string
+	}{{pool, good.URL}, {kyringDB, bad.URL}} {
+		if _, err := c.pool.Exec(ctx, `INSERT INTO surface (key, enabled, route, base_url, credential_id)
+			SELECT $2, true, 'gateway', $1, id FROM credential WHERE kind = 'gateway'`, c.url, engines.ChatGPTApp); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	c, err := svc.TestCredential(ctx, "gateway")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if goodCalls.Load() != 1 || badCalls.Load() != 1 {
+		t.Fatalf("gateway calls: %d to the first workspace's, %d to Kyring's; want one each (status %q)", goodCalls.Load(), badCalls.Load(), c.LastTestStatus)
+	}
+	if !strings.Contains(c.LastTestStatus, "kyring") || !strings.Contains(c.LastTestStatus, bad.URL) || c.LastTestStatus == "ok" {
+		t.Fatalf("last_test_status = %q, want Kyring's gateway at %s named as failing", c.LastTestStatus, bad.URL)
+	}
+
+	if _, err := kyringDB.Exec(ctx, `UPDATE surface SET base_url = $1 WHERE key = $2`, good.URL, engines.ChatGPTApp); err != nil {
+		t.Fatal(err)
+	}
+	if c, err := svc.TestCredential(ctx, "gateway"); err != nil || c.LastTestStatus != "ok" || goodCalls.Load() != 2 {
+		t.Fatalf("both workspaces on one working gateway: %q, %v, %d calls to it; want ok from one call", c.LastTestStatus, err, goodCalls.Load())
 	}
 }

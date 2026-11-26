@@ -117,24 +117,38 @@ type credentialUse struct {
 	CredentialUse
 }
 
-func (s *Service) credentialUses(ctx context.Context) ([]credentialUse, error) {
+type workspaceRef struct{ name, slug, schema string }
+
+// everyWorkspace is every workspace, in the order they were made, with the
+// schema its tables are in, for a query that reads all of them.
+func (s *Service) everyWorkspace(ctx context.Context) ([]workspaceRef, error) {
 	rows, err := s.db.Query(ctx, `SELECT name, slug, schema_name FROM workspace ORDER BY id`)
 	if err != nil {
 		return nil, err
 	}
-	type workspace struct{ name, slug, schema string }
-	all, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (workspace, error) {
-		var w workspace
+	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (workspaceRef, error) {
+		var w workspaceRef
 		return w, r.Scan(&w.name, &w.slug, &w.schema)
 	})
+}
+
+// acrossWorkspaces is query run on each workspace's table, as one UNION
+// ALL whose rows start with the workspace's index in all. query has one
+// %s, the schema, and its first column is %d, the index.
+func acrossWorkspaces(all []workspaceRef, query string) string {
+	union := make([]string, len(all))
+	for i, w := range all {
+		union[i] = fmt.Sprintf(query, i, pgx.Identifier{w.schema}.Sanitize())
+	}
+	return strings.Join(union, " UNION ALL ")
+}
+
+func (s *Service) credentialUses(ctx context.Context) ([]credentialUse, error) {
+	all, err := s.everyWorkspace(ctx)
 	if err != nil {
 		return nil, err
 	}
-	var union []string
-	for i, w := range all {
-		union = append(union, fmt.Sprintf(`SELECT %d, key, enabled, route FROM %s.surface`, i, pgx.Identifier{w.schema}.Sanitize()))
-	}
-	rows, err = s.db.Query(ctx, strings.Join(union, " UNION ALL "))
+	rows, err := s.db.Query(ctx, acrossWorkspaces(all, `SELECT %d, key, enabled, route FROM %s.surface`))
 	if err != nil {
 		return nil, err
 	}
@@ -229,30 +243,84 @@ func (s *Service) TestCredential(ctx context.Context, rawKind string) (Credentia
 	if err != nil {
 		return Credential{}, err
 	}
-	status := "ok"
+	var status string
 	if kind == engines.CredentialGateway {
-		err = s.db.QueryRow(ctx, `SELECT base_url FROM surface WHERE route = 'gateway' ORDER BY enabled DESC, key LIMIT 1`).Scan(&conn.BaseURL)
-		if err == pgx.ErrNoRows {
-			status = "untested: no surface uses the gateway yet, and its base URL is set per surface"
-		} else if err != nil {
+		if status, err = s.testGateways(ctx, conn); err != nil {
 			return Credential{}, err
 		}
-	}
-	if status == "ok" {
-		pctx, cancel := context.WithTimeout(ctx, 30*time.Second)
-		err := engines.Probe(pctx, kind, conn)
-		cancel()
-		switch {
-		case errors.Is(err, engines.ErrNoProbe):
-			status = "untested: " + credentialTitle(kind) + " has no free call to test a key with; Test a surface that uses it"
-		case err != nil:
-			status = err.Error()
-		}
+	} else {
+		status = probe(ctx, kind, conn)
 	}
 	if _, err := s.db.Exec(ctx, `UPDATE credential SET last_tested_at = $2, last_test_status = $3 WHERE kind = $1`, kind, s.now(), status); err != nil {
 		return Credential{}, err
 	}
 	return s.Credential(ctx, kind)
+}
+
+// probe is how one free call with conn went: ok, or why not.
+func probe(ctx context.Context, kind engines.CredentialKind, conn engines.Conn) string {
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	err := engines.Probe(ctx, kind, conn)
+	switch {
+	case errors.Is(err, engines.ErrNoProbe):
+		return "untested: " + credentialTitle(kind) + " has no free call to test a key with; Test a surface that uses it"
+	case err != nil:
+		return err.Error()
+	}
+	return "ok"
+}
+
+// testGateways calls each gateway base URL a surface in any workspace
+// uses, since they all share the key. Several URLs read ok only when every
+// one answered, and otherwise say how each went and which workspaces use
+// it.
+func (s *Service) testGateways(ctx context.Context, conn engines.Conn) (string, error) {
+	all, err := s.everyWorkspace(ctx)
+	if err != nil {
+		return "", err
+	}
+	rows, err := s.db.Query(ctx, acrossWorkspaces(all, `SELECT %d, base_url FROM %s.surface WHERE route = 'gateway'`)+` ORDER BY 1, 2`)
+	if err != nil {
+		return "", err
+	}
+	var urls []string
+	usedBy := map[string][]string{}
+	for rows.Next() {
+		var i int
+		var url string
+		if err := rows.Scan(&i, &url); err != nil {
+			return "", err
+		}
+		if !slices.Contains(urls, url) {
+			urls = append(urls, url)
+		}
+		if slug := all[i].slug; !slices.Contains(usedBy[url], slug) {
+			usedBy[url] = append(usedBy[url], slug)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return "", err
+	}
+	switch len(urls) {
+	case 0:
+		return "untested: no surface in any workspace uses the gateway yet, and its base URL is set per surface", nil
+	case 1:
+		conn.BaseURL = urls[0]
+		return probe(ctx, engines.CredentialGateway, conn), nil
+	}
+	ok := true
+	each := make([]string, len(urls))
+	for i, url := range urls {
+		conn.BaseURL = url
+		status := probe(ctx, engines.CredentialGateway, conn)
+		ok = ok && status == "ok"
+		each[i] = fmt.Sprintf("%s at %s, used by %s", status, url, strings.Join(usedBy[url], ", "))
+	}
+	if ok {
+		return "ok", nil
+	}
+	return strings.Join(each, "; "), nil
 }
 
 // DeleteCredential removes a key no surface uses.
