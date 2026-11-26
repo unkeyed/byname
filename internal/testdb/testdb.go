@@ -59,6 +59,7 @@ func Through(t testing.TB, last string) *pgxpool.Pool {
 		t.Fatalf("testdb: %v", err)
 	}
 	cfg.ConnConfig.Database = name
+	db.RouteSchemas(cfg)
 	pool, err := pgxpool.NewWithConfig(ctx, cfg)
 	if err != nil {
 		t.Fatalf("testdb: connect %s: %v", name, err)
@@ -72,6 +73,18 @@ func Through(t testing.TB, last string) *pgxpool.Pool {
 		t.Fatalf("testdb: migrate %s: %v", name, err)
 	}
 	return pool
+}
+
+// Workspace adds a workspace to pool's database and returns pool bound to
+// it, for tests that check one workspace never sees another's rows.
+func Workspace(t testing.TB, pool *pgxpool.Pool) db.Pool {
+	t.Helper()
+	slug := "ws-" + randomHex(4)
+	w, err := db.CreateWorkspace(context.Background(), pool, slug, slug)
+	if err != nil {
+		t.Fatalf("testdb: create workspace: %v", err)
+	}
+	return db.In(pool, w.Schema)
 }
 
 func drop(t testing.TB, url, name string) {

@@ -192,6 +192,7 @@ func openLanes(ctx context.Context, cfg *pgxpool.Config) (db.Lanes, error) {
 		to  **pgxpool.Pool
 		cfg *pgxpool.Config
 	}{{&l.Web, web}, {&l.Jobs, jobs}, {&l.Locks, locks}} {
+		db.RouteSchemas(p.cfg)
 		pool, err := pgxpool.NewWithConfig(ctx, p.cfg)
 		if err != nil {
 			l.Close()
