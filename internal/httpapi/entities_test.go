@@ -2,6 +2,8 @@ package httpapi
 
 import (
 	"bytes"
+	"context"
+	"fmt"
 	"net/http"
 	"slices"
 	"strings"
@@ -134,4 +136,74 @@ func TestAPageUnderAnUnknownSlugLoadsTheApp(t *testing.T) {
 			t.Errorf("GET %s with Accept %q = %d %s, want a JSON 401", tc.path, tc.header["Accept"], r.code, r.header.Get("Content-Type"))
 		}
 	}
+}
+
+// Only an admin signed in deletes an entity, never the first. It is gone
+// from every path at once, its slug is free, and once its tables are
+// dropped the first entity's rows are exactly what they were.
+func TestDeletingAnEntity(t *testing.T) {
+	ctx := context.Background()
+	c := newServer(t)
+	person, agent := login(t, c)
+	var inv struct{ Token string }
+	person.call("POST", "/v1/invites", map[string]string{"email": "ed@example.com", "role": "editor"}, http.StatusCreated, &inv)
+	editor := c.signup(map[string]string{"invite_token": inv.Token})
+
+	var kyring entities.Summary
+	person.call("POST", "/v1/entities", map[string]string{"name": "Kyring"}, http.StatusCreated, &kyring)
+	agent.call("POST", "/e/kyring/v1/brands", map[string]any{"name": "Contoso", "kind": "competitor"}, http.StatusOK, nil)
+	agent.call("POST", "/v1/brands", map[string]any{"name": "Fabrikam", "kind": "competitor"}, http.StatusOK, nil)
+	var before []string
+	if err := c.db.QueryRow(ctx, `SELECT array_agg(name ORDER BY id) FROM brand`).Scan(&before); err != nil {
+		t.Fatal(err)
+	}
+
+	editor.call("DELETE", "/v1/entities/kyring", nil, http.StatusForbidden, nil)
+	agent.call("DELETE", "/v1/entities/kyring", nil, http.StatusForbidden, nil)
+	person.call("DELETE", "/v1/entities/default", nil, http.StatusConflict, nil)
+	person.call("DELETE", "/v1/entities/nope", nil, http.StatusNotFound, nil)
+	person.call("DELETE", "/v1/entities/kyring", nil, http.StatusNoContent, nil)
+	person.call("DELETE", "/v1/entities/kyring", nil, http.StatusNotFound, nil)
+
+	for _, path := range []string{"/e/kyring/v1/brands", "/e/kyring/mcp"} {
+		if r := agent.do("GET", path, nil); r.code != http.StatusNotFound || !json404(r) {
+			t.Errorf("GET %s after deleting = %d %s, want a JSON 404", path, r.code, r.body)
+		}
+	}
+	if r := agent.do("POST", "/e/kyring/v1/brands", map[string]any{"name": "Northwind", "kind": "competitor"}); r.code != http.StatusNotFound {
+		t.Errorf("POST /e/kyring/v1/brands after deleting = %d %s, want 404", r.code, r.body)
+	}
+	var list []entities.Summary
+	agent.call("GET", "/v1/entities", nil, http.StatusOK, &list)
+	if len(list) != 1 || !list[0].Default {
+		t.Fatalf("GET /v1/entities = %+v, want the default only", list)
+	}
+
+	var again entities.Summary
+	person.call("POST", "/v1/entities", map[string]string{"name": "Kyring"}, http.StatusCreated, &again)
+	if again.ID == kyring.ID || again.Slug != "kyring" {
+		t.Fatalf("POST /v1/entities at the deleted slug = %+v, want a new entity at kyring", again)
+	}
+	if got := brandNames(t, agent, "/e/kyring/v1/brands"); len(got) != 0 {
+		t.Fatalf("the new kyring's brands = %v, want none of the deleted one's", got)
+	}
+
+	if _, err := c.db.Exec(ctx, `UPDATE entity SET deleted_at = now() - interval '1 day' WHERE id = $1`, kyring.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.reg.Sweep(ctx); err != nil {
+		t.Fatal(err)
+	}
+	var left int
+	if err := c.db.QueryRow(ctx, `SELECT count(*) FROM pg_namespace WHERE nspname = $1`, fmt.Sprintf("entity_%d", kyring.ID)).Scan(&left); err != nil || left != 0 {
+		t.Fatalf("the deleted entity's schema after the sweep: %d %v, want gone", left, err)
+	}
+	var after []string
+	if err := c.db.QueryRow(ctx, `SELECT array_agg(name ORDER BY id) FROM brand`).Scan(&after); err != nil || !slices.Equal(after, before) {
+		t.Fatalf("the first entity's brands went from %v to %v %v, want unchanged", before, after, err)
+	}
+	if got := brandNames(t, agent, "/v1/brands"); !slices.Contains(got, "Fabrikam") || slices.Contains(got, "Contoso") {
+		t.Fatalf("GET /v1/brands = %v, want the first entity's Fabrikam and not Contoso", got)
+	}
+	agent.call("GET", "/e/kyring/v1/brands", nil, http.StatusOK, nil)
 }

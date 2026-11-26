@@ -274,6 +274,37 @@ paths:
           $ref: "#/components/responses/NotFound"
         "503":
           $ref: "#/components/responses/Unavailable"
+    delete:
+      tags: [entities]
+      operationId: deleteEntity
+      summary: >-
+        Delete an entity and everything in it: its settings, brands,
+        questions, checks, results and connections. It stops at once, its
+        slug is free to use again, and /e/{slug} answers 404. Its tables are
+        dropped about five minutes later, once every replica has stopped
+        serving it. This cannot be undone. The first entity, which paths
+        without /e/{slug} mean, cannot be deleted and answers 409.
+      security:
+        - session: [admin]
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "503":
+          $ref: "#/components/responses/Unavailable"
   /v1/settings:
     get:
       tags: [config]

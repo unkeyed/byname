@@ -62,6 +62,7 @@ var routes = []route{
 	{"GET /v1/entities", needs(core.ResultsRead), (*server).listEntities},
 	{"POST /v1/entities", admin, (*server).createEntity},
 	{"PATCH /v1/entities/{slug}", admin, (*server).renameEntity},
+	{"DELETE /v1/entities/{slug}", admin, (*server).deleteEntity},
 
 	{"GET /v1/settings", needs(core.ResultsRead), (*server).getSettings},
 	{"PUT /v1/settings", needs(core.ConfigWrite), (*server).putSettings},

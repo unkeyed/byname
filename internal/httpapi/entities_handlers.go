@@ -33,3 +33,7 @@ func (s *server) renameEntity(w http.ResponseWriter, r *http.Request, _ core.Act
 	v, err := s.reg.Rename(r.Context(), r.PathValue("slug"), b.Name)
 	return respond(w, http.StatusOK, v, err)
 }
+
+func (s *server) deleteEntity(w http.ResponseWriter, r *http.Request, _ core.Actor) error {
+	return noContent(w, s.reg.Delete(r.Context(), r.PathValue("slug")))
+}
