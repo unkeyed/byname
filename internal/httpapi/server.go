@@ -340,10 +340,11 @@ func (s *server) workspace(r *http.Request) workspaces.Entity {
 // paths without one.
 //
 // A slug this process does not serve yet answers as a real one would
-// anyone without credentials: the instance's own routes answer, and
-// every other route is 401, without asking the database whether the slug
-// exists. Only a signed-in caller makes it look, for a workspace another
-// replica made, and gets a JSON 404 for a slug no workspace has.
+// anyone without credentials: the instance's own routes answer, a browser
+// loading a page gets the app, and every other route is 401, without
+// asking the database whether the slug exists. Only a signed-in caller
+// makes it look, for a workspace another replica made, and gets a JSON
+// 404 for a slug no workspace has.
 func InWorkspace(reg *workspaces.Registry, authn *auth.Authenticator, log *slog.Logger, next http.Handler) http.Handler {
 	s := &server{reg: reg, authn: authn, keys: authn.Keys, users: authn.Users, oauth: authn.OAuth, log: log}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -363,8 +364,13 @@ func InWorkspace(reg *workspaces.Registry, authn *auth.Authenticator, log *slog.
 			return r2
 		}
 		e, ok := reg.Live(slug)
-		if !ok && instancePath(path) {
+		switch {
+		case !ok && instancePath(path):
 			next.ServeHTTP(w, strip(r.Context()))
+			return
+		case !ok && pageLoad(r, path):
+			// The app, at the path as typed, says nothing is tracked there.
+			next.ServeHTTP(w, r)
 			return
 		}
 		if !ok {
@@ -392,6 +398,14 @@ func instancePath(path string) bool {
 		}
 	}
 	return path == "/healthz" || path == "/v1/openapi.yaml"
+}
+
+// pageLoad is whether r is a browser loading one of the app's pages.
+func pageLoad(r *http.Request, path string) bool {
+	if (r.Method != http.MethodGet && r.Method != http.MethodHead) || !strings.Contains(r.Header.Get("Accept"), "text/html") {
+		return false
+	}
+	return path != "/mcp" && path != "/v1" && !strings.HasPrefix(path, "/v1/") && !strings.HasPrefix(path, "/mcp/") && !instancePath(path)
 }
 
 // signedIn is nil for a caller with a session, an API key, or an MCP

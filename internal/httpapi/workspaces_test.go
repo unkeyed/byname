@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"net/http"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/unkeyed/byname/internal/checks/checkstest"
@@ -108,5 +109,29 @@ func TestTheFirstWorkspaceTakesItsBrandsName(t *testing.T) {
 	agent.call("GET", "/v1/workspaces", nil, http.StatusOK, &list)
 	if len(list) != 1 || list[0].Name != "Northwind" || list[0].Slug != "northwind" || !list[0].Default {
 		t.Fatalf("GET /v1/workspaces = %+v, want the default named Northwind", list)
+	}
+}
+
+// A browser opening a page under a mistyped slug gets the app, which says
+// there is no entity there and offers a way back. API paths stay JSON.
+func TestAPageUnderAnUnknownSlugLoadsTheApp(t *testing.T) {
+	c := newServer(t)
+	page := map[string]string{"Accept": "text/html,application/xhtml+xml,*/*;q=0.8"}
+	for _, path := range []string{"/w/nope/settings", "/w/nope", "/w/nope/ai/questions?range=30d"} {
+		if r := c.raw("GET", path, nil, page); r.code != http.StatusOK || !strings.HasPrefix(r.header.Get("Content-Type"), "text/html") || !bytes.Contains(r.body, []byte(`id="root"`)) {
+			t.Errorf("a page load of %s = %d %s %q, want the app", path, r.code, r.header.Get("Content-Type"), r.body)
+		}
+	}
+	for _, tc := range []struct {
+		path   string
+		header map[string]string
+	}{
+		{"/w/nope/v1/brands", page},
+		{"/w/nope/mcp", page},
+		{"/w/nope/settings", map[string]string{"Accept": "application/json"}},
+	} {
+		if r := c.raw("GET", tc.path, nil, tc.header); r.code != http.StatusUnauthorized || !json404(r) {
+			t.Errorf("GET %s with Accept %q = %d %s, want a JSON 401", tc.path, tc.header["Accept"], r.code, r.header.Get("Content-Type"))
+		}
 	}
 }

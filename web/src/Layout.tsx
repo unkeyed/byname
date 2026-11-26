@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link, Navigate, NavLink, Outlet, useLocation } from "react-router";
 import { api, ApiError } from "./api";
 import { useCan, useMe } from "./queries";
@@ -19,6 +19,15 @@ const themes: { mode: ThemeMode; icon: IconName; label: string }[] = [
   { mode: "light", icon: "sun", label: "Light theme" },
   { mode: "dark", icon: "moon", label: "Dark theme" },
 ];
+
+function ToFirst({ to }: { to: string }) {
+  useEffect(() => go(to, { replace: true }), [to]);
+  return (
+    <div className="grid h-full place-items-center">
+      <Spinner />
+    </div>
+  );
+}
 
 export function Layout() {
   const me = useMe();
@@ -51,6 +60,12 @@ export function Layout() {
   }
 
   if (notSetUp && canSetUp) return <Navigate to="/onboarding" replace />;
+  const first = list.data?.find((w) => w.default);
+  // Only the first entity is ever at /w/default, so a link from before it
+  // took its brand's name still means it.
+  if (missing && slug === "default" && first) {
+    return <ToFirst to={`/w/${first.slug}${location.pathname === "/" ? "" : location.pathname}${location.search}${location.hash}`} />;
+  }
 
   return (
     <NavMenu.Provider value={phoneBar}>
@@ -73,9 +88,9 @@ export function Layout() {
                     icon="building"
                     title="No entity here"
                     action={
-                      <Button onClick={() => go(`/w/${list.data.find((w) => w.default)?.slug ?? ""}`)}>
+                      <Button onClick={() => go(`/w/${first?.slug ?? ""}`)}>
                         <Icon name="left" className="size-3.5" />
-                        Open {list.data.find((w) => w.default)?.name}
+                        Open {first?.name}
                       </Button>
                     }
                   >

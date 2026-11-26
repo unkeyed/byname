@@ -160,7 +160,7 @@ func newServer(t *testing.T, mod ...func(*auth.Config)) client {
 }
 
 // serve starts srv as Byname with PUBLIC_URL publicURL, mounting /mcp the
-// way main does.
+// way main does, and a stand-in for the built app at /.
 func serve(t *testing.T, srv *httptest.Server, publicURL string, mod ...func(*auth.Config)) client {
 	t.Helper()
 	pool := testdb.New(t)
@@ -195,6 +195,10 @@ func serve(t *testing.T, srv *httptest.Server, publicURL string, mod ...func(*au
 	log := slog.New(slog.DiscardHandler)
 	mux := NewMux(reg, authn, log)
 	mux.Handle("/mcp", mcpserver.Handler(reg.Default().Services, reg, authn.OAuth, "test"))
+	mux.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_, _ = io.WriteString(w, `<div id="root"></div>`)
+	}))
 	srv.Config.Handler = InWorkspace(reg, authn, log, mux)
 	srv.Start()
 	t.Cleanup(srv.Close)
