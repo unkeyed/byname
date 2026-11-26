@@ -117,9 +117,20 @@ curl -X DELETE https://byname.example.com/v1/keys/current -H "Authorization: Bea
 
 Keys live in Postgres by default, or in Unkey when `UNKEY_ROOT_KEY` and `UNKEY_API_ID` are set. See [Configuration](configuration.md#unkey_root_key-and-unkey_api_id).
 
+## Reach each workspace
+
+Each brand Byname tracks is a workspace with its own setup and results. One API key reaches every workspace. Put `/w/<slug>` in front of a path to call it in that workspace. A path without it calls the first workspace, as every path did before there were workspaces:
+
+```sh
+curl https://byname.example.com/v1/workspaces -H "Authorization: Bearer $BYNAME_API_KEY"
+curl https://byname.example.com/w/kyring/v1/runs -H "Authorization: Bearer $BYNAME_API_KEY"
+```
+
+`GET /v1/workspaces` lists each workspace's slug and whether its onboarding is finished. The team, API keys, apps and provider keys are shared, so their routes answer the same in every workspace. `/mcp` serves the first workspace.
+
 ## MCP tools
 
-Byname's MCP server has 90 tools. Every REST route an API key can call has one with the same scope, except `DELETE /v1/keys/current`, since MCP clients sign in with OAuth instead of a key, and `GET /v1/brands/{id}/logo`, an image for the browser. A test keeps the two in step. Read tools are marked read-only, and `delete_brand`, `delete_goal`, `delete_change`, `delete_control_page`, `remove_left_out_account`, `remove_social_filter` and `unmark_question_page` are marked destructive, so a client can ask before it runs them.
+Byname's MCP server has 91 tools. Every REST route an API key can call has one with the same scope, except `DELETE /v1/keys/current`, since MCP clients sign in with OAuth instead of a key, and `GET /v1/brands/{id}/logo`, an image for the browser. A test keeps the two in step. Read tools are marked read-only, and `delete_brand`, `delete_goal`, `delete_change`, `delete_control_page`, `remove_left_out_account`, `remove_social_filter` and `unmark_question_page` are marked destructive, so a client can ask before it runs them.
 
 | Tool | Scope | REST | What it does |
 |---|---|---|---|
@@ -156,6 +167,7 @@ Byname's MCP server has 90 tools. Every REST route an API key can call has one w
 | `update_other_brands_settings` | `config:write` | `PUT /v1/other-brands/settings` | Turn reading answers for other brands and logo lookups on or off, and set the monthly limit on new lookups. |
 | `start_brand_backfill` | `runs:write` | `POST /v1/other-brands/backfill` | Read every past answer never read for other brands, as one job in Check history, within the monthly spend cap. |
 | `status` | `results:read` | `GET /v1/status` | Byname's version and whether onboarding is done. |
+| `list_workspaces` | `results:read` | `GET /v1/workspaces` | Every brand this instance tracks, each a workspace, and whether its onboarding is finished. The connection reads and changes the first workspace. |
 | `get_costs` | `results:read` | `GET /v1/costs` | What Byname costs, in US dollars: one answer in each AI app, one check, a month of checks and of social searches, and what this month has spent against the monthly cap. See [Treg](engines/treg.md#cost). |
 | `list_alerts` | `results:read` | `GET /v1/alerts` | Notifications newest first, the ones the app shows under the bell: finished checks with the AI apps that started or stopped naming you on a question, refused or failed checks, spend caps reached, paused models, search goals reached and search clicks that moved on Google or Bing, change results, an expiring GitHub token and social digests, each with whether the person this connection acts for has read it, and the unread count. |
 | `mark_alerts_read` | `results:read` | `POST /v1/alerts/read` | Mark notifications read for the person this connection acts for, by id or all at once. |

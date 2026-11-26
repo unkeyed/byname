@@ -50,15 +50,19 @@ Byname exits with an error that names the variable when one of these rules fails
 
 Any Postgres that accepts a connection URL works: a local container, Neon, Supabase, PlanetScale Postgres, RDS, or another managed service. Byname needs no extensions and keeps nothing on disk.
 
-On start, Byname applies its migrations from `internal/db/migrations`. Each migration runs in its own transaction under a Postgres advisory lock and is recorded in `schema_migrations`, so several replicas can start at the same time.
+On start, Byname applies its migrations from `internal/db/migrations`. Each migration runs in its own transaction under a Postgres advisory lock, so several replicas can start at the same time. A migration to the tables every workspace shares is recorded in `schema_migrations`. A migration to the tables each workspace has of its own is applied to every workspace and recorded per workspace in `workspace_migration`.
+
+Each brand Byname tracks is a workspace. The first workspace's tables are in the `public` schema. Adding a workspace creates a schema for it, `ws_<id>`, with its own copy of those tables.
 
 ## `MIGRATION_DATABASE_URL`
 
 Some providers, such as PlanetScale Postgres, give you a role that can only read and write data, and a separate admin role that can create tables. Set `DATABASE_URL` to the read/write role and `MIGRATION_DATABASE_URL` to the admin role. Byname opens the admin connection at start, applies the migrations, closes it, and then serves every request through `DATABASE_URL`.
 
-The read/write role needs `SELECT`, `INSERT`, `UPDATE` and `DELETE` on the tables the admin role creates. Granting it the `pg_read_all_data` and `pg_write_all_data` roles covers that, including tables added by later migrations.
+Adding a workspace creates tables too, so Byname also opens the admin connection then, creates the workspace's schema and tables through it, and closes it.
 
-When it is unset, Byname migrates through `DATABASE_URL`. A role that cannot create tables still starts when every migration is already applied. When a migration is pending, Byname exits with an error that names `MIGRATION_DATABASE_URL` and `byname migrate`.
+The read/write role needs `SELECT`, `INSERT`, `UPDATE` and `DELETE` on the tables the admin role creates, and `USAGE` on each workspace's schema. Granting it the `pg_read_all_data` and `pg_write_all_data` roles covers that, including tables added by later migrations and the schemas of workspaces added later.
+
+When it is unset, Byname migrates through `DATABASE_URL`. A role that cannot create tables still starts when every migration is already applied. When a migration is pending, Byname exits with an error that names `MIGRATION_DATABASE_URL` and `byname migrate`. Adding a workspace through such a role fails with an error that names `MIGRATION_DATABASE_URL`.
 
 To keep the admin URL out of the deployment, leave `MIGRATION_DATABASE_URL` unset there and apply migrations yourself before you deploy a release that adds one:
 
