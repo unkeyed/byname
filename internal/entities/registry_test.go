@@ -51,7 +51,7 @@ func TestAnEntityAnotherReplicaMadeGoesLiveOnce(t *testing.T) {
 	ctx := context.Background()
 	pool := testdb.New(t)
 	jobs := &jobCounter{running: map[int64]*atomic.Int32{}}
-	r := &Registry{pool: pool, opts: opts, log: opts.Log, byID: map[int64]*live{}, build: jobs.build, now: time.Now}
+	r := &Registry{pool: pool, opts: opts, log: opts.Log, byID: map[int64]*entry{}, build: jobs.build, now: time.Now}
 	if err := r.Refresh(ctx); err != nil {
 		t.Fatal(err)
 	}

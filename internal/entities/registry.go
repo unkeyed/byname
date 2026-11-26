@@ -19,8 +19,8 @@ import (
 	"github.com/unkeyed/byname/internal/db"
 )
 
-// Live is one live entity: its row and its services, bound to its
-// tables.
+// Live is one entity this process serves: its row and its services,
+// bound to its tables.
 type Live struct {
 	Entity   db.Entity
 	Services app.Services
@@ -35,7 +35,7 @@ type Summary struct {
 	Default   bool   `json:"default" jsonschema:"whether paths without /e/<slug> mean this entity: the first one made"`
 }
 
-type live struct {
+type entry struct {
 	Live
 	run     func(context.Context)
 	started bool
@@ -52,7 +52,7 @@ type Registry struct {
 	refreshMu sync.Mutex
 
 	mu      sync.RWMutex
-	byID    map[int64]*live
+	byID    map[int64]*entry
 	runCtx  context.Context
 	stopped bool
 	running sync.WaitGroup
@@ -65,7 +65,7 @@ type Registry struct {
 // Open builds every entity in the database on pool, which must not be
 // bound to one. Nothing runs in the background until Run.
 func Open(ctx context.Context, pool db.Pool, o Options) (*Registry, error) {
-	r := &Registry{pool: pool, opts: o, log: o.Log, byID: map[int64]*live{}, now: time.Now}
+	r := &Registry{pool: pool, opts: o, log: o.Log, byID: map[int64]*entry{}, now: time.Now}
 	if r.log == nil {
 		r.log = slog.Default()
 	}
@@ -104,7 +104,7 @@ func (r *Registry) Run(ctx context.Context) {
 	}
 }
 
-func (r *Registry) startLocked(l *live) {
+func (r *Registry) startLocked(l *entry) {
 	if l.started || r.runCtx == nil || r.stopped {
 		return
 	}
@@ -146,7 +146,7 @@ func (r *Registry) Refresh(ctx context.Context) error {
 			continue
 		}
 		r.mu.Lock()
-		l = &live{Live: Live{Entity: w, Services: svc}, run: run}
+		l = &entry{Live: Live{Entity: w, Services: svc}, run: run}
 		r.byID[w.ID] = l
 		r.startLocked(l)
 		r.mu.Unlock()

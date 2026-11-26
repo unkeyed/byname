@@ -168,7 +168,7 @@ func TestTheBrandStepNamesTheFirstEntity(t *testing.T) {
 // The gateway key is shared, and each entity's surfaces set the
 // gateway's base URL, so testing the key calls every base URL any
 // entity uses and says how each went.
-func TestTestingTheGatewayKeyCallsEveryEntitiesGateway(t *testing.T) {
+func TestTestingTheGatewayKeyCallsTheGatewayOfEveryEntity(t *testing.T) {
 	pool := testdb.New(t)
 	second, err := db.CreateEntity(ctx, pool, "Kyring", "kyring")
 	if err != nil {

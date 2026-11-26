@@ -56,11 +56,11 @@ type AccessTokens interface {
 // that has one, which is /e/<slug>/mcp, gets that entity's. Every
 // entity also gets the list of every entity. Stateless, so any
 // replica serves any request without sticky sessions.
-func Handler(svc app.Services, ws Entities, tokens AccessTokens, version string) http.Handler {
+func Handler(svc app.Services, all Entities, tokens AccessTokens, version string) http.Handler {
 	build := func(svc app.Services) *mcp.Server {
 		srv := mcp.NewServer(&mcp.Implementation{Name: "byname", Version: version}, &mcp.ServerOptions{Instructions: instructions})
 		addTools(srv, svc)
-		addEntityTools(srv, ws)
+		addEntityTools(srv, all)
 		return srv
 	}
 	unprefixed := build(svc)

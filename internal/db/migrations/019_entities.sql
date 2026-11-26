@@ -25,9 +25,9 @@ CREATE TABLE entity (
 -- Which entity migrations each entity has. It lives in the install's
 -- own schema only, so no entity's schema can hide it.
 CREATE TABLE entity_migration (
-    entity_id bigint NOT NULL REFERENCES entity (id) ON DELETE CASCADE,
-    name         text NOT NULL,
-    applied_at   timestamptz NOT NULL DEFAULT now(),
+    entity_id  bigint NOT NULL REFERENCES entity (id) ON DELETE CASCADE,
+    name       text NOT NULL,
+    applied_at timestamptz NOT NULL DEFAULT now(),
     PRIMARY KEY (entity_id, name)
 );
 

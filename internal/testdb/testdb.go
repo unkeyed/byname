@@ -99,7 +99,7 @@ func ThroughIn(t testing.TB, last, schema string) *pgxpool.Pool {
 // it, for tests that check one entity never sees another's rows.
 func Entity(t testing.TB, pool *pgxpool.Pool) db.Pool {
 	t.Helper()
-	slug := "ws-" + randomHex(4)
+	slug := "entity-" + randomHex(4)
 	w, err := db.CreateEntity(context.Background(), pool, slug, slug)
 	if err != nil {
 		t.Fatalf("testdb: create entity: %v", err)
