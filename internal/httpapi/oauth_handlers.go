@@ -19,20 +19,37 @@ import (
 // so they live outside routes and openapi.yaml; the metadata documents
 // describe them. None reads a cookie, so any origin may call them.
 func (s *server) mountOAuth(mux *http.ServeMux) {
-	prm := mcpauth.ProtectedResourceMetadataHandler(&oauthex.ProtectedResourceMetadata{
-		Resource:               s.oauth.Resource(),
-		AuthorizationServers:   []string{s.oauth.Issuer()},
-		BearerMethodsSupported: []string{"header"},
-		ResourceName:           "Byname",
-		ScopesSupported:        scopeNames(),
-	})
+	prm := mcpauth.ProtectedResourceMetadataHandler(s.resourceMetadata(""))
 	mux.Handle("/.well-known/oauth-protected-resource", prm)
 	mux.Handle("/.well-known/oauth-protected-resource/mcp", prm)
+	mux.HandleFunc("/.well-known/oauth-protected-resource/w/{slug}/mcp", s.workspaceResourceMetadata)
 	mux.Handle("/.well-known/oauth-authorization-server", anyOrigin(http.MethodGet, s.authServerMetadata))
 	mux.Handle("/oauth/register", anyOrigin(http.MethodPost, s.registerClient))
 	mux.Handle("/oauth/token", anyOrigin(http.MethodPost, s.token))
 	mux.Handle("/oauth/revoke", anyOrigin(http.MethodPost, s.revokeToken))
 	mux.HandleFunc("GET /oauth/authorize", s.authorize)
+}
+
+// resourceMetadata is RFC 9728 metadata for the MCP server at
+// /w/<slug>/mcp, or at /mcp when slug is empty. Clients reject a document
+// whose resource is not the URL they connect to, so each has its own.
+func (s *server) resourceMetadata(slug string) *oauthex.ProtectedResourceMetadata {
+	return &oauthex.ProtectedResourceMetadata{
+		Resource:               s.oauth.Resource(slug),
+		AuthorizationServers:   []string{s.oauth.Issuer()},
+		BearerMethodsSupported: []string{"header"},
+		ResourceName:           "Byname",
+		ScopesSupported:        scopeNames(),
+	}
+}
+
+func (s *server) workspaceResourceMetadata(w http.ResponseWriter, r *http.Request) {
+	e, err := s.reg.Lookup(r.Context(), r.PathValue("slug"))
+	if err != nil {
+		s.writeError(w, r, err)
+		return
+	}
+	mcpauth.ProtectedResourceMetadataHandler(s.resourceMetadata(e.Workspace.Slug)).ServeHTTP(w, r)
 }
 
 // anyOrigin serves method with CORS open to every origin, for MCP clients

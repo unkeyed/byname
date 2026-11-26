@@ -105,7 +105,7 @@ func (ts tokens) VerifyAccessToken(_ context.Context, token string) (core.Actor,
 	return a, time.Now().Add(time.Hour), nil
 }
 
-func (tokens) ResourceMetadataURL() string {
+func (tokens) ResourceMetadataURL(string) string {
 	return "http://localhost/.well-known/oauth-protected-resource/mcp"
 }
 

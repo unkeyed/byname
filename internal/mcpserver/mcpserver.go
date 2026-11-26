@@ -1,5 +1,5 @@
 // Package mcpserver exposes Byname's services as MCP tools over stateless
-// Streamable HTTP at /mcp, authenticated with OAuth access tokens that act
+// Streamable HTTP at /mcp and each workspace's /w/<slug>/mcp, authenticated with OAuth access tokens that act
 // as the person who approved the client, with the scopes they chose.
 // Each tool is an input struct and a few lines that call one service
 // method, and names the one scope a caller needs to run it.
@@ -17,6 +17,7 @@ import (
 	"net/http"
 	"reflect"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/jsonschema-go/jsonschema"
@@ -28,6 +29,7 @@ import (
 	"github.com/unkeyed/byname/internal/auth"
 	"github.com/unkeyed/byname/internal/core"
 	"github.com/unkeyed/byname/internal/instance"
+	"github.com/unkeyed/byname/internal/workspaces"
 )
 
 const actorKey = "actor"
@@ -38,24 +40,47 @@ const ScopeMeta = "byname.dev/scope"
 
 const instructions = `Byname tracks how this team's brand shows up in AI answers and in search engines (Google Search Console and Bing Webmaster Tools, each read on its own). It asks a fixed panel of questions in AI apps (the places people ask, such as the ChatGPT app or Claude Code, which the API calls surfaces), each with one or more models; an AI app and model is a line with its own accuracy label (fidelity: app, model_match or approximation), and lines are never averaged together. A check (a run in the API) asks every question in every AI app and model. Start with list_runs, then compare_runs for what was gained or lost, gaps for missed questions, where you were not named, content_brief for a prompt that tells an agent working on your site what content to write to win a missed question, and question_history for one question over time. Naming you (your name in the text, a mention) and linking to your site (a link to your domains, a citation) are separate. Each tool's _meta names the scope it needs ("byname.dev/scope"); a tool your connection lacks the scope for fails, and the person who approved this connection can reconnect it with more.`
 
-// AccessTokens verifies the OAuth access tokens /mcp accepts:
+// AccessTokens verifies the OAuth access tokens the MCP servers accept:
 // auth.OAuthServer in production.
 type AccessTokens interface {
 	// VerifyAccessToken returns the token's actor and expiry, or an error
 	// wrapping auth.ErrInvalidToken. Any other error means it could not decide.
 	VerifyAccessToken(ctx context.Context, token string) (core.Actor, time.Time, error)
-	ResourceMetadataURL() string
+	// ResourceMetadataURL is the RFC 9728 metadata of the MCP server at
+	// /w/<slug>/mcp, or at /mcp when slug is empty.
+	ResourceMetadataURL(slug string) string
 }
 
-// Handler returns the /mcp handler, serving svc, the default workspace's
-// services, and the list of every workspace. Stateless, so any replica
-// serves any request without sticky sessions.
+// Handler returns the MCP handler. A request without a workspace on its
+// context, which is /mcp, gets svc, the default workspace's services. One
+// that has one, which is /w/<slug>/mcp, gets that workspace's. Every
+// workspace also gets the list of every workspace. Stateless, so any
+// replica serves any request without sticky sessions.
 func Handler(svc app.Services, ws Workspaces, tokens AccessTokens, version string) http.Handler {
-	srv := mcp.NewServer(&mcp.Implementation{Name: "byname", Version: version}, &mcp.ServerOptions{Instructions: instructions})
-	addTools(srv, svc)
-	addWorkspaceTools(srv, ws)
-	h := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server { return srv },
-		&mcp.StreamableHTTPOptions{Stateless: true})
+	build := func(svc app.Services) *mcp.Server {
+		srv := mcp.NewServer(&mcp.Implementation{Name: "byname", Version: version}, &mcp.ServerOptions{Instructions: instructions})
+		addTools(srv, svc)
+		addWorkspaceTools(srv, ws)
+		return srv
+	}
+	unprefixed := build(svc)
+	var mu sync.Mutex
+	byWorkspace := map[int64]*mcp.Server{}
+	server := func(r *http.Request) *mcp.Server {
+		e, ok := workspaces.FromContext(r.Context())
+		if !ok {
+			return unprefixed
+		}
+		mu.Lock()
+		defer mu.Unlock()
+		srv, ok := byWorkspace[e.Workspace.ID]
+		if !ok {
+			srv = build(e.Services)
+			byWorkspace[e.Workspace.ID] = srv
+		}
+		return srv
+	}
+	h := mcp.NewStreamableHTTPHandler(server, &mcp.StreamableHTTPOptions{Stateless: true})
 	return anyOrigin(requireToken(tokens, h))
 }
 
@@ -87,11 +112,15 @@ type verifiedKey struct{}
 // (RFC 6750 section 3.1). The SDK's RequireBearerToken cannot add that
 // error, so it only carries the verified token to the tools.
 func requireToken(tokens AccessTokens, next http.Handler) http.Handler {
-	challenge := fmt.Sprintf("Bearer resource_metadata=%q", tokens.ResourceMetadataURL())
 	carry := mcpauth.RequireBearerToken(func(_ context.Context, _ string, r *http.Request) (*mcpauth.TokenInfo, error) {
 		return r.Context().Value(verifiedKey{}).(*mcpauth.TokenInfo), nil
 	}, nil)(next)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		slug := ""
+		if e, ok := workspaces.FromContext(r.Context()); ok {
+			slug = e.Workspace.Slug
+		}
+		challenge := fmt.Sprintf("Bearer resource_metadata=%q", tokens.ResourceMetadataURL(slug))
 		scheme, token, _ := strings.Cut(r.Header.Get("Authorization"), " ")
 		token = strings.TrimSpace(token)
 		if !strings.EqualFold(scheme, "Bearer") || token == "" {

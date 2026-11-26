@@ -58,7 +58,7 @@ func TestWorkspacesOverHTTP(t *testing.T) {
 			t.Errorf("GET %s = %v, want the default workspace's Fabrikam only", path, got)
 		}
 	}
-	for _, path := range []string{"/w/nope/v1/brands", "/w/kyring/mcp"} {
+	for _, path := range []string{"/w/nope/v1/brands", "/w/nope/mcp", "/.well-known/oauth-protected-resource/w/nope/mcp"} {
 		if r := agent.do("GET", path, nil); r.code != http.StatusNotFound || !json404(r) {
 			t.Errorf("GET %s = %d %s, want a JSON 404", path, r.code, r.body)
 		}

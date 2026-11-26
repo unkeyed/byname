@@ -338,7 +338,10 @@ func (s *server) workspace(r *http.Request) workspaces.Entity {
 // without it, for that workspace: /w/kyring/v1/brands is GET /v1/brands in
 // Kyring. Paths without the prefix are the default workspace's, as every
 // path was before there were workspaces, so existing keys, links and
-// bookmarks keep working. An unknown slug is a JSON 404.
+// bookmarks keep working. /w/kyring/mcp is Kyring's MCP server. Sign-in,
+// OAuth and its metadata belong to the instance, not a workspace, so they
+// answer the same under any prefix, and the metadata only ever names the
+// paths without one. An unknown slug is a JSON 404.
 func InWorkspace(reg *workspaces.Registry, log *slog.Logger, next http.Handler) http.Handler {
 	s := &server{reg: reg, log: log}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -349,13 +352,6 @@ func InWorkspace(reg *workspaces.Registry, log *slog.Logger, next http.Handler) 
 		}
 		slug, path, _ := strings.Cut(rest, "/")
 		path = "/" + path
-		// /mcp's OAuth resource is the instance's own address, so until it
-		// has one per workspace, /w/<slug>/mcp would answer from the
-		// default workspace.
-		if path == "/mcp" || strings.HasPrefix(path, "/mcp/") {
-			writeJSON(w, http.StatusNotFound, map[string]string{"error": "MCP serves the default workspace at /mcp only"})
-			return
-		}
 		e, err := reg.Lookup(r.Context(), slug)
 		if err != nil {
 			s.writeError(w, r, err)

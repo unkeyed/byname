@@ -35,7 +35,9 @@ info:
     with OAuth 2.1 as a person, who approves it and its scopes in the
     browser. The OAuth endpoints are described by
     `/.well-known/oauth-authorization-server` and
-    `/.well-known/oauth-protected-resource/mcp`, not here.
+    `/.well-known/oauth-protected-resource/mcp`, or
+    `/.well-known/oauth-protected-resource/w/{workspace}/mcp` for a
+    workspace's MCP server, not here.
 
     Workspaces. Each brand this instance tracks is a workspace with its own
     settings, brands, questions, AI apps, schedule, checks, results, search
@@ -45,7 +47,9 @@ info:
     brands. A path without the prefix is the default workspace's, the first
     one made. An unknown slug is 404. The team, sign-in, API keys, apps and
     the provider keys under `/v1/credentials` are shared, so they answer the
-    same under any prefix. `/mcp` serves the default workspace only.
+    same under any prefix. `/mcp` serves the default workspace and
+    `/w/{workspace}/mcp` the one with that slug, and one MCP sign-in works
+    at each.
   license:
     name: MIT
     identifier: MIT
