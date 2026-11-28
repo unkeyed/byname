@@ -1,5 +1,6 @@
 import { keepPreviousData, useQuery, type QueryClient } from "@tanstack/react-query";
 import { useLoading } from "./ui";
+import { reviewOpen } from "./pages/settings/mcpserver/model";
 import { api, type Grouping, type Line, type ResultsFilter, type Run, type Scope, type SearchStatus, type SocialMentionQuery } from "./api";
 
 /** Query keys in one place, so a mutation can invalidate exactly what it touched. */
@@ -119,7 +120,7 @@ export const useMcpServer = () =>
   useQuery({
     queryKey: keys.mcpServer,
     queryFn: api.mcpServer.get,
-    refetchInterval: (q) => (q.state.data && ["queued", "running"].includes(q.state.data.review.status) ? 3000 : false),
+    refetchInterval: (q) => (q.state.data && reviewOpen(q.state.data.review.status) ? 3000 : false),
   });
 
 export const useSocialMentions = (q: SocialMentionQuery) => useQuery({ queryKey: keys.socialMentions(q), queryFn: () => api.social.mentions(q) });

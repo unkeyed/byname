@@ -1,6 +1,8 @@
 package mcpgrade
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"strings"
 	"testing"
@@ -72,5 +74,12 @@ func TestParseReview(t *testing.T) {
 	got, err := parseReview(`{"title":{"score":50,"reason":"` + long + `"},"description":{"score":50,"reason":""},"inputs":{"score":50,"reason":""}}`)
 	if err != nil || utf8.RuneCountInString(got.Title.Reason) != maxReason || !strings.HasSuffix(got.Title.Reason, "…") {
 		t.Errorf("a 400-character reason kept %d characters, %v; want %d ending in an ellipsis", utf8.RuneCountInString(got.Title.Reason), err, maxReason)
+	}
+}
+
+func TestPromptVersionNamesThePrompt(t *testing.T) {
+	sum := sha256.Sum256([]byte(reviewSystem + "\x00" + reviewPrompt + "\x00" + cutNote))
+	if got := hex.EncodeToString(sum[:8]); promptVersion != "2026-11" || got != "7d8f84fd7f793058" {
+		t.Errorf("the review prompt changed under version %q: bump promptVersion, which reviews every tool again, and pin it to %s", promptVersion, got)
 	}
 }

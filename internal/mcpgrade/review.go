@@ -86,7 +86,7 @@ func (s *Service) review(ctx context.Context, v *Server) error {
 		return nil
 	}
 	tools := v.Latest.Tools
-	done, err := s.reviews(ctx, tools)
+	done, err := s.reviewsByKey(ctx, tools)
 	if err != nil {
 		return err
 	}
@@ -115,7 +115,7 @@ func (s *Service) review(ctx context.Context, v *Server) error {
 	return nil
 }
 
-func (s *Service) reviews(ctx context.Context, tools []Tool) (map[string]ToolReview, error) {
+func (s *Service) reviewsByKey(ctx context.Context, tools []Tool) (map[string]ToolReview, error) {
 	keys := make([]string, len(tools))
 	for i, t := range tools {
 		keys[i] = reviewKey(t)
@@ -152,7 +152,17 @@ func pending(tools []Tool, done map[string]ToolReview) []Tool {
 }
 
 func weigh(r ToolReview) int {
-	return int(math.Round(float64(15*r.Title.Score+35*r.Description.Score+30*r.Inputs.Score) / 80))
+	t, d, in := weightOf("documentation.title"), weightOf("documentation.description"), weightOf("documentation.inputs")
+	return int(math.Round(float64(t*r.Title.Score+d*r.Description.Score+in*r.Inputs.Score) / float64(t+d+in)))
+}
+
+func weightOf(id string) int {
+	for _, c := range checks {
+		if c.id == id {
+			return c.weight
+		}
+	}
+	panic("mcpgrade: no check " + id)
 }
 
 func render(t Tool) string {
@@ -317,7 +327,7 @@ func (s *Service) reviewTools(ctx context.Context, job int64) error {
 	if err := json.Unmarshal(raw, &r); err != nil {
 		return err
 	}
-	done, err := s.reviews(ctx, r.Tools)
+	done, err := s.reviewsByKey(ctx, r.Tools)
 	if err != nil {
 		return err
 	}
