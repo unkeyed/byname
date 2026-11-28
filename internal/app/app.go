@@ -9,6 +9,7 @@ import (
 	"github.com/unkeyed/byname/internal/discovery"
 	"github.com/unkeyed/byname/internal/instance"
 	"github.com/unkeyed/byname/internal/logos"
+	"github.com/unkeyed/byname/internal/mcpgrade"
 	"github.com/unkeyed/byname/internal/notify"
 	"github.com/unkeyed/byname/internal/results"
 	"github.com/unkeyed/byname/internal/search"
@@ -26,4 +27,5 @@ type Services struct {
 	Social    *social.Service
 	Discovery *discovery.Service
 	Logos     *logos.Service
+	MCPGrade  *mcpgrade.Service
 }
