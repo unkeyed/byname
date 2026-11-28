@@ -2292,7 +2292,8 @@ export const api = {
   mcpServer: {
     get: () => request<McpServer>("GET", "/v1/mcp-server"),
     set: (url: string) => request<McpServer>("PUT", "/v1/mcp-server", { body: { url } }),
-    setToken: (token: string) => request<McpServer>("PUT", "/v1/mcp-server/token", { body: { token } }),
+    /** url is the server URL the admin saw; a token for a URL changed since then fails with 409. */
+    setToken: (url: string, token: string) => request<McpServer>("PUT", "/v1/mcp-server/token", { body: { url, token } }),
     grade: () => request<McpServer>("POST", "/v1/mcp-server/grade"),
   },
 
