@@ -264,8 +264,11 @@ func (s *Service) StartReview(ctx context.Context) (Server, error) {
 		if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(`+queueLock+`)`); err != nil {
 			return err
 		}
-		_, err := tx.Exec(ctx, `INSERT INTO job_run (job, trigger, status, started_at) SELECT 'mcp_review', 'run_now', 'queued', $1
-			WHERE NOT EXISTS (SELECT 1 FROM job_run WHERE job = 'mcp_review' AND status IN ('queued', 'running'))`, s.now())
+		var open bool
+		if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM job_run WHERE job = 'mcp_review' AND status IN ('queued', 'running'))`).Scan(&open); err != nil || open {
+			return err
+		}
+		_, err := tx.Exec(ctx, `INSERT INTO job_run (job, trigger, status, started_at) VALUES ('mcp_review', 'run_now', 'queued', $1)`, s.now())
 		return err
 	})
 	if err != nil {
