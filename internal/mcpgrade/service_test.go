@@ -14,8 +14,10 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/unkeyed/byname/internal/config"
 	"github.com/unkeyed/byname/internal/core"
 	"github.com/unkeyed/byname/internal/db"
+	"github.com/unkeyed/byname/internal/engines/tregtest"
 	"github.com/unkeyed/byname/internal/mcpgrade"
 	"github.com/unkeyed/byname/internal/secretbox"
 	"github.com/unkeyed/byname/internal/testdb"
@@ -80,16 +82,20 @@ func registry(t *testing.T) string {
 }
 
 type env struct {
-	t   *testing.T
-	ctx context.Context
-	db  *pgxpool.Pool
-	svc *mcpgrade.Service
+	t      *testing.T
+	ctx    context.Context
+	db     *pgxpool.Pool
+	treg   *tregtest.Server
+	config *config.Service
+	svc    *mcpgrade.Service
 }
 
 func newEnv(t *testing.T) *env {
 	t.Helper()
 	pool := testdb.New(t)
-	return &env{t: t, ctx: context.Background(), db: pool, svc: mcpgrade.New(pool, mcpgrade.Options{
+	treg := tregtest.New(t)
+	cfg := config.New(pool, config.Options{Secrets: secretbox.ForTest(), TregBaseURL: treg.URL})
+	return &env{t: t, ctx: context.Background(), db: pool, treg: treg, config: cfg, svc: mcpgrade.New(pool, cfg, mcpgrade.Options{
 		Secrets: secretbox.ForTest(), AllowPrivate: true, UserAgent: "Byname/test", RegistryURL: registry(t),
 	})}
 }
@@ -270,7 +276,7 @@ func TestSealSecretsMovesTheTokenToTheCurrentKey(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	rotated := mcpgrade.New(e.db, mcpgrade.Options{Secrets: next})
+	rotated := mcpgrade.New(e.db, e.config, mcpgrade.Options{Secrets: next})
 	if n, err := rotated.SealSecrets(e.ctx); err != nil || n != 1 {
 		t.Fatalf("SealSecrets = %d, %v, want 1 resealed", n, err)
 	}

@@ -145,6 +145,9 @@ type Tool struct {
 	// Key is a hash of the definition above, so a later review can skip a
 	// tool that did not change.
 	Key string `json:"key"`
+	// Review is joined in by Key when a grade is read, so a review shows
+	// on every grade where the tool is unchanged. A stored report has none.
+	Review *ToolReview `json:"review" jsonschema:"the model's review of this definition; null before one"`
 }
 
 // Param is one top-level input property.
