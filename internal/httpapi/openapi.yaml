@@ -6404,7 +6404,7 @@ components:
           description: The monthly spend cap finishing onboarding sets when none is set. Three times month_estimate_usd, rounded up to a whole dollar, and at least 5.
         month:
           type: object
-          required: [start, checks_usd, social_usd, brands_usd, spent_usd, missing_cost_calls, cap_usd]
+          required: [start, checks_usd, social_usd, brands_usd, mcp_review_usd, spent_usd, missing_cost_calls, cap_usd]
           description: The calendar month so far, in the instance's time zone.
           properties:
             start:
@@ -6417,9 +6417,12 @@ components:
             brands_usd:
               type: number
               description: Finding other brands, reading answers in checks or later and looking up logos.
+            mcp_review_usd:
+              type: number
+              description: Reviewing MCP tool documentation.
             spent_usd:
               type: number
-              description: checks_usd plus social_usd plus brands_usd, what the monthly spend cap counts.
+              description: checks_usd plus social_usd plus brands_usd plus mcp_review_usd, what the monthly spend cap counts.
             missing_cost_calls:
               type: integer
               description: Answered calls this month that reported no cost, so spent_usd is a floor.
@@ -7397,7 +7400,7 @@ components:
           type: integer
         job:
           type: string
-          enum: [ai_check, model_refresh, source_fetch, search_sync, site_changes, recrawl_watch, verdicts, social_fetch, other_brands, brand_logos]
+          enum: [ai_check, model_refresh, source_fetch, search_sync, site_changes, recrawl_watch, verdicts, social_fetch, other_brands, brand_logos, mcp_review]
         provider:
           type: string
           description: The search engine a search_sync synced, such as google or bing. Empty for other jobs.
@@ -7420,7 +7423,7 @@ components:
           type: string
         spend_usd:
           type: [number, "null"]
-          description: What the job spent. An AI check's answers and its reads for other brands, or the calls an other_brands or brand_logos job made. Null for a job that spends nothing.
+          description: What the job spent. An AI check's answers and its reads for other brands, or the calls an other_brands, brand_logos or mcp_review job made. Null for a job that spends nothing.
     SearchTotals:
       type: object
       required: [clicks, impressions, ctr, position]

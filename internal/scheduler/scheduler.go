@@ -36,6 +36,9 @@ type Scheduler struct {
 	brands    []Ticker
 	branding  sync.WaitGroup
 	finding   atomic.Bool
+	review    Ticker
+	reviews   sync.WaitGroup
+	reviewing atomic.Bool
 }
 
 type Options struct {
@@ -54,10 +57,14 @@ type Options struct {
 	// OtherBrands reads past answers for other brands and looks up
 	// logos, in order; empty when not wired.
 	OtherBrands []Ticker
+	// MCPReview runs a review of MCP tool documentation someone asked
+	// for; nil when not wired.
+	MCPReview Ticker
 }
 
 // Ticker is a job that decides itself what is due on each tick and holds
-// its own advisory lock: internal/discovery and internal/logos.
+// its own advisory lock: internal/discovery, internal/logos and
+// internal/mcpgrade.
 type Ticker interface {
 	Tick(ctx context.Context) error
 }
@@ -89,7 +96,7 @@ func New(c *checks.Service, cfg *config.Service, o Options) *Scheduler {
 	if o.Log == nil {
 		o.Log = slog.Default()
 	}
-	return &Scheduler{checks: c, config: cfg, log: o.Log, ticks: o.Ticks, now: o.Now, sources: o.Sources, search: o.Search, changes: o.Changes, social: o.Social, brands: o.OtherBrands}
+	return &Scheduler{checks: c, config: cfg, log: o.Log, ticks: o.Ticks, now: o.Now, sources: o.Sources, search: o.Search, changes: o.Changes, social: o.Social, brands: o.OtherBrands, review: o.MCPReview}
 }
 
 // Run ticks once at start, which resumes a run a previous process left
@@ -101,6 +108,7 @@ func (s *Scheduler) Run(ctx context.Context) {
 	defer s.searching.Wait()
 	defer s.socialing.Wait()
 	defer s.branding.Wait()
+	defer s.reviews.Wait()
 	ticks := s.ticks
 	if ticks == nil {
 		t := time.NewTicker(time.Minute)
@@ -170,6 +178,16 @@ func (s *Scheduler) Tick(ctx context.Context) {
 				if err := t.Tick(ctx); err != nil && ctx.Err() == nil {
 					s.log.Warn("other brands failed", "err", err)
 				}
+			}
+		})
+	}
+	// MCP tool review: one paid call per tool, up to 100 of them, so it
+	// too runs on its own goroutine.
+	if s.review != nil && s.reviewing.CompareAndSwap(false, true) {
+		s.reviews.Go(func() {
+			defer s.reviewing.Store(false)
+			if err := s.review.Tick(ctx); err != nil && ctx.Err() == nil {
+				s.log.Warn("MCP tool review failed", "err", err)
 			}
 		})
 	}

@@ -83,11 +83,12 @@ type Costs struct {
 // MonthCost is what the calendar month so far has spent, in the
 // instance's time zone, which the monthly spend cap counts.
 type MonthCost struct {
-	Start     time.Time `json:"start" jsonschema:"the first moment of the month in the instance's time zone"`
-	ChecksUSD float64   `json:"checks_usd" jsonschema:"what this month's checks spent on answers"`
-	SocialUSD float64   `json:"social_usd" jsonschema:"what this month's social searches spent"`
-	BrandsUSD float64   `json:"brands_usd" jsonschema:"what this month spent finding other brands: reading answers, in checks or later, and looking up logos"`
-	SpentUSD  float64   `json:"spent_usd" jsonschema:"checks_usd plus social_usd plus brands_usd, what the monthly cap counts"`
+	Start        time.Time `json:"start" jsonschema:"the first moment of the month in the instance's time zone"`
+	ChecksUSD    float64   `json:"checks_usd" jsonschema:"what this month's checks spent on answers"`
+	SocialUSD    float64   `json:"social_usd" jsonschema:"what this month's social searches spent"`
+	BrandsUSD    float64   `json:"brands_usd" jsonschema:"what this month spent finding other brands: reading answers, in checks or later, and looking up logos"`
+	MCPReviewUSD float64   `json:"mcp_review_usd" jsonschema:"what this month spent reviewing MCP tool documentation"`
+	SpentUSD     float64   `json:"spent_usd" jsonschema:"checks_usd plus social_usd plus brands_usd plus mcp_review_usd, what the monthly cap counts"`
 	// MissingCostCalls are answered calls that reported no cost, which no
 	// figure here can count.
 	MissingCostCalls int      `json:"missing_cost_calls" jsonschema:"answered calls this month that reported no cost, so spent_usd is a floor"`
@@ -122,11 +123,13 @@ func (s *Service) Costs(ctx context.Context) (Costs, error) {
 			coalesce((SELECT sum(usd) FROM spend WHERE at >= $1 AND source = 'checks'), 0)::float8,
 			coalesce((SELECT sum(usd) FROM spend WHERE at >= $1 AND source = 'social'), 0)::float8,
 			coalesce((SELECT sum(usd) FROM spend WHERE at >= $1 AND source = 'brands'), 0)::float8,
+			coalesce((SELECT sum(usd) FROM spend WHERE at >= $1 AND source = 'mcp_review'), 0)::float8,
 			coalesce((SELECT sum(spend_missing_calls) FROM run WHERE started_at >= $1), 0)::int
 			+ (SELECT count(*) FROM social_call WHERE called_at >= $1 AND cost_usd IS NULL AND status = 'ok')::int
-			+ (SELECT count(*) FROM brand_call WHERE called_at >= $1 AND cost_usd IS NULL AND status = 'ok')::int`,
-		out.Month.Start).Scan(&out.Month.ChecksUSD, &out.Month.SocialUSD, &out.Month.BrandsUSD, &out.Month.MissingCostCalls)
-	out.Month.SpentUSD = out.Month.ChecksUSD + out.Month.SocialUSD + out.Month.BrandsUSD
+			+ (SELECT count(*) FROM brand_call WHERE called_at >= $1 AND cost_usd IS NULL AND status = 'ok')::int
+			+ (SELECT count(*) FROM mcp_review WHERE called_at >= $1 AND cost_usd IS NULL AND treg_call_id <> '' AND status <> 'refused')::int`,
+		out.Month.Start).Scan(&out.Month.ChecksUSD, &out.Month.SocialUSD, &out.Month.BrandsUSD, &out.Month.MCPReviewUSD, &out.Month.MissingCostCalls)
+	out.Month.SpentUSD = out.Month.ChecksUSD + out.Month.SocialUSD + out.Month.BrandsUSD + out.Month.MCPReviewUSD
 	return out, err
 }
 

@@ -547,6 +547,8 @@ export interface Costs {
     social_usd: number;
     /** Reading answers for other brands and looking up logos. */
     brands_usd: number;
+    /** Reviewing MCP tool documentation. */
+    mcp_review_usd: number;
     spent_usd: number;
     missing_cost_calls: number;
     cap_usd: number | null;
