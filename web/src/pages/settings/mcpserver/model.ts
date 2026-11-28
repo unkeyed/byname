@@ -1,4 +1,4 @@
-import type { McpGrade, McpGradeSummary, McpLetter, McpPartial, McpStatus, McpTool } from "../../../api";
+import type { McpGrade, McpGradeSummary, McpLetter, McpPartial, McpReview, McpReviewStatus, McpStatus, McpTool } from "../../../api";
 import type { Tone } from "../../../ui";
 
 export const statusTone: Record<McpStatus, Tone> = { pass: "success", partial: "warn", fail: "danger", skipped: "neutral" };
@@ -34,3 +34,26 @@ export function duration(ms: number | null): string {
 export const shortfalls = (t: Pick<McpTool, "marks">) => t.marks.filter((m) => m.status === "fail" || m.status === "partial");
 
 export const scoresOverTime = (history: Pick<McpGradeSummary, "score">[]) => history.map((h) => h.score).reverse();
+
+export const reviewOpen = (s: McpReviewStatus) => s === "queued" || s === "running";
+
+export const toolCount = (n: number) => `${n} ${n === 1 ? "tool" : "tools"}`;
+
+/** The tool documentation tile's score: the rules', with the model's beside it once there is one. */
+export const docScore = (rules: number, review: Pick<McpReview, "score">) => (review.score == null ? `${rules}` : `Rules ${rules} · AI ${review.score}`);
+
+const stopped: Partial<Record<McpReviewStatus, string>> = {
+  capped: "The monthly spend cap stopped the review.",
+  refused: "Treg refused a call, such as for an empty balance, so the review stopped.",
+  failed: "The review failed.",
+};
+
+/** Why the latest review ended early, or null when it did not. */
+export const reviewStopped = (r: Pick<McpReview, "status">) => stopped[r.status] ?? null;
+
+/** What a toast says when a review someone watched ends. */
+export function reviewDone(r: Pick<McpReview, "status" | "reviewed" | "tools" | "score">): string {
+  const done = `${r.reviewed} of ${toolCount(r.tools)} reviewed`;
+  if (r.status === "completed") return r.score == null ? `Review done: ${done}.` : `Review done: ${done}, AI score ${r.score}.`;
+  return `${reviewStopped(r) ?? "The review stopped."} ${done}.`;
+}

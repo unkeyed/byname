@@ -115,7 +115,13 @@ export const useChanges = () => useQuery({ queryKey: keys.changeList, queryFn: a
 export const useChangeSettings = () => useQuery({ queryKey: keys.changeSettings, queryFn: api.changes.settings, staleTime: 60_000 });
 export const useControlPages = () => useQuery({ queryKey: keys.controlPages, queryFn: api.controlPages.list });
 export const useRepo = () => useQuery({ queryKey: keys.repo, queryFn: api.repo.get });
-export const useMcpServer = () => useQuery({ queryKey: keys.mcpServer, queryFn: api.mcpServer.get });
+/** Polls while a review of the tool docs is queued or running. */
+export const useMcpServer = () =>
+  useQuery({
+    queryKey: keys.mcpServer,
+    queryFn: api.mcpServer.get,
+    refetchInterval: (q) => (q.state.data && ["queued", "running"].includes(q.state.data.review.status) ? 3000 : false),
+  });
 
 export const useSocialMentions = (q: SocialMentionQuery) => useQuery({ queryKey: keys.socialMentions(q), queryFn: () => api.social.mentions(q) });
 /** Keeps the shown period while another loads, so the digest card never empties under the reader. */
