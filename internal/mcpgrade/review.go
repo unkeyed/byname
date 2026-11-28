@@ -378,9 +378,6 @@ func (s *Service) reviewTool(ctx context.Context, treg engines.Treg, job int64, 
 		Tool: engines.MCPReviewer, System: reviewSystem, Context: parts, Prompt: prompt, MaxOutputTokens: 600,
 		IdempotencyKey: fmt.Sprintf("byname/%smcp-review/%s/%d", db.KeyScope(s.db), key, attempt),
 	})
-	if ctx.Err() != nil {
-		return nil, ctx.Err()
-	}
 	refusal, _ := errors.AsType[*engines.Refusal](err)
 	var rv ToolReview
 	switch {
@@ -403,11 +400,11 @@ func (s *Service) reviewTool(ctx context.Context, treg engines.Treg, job int64, 
 	if status == "ok" {
 		found = [6]any{rv.Title.Score, rv.Title.Reason, rv.Description.Score, rv.Description.Reason, rv.Inputs.Score, rv.Inputs.Reason}
 	}
-	_, err = s.db.Exec(ctx, `INSERT INTO mcp_review (review_key, tool_name, job_run_id, status, title_score, title_reason, description_score, description_reason,
+	_, err = s.db.Exec(context.WithoutCancel(ctx), `INSERT INTO mcp_review (review_key, tool_name, job_run_id, status, title_score, title_reason, description_score, description_reason,
 			inputs_score, inputs_reason, cost_usd, treg_call_id, error, called_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
 		key, t.Name, job, status, found[0], found[1], found[2], found[3], found[4], found[5], res.CostUSD, res.CallID, msg, s.now())
-	return refusal, err
+	return refusal, cmp.Or(err, ctx.Err())
 }
 
 // overCap says what the month has spent once it reaches the monthly spend

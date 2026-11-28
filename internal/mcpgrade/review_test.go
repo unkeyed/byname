@@ -1,6 +1,7 @@
 package mcpgrade_test
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"math"
@@ -253,5 +254,25 @@ func TestTickFailsAReviewCutOffMidway(t *testing.T) {
 	v, _ := e.svc.Server(e.ctx)
 	if v.Review.Status != "failed" || !strings.Contains(v.Review.Error, "reviewing again does the rest") || len(e.treg.Calls()) != 0 {
 		t.Errorf("a review left running = %+v after %d calls, want failed with how to resume", v.Review, len(e.treg.Calls()))
+	}
+}
+
+func TestReviewRecordsACallCutOffByShutdown(t *testing.T) {
+	e := newEnv(t)
+	e.reviewing(nil, nil)
+	e.graded("v1", "a", "b")
+	if _, err := e.svc.StartReview(e.ctx); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(e.ctx)
+	e.treg.Reply(func(tregtest.Call) []byte {
+		cancel()
+		return tregtest.LLMBody(goodReview)
+	})
+	if err := e.svc.Tick(ctx); !errors.Is(err, context.Canceled) {
+		t.Fatalf("Tick = %v, want context.Canceled", err)
+	}
+	if n := e.count(`SELECT count(*) FROM mcp_review`); n != 1 {
+		t.Errorf("%d rows for the call shutdown cut off, want it recorded", n)
 	}
 }
