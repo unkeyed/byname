@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/unkeyed/byname/internal/checks/checkstest"
@@ -267,7 +268,72 @@ func TestReviewRecordsACallCutOffByShutdown(t *testing.T) {
 	if err := e.svc.Tick(ctx); !errors.Is(err, context.Canceled) {
 		t.Fatalf("Tick = %v, want context.Canceled", err)
 	}
-	if n := e.count(`SELECT count(*) FROM mcp_review`); n != 1 {
-		t.Errorf("%d rows for the call shutdown cut off, want it recorded", n)
+	e.reviewing(nil, nil)
+	if err := e.svc.Tick(e.ctx); err != nil {
+		t.Fatal(err)
+	}
+	if v := e.review(); v.Review.Status != "completed" || v.Review.Reviewed != 2 {
+		t.Fatalf("review after the shutdown = %+v, want both reviewed", v.Review)
+	}
+	var spent float64
+	if err := e.db.QueryRow(e.ctx, `SELECT sum(usd)::float8 FROM spend WHERE source = 'mcp_review'`).Scan(&spent); err != nil || spent != 0.02 {
+		t.Errorf("spend counts %v of reviews, %v; want the call shutdown cut off counted once", spent, err)
+	}
+	for _, c := range e.treg.Calls() {
+		if !strings.HasSuffix(c.IdempotencyKey, "/1") {
+			t.Errorf("key %q, want every tool on its first attempt", c.IdempotencyKey)
+		}
+	}
+}
+
+func TestReviewRecoversAPaidAnswerThatWasLost(t *testing.T) {
+	e := newEnv(t)
+	e.reviewing(nil, nil)
+	e.graded("v1", "a", "b")
+	e.treg.Lose(func(c tregtest.Call) bool { return strings.Contains(c.Sent, `Tool name: b\n`) })
+	if _, err := e.svc.StartReview(e.ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.svc.Tick(e.ctx); err == nil {
+		t.Fatal("Tick = nil, want the lost answer's error")
+	}
+	if v, _ := e.svc.Server(e.ctx); v.Review.Status != "failed" || e.count(`SELECT count(*) FROM mcp_review`) != 0 {
+		t.Fatalf("review = %+v, want failed with nothing recorded for the lost answer", v.Review)
+	}
+	e.treg.Lose(nil)
+	e.treg.Reset()
+	if v := e.review(); v.Review.Status != "completed" || v.Review.Reviewed != 2 {
+		t.Fatalf("review = %+v, want both reviewed", v.Review)
+	}
+	if c := e.treg.Calls()[0]; !strings.HasSuffix(c.IdempotencyKey, "/b-v1/2026-11/1") || !c.Replay {
+		t.Errorf("b's retry key %q, replay %v; want attempt 1 again so Treg replays the paid answer", c.IdempotencyKey, c.Replay)
+	}
+	var spent float64
+	if err := e.db.QueryRow(e.ctx, `SELECT sum(usd)::float8 FROM spend WHERE source = 'mcp_review'`).Scan(&spent); err != nil || spent != 0.02 {
+		t.Errorf("spend counts %v of reviews, %v; want b's lost answer counted once", spent, err)
+	}
+}
+
+func TestConcurrentStartsQueueOneReview(t *testing.T) {
+	e := newEnv(t)
+	e.reviewing(nil, nil)
+	e.graded("v1", "a")
+	errs := make(chan error, 8)
+	var wg sync.WaitGroup
+	for range cap(errs) {
+		wg.Go(func() {
+			_, err := e.svc.StartReview(e.ctx)
+			errs <- err
+		})
+	}
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	if n := e.count(`SELECT count(*) FROM job_run WHERE job = 'mcp_review'`); n != 1 {
+		t.Errorf("%d reviews queued by concurrent starts, want one", n)
 	}
 }

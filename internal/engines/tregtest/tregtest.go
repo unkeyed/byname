@@ -81,6 +81,7 @@ type Server struct {
 	// Before runs for each call before it is answered. A non-nil Refusal
 	// refuses it.
 	before func(Call) *Refusal
+	lose   func(Call) bool
 }
 
 // New starts a fake Treg that closes when the test ends.
@@ -157,6 +158,15 @@ func (s *Server) Before(f func(Call) *Refusal) {
 	s.before = f
 }
 
+// Lose installs a hook that, for each call it returns true for, charges the
+// call and then closes the connection without answering, as when Treg's
+// answer is lost on its way back.
+func (s *Server) Lose(f func(Call) bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.lose = f
+}
+
 // Calls returns every call received so far, in order.
 func (s *Server) Calls() []Call {
 	s.mu.Lock()
@@ -195,7 +205,7 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request) {
 	if c.Find {
 		body = s.find
 	}
-	reply, before := s.reply, s.before
+	reply, before, lose := s.reply, s.before, s.lose
 	price, priced := s.cost[tool]
 	original, replay := s.paid[c.IdempotencyKey]
 	c.Replay = replay && c.IdempotencyKey != ""
@@ -245,6 +255,12 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request) {
 		s.mu.Lock()
 		s.paid[c.IdempotencyKey] = cost
 		s.mu.Unlock()
+	}
+	if lose != nil && lose(c) {
+		if conn, _, err := http.NewResponseController(w).Hijack(); err == nil {
+			_ = conn.Close()
+		}
+		return
 	}
 	_, _ = w.Write(body)
 }

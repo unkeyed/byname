@@ -31,7 +31,10 @@ const maxReviews = 100
 
 const maxReason = 300
 
-var reviewLock = db.EntityLock("byname.mcpgrade.review")
+var (
+	reviewLock = db.EntityLock("byname.mcpgrade.review")
+	queueLock  = db.EntityLock("byname.mcpgrade.queue")
+)
 
 const (
 	reviewSystem = `You judge how well one tool from an MCP server is documented for an AI agent that must decide when to call it and how. ` +
@@ -257,7 +260,15 @@ func (s *Service) StartReview(ctx context.Context) (Server, error) {
 		}
 		return bad("the monthly spend cap is reached: " + over)
 	}
-	if _, err := s.db.Exec(ctx, `INSERT INTO job_run (job, trigger, status, started_at) VALUES ('mcp_review', 'run_now', 'queued', $1)`, s.now()); err != nil {
+	err = pgx.BeginFunc(ctx, s.db, func(tx pgx.Tx) error {
+		if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(`+queueLock+`)`); err != nil {
+			return err
+		}
+		_, err := tx.Exec(ctx, `INSERT INTO job_run (job, trigger, status, started_at) SELECT 'mcp_review', 'run_now', 'queued', $1
+			WHERE NOT EXISTS (SELECT 1 FROM job_run WHERE job = 'mcp_review' AND status IN ('queued', 'running'))`, s.now())
+		return err
+	})
+	if err != nil {
 		return v, err
 	}
 	return s.Server(ctx)
@@ -367,8 +378,13 @@ func (s *Service) reviewTool(ctx context.Context, treg engines.Treg, job int64, 
 	refusal, _ := errors.AsType[*engines.Refusal](err)
 	var rv ToolReview
 	switch {
-	case err != nil:
+	case refusal != nil:
 		res = engines.Result{Status: engines.StatusFailed, Error: err.Error()}
+	case err != nil:
+		// No reply came back, yet Treg may have charged for one. Recording
+		// nothing keeps this attempt's key, so the next review gets that
+		// reply replayed with its charge instead of paying again.
+		return nil, err
 	case res.Status == engines.StatusFailed:
 	default:
 		if rv, err = parseReview(res.Text); err != nil {
