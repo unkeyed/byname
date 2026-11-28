@@ -9,6 +9,8 @@ import (
 	"io"
 	"iter"
 	"net/http"
+	"net/url"
+	"strings"
 	"sync"
 )
 
@@ -70,7 +72,7 @@ func (t tap) RoundTrip(r *http.Request) (*http.Response, error) {
 
 	r = r.Clone(r.Context())
 	r.Header.Del("Authorization")
-	if t.withToken && w.token != "" && sameURL(r.URL.String(), w.endpoint) {
+	if t.withToken && w.token != "" && exactURL(r.URL, w.endpoint) {
 		r.Header.Set("Authorization", "Bearer "+w.token)
 	}
 	var pg *page
@@ -86,6 +88,14 @@ func (t tap) RoundTrip(r *http.Request) (*http.Response, error) {
 	}
 	resp.Body = &capped{body: resp.Body, w: w, left: bodyCap, page: pg}
 	return resp, nil
+}
+
+// exactURL is stricter than sameURL: the token goes only to the endpoint as
+// given, not to a redirect that adds a slash or encodes the path differently.
+func exactURL(u *url.URL, endpoint string) bool {
+	e, err := url.Parse(endpoint)
+	return err == nil && strings.EqualFold(u.Scheme, e.Scheme) && strings.EqualFold(u.Host, e.Host) &&
+		u.EscapedPath() == e.EscapedPath() && u.RawQuery == e.RawQuery
 }
 
 func isToolsList(r *http.Request) bool {

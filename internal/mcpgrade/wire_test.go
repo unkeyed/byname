@@ -65,9 +65,14 @@ func TestWireSendsTokenOnlyToEndpoint(t *testing.T) {
 	get(t, authd, target.URL+"/.well-known/oauth-protected-resource/mcp", nil)
 	get(t, authd, other.URL+"/mcp", http.Header{"Authorization": {"Bearer smuggled"}})
 	get(t, authd, target.URL+"/mcp?away=1", nil)
+	get(t, authd, target.URL+"/%6Dcp", nil)
+	get(t, authd, target.URL+"/mcp/", nil)
 
-	if got := target.saw("/mcp"); len(got) != 3 || got[0] != "Bearer secret" || got[1] != "" || got[2] != "" {
+	if got := target.saw("/mcp"); len(got) != 4 || got[0] != "Bearer secret" || got[1] != "" || got[2] != "" || got[3] != "" {
 		t.Errorf("the endpoint saw %q, want the token only from the token client on the exact URL", got)
+	}
+	if got := target.saw("/mcp/"); len(got) != 1 || got[0] != "" {
+		t.Errorf("the endpoint with a trailing slash saw %q", got)
 	}
 	if got := target.saw("/.well-known/oauth-protected-resource/mcp"); len(got) != 1 || got[0] != "" {
 		t.Errorf("a well-known document on the endpoint's origin saw %q", got)
