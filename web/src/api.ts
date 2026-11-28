@@ -1509,6 +1509,8 @@ export interface McpTool {
   key: string;
 }
 
+export type McpPartial = "" | "needs_token" | "no_session" | "no_tools";
+
 export interface McpGrade {
   id: number;
   graded_at: Timestamp;
@@ -1516,7 +1518,8 @@ export interface McpGrade {
   rules: string;
   score: number;
   grade: McpLetter;
-  complete: boolean;
+  /** Empty when complete, else why a required category counted as 0. */
+  partial: McpPartial;
   server: {
     name: string;
     title: string;

@@ -48,12 +48,12 @@ type mcpServerView struct {
 	URL      string `json:"url"`
 	TokenSet bool   `json:"token_set"`
 	Latest   *struct {
-		ID       int64  `json:"id"`
-		URL      string `json:"url"`
-		Score    int    `json:"score"`
-		Grade    string `json:"grade"`
-		Complete bool   `json:"complete"`
-		Server   struct {
+		ID      int64  `json:"id"`
+		URL     string `json:"url"`
+		Score   int    `json:"score"`
+		Grade   string `json:"grade"`
+		Partial string `json:"partial"`
+		Server  struct {
 			TokenUsed bool `json:"token_used"`
 		} `json:"server"`
 		Categories []struct {
@@ -105,7 +105,7 @@ func TestMCPServerGradeOverHTTP(t *testing.T) {
 	viewer.call("POST", "/v1/mcp-server/grade", nil, http.StatusForbidden, nil)
 
 	keep(agent.call("POST", "/v1/mcp-server/grade", nil, http.StatusOK, &v))
-	if v.Latest == nil || v.Latest.Complete || v.Latest.Server.TokenUsed || v.Latest.URL != endpoint || len(v.Latest.Categories) != 6 {
+	if v.Latest == nil || v.Latest.Partial != "needs_token" || v.Latest.Server.TokenUsed || v.Latest.URL != endpoint || len(v.Latest.Categories) != 6 {
 		t.Fatalf("a grade without the token = %+v", v.Latest)
 	}
 	partial := v.Latest.ID
@@ -115,7 +115,7 @@ func TestMCPServerGradeOverHTTP(t *testing.T) {
 		t.Fatal("token_set is false after an admin set it")
 	}
 	keep(editor.call("POST", "/v1/mcp-server/grade", nil, http.StatusOK, &v))
-	if !v.Latest.Complete || !v.Latest.Server.TokenUsed || len(v.Latest.Tools) != 1 {
+	if v.Latest.Partial != "" || !v.Latest.Server.TokenUsed || len(v.Latest.Tools) != 1 {
 		t.Fatalf("a grade with the token = %+v", v.Latest)
 	}
 	if len(v.History) != 2 || v.History[0].ID != v.Latest.ID || v.History[1].ID != partial || v.History[0].Score <= v.History[1].Score {
@@ -191,11 +191,11 @@ func TestMCPServerToolsOverMCP(t *testing.T) {
 		t.Fatalf("set_mcp_server = %+v", v)
 	}
 	person.call("PUT", "/v1/mcp-server/token", map[string]string{"token": mcpToken}, http.StatusOK, nil)
-	if v := call("grade_mcp_server", nil); v.Latest == nil || !v.Latest.Complete || len(v.Latest.Tools) != 1 {
+	if v := call("grade_mcp_server", nil); v.Latest == nil || v.Latest.Partial != "" || len(v.Latest.Tools) != 1 {
 		t.Fatalf("grade_mcp_server = %+v", v.Latest)
 	}
 	person.call("PUT", "/v1/mcp-server/token", map[string]string{"token": ""}, http.StatusOK, nil)
-	if v := call("grade_mcp_server", nil); v.Latest == nil || v.Latest.Complete || len(v.History) != 2 {
+	if v := call("grade_mcp_server", nil); v.Latest == nil || v.Latest.Partial != "needs_token" || len(v.History) != 2 {
 		t.Fatalf("grade_mcp_server without the token = %+v", v.Latest)
 	}
 	if v := call("mcp_server_grade", nil); v.TokenSet || len(v.History) != 2 {

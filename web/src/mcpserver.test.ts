@@ -14,18 +14,11 @@ test("letters run from success to danger", () => {
   assert.equal(letterColor("F"), "var(--danger)");
 });
 
-const category = (score: number | null, note = "") => ({ id: "metadata" as const, title: "Server metadata", score, note, checks: [] });
-
 test("a partial grade says why, and names the token when sign-in blocked it", () => {
-  assert.equal(partialNote({ complete: true, categories: [category(0, "Needs a token to grade")] }), null);
-  assert.equal(
-    partialNote({ complete: false, categories: [category(100), category(0, "Needs a token to grade")] }),
-    "Partial grade. Sign-in blocked the tool checks. An admin can add a token to grade the rest.",
-  );
-  assert.equal(
-    partialNote({ complete: false, categories: [category(0, "No session")] }),
-    "Partial grade. No MCP session started, so the metadata and tool checks could not run. Connection says why.",
-  );
+  assert.equal(partialNote(""), null);
+  assert.equal(partialNote("needs_token"), "Partial grade. Sign-in blocked the tool checks. An admin can add a token to grade the rest.");
+  assert.equal(partialNote("no_session"), "Partial grade. No MCP session started, so the metadata and tool checks could not run. Connection says why.");
+  assert.equal(partialNote("no_tools"), "Partial grade. Some checks could not run.");
 });
 
 test("negotiation time reads in ms under a second", () => {

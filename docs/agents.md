@@ -205,7 +205,7 @@ Byname's MCP server has 94 tools. Every REST route an API key can call has one w
 | `unhide_brand` | `config:write` | `POST /v1/other-brands/{id}/unhide` | Put a brand marked as not a competitor back on the list. |
 | `update_other_brands_settings` | `config:write` | `PUT /v1/other-brands/settings` | Turn reading answers for other brands and logo lookups on or off, and set the monthly limit on new lookups. |
 | `start_brand_backfill` | `runs:write` | `POST /v1/other-brands/backfill` | Read every past answer never read for other brands, as one job in Check history, within the monthly spend cap. |
-| `mcp_server_grade` | `results:read` | `GET /v1/mcp-server` | Your own MCP server's URL, whether a token is stored, its newest grade in full (score, letter, whether it is complete, each category and check with its finding and fix, each tool's documentation score) and the scores of the newest 50. See [MCP server grade](mcp-server.md). |
+| `mcp_server_grade` | `results:read` | `GET /v1/mcp-server` | Your own MCP server's URL, whether a token is stored, its newest grade in full (score, letter, whether it is partial and why, each category and check with its finding and fix, each tool's documentation score) and the scores of the newest 50. See [MCP server grade](mcp-server.md). |
 | `set_mcp_server` | `config:write` | `PUT /v1/mcp-server` | Set the MCP server URL. Another origin deletes the stored token; an empty URL removes the server and its token. |
 | `grade_mcp_server` | `runs:write` | `POST /v1/mcp-server/grade` | Grade the MCP server now, such as after a deploy, and return the new grade. Never calls a tool; takes up to 30 seconds. |
 | `status` | `results:read` | `GET /v1/status` | Byname's version and whether onboarding is done. |

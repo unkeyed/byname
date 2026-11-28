@@ -12,7 +12,7 @@ import (
 
 func addMCPGradeTools(srv *mcp.Server, svc app.Services) {
 	addTool(srv, core.ResultsRead, &mcp.Tool{Name: "mcp_server_grade", Annotations: readOnly(),
-		Description: "The entity's own MCP server graded against the MCP spec essentials: the URL, whether a token is stored (never the token), the newest grade in full (0 to 100 score, letter, whether it is complete, each category's score and each check's status, finding and fix, and each tool's documentation score) and the scores of the newest 50 grades. GET /v1/mcp-server."},
+		Description: "The entity's own MCP server graded against the MCP spec essentials: the URL, whether a token is stored (never the token), the newest grade in full (0 to 100 score, letter, whether it is partial and why, each category's score and each check's status, finding and fix, and each tool's documentation score) and the scores of the newest 50 grades. GET /v1/mcp-server."},
 		func(ctx context.Context, _ core.Actor, _ noInput) (mcpgrade.Server, error) {
 			return svc.MCPGrade.Server(ctx)
 		})

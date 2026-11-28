@@ -14,7 +14,7 @@ func score(o *observation) Report {
 	if o.session != nil {
 		tools = o.session.tools
 	}
-	r := Report{Rules: rules, Complete: true, Server: serverInfo(o), Tools: make([]Tool, len(tools))}
+	r := Report{Rules: rules, Server: serverInfo(o), Tools: make([]Tool, len(tools))}
 	for i, t := range tools {
 		r.Tools[i] = describe(t)
 	}
@@ -70,7 +70,7 @@ func score(o *observation) Report {
 		case cat.required:
 			c.Score = new(0)
 			c.Note = c.Checks[0].Finding
-			r.Complete = false
+			r.Partial = partialReason(o)
 		default:
 			c.Note = c.Checks[0].Finding
 		}
@@ -83,6 +83,19 @@ func score(o *observation) Report {
 	r.Score = int(math.Round(float64(sum) / float64(counted)))
 	r.Grade = letter(r.Score)
 	return r
+}
+
+// partialReason follows the notes the skipped checks carry: without a
+// session the tool checks say noSession(o), and with one the only required
+// category that can go unassessed is documentation, when no tool is listed.
+func partialReason(o *observation) PartialReason {
+	switch {
+	case needsToken(o):
+		return NeedsToken
+	case o.session == nil:
+		return NoSession
+	}
+	return NoTools
 }
 
 const maxNamed = 5

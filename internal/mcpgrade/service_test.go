@@ -188,7 +188,7 @@ func TestRunGradesAndStores(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if v.Latest == nil || v.Latest.Complete || v.Latest.Server.TokenUsed || v.Latest.URL != srv.URL || len(v.History) != 1 {
+	if v.Latest == nil || v.Latest.Partial != mcpgrade.NeedsToken || v.Latest.Server.TokenUsed || v.Latest.URL != srv.URL || len(v.History) != 1 {
 		t.Fatalf("a grade behind sign-in without a token = %+v", v)
 	}
 	partial := v.Latest.Score
@@ -199,8 +199,8 @@ func TestRunGradesAndStores(t *testing.T) {
 	if v, err = e.svc.Run(e.ctx); err != nil {
 		t.Fatal(err)
 	}
-	if !v.Latest.Complete || !v.Latest.Server.TokenUsed || len(v.Latest.Tools) != 1 || v.Latest.Score <= partial {
-		t.Fatalf("a grade with the token = complete %v, token used %v, %d tools, score %d after %d", v.Latest.Complete, v.Latest.Server.TokenUsed, len(v.Latest.Tools), v.Latest.Score, partial)
+	if v.Latest.Partial != mcpgrade.Complete || !v.Latest.Server.TokenUsed || len(v.Latest.Tools) != 1 || v.Latest.Score <= partial {
+		t.Fatalf("a grade with the token = partial %q, token used %v, %d tools, score %d after %d", v.Latest.Partial, v.Latest.Server.TokenUsed, len(v.Latest.Tools), v.Latest.Score, partial)
 	}
 	if !srv.sawBearer() {
 		t.Error("the server never saw the token")
