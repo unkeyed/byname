@@ -189,9 +189,6 @@ func TestMCPServerGradeOverHTTP(t *testing.T) {
 	}
 }
 
-// A paid review of tool docs: runs:write queues it once a Treg token is
-// stored, the scheduler runs it, and its spend shows in Check history and
-// the month's costs.
 func TestMCPToolReviewOverHTTP(t *testing.T) {
 	c := newServer(t)
 	person, agent := login(t, c)

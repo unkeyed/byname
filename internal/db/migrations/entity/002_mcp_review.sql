@@ -1,7 +1,5 @@
 CREATE TABLE mcp_review (
     id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    -- The tool's definition hash and the prompt version: an unchanged tool
-    -- is never paid for twice, and a new prompt reviews every tool again.
     review_key text NOT NULL,
     tool_name text NOT NULL,
     job_run_id bigint REFERENCES job_run (id) ON DELETE SET NULL,
@@ -12,7 +10,6 @@ CREATE TABLE mcp_review (
     description_reason text,
     inputs_score smallint CHECK (inputs_score BETWEEN 0 AND 100),
     inputs_reason text,
-    -- NULL when the call reported no cost, never 0.
     cost_usd numeric(12,6),
     treg_call_id text NOT NULL DEFAULT '',
     error text,

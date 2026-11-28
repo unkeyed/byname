@@ -428,8 +428,6 @@ function ReviewCard({ r }: { r: McpReview }) {
     },
   });
   const open = reviewOpen(r.status);
-  // A toast only for a review this page watched end, not for one that
-  // ended before the page opened.
   const watched = useRef(open);
   useEffect(() => {
     if (open) watched.current = true;

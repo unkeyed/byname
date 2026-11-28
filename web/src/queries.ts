@@ -115,7 +115,6 @@ export const useChanges = () => useQuery({ queryKey: keys.changeList, queryFn: a
 export const useChangeSettings = () => useQuery({ queryKey: keys.changeSettings, queryFn: api.changes.settings, staleTime: 60_000 });
 export const useControlPages = () => useQuery({ queryKey: keys.controlPages, queryFn: api.controlPages.list });
 export const useRepo = () => useQuery({ queryKey: keys.repo, queryFn: api.repo.get });
-/** Polls while a review of the tool docs is queued or running. */
 export const useMcpServer = () =>
   useQuery({
     queryKey: keys.mcpServer,

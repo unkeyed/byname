@@ -57,14 +57,11 @@ type Options struct {
 	// OtherBrands reads past answers for other brands and looks up
 	// logos, in order; empty when not wired.
 	OtherBrands []Ticker
-	// MCPReview runs a review of MCP tool documentation someone asked
-	// for; nil when not wired.
-	MCPReview Ticker
+	MCPReview   Ticker
 }
 
 // Ticker is a job that decides itself what is due on each tick and holds
-// its own advisory lock: internal/discovery, internal/logos and
-// internal/mcpgrade.
+// its own advisory lock.
 type Ticker interface {
 	Tick(ctx context.Context) error
 }
@@ -181,8 +178,6 @@ func (s *Scheduler) Tick(ctx context.Context) {
 			}
 		})
 	}
-	// MCP tool review: one paid call per tool, up to 100 of them, so it
-	// too runs on its own goroutine.
 	if s.review != nil && s.reviewing.CompareAndSwap(false, true) {
 		s.reviews.Go(func() {
 			defer s.reviewing.Store(false)

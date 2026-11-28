@@ -1508,7 +1508,6 @@ export interface McpTool {
   score: number;
   marks: { check: string; status: McpStatus; finding: string }[];
   key: string;
-  /** The model's review of this definition, from any grade where it is unchanged. */
   review: McpToolReview | null;
 }
 
@@ -1518,7 +1517,6 @@ export interface McpReviewPart {
 }
 
 export interface McpToolReview {
-  /** (15 × title + 35 × description + 30 × inputs) / 80, the rules' weights. */
   score: number;
   title: McpReviewPart;
   description: McpReviewPart;
@@ -1527,7 +1525,6 @@ export interface McpToolReview {
 
 export type McpReviewStatus = "none" | "queued" | "running" | "completed" | "capped" | "refused" | "failed";
 
-/** The paid review of the newest grade's tool docs. Advisory: it never changes the grade's score. */
 export interface McpReview {
   status: McpReviewStatus;
   error: string;
@@ -1535,10 +1532,8 @@ export interface McpReview {
   reviewed: number;
   tools: number;
   score: number | null;
-  /** What the latest review spent; null before any or when no call reported a cost. */
   cost_usd: number | null;
   estimate_usd: number;
-  /** Tools without a review of their current definition, at most 100. */
   estimate_tools: number;
 }
 

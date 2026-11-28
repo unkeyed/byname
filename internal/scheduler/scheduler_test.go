@@ -261,8 +261,6 @@ type slowReview struct{ *slowSearch }
 
 func (r slowReview) Tick(ctx context.Context) error { return r.SyncIfDue(ctx) }
 
-// TestMCPReviewDoesNotHoldUpChecks: a review of up to 100 tools runs
-// beside the checks, and never twice at once.
 func TestMCPReviewDoesNotHoldUpChecks(t *testing.T) {
 	e := setup(t)
 	p := e.process(nil)

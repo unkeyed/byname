@@ -19,9 +19,6 @@ import (
 
 const goodReview = `{"title":{"score":80,"reason":"Clear."},"description":{"score":60,"reason":"Say what it returns."},"inputs":{"score":40,"reason":"Describe the query."}}`
 
-// reviewing readies e for a review: a Treg token, settings with a monthly
-// cap of capUSD (nil for none), and the model's reply goodReview unless
-// reply answers a tool by name.
 func (e *env) reviewing(capUSD *float64, reply map[string]string) {
 	e.t.Helper()
 	st := checkstest.Settings()
@@ -42,8 +39,6 @@ func (e *env) reviewing(capUSD *float64, reply map[string]string) {
 	})
 }
 
-// graded stores a grade listing tools, each keyed by its name and the
-// given definition version, with rule scores in the order given.
 func (e *env) graded(version string, names ...string) {
 	e.t.Helper()
 	r := mcpgrade.Report{Rules: "2026-11", Score: 72, Grade: "B", Categories: []mcpgrade.Category{}}

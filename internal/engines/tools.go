@@ -23,9 +23,6 @@ var (
 	// DataForSEO bills $0.0006 a call plus the model's tokens, about $0.002
 	// for an answer of 3,000 characters.
 	BrandFinder = Tool{ID: claudeAPI.ID, Model: "claude-haiku-4-5", SampleCostUSD: 0.003}
-	// MCPReviewer judges one MCP tool's documentation, on the same route
-	// and model as BrandFinder. A definition is up to 5,000 characters, so
-	// a call costs about what reading an answer does.
 	MCPReviewer = Tool{ID: claudeAPI.ID, Model: "claude-haiku-4-5", SampleCostUSD: 0.003}
 	// BrandByDomain is Context.dev's brand record for a domain: logos and
 	// colours. 10 Context.dev credits a call, charged only on a hit.

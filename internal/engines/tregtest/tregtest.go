@@ -3,8 +3,7 @@
 // tool from internal/engines/testdata, sets X-Treg-Cost-Micro the way Treg
 // does, and replays a repeated Idempotency-Key the way Treg does. A call
 // that reads an answer for other brands (engines.BrandFinder with a system
-// message) gets FindFixture's reply instead of the tool's answer, and Reply
-// answers any call a test wants to answer itself.
+// message) gets FindFixture's reply instead of the tool's answer.
 package tregtest
 
 import (
@@ -59,10 +58,8 @@ type Call struct {
 	Token          string
 	IdempotencyKey string
 	Replay         bool
-	// Find is a call to engines.BrandFinder's tool with a system message,
-	// which is how other brands are read.
-	Find bool
-	Sent string
+	Find           bool
+	Sent           string
 }
 
 // Refusal makes the fake answer as Treg refusing on its own behalf.
@@ -146,7 +143,6 @@ func (s *Server) Reply(f func(Call) []byte) {
 	s.reply = f
 }
 
-// LLMBody is DataForSEO's LLM Responses body with one message, text.
 func LLMBody(text string) []byte {
 	b, _ := json.Marshal(map[string]any{"status_code": 20000, "tasks": []any{map[string]any{"status_code": 20000,
 		"result": []any{map[string]any{"model_name": "claude-haiku-4-5", "items": []any{map[string]any{"type": "message",

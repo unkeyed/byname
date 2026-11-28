@@ -39,7 +39,6 @@ export const reviewOpen = (s: McpReviewStatus) => s === "queued" || s === "runni
 
 export const toolCount = (n: number) => `${n} ${n === 1 ? "tool" : "tools"}`;
 
-/** The tool documentation tile's score: the rules', with the model's beside it once there is one. */
 export const docScore = (rules: number, review: Pick<McpReview, "score">) => (review.score == null ? `${rules}` : `Rules ${rules} · AI ${review.score}`);
 
 const stopped: Partial<Record<McpReviewStatus, string>> = {
@@ -48,10 +47,8 @@ const stopped: Partial<Record<McpReviewStatus, string>> = {
   failed: "The review failed.",
 };
 
-/** Why the latest review ended early, or null when it did not. */
 export const reviewStopped = (r: Pick<McpReview, "status">) => stopped[r.status] ?? null;
 
-/** What a toast says when a review someone watched ends. */
 export function reviewDone(r: Pick<McpReview, "status" | "reviewed" | "tools" | "score">): string {
   const done = `${r.reviewed} of ${toolCount(r.tools)} reviewed`;
   if (r.status === "completed") return r.score == null ? `Review done: ${done}.` : `Review done: ${done}, AI score ${r.score}.`;
