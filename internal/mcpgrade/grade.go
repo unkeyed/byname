@@ -48,9 +48,13 @@ func Grade(ctx context.Context, t Target) (Report, error) {
 
 // Report is one grade.
 type Report struct {
-	Rules      string     `json:"rules" jsonschema:"the version of the check catalog this grade used"`
-	Score      int        `json:"score" jsonschema:"0 to 100, the equal-weight mean of the categories that count"`
-	Grade      Letter     `json:"grade"`
+	Rules string `json:"rules" jsonschema:"the version of the check catalog this grade used"`
+	Score int    `json:"score" jsonschema:"0 to 100, the equal-weight mean of the categories that count"`
+	Grade Letter `json:"grade"`
+	// Complete is false when a required category counted as 0 because
+	// nothing in it could be assessed, such as when sign-in blocked the
+	// tool checks.
+	Complete   bool       `json:"complete" jsonschema:"false when a required category counted as 0 because none of its checks could be assessed"`
 	Server     ServerInfo `json:"server"`
 	Categories []Category `json:"categories"`
 	Tools      []Tool     `json:"tools" jsonschema:"each tool as listed, with its documentation score by the rules"`
