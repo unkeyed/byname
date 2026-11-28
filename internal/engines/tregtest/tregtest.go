@@ -3,7 +3,8 @@
 // tool from internal/engines/testdata, sets X-Treg-Cost-Micro the way Treg
 // does, and replays a repeated Idempotency-Key the way Treg does. A call
 // that reads an answer for other brands (engines.BrandFinder with a system
-// message) gets FindFixture's reply instead of the tool's answer.
+// message) gets FindFixture's reply instead of the tool's answer, and Reply
+// answers any call a test wants to answer itself.
 package tregtest
 
 import (
@@ -58,9 +59,10 @@ type Call struct {
 	Token          string
 	IdempotencyKey string
 	Replay         bool
-	// Find is a call reading an answer for other brands, and Sent its
-	// request body.
+	// Find is a call to engines.BrandFinder's tool with a system message,
+	// which is how other brands are read.
 	Find bool
+	// Sent is the request body.
 	Sent string
 }
 
@@ -79,6 +81,7 @@ type Server struct {
 	paid   map[string]int64
 	bodies map[string][]byte
 	find   []byte
+	reply  func(Call) []byte
 	// Before runs for each call before it is answered. A non-nil Refusal
 	// refuses it.
 	before func(Call) *Refusal
@@ -136,6 +139,22 @@ func (s *Server) SetFindBody(body []byte) {
 	s.find = body
 }
 
+// Reply installs a hook that answers a call with the body it returns, or
+// leaves it to the fixtures by returning nil.
+func (s *Server) Reply(f func(Call) []byte) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.reply = f
+}
+
+// LLMBody is DataForSEO's LLM Responses body with one message, text.
+func LLMBody(text string) []byte {
+	b, _ := json.Marshal(map[string]any{"status_code": 20000, "tasks": []any{map[string]any{"status_code": 20000,
+		"result": []any{map[string]any{"model_name": "claude-haiku-4-5", "items": []any{map[string]any{"type": "message",
+			"sections": []any{map[string]any{"type": "text", "text": text}}}}}}}}})
+	return b
+}
+
 // Before installs a hook that runs before each call is answered.
 func (s *Server) Before(f func(Call) *Refusal) {
 	s.mu.Lock()
@@ -174,21 +193,24 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request) {
 	tool, ok := strings.CutPrefix(r.URL.Path, "/call/")
 	c := Call{Tool: tool, Token: r.Header.Get("X-Treg-Token"), IdempotencyKey: r.Header.Get("Idempotency-Key")}
 	sent, _ := io.ReadAll(r.Body)
+	c.Sent = string(sent)
 	c.Find = tool == engines.BrandFinder.ID && bytes.Contains(sent, []byte(`"system_message"`))
-	if c.Find {
-		c.Sent = string(sent)
-	}
 	s.mu.Lock()
 	body, known := s.bodies[tool]
 	if c.Find {
 		body = s.find
 	}
-	before := s.before
+	reply, before := s.reply, s.before
 	price, priced := s.cost[tool]
 	original, replay := s.paid[c.IdempotencyKey]
 	c.Replay = replay && c.IdempotencyKey != ""
 	s.calls = append(s.calls, c)
 	s.mu.Unlock()
+	if reply != nil {
+		if b := reply(c); b != nil {
+			body = b
+		}
+	}
 
 	if !ok || !known {
 		refuse(w, http.StatusNotFound, "unknown_tool")
