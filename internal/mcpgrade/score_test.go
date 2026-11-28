@@ -139,8 +139,8 @@ func TestGoodServerScoresFull(t *testing.T) {
 			}
 		}
 	}
-	if r.Score != 100 || r.Grade != "A+" {
-		t.Errorf("score %d %s, want 100 A+", r.Score, r.Grade)
+	if r.Score != 100 || r.Grade != "A+" || !r.Complete {
+		t.Errorf("score %d %s complete %v, want 100 A+ complete", r.Score, r.Grade, r.Complete)
 	}
 	if c := categoryIn(t, r, "authorization"); c.Score != nil || c.Note != "The server did not ask for sign-in" {
 		t.Errorf("authorization without a 401 should be dropped with a note, got %s %q", scoreOf(c), c.Note)
@@ -173,6 +173,9 @@ func TestSignInWithoutToken(t *testing.T) {
 	if r.Score != 50 || r.Grade != "D" {
 		t.Errorf("overall %d %s, want the mean of six categories, 50 D", r.Score, r.Grade)
 	}
+	if r.Complete {
+		t.Error("a grade whose tool checks sign-in blocked says it is complete")
+	}
 }
 
 func TestOptionalCategoryCountsWhenAnyCheckIsAssessed(t *testing.T) {
@@ -184,8 +187,8 @@ func TestOptionalCategoryCountsWhenAnyCheckIsAssessed(t *testing.T) {
 	if c := categoryIn(t, r, "discoverability"); scoreOf(c) != "0" {
 		t.Errorf("discoverability with two failures and one skip should score 0, got %s", scoreOf(c))
 	}
-	if r.Score != 80 {
-		t.Errorf("overall %d, want (100*4 + 0)/5 = 80", r.Score)
+	if r.Score != 80 || !r.Complete {
+		t.Errorf("overall %d complete %v, want (100*4 + 0)/5 = 80 and complete: an optional category is never what makes a grade partial", r.Score, r.Complete)
 	}
 }
 

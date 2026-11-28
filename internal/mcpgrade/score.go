@@ -14,7 +14,7 @@ func score(o *observation) Report {
 	if o.session != nil {
 		tools = o.session.tools
 	}
-	r := Report{Rules: rules, Server: serverInfo(o), Tools: make([]Tool, len(tools))}
+	r := Report{Rules: rules, Complete: true, Server: serverInfo(o), Tools: make([]Tool, len(tools))}
 	for i, t := range tools {
 		r.Tools[i] = describe(t)
 	}
@@ -70,6 +70,7 @@ func score(o *observation) Report {
 		case cat.required:
 			c.Score = new(0)
 			c.Note = c.Checks[0].Finding
+			r.Complete = false
 		default:
 			c.Note = c.Checks[0].Finding
 		}
