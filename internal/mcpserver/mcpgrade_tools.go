@@ -10,9 +10,6 @@ import (
 	"github.com/unkeyed/byname/internal/mcpgrade"
 )
 
-// addMCPGradeTools registers the tools for the entity's own MCP server
-// grade. Setting the token stays with a signed-in admin, so no tool sets
-// or reads it.
 func addMCPGradeTools(srv *mcp.Server, svc app.Services) {
 	addTool(srv, core.ResultsRead, &mcp.Tool{Name: "mcp_server_grade", Annotations: readOnly(),
 		Description: "The entity's own MCP server graded against the MCP spec essentials: the URL, whether a token is stored (never the token), the newest grade in full (0 to 100 score, letter, whether it is complete, each category's score and each check's status, finding and fix, and each tool's documentation score) and the scores of the newest 50 grades. GET /v1/mcp-server."},

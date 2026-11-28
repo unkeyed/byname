@@ -23,7 +23,6 @@ export function McpServer() {
   );
 }
 
-/** Grading runs in one mutation the whole page shares, so the score card and the URL form show the same progress. */
 function useGrade() {
   const qc = useQueryClient();
   return useMutation({ mutationFn: api.mcpServer.grade, onSuccess: (s) => qc.setQueryData(keys.mcpServer, s) });

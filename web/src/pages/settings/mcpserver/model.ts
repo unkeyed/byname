@@ -9,14 +9,8 @@ const letterTones: Record<McpLetter, Tone> = { "A+": "success", A: "success", B:
 
 export const letterTone = (l: McpLetter): Tone => letterTones[l];
 
-/** The CSS color of a letter's tone, for the score ring. */
 export const letterColor = (l: McpLetter) => `var(--${letterTones[l]})`;
 
-/**
- * Why a grade is partial, or null when it is complete. The notes are the
- * ones internal/mcpgrade gives a required category none of whose checks
- * could run.
- */
 export function partialNote(g: Pick<McpGrade, "complete" | "categories">): string | null {
   if (g.complete) return null;
   const notes = g.categories.filter((c) => c.score === 0).map((c) => c.note);
@@ -36,8 +30,6 @@ export function duration(ms: number | null): string {
   return ms < 1000 ? `${ms} ms` : `${(ms / 1000).toFixed(1)} s`;
 }
 
-/** The per-tool checks a tool fell short on. */
 export const shortfalls = (t: Pick<McpTool, "marks">) => t.marks.filter((m) => m.status === "fail" || m.status === "partial");
 
-/** Scores oldest first, as a sparkline draws them. */
 export const scoresOverTime = (history: Pick<McpGradeSummary, "score">[]) => history.map((h) => h.score).reverse();

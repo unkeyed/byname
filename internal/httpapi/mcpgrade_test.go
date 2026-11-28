@@ -23,7 +23,6 @@ func fakeMCPRegistry(t *testing.T) string {
 	return srv.URL
 }
 
-// northwindMCP is an MCP server that asks for mcpToken.
 func northwindMCP(t *testing.T) string {
 	t.Helper()
 	srv := mcp.NewServer(&mcp.Implementation{Name: "northwind", Title: "Northwind", Version: "1.0.0"}, nil)
