@@ -38,3 +38,8 @@ func (s *server) gradeMCPServer(w http.ResponseWriter, r *http.Request, _ core.A
 	v, err := s.svc.MCPGrade.Run(r.Context())
 	return respond(w, http.StatusOK, v, err)
 }
+
+func (s *server) reviewMCPTools(w http.ResponseWriter, r *http.Request, _ core.Actor) error {
+	v, err := s.svc.MCPGrade.StartReview(r.Context())
+	return respond(w, http.StatusOK, v, err)
+}

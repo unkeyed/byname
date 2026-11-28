@@ -186,6 +186,7 @@ var routes = []route{
 	{"PUT /v1/mcp-server", needs(core.ConfigWrite), (*server).setMCPServer},
 	{"PUT /v1/mcp-server/token", admin, (*server).setMCPServerToken},
 	{"POST /v1/mcp-server/grade", needs(core.RunsWrite), (*server).gradeMCPServer},
+	{"POST /v1/mcp-server/review", needs(core.RunsWrite), (*server).reviewMCPTools},
 
 	{"GET /v1/keys", admin, (*server).listKeys},
 	{"POST /v1/keys", admin, (*server).createKey},
