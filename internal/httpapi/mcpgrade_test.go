@@ -110,7 +110,8 @@ func TestMCPServerGradeOverHTTP(t *testing.T) {
 	}
 	partial := v.Latest.ID
 
-	keep(person.call("PUT", "/v1/mcp-server/token", map[string]string{"token": mcpToken}, http.StatusOK, &v))
+	person.call("PUT", "/v1/mcp-server/token", map[string]string{"token": mcpToken, "url": "https://mcp.elsewhere.example/mcp"}, http.StatusConflict, nil)
+	keep(person.call("PUT", "/v1/mcp-server/token", map[string]string{"token": mcpToken, "url": endpoint}, http.StatusOK, &v))
 	if !v.TokenSet {
 		t.Fatal("token_set is false after an admin set it")
 	}
@@ -190,7 +191,7 @@ func TestMCPServerToolsOverMCP(t *testing.T) {
 	if v := call("set_mcp_server", map[string]any{"url": endpoint}); v.URL != endpoint {
 		t.Fatalf("set_mcp_server = %+v", v)
 	}
-	person.call("PUT", "/v1/mcp-server/token", map[string]string{"token": mcpToken}, http.StatusOK, nil)
+	person.call("PUT", "/v1/mcp-server/token", map[string]string{"token": mcpToken, "url": endpoint}, http.StatusOK, nil)
 	if v := call("grade_mcp_server", nil); v.Latest == nil || v.Latest.Partial != "" || len(v.Latest.Tools) != 1 {
 		t.Fatalf("grade_mcp_server = %+v", v.Latest)
 	}

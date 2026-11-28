@@ -1,6 +1,6 @@
 import { useState, type FormEvent, type ReactNode } from "react";
 import { useIsMutating, useMutation, useMutationState, useQueryClient } from "@tanstack/react-query";
-import { api, type McpCategory, type McpGrade, type McpServer as Server, type McpTool } from "../../api";
+import { api, ApiError, type McpCategory, type McpGrade, type McpServer as Server, type McpTool } from "../../api";
 import { Donut, Sparkline } from "../../charts";
 import { ReadOnlyNote } from "../../config/forms";
 import { keys, useCan, useIsAdmin, useMcpServer } from "../../queries";
@@ -87,10 +87,14 @@ function GradeButton({ label = "Grade again" }: { label?: string }) {
 }
 
 function NotGraded() {
+  const grade = useGrade();
   return (
-    <EmptyState icon="chart" title="Not graded yet" action={<GradeButton label="Grade now" />}>
-      {gradingHint}
-    </EmptyState>
+    <div className="space-y-3">
+      <EmptyState icon="chart" title="Not graded yet" action={<GradeButton label="Grade now" />}>
+        {gradingHint}
+      </EmptyState>
+      <ErrorNote error={grade.error} />
+    </div>
   );
 }
 
@@ -138,12 +142,18 @@ function TokenRow({ s }: { s: Server }) {
   const grade = useGrade();
   const admin = useIsAdmin();
   const [token, setToken] = useState("");
+  // The URL is captured at submit, so a retry after reauth still names the
+  // server the admin saw. A 409 means an editor changed it; refetch to show it.
   const set = useReauthMutation({
-    mutationFn: (v: string) => api.mcpServer.setToken(v),
+    mutationFn: (v: { url: string; token: string }) =>
+      api.mcpServer.setToken(v.url, v.token).catch((err: unknown) => {
+        if (err instanceof ApiError && err.status === 409) void qc.invalidateQueries({ queryKey: keys.mcpServer });
+        throw err;
+      }),
     onSuccess: (st, v) => {
       setToken("");
       qc.setQueryData(keys.mcpServer, st);
-      if (v) grade.run();
+      if (v.token) grade.run();
     },
   });
   const status = s.token_set ? <Badge tone="success">Token set</Badge> : <Badge tone="outline">No token</Badge>;
@@ -157,7 +167,7 @@ function TokenRow({ s }: { s: Server }) {
   }
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    if (token.trim()) set.mutate(token.trim());
+    if (token.trim()) set.mutate({ url: s.url, token: token.trim() });
   };
   return (
     <div className="rounded-surface border border-line p-3">
@@ -182,7 +192,7 @@ function TokenRow({ s }: { s: Server }) {
             {set.isPending ? "Saving…" : s.token_set ? "Replace" : "Save token"}
           </Button>
           {s.token_set && (
-            <ConfirmButton label="Delete token" confirmLabel="Delete?" onConfirm={() => set.mutate("")} disabled={set.isPending}>
+            <ConfirmButton label="Delete token" confirmLabel="Delete?" onConfirm={() => set.mutate({ url: s.url, token: "" })} disabled={set.isPending}>
               <Icon name="x" className="size-3.5" />
               Delete
             </ConfirmButton>
