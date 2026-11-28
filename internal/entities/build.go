@@ -54,9 +54,9 @@ type Options struct {
 	BingBaseURL   string
 	GitHubBaseURL string
 	// BlueskyBaseURL replaces Bluesky's search API.
-	BlueskyBaseURL      string
-	SourcesAllowPrivate bool
-	MCPRegistryURL      string
+	BlueskyBaseURL       string
+	AllowPrivateNetworks bool
+	MCPRegistryURL       string
 }
 
 // Build makes the services of the entity pool is bound to, and run,
@@ -77,7 +77,7 @@ func Build(w db.Entity, pool db.Pool, o Options) (app.Services, func(context.Con
 		HTTPClient: &http.Client{}, Resolve: o.Resolve, Alerts: alerts,
 	})
 	brands := discovery.New(pool, settings, discovery.Options{Log: log})
-	logoLookups := logos.New(pool, settings, logos.Options{Log: log, Client: sources.PublicClient(o.SourcesAllowPrivate)})
+	logoLookups := logos.New(pool, settings, logos.Options{Log: log, Client: sources.PublicClient(o.AllowPrivateNetworks)})
 	runs := checks.New(pool, settings, checks.Options{Log: log, Alerts: alerts, Finder: brands})
 	traffic := search.New(pool, search.Options{
 		Secrets: o.Secrets, BaseURLs: map[search.Provider]string{search.Google: o.GSCBaseURL, search.Bing: o.BingBaseURL}, GoogleClient: o.GSCClient,
@@ -89,10 +89,10 @@ func Build(w db.Entity, pool db.Pool, o Options) (app.Services, func(context.Con
 		Instance: instance.New(o.Version, pool, settings, mentions, brands), Config: settings, Checks: runs, Results: res, Notify: alerts,
 		Search: traffic, Changes: site, Social: mentions, Discovery: brands, Logos: logoLookups,
 		MCPGrade: mcpgrade.New(pool, mcpgrade.Options{
-			Secrets: o.Secrets, AllowPrivate: o.SourcesAllowPrivate, UserAgent: "Byname/" + o.Version, RegistryURL: o.MCPRegistryURL,
+			Secrets: o.Secrets, AllowPrivate: o.AllowPrivateNetworks, UserAgent: "Byname/" + o.Version, RegistryURL: o.MCPRegistryURL,
 		}),
 	}
-	cited := sources.New(pool, settings, sources.Options{AllowPrivate: o.SourcesAllowPrivate, UserAgent: "Byname/" + o.Version, Log: log})
+	cited := sources.New(pool, settings, sources.Options{AllowPrivate: o.AllowPrivateNetworks, UserAgent: "Byname/" + o.Version, Log: log})
 	run := func(ctx context.Context) {
 		var jobs sync.WaitGroup
 		jobs.Go(func() {
