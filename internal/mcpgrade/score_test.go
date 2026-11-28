@@ -43,6 +43,7 @@ func good() *observation {
 			badVersion: httpSeen{status: 400},
 			unknownRPC: rpcSeen{code: -32601},
 			origin:     httpSeen{status: 403},
+			control:    httpSeen{status: 200},
 		},
 		html:     httpSeen{status: 200, contentType: "text/html; charset=utf-8"},
 		manifest: manifestSeen{at: "https://mcp.example.com/.well-known/mcp.json", namesEndpoint: true},
@@ -215,6 +216,9 @@ func TestChecks(t *testing.T) {
 		{"wrong error code", func(o *observation) { o.session.unknownRPC = rpcSeen{code: -32600} }, "connection.unknown_method", Fail, 0},
 		{"accepts a foreign origin", func(o *observation) { o.session.origin = httpSeen{status: 200} }, "connection.origin", Fail, 0},
 		{"refuses origin with 400", func(o *observation) { o.session.origin = httpSeen{status: 400} }, "connection.origin", Pass, 1},
+		{"400 with or without the origin", func(o *observation) {
+			o.session.origin, o.session.control = httpSeen{status: 400}, httpSeen{status: 400}
+		}, "connection.origin", Fail, 0},
 
 		{"no 401 skips authorization", func(o *observation) {}, "authorization.pkce", Skipped, 0},
 		{"bearer without resource_metadata", func(o *observation) {

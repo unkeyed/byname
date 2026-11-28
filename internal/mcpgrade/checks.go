@@ -303,14 +303,18 @@ func checkUnknownMethod(o *observation) mark {
 
 func checkOrigin(o *observation) mark {
 	return withSession(o, func(s *sessionSeen) mark {
-		switch h := s.origin; {
+		h, c := s.origin, s.control
+		switch {
 		case h.err != nil:
 			return fail(errLine(h.err))
-		case h.status == 403 || h.status == 400:
-			return pass(fmt.Sprintf("Answered HTTP %d", h.status))
-		default:
-			return fail(fmt.Sprintf("Answered HTTP %d to Origin https://byname-probe.invalid", h.status))
+		case h.status == 403:
+			return pass("Answered HTTP 403")
+		case h.status == 400 && c.status >= 200 && c.status < 300:
+			return pass(fmt.Sprintf("Answered HTTP 400, and HTTP %d without the Origin", c.status))
+		case h.status == c.status:
+			return fail(fmt.Sprintf("Answered HTTP %d with or without Origin %s", h.status, probeOrigin))
 		}
+		return fail(fmt.Sprintf("Answered HTTP %d to Origin %s", h.status, probeOrigin))
 	})
 }
 

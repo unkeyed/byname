@@ -10,6 +10,7 @@
 package mcpgrade
 
 import (
+	"context"
 	"net/http"
 	"time"
 )
@@ -38,6 +39,20 @@ const (
 	rules           = "2026-11"
 	defaultRegistry = "https://registry.modelcontextprotocol.io"
 )
+
+// Grade probes the server once and scores it. A server that is down,
+// refuses us or speaks nonsense is not an error: it is a low grade whose
+// checks say why. The error is only ctx's, so a shutdown never yields a
+// half-probed report.
+func Grade(ctx context.Context, t Target) (Report, error) {
+	pctx, cancel := context.WithTimeout(ctx, deadline)
+	defer cancel()
+	o := probe(pctx, t)
+	if err := ctx.Err(); err != nil {
+		return Report{}, err
+	}
+	return score(o), nil
+}
 
 // Report is one grade.
 type Report struct {
