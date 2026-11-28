@@ -8492,7 +8492,7 @@ components:
     MCPGrade:
       type: object
       description: One grade. The score is the equal-weight mean of the categories that count.
-      required: [id, graded_at, url, rules, score, grade, complete, server, categories, tools]
+      required: [id, graded_at, url, rules, score, grade, partial, server, categories, tools]
       properties:
         id:
           type: integer
@@ -8510,9 +8510,10 @@ components:
           maximum: 100
         grade:
           $ref: "#/components/schemas/MCPLetter"
-        complete:
-          type: boolean
-          description: False when a required category counted as 0 because none of its checks could be assessed, such as when sign-in blocked the tool checks.
+        partial:
+          type: string
+          enum: ["", needs_token, no_session, no_tools]
+          description: Empty when the grade is complete. Otherwise why a required category counted as 0 because none of its checks could be assessed. needs_token means sign-in blocked the session and no token is stored, no_session means no session started for another reason (connection says why), no_tools means the server listed no tools.
         server:
           type: object
           required: [name, title, version, protocol_version, transport, negotiate_ms, token_used]

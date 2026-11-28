@@ -40,7 +40,7 @@ The sign-in checks always run without the token, so storing one never hides a br
 
 Each check earns all, part or none of its weight: **pass**, **partial** or **fail**. A check that does not apply is **skipped** and leaves the sums. A category's score is the weight its checks earned over the weight of the checks that applied, from 0 to 100.
 
-The overall score is the mean of the categories that count, each weighing the same. Connection, server metadata, tool definitions and tool documentation always count. Authorization counts only when the server asks for sign-in. Discoverability would be left out if none of its checks could run, but the manifest and setup page checks run on every grade, so it counts too. When a category that always counts has no check that could run, such as when sign-in blocked the session, it counts as 0, and the grade says it is partial.
+The overall score is the mean of the categories that count, each weighing the same. Connection, server metadata, tool definitions and tool documentation always count. Authorization counts only when the server asks for sign-in. Discoverability would be left out if none of its checks could run, but the manifest and setup page checks run on every grade, so it counts too. When a category that always counts has no check that could run, such as when sign-in blocked the session, it counts as 0, and the grade says it is partial. Its `partial` field says why: `needs_token` when sign-in blocked the session and no token is stored, `no_session` when no session started for another reason, and `no_tools` when the server listed no tools. It is empty when the grade is complete.
 
 | Letter | Score |
 |---|---|

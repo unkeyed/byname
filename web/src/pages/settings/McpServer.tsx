@@ -192,7 +192,7 @@ function TokenRow({ s, grade }: { s: Server; grade: Grade }) {
 }
 
 function ScoreCard({ g, current, grade }: { g: McpGrade; current: string; grade: Grade }) {
-  const note = partialNote(g);
+  const note = partialNote(g.partial);
   const rows: [string, ReactNode][] = [
     ["Server", <span className="font-mono text-xs [overflow-wrap:anywhere]">{g.url}</span>],
     ["Graded", <RelativeTime iso={g.graded_at} />],
