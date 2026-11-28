@@ -48,13 +48,25 @@ func Grade(ctx context.Context, t Target) (Report, error) {
 
 // Report is one grade.
 type Report struct {
-	Rules      string     `json:"rules" jsonschema:"the version of the check catalog this grade used"`
-	Score      int        `json:"score" jsonschema:"0 to 100, the equal-weight mean of the categories that count"`
-	Grade      Letter     `json:"grade"`
-	Server     ServerInfo `json:"server"`
-	Categories []Category `json:"categories"`
-	Tools      []Tool     `json:"tools" jsonschema:"each tool as listed, with its documentation score by the rules"`
+	Rules      string        `json:"rules" jsonschema:"the version of the check catalog this grade used"`
+	Score      int           `json:"score" jsonschema:"0 to 100, the equal-weight mean of the categories that count"`
+	Grade      Letter        `json:"grade"`
+	Partial    PartialReason `json:"partial" jsonschema:"empty when complete; else why a required category counted as 0: needs_token, no_session or no_tools"`
+	Server     ServerInfo    `json:"server"`
+	Categories []Category    `json:"categories"`
+	Tools      []Tool        `json:"tools" jsonschema:"each tool as listed, with its documentation score by the rules"`
 }
+
+// PartialReason says why a required category could not be assessed and
+// counted as 0. Complete is the empty reason.
+type PartialReason string
+
+const (
+	Complete   PartialReason = ""
+	NeedsToken PartialReason = "needs_token"
+	NoSession  PartialReason = "no_session"
+	NoTools    PartialReason = "no_tools"
+)
 
 // Letter is A+, A, B, C, D or F.
 type Letter string

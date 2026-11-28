@@ -23,6 +23,7 @@ import (
 	"github.com/unkeyed/byname/internal/engines"
 	"github.com/unkeyed/byname/internal/instance"
 	"github.com/unkeyed/byname/internal/logos"
+	"github.com/unkeyed/byname/internal/mcpgrade"
 	"github.com/unkeyed/byname/internal/notify"
 	"github.com/unkeyed/byname/internal/results"
 	"github.com/unkeyed/byname/internal/scheduler"
@@ -53,10 +54,9 @@ type Options struct {
 	BingBaseURL   string
 	GitHubBaseURL string
 	// BlueskyBaseURL replaces Bluesky's search API.
-	BlueskyBaseURL string
-	// SourcesAllowPrivate lets cited-source fetching and logo downloads
-	// reach private and loopback addresses.
-	SourcesAllowPrivate bool
+	BlueskyBaseURL       string
+	AllowPrivateNetworks bool
+	MCPRegistryURL       string
 }
 
 // Build makes the services of the entity pool is bound to, and run,
@@ -77,7 +77,7 @@ func Build(w db.Entity, pool db.Pool, o Options) (app.Services, func(context.Con
 		HTTPClient: &http.Client{}, Resolve: o.Resolve, Alerts: alerts,
 	})
 	brands := discovery.New(pool, settings, discovery.Options{Log: log})
-	logoLookups := logos.New(pool, settings, logos.Options{Log: log, Client: sources.PublicClient(o.SourcesAllowPrivate)})
+	logoLookups := logos.New(pool, settings, logos.Options{Log: log, Client: sources.PublicClient(o.AllowPrivateNetworks)})
 	runs := checks.New(pool, settings, checks.Options{Log: log, Alerts: alerts, Finder: brands})
 	traffic := search.New(pool, search.Options{
 		Secrets: o.Secrets, BaseURLs: map[search.Provider]string{search.Google: o.GSCBaseURL, search.Bing: o.BingBaseURL}, GoogleClient: o.GSCClient,
@@ -88,8 +88,11 @@ func Build(w db.Entity, pool db.Pool, o Options) (app.Services, func(context.Con
 	svc := app.Services{
 		Instance: instance.New(o.Version, pool, settings, mentions, brands), Config: settings, Checks: runs, Results: res, Notify: alerts,
 		Search: traffic, Changes: site, Social: mentions, Discovery: brands, Logos: logoLookups,
+		MCPGrade: mcpgrade.New(pool, mcpgrade.Options{
+			Secrets: o.Secrets, AllowPrivate: o.AllowPrivateNetworks, UserAgent: "Byname/" + o.Version, RegistryURL: o.MCPRegistryURL,
+		}),
 	}
-	cited := sources.New(pool, settings, sources.Options{AllowPrivate: o.SourcesAllowPrivate, UserAgent: "Byname/" + o.Version, Log: log})
+	cited := sources.New(pool, settings, sources.Options{AllowPrivate: o.AllowPrivateNetworks, UserAgent: "Byname/" + o.Version, Log: log})
 	run := func(ctx context.Context) {
 		var jobs sync.WaitGroup
 		jobs.Go(func() {
@@ -114,13 +117,17 @@ func prepare(ctx context.Context, w db.Entity, svc app.Services, log *slog.Logge
 	if err != nil {
 		return fmt.Errorf("entity %s: encrypt the GitHub token with ENCRYPTION_KEY: %w", w.Slug, err)
 	}
+	mcp, err := svc.MCPGrade.SealSecrets(ctx)
+	if err != nil {
+		return fmt.Errorf("entity %s: encrypt the MCP server token with ENCRYPTION_KEY: %w", w.Slug, err)
+	}
 	channels, err := svc.Notify.SealChannels(ctx)
 	if err != nil {
 		return fmt.Errorf("entity %s: encrypt notification channel secrets with ENCRYPTION_KEY: %w", w.Slug, err)
 	}
-	if search+repo+channels > 0 {
+	if search+repo+mcp+channels > 0 {
 		log.Info("encrypted stored secrets with the current ENCRYPTION_KEY", "entity", w.Slug,
-			"credentials", search+repo, "notification_channels", channels)
+			"credentials", search+repo+mcp, "notification_channels", channels)
 	}
 	return nil
 }

@@ -187,7 +187,7 @@ func serve(t *testing.T, srv *httptest.Server, publicURL string, mod ...func(*au
 		Version: "test", Secrets: cfg.Secrets, PublicURL: u, Log: slog.New(slog.DiscardHandler),
 		TregBaseURL: treg.URL, ResendBaseURL: resendSrv.URL,
 		GSCClient: search.OAuthClient{ID: "test-client", Secret: "test-secret"}, GSCBaseURL: google.URL, BingBaseURL: bing.URL,
-		GitHubBaseURL: github.URL, BlueskyBaseURL: fakeBluesky(t), SourcesAllowPrivate: true,
+		GitHubBaseURL: github.URL, BlueskyBaseURL: fakeBluesky(t), AllowPrivateNetworks: true, MCPRegistryURL: fakeMCPRegistry(t),
 	})
 	if err != nil {
 		t.Fatal(err)

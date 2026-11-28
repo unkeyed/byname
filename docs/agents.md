@@ -12,13 +12,13 @@ Every API key and every MCP connection carries one or more of three scopes. Each
 
 | Scope | Allows |
 |---|---|
-| `results:read` | Read checks, answers, raw responses, questions, brands, search engine data (Google and Bing), goals, site changes, comparison pages, the repo connection, social mentions and digests, the left-out list and filters, notifications and settings. Never a secret. |
-| `runs:write` | Queue a check, pause and resume scheduled checks, and read past answers for other brands. |
-| `config:write` | Edit the brand, competitors, questions and question sets, AI apps and models, the schedule and limits, goals, branded search terms, site changes logged by hand, comparison pages, path rules, when change results fall and what counts as a move, the social search settings, the people left out of social mentions, which brands answers name are tracked or hidden, and the settings for finding other brands and their logos. |
+| `results:read` | Read checks, answers, raw responses, questions, brands, search engine data (Google and Bing), goals, site changes, comparison pages, the repo connection, social mentions and digests, the left-out list and filters, the MCP server grade, notifications and settings. Never a secret. |
+| `runs:write` | Queue a check, pause and resume scheduled checks, read past answers for other brands, and grade the MCP server. |
+| `config:write` | Edit the brand, competitors, questions and question sets, AI apps and models, the schedule and limits, goals, branded search terms, site changes logged by hand, comparison pages, path rules, when change results fall and what counts as a move, the social search settings, the people left out of social mentions, which brands answers name are tracked or hidden, the settings for finding other brands and their logos, and the MCP server URL. |
 
 A key or connection never carries a scope its creator's role lacks. An Admin or Editor can grant all three. A Viewer can grant only `results:read`. If the creator's role later loses a scope, so do their keys and connections. [Sign-in](sign-in.md#roles-and-what-they-allow) describes the roles.
 
-Some things no key or MCP connection can do, whatever its scopes. The Treg token, provider keys, search engine connections (Google Search Console and Bing Webmaster Tools), the GitHub repo connection for site changes, where notifications go, API keys, connected apps and teammates are managed only by a signed-in Admin in the UI. A key that tries gets `403`.
+Some things no key or MCP connection can do, whatever its scopes. The Treg token, provider keys, search engine connections (Google Search Console and Bing Webmaster Tools), the GitHub repo connection for site changes, the MCP server token, where notifications go, API keys, connected apps and teammates are managed only by a signed-in Admin in the UI. A key that tries gets `403`.
 
 ## Connect an MCP client
 
@@ -169,7 +169,7 @@ curl https://byname.example.com/e/kyring/v1/runs -H "Authorization: Bearer $BYNA
 
 ## MCP tools
 
-Byname's MCP server has 91 tools. Every REST route an API key can call has one with the same scope, except `DELETE /v1/keys/current`, since MCP clients sign in with OAuth instead of a key, and `GET /v1/brands/{id}/logo`, an image for the browser. A test keeps the two in step. Read tools are marked read-only, and `delete_brand`, `delete_goal`, `delete_change`, `delete_control_page`, `remove_left_out_account`, `remove_social_filter` and `unmark_question_page` are marked destructive, so a client can ask before it runs them.
+Byname's MCP server has 94 tools. Every REST route an API key can call has one with the same scope, except `DELETE /v1/keys/current`, since MCP clients sign in with OAuth instead of a key, and `GET /v1/brands/{id}/logo`, an image for the browser. A test keeps the two in step. Read tools are marked read-only, and `delete_brand`, `delete_goal`, `delete_change`, `delete_control_page`, `remove_left_out_account`, `remove_social_filter` and `unmark_question_page` are marked destructive, so a client can ask before it runs them.
 
 | Tool | Scope | REST | What it does |
 |---|---|---|---|
@@ -205,6 +205,9 @@ Byname's MCP server has 91 tools. Every REST route an API key can call has one w
 | `unhide_brand` | `config:write` | `POST /v1/other-brands/{id}/unhide` | Put a brand marked as not a competitor back on the list. |
 | `update_other_brands_settings` | `config:write` | `PUT /v1/other-brands/settings` | Turn reading answers for other brands and logo lookups on or off, and set the monthly limit on new lookups. |
 | `start_brand_backfill` | `runs:write` | `POST /v1/other-brands/backfill` | Read every past answer never read for other brands, as one job in Check history, within the monthly spend cap. |
+| `mcp_server_grade` | `results:read` | `GET /v1/mcp-server` | Your own MCP server's URL, whether a token is stored, its newest grade in full (score, letter, whether it is partial and why, each category and check with its finding and fix, each tool's documentation score) and the scores of the newest 50. See [MCP server grade](mcp-server.md). |
+| `set_mcp_server` | `config:write` | `PUT /v1/mcp-server` | Set the MCP server URL. Another origin deletes the stored token; an empty URL removes the server and its token. |
+| `grade_mcp_server` | `runs:write` | `POST /v1/mcp-server/grade` | Grade the MCP server now, such as after a deploy, and return the new grade. Never calls a tool; takes up to 30 seconds. |
 | `status` | `results:read` | `GET /v1/status` | Byname's version and whether onboarding is done. |
 | `list_entities` | `results:read` | `GET /v1/entities` | Every brand this instance tracks, each an entity, and whether its onboarding is finished. A connection reads and changes one entity: the first at `/mcp`, any other at `/e/<slug>/mcp`. |
 | `get_costs` | `results:read` | `GET /v1/costs` | What Byname costs, in US dollars: one answer in each AI app, one check, a month of checks and of social searches, and what this month has spent against the monthly cap. See [Treg](engines/treg.md#cost). |

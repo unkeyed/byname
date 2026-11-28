@@ -6,6 +6,7 @@ import { Account } from "./Account";
 import { Apps } from "./Apps";
 import { ApiKeys } from "./ApiKeys";
 import { CheckHistory } from "./CheckHistory";
+import { McpServer } from "./McpServer";
 import { NotificationSettings } from "./Notifications";
 import { ReauthProvider } from "./Reauth";
 import { SearchEngines } from "./SearchEngines";
@@ -48,6 +49,7 @@ const sections: { label: string; pages: Page[] }[] = [
     pages: [
       { path: "search-engines", label: "Search engines", element: <SearchEngines />, admin: true },
       { path: "site-changes", label: "Site changes", element: <SiteChanges />, admin: true },
+      { path: "mcp-server", label: "MCP server", element: <McpServer /> },
       { path: "social", label: "Social", element: <SocialSettings /> },
       { path: "notifications", label: "Notifications", element: <NotificationSettings />, admin: true },
     ],

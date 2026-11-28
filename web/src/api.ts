@@ -1473,6 +1473,82 @@ export interface RepoStatus {
   last_poll_error: string;
 }
 
+export type McpStatus = "pass" | "partial" | "fail" | "skipped";
+
+export type McpLetter = "A+" | "A" | "B" | "C" | "D" | "F";
+
+export type McpCategoryId = "connection" | "authorization" | "metadata" | "definitions" | "documentation" | "discoverability";
+
+export interface McpCheck {
+  id: string;
+  title: string;
+  weight: number;
+  status: McpStatus;
+  fraction: number;
+  finding: string;
+  fix: string;
+}
+
+export interface McpCategory {
+  id: McpCategoryId;
+  title: string;
+  score: number | null;
+  note: string;
+  checks: McpCheck[];
+}
+
+export interface McpTool {
+  name: string;
+  title: string;
+  description: string;
+  params: { name: string; type: string; required: boolean; description: string }[];
+  hints: string[];
+  has_output_schema: boolean;
+  score: number;
+  marks: { check: string; status: McpStatus; finding: string }[];
+  key: string;
+}
+
+export type McpPartial = "" | "needs_token" | "no_session" | "no_tools";
+
+export interface McpGrade {
+  id: number;
+  graded_at: Timestamp;
+  url: string;
+  rules: string;
+  score: number;
+  grade: McpLetter;
+  /** Empty when complete, else why a required category counted as 0. */
+  partial: McpPartial;
+  server: {
+    name: string;
+    title: string;
+    version: string;
+    protocol_version: string;
+    transport: "streamable_http" | "sse" | "none";
+    negotiate_ms: number | null;
+    token_used: boolean;
+  };
+  categories: McpCategory[];
+  tools: McpTool[];
+}
+
+export interface McpGradeSummary {
+  id: number;
+  graded_at: Timestamp;
+  url: string;
+  score: number;
+  grade: McpLetter;
+  rules: string;
+}
+
+export interface McpServer {
+  url: string;
+  token_set: boolean;
+  latest: McpGrade | null;
+  history: McpGradeSummary[];
+}
+
 /** internal/social: the networks searched for posts that mention you. */
 export type SocialNetwork = "x" | "reddit" | "hackernews" | "linkedin" | "youtube" | "threads" | "bluesky";
 
@@ -2212,6 +2288,14 @@ export const api = {
     startBackfill: () => request<BrandBackfill>("POST", "/v1/other-brands/backfill"),
   },
   logos: () => request<BrandLogo[]>("GET", "/v1/logos"),
+
+  mcpServer: {
+    get: () => request<McpServer>("GET", "/v1/mcp-server"),
+    set: (url: string) => request<McpServer>("PUT", "/v1/mcp-server", { body: { url } }),
+    /** url is the server URL the admin saw; a token for a URL changed since then fails with 409. */
+    setToken: (url: string, token: string) => request<McpServer>("PUT", "/v1/mcp-server/token", { body: { url, token } }),
+    grade: () => request<McpServer>("POST", "/v1/mcp-server/grade"),
+  },
 
   social: {
     mentions: (q: SocialMentionQuery = {}) =>

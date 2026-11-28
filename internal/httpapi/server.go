@@ -182,6 +182,11 @@ var routes = []route{
 	{"GET /v1/logos", needs(core.ResultsRead), (*server).listLogos},
 	{"GET /v1/brands/{id}/logo", needs(core.ResultsRead), (*server).brandLogo},
 
+	{"GET /v1/mcp-server", needs(core.ResultsRead), (*server).mcpServer},
+	{"PUT /v1/mcp-server", needs(core.ConfigWrite), (*server).setMCPServer},
+	{"PUT /v1/mcp-server/token", admin, (*server).setMCPServerToken},
+	{"POST /v1/mcp-server/grade", needs(core.RunsWrite), (*server).gradeMCPServer},
+
 	{"GET /v1/keys", admin, (*server).listKeys},
 	{"POST /v1/keys", admin, (*server).createKey},
 	{"DELETE /v1/keys/{id}", admin, (*server).revokeKey},

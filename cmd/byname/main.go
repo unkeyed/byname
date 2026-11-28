@@ -482,7 +482,7 @@ func run(log *slog.Logger) error {
 		Resolve:     engines.HeadResolver(&http.Client{Timeout: 10 * time.Second}),
 		TregBaseURL: cfg.TregBaseURL, ProviderURLs: cfg.ProviderURLs, ResendBaseURL: cfg.ResendBaseURL,
 		GSCClient: cfg.GSCClient, GSCBaseURL: cfg.GSCBaseURL, BingBaseURL: cfg.BingBaseURL, GitHubBaseURL: cfg.GitHubBaseURL,
-		BlueskyBaseURL: cfg.BlueskyBaseURL, SourcesAllowPrivate: cfg.SourcesAllowPrivate,
+		BlueskyBaseURL: cfg.BlueskyBaseURL, AllowPrivateNetworks: cfg.SourcesAllowPrivate,
 	})
 	if err != nil {
 		return err

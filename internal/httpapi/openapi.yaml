@@ -114,6 +114,13 @@ tags:
       Context.dev through Treg. None of it counts in any score. results:read
       reads them; config:write tracks, hides and unhides a brand and changes
       the settings; runs:write starts reading past answers.
+  - name: mcp-server
+    description: >-
+      Your own MCP server, graded against the MCP spec essentials: a 0 to 100
+      score, a letter, category scores and each check with how to fix it.
+      The grade reads the server's metadata and never calls a tool.
+      results:read reads the grades; config:write sets the URL; runs:write
+      grades it now; a signed-in admin sets the token.
   - name: settings
     description: Keys, apps, the team and the Treg token, for signed-in admins, and the consent page.
   - name: auth
@@ -3140,6 +3147,129 @@ paths:
           $ref: "#/components/responses/NotFound"
         "503":
           $ref: "#/components/responses/Unavailable"
+  /v1/mcp-server:
+    get:
+      tags: [mcp-server]
+      operationId: getMCPServer
+      summary: Your MCP server, whether a token is stored, its newest grade in full and the scores of the newest 50. Never the token.
+      security:
+        - apiKey: [results:read]
+        - session: [results:read]
+      responses:
+        "200":
+          description: The server and its grades.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MCPServer"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+    put:
+      tags: [mcp-server]
+      operationId: setMCPServer
+      summary: Set the MCP server to grade. A URL on another origin deletes the stored token; an empty URL removes the server and its token, and keeps the grades.
+      security:
+        - apiKey: [config:write]
+        - session: [config:write]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [url]
+              additionalProperties: false
+              properties:
+                url:
+                  type: string
+                  maxLength: 2048
+                  description: The Streamable HTTP endpoint, such as https://mcp.example.com/mcp. https, or http on localhost. No user name or password.
+      responses:
+        "200":
+          description: The server and its grades.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MCPServer"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /v1/mcp-server/token:
+    put:
+      tags: [mcp-server]
+      operationId: setMCPServerToken
+      summary: Store the bearer token the grade sends to the server URL, sealed with ENCRYPTION_KEY, or delete it with an empty token.
+      description: Needs a recent sign-in. The grade sends the token only to the server URL itself, never to its sign-in metadata, its authorization server or the registry. The response never carries the token.
+      security:
+        - session: [admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              additionalProperties: false
+              properties:
+                token:
+                  type: string
+                  maxLength: 4096
+                  description: A bearer token the server accepts. Empty deletes the stored one.
+                url:
+                  type: string
+                  maxLength: 2048
+                  description: The server URL the token is for, as the admin saw it. Needed with a token; the write fails when the stored URL differs.
+      responses:
+        "200":
+          description: The server and its grades.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MCPServer"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Reauth"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /v1/mcp-server/grade:
+    post:
+      tags: [mcp-server]
+      operationId: gradeMCPServer
+      summary: Grade the MCP server now and store the grade. Answers when the grade is done, within about 30 seconds. Never calls a tool.
+      security:
+        - apiKey: [runs:write]
+        - session: [runs:write]
+      responses:
+        "200":
+          description: The server with the new grade as latest.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MCPServer"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "503":
+          $ref: "#/components/responses/Unavailable"
   /v1/keys:
     get:
       tags: [settings]
@@ -4672,14 +4802,14 @@ components:
           schema:
             $ref: "#/components/schemas/Error"
     Conflict:
-      description: That email already has an account, the change would leave no admin, or another brand already has that name.
+      description: That email already has an account, the change would leave no admin, another brand already has that name, or a grade of the MCP server is already running.
       content:
         application/json:
           schema:
             $ref: "#/components/schemas/Error"
     Reauth:
       description: >-
-        This change (how you sign in, API keys, connected apps, the team or the Treg token)
+        This change (how you sign in, API keys, connected apps, the team, the Treg token or the MCP server token)
         needs a sign-in within the last 15 minutes (code reauth_required).
         Confirm with POST /v1/account/reauth/*, or the reauth OAuth intent, and
         retry. Also 403 for a caller the route is not for, as Forbidden.
@@ -8320,6 +8450,203 @@ components:
           format: date-time
         last_poll_error:
           type: string
+    MCPServer:
+      type: object
+      description: Your MCP server as anyone with results:read sees it. Never the token.
+      required: [url, token_set, latest, history]
+      properties:
+        url:
+          type: string
+          description: The endpoint graded. Empty when none is set.
+        token_set:
+          type: boolean
+          description: A bearer token is stored.
+        latest:
+          description: The newest grade in full. Null before the first.
+          oneOf:
+            - $ref: "#/components/schemas/MCPGrade"
+            - type: "null"
+        history:
+          type: array
+          description: The newest 50 grades, newest first.
+          items:
+            $ref: "#/components/schemas/MCPGradeSummary"
+    MCPGradeSummary:
+      type: object
+      required: [id, graded_at, url, score, grade, rules]
+      properties:
+        id:
+          type: integer
+        graded_at:
+          type: string
+          format: date-time
+        url:
+          type: string
+        score:
+          type: integer
+          minimum: 0
+          maximum: 100
+        grade:
+          $ref: "#/components/schemas/MCPLetter"
+        rules:
+          type: string
+          description: The version of the check list the grade used, such as 2026-11.
+    MCPLetter:
+      type: string
+      enum: [A+, A, B, C, D, F]
+      description: A+ from 95, A from 85, B from 70, C from 55, D from 40, F below.
+    MCPGrade:
+      type: object
+      description: One grade. The score is the equal-weight mean of the categories that count.
+      required: [id, graded_at, url, rules, score, grade, partial, server, categories, tools]
+      properties:
+        id:
+          type: integer
+        graded_at:
+          type: string
+          format: date-time
+        url:
+          type: string
+          description: The URL that was graded.
+        rules:
+          type: string
+        score:
+          type: integer
+          minimum: 0
+          maximum: 100
+        grade:
+          $ref: "#/components/schemas/MCPLetter"
+        partial:
+          type: string
+          enum: ["", needs_token, no_session, no_tools]
+          description: Empty when the grade is complete. Otherwise why a required category counted as 0 because none of its checks could be assessed. needs_token means sign-in blocked the session and no token is stored, no_session means no session started for another reason (connection says why), no_tools means the server listed no tools.
+        server:
+          type: object
+          required: [name, title, version, protocol_version, transport, negotiate_ms, token_used]
+          properties:
+            name:
+              type: string
+            title:
+              type: string
+            version:
+              type: string
+            protocol_version:
+              type: string
+              description: Empty when no session was made.
+            transport:
+              type: string
+              enum: [streamable_http, sse, none]
+            negotiate_ms:
+              type: [integer, "null"]
+              description: How long the session took to start. Shown, not scored.
+            token_used:
+              type: boolean
+        categories:
+          type: array
+          items:
+            $ref: "#/components/schemas/MCPCategory"
+        tools:
+          type: array
+          description: Each tool as listed, with its documentation score.
+          items:
+            $ref: "#/components/schemas/MCPTool"
+    MCPCategory:
+      type: object
+      required: [id, title, score, note, checks]
+      properties:
+        id:
+          type: string
+          enum: [connection, authorization, metadata, definitions, documentation, discoverability]
+        title:
+          type: string
+        score:
+          type: [integer, "null"]
+          description: 0 to 100. Null when an optional category had nothing to assess and does not count.
+        note:
+          type: string
+          description: Why the category was not assessed, such as Needs a token to grade. Empty otherwise.
+        checks:
+          type: array
+          items:
+            $ref: "#/components/schemas/MCPCheck"
+    MCPStatus:
+      type: string
+      enum: [pass, partial, fail, skipped]
+    MCPCheck:
+      type: object
+      required: [id, title, weight, status, fraction, finding, fix]
+      properties:
+        id:
+          type: string
+          description: <category>.<name>, such as connection.version. Stable; docs/mcp-server.md explains each.
+        title:
+          type: string
+        weight:
+          type: integer
+        status:
+          $ref: "#/components/schemas/MCPStatus"
+        fraction:
+          type: number
+          description: The share of the weight earned, 0 to 1. 0 when skipped.
+        finding:
+          type: string
+          description: What the grade saw.
+        fix:
+          type: string
+          description: How to pass. Empty on a pass or a skip.
+    MCPTool:
+      type: object
+      required: [name, title, description, params, hints, has_output_schema, score, marks, key]
+      properties:
+        name:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+          description: As listed, cut at 8 KB.
+        params:
+          type: array
+          items:
+            type: object
+            required: [name, type, required, description]
+            properties:
+              name:
+                type: string
+              type:
+                type: string
+              required:
+                type: boolean
+              description:
+                type: string
+        hints:
+          type: array
+          description: The annotation hints the tool declares true, such as read_only.
+          items:
+            type: string
+        has_output_schema:
+          type: boolean
+        score:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: The tool's documentation score.
+        marks:
+          type: array
+          description: How each per-tool check went for this tool.
+          items:
+            type: object
+            required: [check, status, finding]
+            properties:
+              check:
+                type: string
+              status:
+                $ref: "#/components/schemas/MCPStatus"
+              finding:
+                type: string
+        key:
+          type: string
+          description: A hash of the tool's definition.
     SocialNetwork:
       type: string
       enum: [x, reddit, hackernews, linkedin, youtube, threads, bluesky]
