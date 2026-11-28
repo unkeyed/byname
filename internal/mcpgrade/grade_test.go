@@ -26,8 +26,6 @@ type searchOut struct {
 	Pages []string `json:"pages" jsonschema:"links to the matching pages, best first"`
 }
 
-// registryServer answers the MCP Registry's search as listed, unlisted or
-// down.
 func registryServer(t *testing.T, mode, endpoint string) string {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -48,9 +46,6 @@ func registryServer(t *testing.T, mode, endpoint string) string {
 	return srv.URL
 }
 
-// wellDocumented is a go-sdk server that does everything the catalog asks:
-// stateless on 2026-07-28, behind cross-origin protection, with a manifest
-// and a setup page beside it.
 func wellDocumented(t *testing.T) *httptest.Server {
 	t.Helper()
 	srv := mcp.NewServer(&mcp.Implementation{
@@ -87,19 +82,18 @@ func wellDocumented(t *testing.T) *httptest.Server {
 	return ts
 }
 
-// fake is a hand-written MCP server whose faults are knobs.
 type fake struct {
-	tools        string // the tools array tools/list returns, raw
-	sse          bool   // answer requests with an event stream
-	endless      bool   // answer tools/list with an event stream that never ends
-	checkVersion bool   // answer 400 to an unknown MCP-Protocol-Version
-	signIn       bool   // answer 401 without the token
+	toolsJSON    string
+	sse          bool
+	endless      bool
+	checkVersion bool
+	signIn       bool
 	token        string
-	prm          bool // serve protected resource metadata
-	s256         bool // the authorization server lists S256
+	prm          bool
+	s256         bool
 
 	mu   sync.Mutex
-	auth map[string][]string // path to the Authorization headers it saw
+	auth map[string][]string
 	url  string
 }
 
@@ -181,7 +175,7 @@ func (f *fake) serveMCP(w http.ResponseWriter, r *http.Request) {
 			}
 			return
 		}
-		body = `{"tools":` + f.tools + `}`
+		body = `{"tools":` + f.toolsJSON + `}`
 	case "ping":
 		body = `{}`
 	}
@@ -251,7 +245,7 @@ func TestGradeWellDocumentedServer(t *testing.T) {
 }
 
 func TestGradeMisbehavingServer(t *testing.T) {
-	f := &fake{tools: `[
+	f := &fake{toolsJSON: `[
 		{"name":"search docs!","description":"Search.","inputSchema":{"type":"object","properties":{"q":{"type":"string"}}}},
 		{"name":"lookup","title":"Look up a record","description":"Looks up one customer record by its ID and returns every field on it.",
 		 "inputSchema":{"type":"object","properties":{"id":{"type":"object","description":"Record ID","x-mcp-header":"Record-Id"}}},` + hints + `}
@@ -297,7 +291,7 @@ func TestGradeMisbehavingServer(t *testing.T) {
 }
 
 func TestGradeChecksProtocolVersionHeader(t *testing.T) {
-	f := &fake{tools: `[]`, checkVersion: true}
+	f := &fake{toolsJSON: `[]`, checkVersion: true}
 	r := grade(t, Target{URL: f.start(t)})
 	wantStatus(t, r, "connection.bad_version", Pass)
 	wantStatus(t, r, "definitions.listed", Fail)
@@ -320,7 +314,7 @@ func TestGradeSignIn(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			f := &fake{tools: `[]`, signIn: true, token: "secret", prm: tc.prm, s256: tc.s256}
+			f := &fake{toolsJSON: `[]`, signIn: true, token: "secret", prm: tc.prm, s256: tc.s256}
 			r := grade(t, Target{URL: f.start(t)})
 			for id, want := range tc.want {
 				wantStatus(t, r, id, want)
@@ -335,7 +329,7 @@ func TestGradeSignIn(t *testing.T) {
 }
 
 func TestGradeWithToken(t *testing.T) {
-	f := &fake{tools: `[{"name":"lookup","description":"Looks up one customer record.","inputSchema":{"type":"object"}}]`,
+	f := &fake{toolsJSON: `[{"name":"lookup","description":"Looks up one customer record.","inputSchema":{"type":"object"}}]`,
 		signIn: true, token: "secret", prm: true, s256: true}
 	r := grade(t, Target{URL: f.start(t), Token: "secret"})
 	if !r.Server.TokenUsed || len(r.Tools) != 1 {
@@ -348,7 +342,7 @@ func TestGradeWithToken(t *testing.T) {
 func TestGradeRegistry(t *testing.T) {
 	for mode, want := range map[string]Status{"listed": Pass, "unlisted": Fail, "down": Skipped} {
 		t.Run(mode, func(t *testing.T) {
-			f := &fake{tools: `[]`}
+			f := &fake{toolsJSON: `[]`}
 			endpoint := f.start(t)
 			r := grade(t, Target{URL: endpoint, RegistryURL: registryServer(t, mode, endpoint)})
 			wantStatus(t, r, "discoverability.registry", want)
@@ -380,7 +374,7 @@ func TestGradeErrorsOnlyWhenContextEnds(t *testing.T) {
 }
 
 func TestGradeSendsTokenOnlyToEndpoint(t *testing.T) {
-	f := &fake{tools: `[]`, signIn: true, token: "secret", prm: true, s256: true}
+	f := &fake{toolsJSON: `[]`, signIn: true, token: "secret", prm: true, s256: true}
 	endpoint := f.start(t)
 	registry := newRecorder(t, func(w http.ResponseWriter, r *http.Request) { io.WriteString(w, `{"servers":[]}`) })
 	grade(t, Target{URL: endpoint, Token: "secret", RegistryURL: registry.URL})
@@ -408,7 +402,7 @@ func TestGradeSendsTokenOnlyToEndpoint(t *testing.T) {
 }
 
 func TestGradeSurvivesEndlessToolsList(t *testing.T) {
-	f := &fake{tools: `[]`, endless: true}
+	f := &fake{toolsJSON: `[]`, endless: true}
 	start := time.Now()
 	r := grade(t, Target{URL: f.start(t)})
 	if took := time.Since(start); took > 10*time.Second {
@@ -421,7 +415,7 @@ func TestGradeSurvivesEndlessToolsList(t *testing.T) {
 }
 
 func TestToolsListOverEventStream(t *testing.T) {
-	f := &fake{sse: true, tools: `[{"name":"lookup","title":"Look up a record","description":"Looks up one customer record by ID.",
+	f := &fake{sse: true, toolsJSON: `[{"name":"lookup","title":"Look up a record","description":"Looks up one customer record by ID.",
 		"inputSchema":{"type":"object"},` + hints + `}]`}
 	r := grade(t, Target{URL: f.start(t)})
 	if len(r.Tools) != 1 || r.Tools[0].Name != "lookup" || strings.Join(r.Tools[0].Hints, ",") != "read_only,idempotent" {

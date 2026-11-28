@@ -13,9 +13,9 @@ import (
 )
 
 const (
-	bodyCap     = 2 << 20 // per response
-	gradeBytes  = 8 << 20 // per grade, every response together
-	maxRequests = 40      // per grade, the SDK's and the probe's together
+	bodyCap     = 2 << 20
+	gradeBytes  = 8 << 20
+	maxRequests = 40
 	maxTools    = 500
 )
 
@@ -25,11 +25,6 @@ var (
 	errGradeCap = errors.New("the grade's budget of 8 MiB read is spent")
 )
 
-// wire is the transport under every request a grade makes, the SDK's and
-// the probe's own, so the grade's safety lives in one place: the token only
-// ever reaches the endpoint, and a server cannot make the grade read
-// without end. It also keeps a copy of each tools/list answer, so tools are
-// graded as the server sent them.
 type wire struct {
 	next     http.RoundTripper
 	endpoint string
@@ -49,8 +44,6 @@ func newWire(t Target) *wire {
 	return &wire{next: next, endpoint: t.URL, token: t.Token}
 }
 
-// client is base with the wire as its transport. withToken lets the token
-// ride on requests to the endpoint; without it no request carries one.
 func (w *wire) client(base *http.Client, withToken bool) *http.Client {
 	var c http.Client
 	if base != nil {
@@ -110,16 +103,13 @@ func isToolsList(r *http.Request) bool {
 	return json.NewDecoder(io.LimitReader(b, 1<<20)).Decode(&m) == nil && m.Method == "tools/list"
 }
 
-// capped cuts a response body at bodyCap and the grade at gradeBytes with
-// an error, so a reader sees a failure rather than a silently short body.
 type capped struct {
 	body io.ReadCloser
 	w    *wire
 	left int64
-	page *page // the tools/list copy, nil for other requests
+	page *page
 }
 
-// page is one tools/list answer as read, and the cap that cut it, if any.
 type page struct {
 	body bytes.Buffer
 	err  error
@@ -156,8 +146,6 @@ func (c *capped) cut(err error) error {
 	return err
 }
 
-// pages is a copy of every tools/list answer so far, in the order asked,
-// and the first cap that cut one.
 func (w *wire) pages() ([][]byte, error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -170,8 +158,6 @@ func (w *wire) pages() ([][]byte, error) {
 	return out, err
 }
 
-// messages yields the JSON-RPC messages in a response body: the body itself
-// when it is JSON, or each event's data when it is an event stream.
 func messages(body []byte) iter.Seq[[]byte] {
 	return func(yield func([]byte) bool) {
 		if t := bytes.TrimSpace(body); len(t) > 0 && (t[0] == '{' || t[0] == '[') {
@@ -200,8 +186,6 @@ func messages(body []byte) iter.Seq[[]byte] {
 	}
 }
 
-// errorCode is the code of the first JSON-RPC error in a response body, 0
-// when there is none.
 func errorCode(body []byte) int64 {
 	for m := range messages(body) {
 		var msg struct {
@@ -231,9 +215,6 @@ type wireTool struct {
 	} `json:"annotations"`
 }
 
-// parseToolPages reads the tools from the kept tools/list answers. A page
-// that holds no tools/list result is an error; a tool that is not an object
-// with a string name is skipped.
 func parseToolPages(pages [][]byte) ([]*rawTool, error) {
 	var tools []*rawTool
 	for _, page := range pages {

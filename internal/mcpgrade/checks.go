@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"iter"
 	"maps"
+	"net/http"
 	"net/url"
 	"regexp"
 	"slices"
@@ -15,9 +16,7 @@ import (
 
 type category struct {
 	id, title string
-	// required: when nothing in it can be assessed it counts as 0;
-	// otherwise it is dropped from the mean.
-	required bool
+	required  bool
 }
 
 var categories = []category{
@@ -29,8 +28,6 @@ var categories = []category{
 	{"discoverability", "Discoverability", false},
 }
 
-// check is one catalog entry. Its id is "<category>.<name>", stable forever:
-// stored in reports and used as a docs anchor.
 type check struct {
 	id, title, fix string
 	weight         int
@@ -42,23 +39,17 @@ func (c check) category() string {
 	return cat
 }
 
-// evaluator is serverCheck or toolCheck, so a check is exactly one of them.
 type evaluator interface{ isEvaluator() }
 
-// serverCheck judges the observation as a whole.
 type serverCheck func(o *observation) mark
 
-// toolCheck judges one tool. The check's fraction is the mean over the tools
-// it applies to, which for a pass/fail judge is the share of tools that
-// pass. With no session or no tools it is skipped.
 type toolCheck func(t *rawTool) mark
 
 func (serverCheck) isEvaluator() {}
 func (toolCheck) isEvaluator()   {}
 
-// mark is a check's raw outcome before weighting.
 type mark struct {
-	fraction float64 // 1 pass, 0 fail, between partial
+	fraction float64
 	skipped  bool
 	finding  string
 }
@@ -68,7 +59,6 @@ func partial(f float64, finding string) mark { return mark{fraction: f, finding:
 func fail(finding string) mark               { return mark{finding: finding} }
 func skip(why string) mark                   { return mark{skipped: true, finding: why} }
 
-// checks is the catalog, in display order.
 var checks = []check{
 	{id: "connection.https", weight: 10, title: "Served over HTTPS",
 		fix: "Serve the endpoint over https.", eval: serverCheck(checkHTTPS)},
@@ -159,10 +149,10 @@ var checks = []check{
 		fix: "Publish the server to registry.modelcontextprotocol.io with this URL as a remote; a name under io.github.* may not be found by domain.", eval: serverCheck(checkRegistry)},
 }
 
-// needsToken reports whether the server asked for sign-in and no token was
-// given, so nothing behind sign-in could be graded.
+func (o *observation) asksSignIn() bool { return o.bareInit.status == http.StatusUnauthorized }
+
 func needsToken(o *observation) bool {
-	return o.session == nil && o.first.status == 401 && !o.token
+	return o.session == nil && o.asksSignIn() && !o.tokenGiven
 }
 
 func noSession(o *observation) string {
@@ -195,7 +185,6 @@ func withAuth(o *observation, f func(a *authSeen) mark) mark {
 	return f(o.auth)
 }
 
-// errLine is an error as one short line for a finding.
 func errLine(err error) string {
 	s := strings.Join(strings.Fields(err.Error()), " ")
 	if len(s) > 200 {
@@ -211,11 +200,9 @@ func checkHTTPS(o *observation) mark {
 	return fail("Served over plain http")
 }
 
-// transportOf names the transport the server spoke. A 401 to the POST is
-// the Streamable HTTP sign-in flow, so it counts as Streamable HTTP.
 func transportOf(o *observation) string {
 	switch {
-	case o.session != nil, o.first.status == 401, o.first.ok():
+	case o.session != nil, o.asksSignIn(), o.bareInit.ok():
 		return "streamable_http"
 	case o.legacySSE:
 		return "sse"
@@ -232,17 +219,17 @@ func (h httpSeen) ok() bool {
 func checkTransport(o *observation) mark {
 	switch transportOf(o) {
 	case "streamable_http":
-		if o.session == nil && o.first.status == 401 {
+		if o.session == nil && o.asksSignIn() {
 			return pass("Answered POST with a 401 sign-in challenge")
 		}
 		return pass("Streamable HTTP")
 	case "sse":
 		return partial(0.5, "Only the deprecated HTTP+SSE transport answered")
 	}
-	if o.first.err != nil {
-		return fail(errLine(o.first.err))
+	if o.bareInit.err != nil {
+		return fail(errLine(o.bareInit.err))
 	}
-	return fail(fmt.Sprintf("POST answered HTTP %d %s", o.first.status, o.first.contentType))
+	return fail(fmt.Sprintf("POST answered HTTP %d %s", o.bareInit.status, o.bareInit.contentType))
 }
 
 func checkNegotiate(o *observation) mark {
@@ -303,7 +290,7 @@ func checkUnknownMethod(o *observation) mark {
 
 func checkOrigin(o *observation) mark {
 	return withSession(o, func(s *sessionSeen) mark {
-		h, c := s.origin, s.control
+		h, c := s.origin, s.noOrigin
 		switch {
 		case h.err != nil:
 			return fail(errLine(h.err))
@@ -343,13 +330,13 @@ func checkResourceMetadata(o *observation) mark {
 			if a.prmErr != nil {
 				why = errLine(a.prmErr)
 			}
-			return fail(fmt.Sprintf("No metadata at %s: %s", a.prmURL, why))
+			return fail(fmt.Sprintf("No metadata at %s: %s", a.prmLookedAt, why))
 		}
 		resource := sameURL(a.prm.Resource, o.endpoint)
 		servers := len(a.prm.AuthorizationServers) > 0
 		switch {
 		case resource && servers:
-			return pass("Found at " + a.prmURL)
+			return pass("Found at " + a.prmLookedAt)
 		case servers:
 			return partial(0.5, fmt.Sprintf("resource is %q, not this URL", a.prm.Resource))
 		case resource:
@@ -446,7 +433,6 @@ func checkIcon(o *observation) mark {
 	})
 }
 
-// minSide reads "48x48" as 48, the smaller side; 0 when it does not parse.
 func minSide(size string) int {
 	w, h, ok := strings.Cut(strings.ToLower(size), "x")
 	if !ok {
@@ -683,9 +669,6 @@ func checkHiddenChars(t *rawTool) mark {
 	return pass("")
 }
 
-// hiddenRune finds a character a person reading the text would not see:
-// format characters (zero-width, bidirectional, tag) and control characters
-// other than tab and newline.
 func hiddenRune(s string) (rune, bool) {
 	for _, r := range s {
 		if unicode.Is(unicode.Cf, r) || (unicode.IsControl(r) && r != '\n' && r != '\r' && r != '\t') {
@@ -695,7 +678,6 @@ func hiddenRune(s string) (rune, bool) {
 	return 0, false
 }
 
-// stringsIn yields every string in a decoded JSON value, keys included.
 func stringsIn(v any) iter.Seq[string] {
 	return func(yield func(string) bool) {
 		var walk func(v any) bool
@@ -753,8 +735,6 @@ func checkDeclaredLists(o *observation) mark {
 	})
 }
 
-// words is s lowercased with separators as spaces, to tell whether a title
-// or description only restates the name.
 func words(s string) string {
 	return strings.Join(strings.FieldsFunc(strings.ToLower(s), func(r rune) bool {
 		return !unicode.IsLetter(r) && !unicode.IsDigit(r)
@@ -819,10 +799,9 @@ func docOutput(t *rawTool) mark {
 
 type param struct {
 	Param
-	typed bool // has a type, or a $ref, enum, const or combinator standing in for one
+	typed bool
 }
 
-// params reads the top-level properties of an input schema, by name.
 func params(schema json.RawMessage) []param {
 	var s struct {
 		Properties map[string]map[string]json.RawMessage `json:"properties"`
@@ -886,8 +865,6 @@ func checkRegistry(o *observation) mark {
 	}
 }
 
-// sameURL compares two URLs ignoring the case of scheme and host and a
-// trailing slash.
 func sameURL(a, b string) bool { return normURL(a) == normURL(b) }
 
 func normURL(s string) string {

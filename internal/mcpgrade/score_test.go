@@ -1,6 +1,8 @@
 package mcpgrade
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -25,11 +27,10 @@ func goodTool(name, title string) *rawTool {
 	}
 }
 
-// good is a server that passes every check that applies to it.
 func good() *observation {
 	return &observation{
 		endpoint: endpoint,
-		first:    httpSeen{status: 200, contentType: "application/json"},
+		bareInit: httpSeen{status: 200, contentType: "application/json"},
 		session: &sessionSeen{
 			init: &mcp.InitializeResult{
 				ProtocolVersion: "2026-07-28",
@@ -43,7 +44,7 @@ func good() *observation {
 			badVersion: httpSeen{status: 400},
 			unknownRPC: rpcSeen{code: -32601},
 			origin:     httpSeen{status: 403},
-			control:    httpSeen{status: 200},
+			noOrigin:   httpSeen{status: 200},
 		},
 		html:     httpSeen{status: 200, contentType: "text/html; charset=utf-8"},
 		manifest: manifestSeen{at: "https://mcp.example.com/.well-known/mcp.json", namesEndpoint: true},
@@ -51,18 +52,16 @@ func good() *observation {
 	}
 }
 
-// signIn is a server that answers 401 with a complete OAuth discovery chain
-// and was graded without a token.
 func signIn() *observation {
 	o := good()
-	o.first = httpSeen{status: 401, contentType: "application/json"}
+	o.bareInit = httpSeen{status: 401, contentType: "application/json"}
 	o.session = nil
 	o.auth = &authSeen{
-		challenges: []oauthex.Challenge{{Scheme: "bearer", Params: map[string]string{"resource_metadata": "https://mcp.example.com/.well-known/oauth-protected-resource/mcp"}}},
-		prmURL:     "https://mcp.example.com/.well-known/oauth-protected-resource/mcp",
-		prm:        &oauthex.ProtectedResourceMetadata{Resource: endpoint, AuthorizationServers: []string{"https://auth.example.com"}},
-		asURL:      "https://auth.example.com",
-		as:         &oauthex.AuthServerMeta{Issuer: "https://auth.example.com", CodeChallengeMethodsSupported: []string{"S256"}, RegistrationEndpoint: "https://auth.example.com/register"},
+		challenges:  []oauthex.Challenge{{Scheme: "bearer", Params: map[string]string{"resource_metadata": "https://mcp.example.com/.well-known/oauth-protected-resource/mcp"}}},
+		prmLookedAt: "https://mcp.example.com/.well-known/oauth-protected-resource/mcp",
+		prm:         &oauthex.ProtectedResourceMetadata{Resource: endpoint, AuthorizationServers: []string{"https://auth.example.com"}},
+		asURL:       "https://auth.example.com",
+		as:          &oauthex.AuthServerMeta{Issuer: "https://auth.example.com", CodeChallengeMethodsSupported: []string{"S256"}, RegistrationEndpoint: "https://auth.example.com/register"},
 	}
 	return o
 }
@@ -200,10 +199,10 @@ func TestChecks(t *testing.T) {
 	}{
 		{"plain http", func(o *observation) { o.endpoint = "http://mcp.example.com/mcp" }, "connection.https", Fail, 0},
 		{"legacy sse", func(o *observation) {
-			o.session, o.first, o.legacySSE = nil, httpSeen{status: 405}, true
+			o.session, o.bareInit, o.legacySSE = nil, httpSeen{status: 405}, true
 		}, "connection.transport", Partial, 0.5},
 		{"nothing speaks", func(o *observation) {
-			o.session, o.first, o.sessionErr = nil, httpSeen{status: 404, contentType: "text/html"}, errors.New("404")
+			o.session, o.bareInit, o.sessionErr = nil, httpSeen{status: 404, contentType: "text/html"}, errors.New("404")
 		}, "connection.transport", Fail, 0},
 		{"no session", func(o *observation) {
 			o.session, o.sessionErr = nil, errors.New("connection refused")
@@ -217,7 +216,7 @@ func TestChecks(t *testing.T) {
 		{"accepts a foreign origin", func(o *observation) { o.session.origin = httpSeen{status: 200} }, "connection.origin", Fail, 0},
 		{"refuses origin with 400", func(o *observation) { o.session.origin = httpSeen{status: 400} }, "connection.origin", Pass, 1},
 		{"400 with or without the origin", func(o *observation) {
-			o.session.origin, o.session.control = httpSeen{status: 400}, httpSeen{status: 400}
+			o.session.origin, o.session.noOrigin = httpSeen{status: 400}, httpSeen{status: 400}
 		}, "connection.origin", Fail, 0},
 
 		{"no 401 skips authorization", func(o *observation) {}, "authorization.pkce", Skipped, 0},
@@ -387,5 +386,17 @@ func TestLetter(t *testing.T) {
 		if got := letter(score); got != want {
 			t.Errorf("letter(%d) = %s, want %s", score, got, want)
 		}
+	}
+}
+
+func TestRulesNameTheCatalog(t *testing.T) {
+	var b strings.Builder
+	for _, c := range checks {
+		fmt.Fprintf(&b, "%s %d %T\n", c.id, c.weight, c.eval)
+	}
+	sum := sha256.Sum256([]byte(b.String()))
+	got := hex.EncodeToString(sum[:8])
+	if rules != "2026-11" || got != "26511e80d5a10a4c" {
+		t.Errorf("the catalog changed under rules %q: bump rules in grade.go and pin it to %s", rules, got)
 	}
 }

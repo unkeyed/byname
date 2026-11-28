@@ -10,8 +10,6 @@ import (
 	"testing"
 )
 
-// recorder answers every request and remembers the Authorization header
-// each path saw.
 type recorder struct {
 	*httptest.Server
 	mu   sync.Mutex

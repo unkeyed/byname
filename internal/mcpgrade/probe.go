@@ -21,24 +21,18 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/oauthex"
 )
 
-// observation is everything the probe saw, parsed, and nothing scored. SDK
-// and oauthex types stay in here, unexported, so no wire type crosses the
-// package boundary. A nil pointer means the probe that would fill it did
-// not run.
 type observation struct {
-	endpoint string
-	token    bool // a token was given
+	endpoint   string
+	tokenGiven bool
 
-	// first is a bare initialize POST, always without the token: it decides
-	// the transport and whether the server asks for sign-in.
-	first     httpSeen
-	legacySSE bool      // GET text/event-stream sent an endpoint event
-	auth      *authSeen // only when first answered 401
+	bareInit  httpSeen
+	legacySSE bool
+	auth      *authSeen
 
 	session    *sessionSeen
-	sessionErr error // why there is no session, when one was tried
+	sessionErr error
 
-	html     httpSeen // GET endpoint with Accept: text/html
+	html     httpSeen
 	manifest manifestSeen
 	registry registrySeen
 }
@@ -53,41 +47,39 @@ type httpSeen struct {
 type authSeen struct {
 	challenges   []oauthex.Challenge
 	challengeErr error
-	prmURL       string // where the resource metadata was found or last looked for
+	prmLookedAt  string
 	prm          *oauthex.ProtectedResourceMetadata
 	prmErr       error
-	asURL        string // the first authorization server, "" when none was named
+	asURL        string
 	as           *oauthex.AuthServerMeta
 	asErr        error
 }
 
 type sessionSeen struct {
-	init      *mcp.InitializeResult
-	negotiate time.Duration
-	tools     []*rawTool // from the wire, in listed order
-	toolsErr  error
-	// lists maps each declared list method (resources/list, prompts/list)
-	// to its outcome.
+	init       *mcp.InitializeResult
+	negotiate  time.Duration
+	tools      []*rawTool
+	toolsErr   error
 	lists      map[string]error
-	badVersion httpSeen // MCP-Protocol-Version: 1999-01-01
-	unknownRPC rpcSeen  // method byname/unknown
-	origin     httpSeen // Origin: https://byname-probe.invalid
-	control    httpSeen // the origin probe without the Origin header
+	badVersion httpSeen
+	unknownRPC rpcSeen
+	origin     httpSeen
+	noOrigin   httpSeen
 }
 
 type rpcSeen struct {
 	httpSeen
-	code int64 // JSON-RPC error code, 0 when none
+	code int64
 }
 
 type manifestSeen struct {
-	at            string // the manifest URL that answered, "" when none
+	at            string
 	namesEndpoint bool
 }
 
 type registrySeen struct {
 	listed bool
-	err    error // registry unreachable: the check is skipped, not failed
+	err    error
 }
 
 // rawTool is one tool as tools/list sent it, not as the SDK decoded it: the
@@ -95,11 +87,9 @@ type registrySeen struct {
 // false.
 type rawTool struct {
 	name, title, annotTitle, description string
-	// hints holds the declared annotation hints by hintNames key; a missing
-	// key was not declared.
-	hints  map[string]bool
-	input  json.RawMessage
-	output json.RawMessage // nil when absent
+	hints                                map[string]bool
+	input                                json.RawMessage
+	output                               json.RawMessage
 }
 
 var hintNames = []string{"read_only", "destructive", "idempotent", "open_world"}
@@ -110,11 +100,8 @@ const (
 	probeOrigin = "https://byname-probe.invalid"
 )
 
-// probe makes every request and fills an observation. It never fails:
-// failures become fields. Discoverability runs beside the rest, since it
-// shares nothing with it but the wire's budget.
 func probe(ctx context.Context, t Target) *observation {
-	o := &observation{endpoint: t.URL, token: t.Token != ""}
+	o := &observation{endpoint: t.URL, tokenGiven: t.Token != ""}
 	w := newWire(t)
 	bare, authd := w.client(t.Client, false), w.client(t.Client, true)
 	registry := strings.TrimSuffix(cmp.Or(t.RegistryURL, defaultRegistry), "/")
@@ -126,13 +113,13 @@ func probe(ctx context.Context, t Target) *observation {
 		o.registry = lookupRegistry(ctx, bare, registry, t.URL)
 	})
 
-	o.first = firstPost(ctx, bare, t.URL)
-	if o.first.status == http.StatusUnauthorized {
-		o.auth = discoverAuth(ctx, bare, t.URL, o.first.header)
+	o.bareInit = firstPost(ctx, bare, t.URL)
+	if o.asksSignIn() {
+		o.auth = discoverAuth(ctx, bare, t.URL, o.bareInit.header)
 	}
 	if !needsToken(o) {
 		o.session, o.sessionErr = connect(ctx, authd, w, t.URL)
-		if o.session == nil && o.first.status != http.StatusUnauthorized && !o.first.ok() {
+		if o.session == nil && !o.asksSignIn() && !o.bareInit.ok() {
 			o.legacySSE = legacySSE(ctx, authd, t.URL)
 		}
 	}
@@ -140,7 +127,6 @@ func probe(ctx context.Context, t Target) *observation {
 	return o
 }
 
-// exchange sends one request and reads up to read bytes of the answer.
 func exchange(ctx context.Context, c *http.Client, method, target string, body []byte, header http.Header, read int64) (httpSeen, []byte) {
 	ctx, cancel := context.WithTimeout(ctx, stepTimeout)
 	defer cancel()
@@ -166,9 +152,8 @@ func exchange(ctx context.Context, c *http.Client, method, target string, body [
 	return h, b
 }
 
-// rpcHeader is the headers of a JSON-RPC POST. From 2026-07-28 a server
-// refuses a request whose Mcp-Method header is missing or differs from the
-// body's method; earlier ones ignore it.
+// From 2026-07-28 a server refuses a request whose Mcp-Method header is
+// missing or differs from the body's method; earlier ones ignore it.
 func rpcHeader(method, session, version string) http.Header {
 	h := http.Header{
 		"Content-Type": {"application/json"},
@@ -184,8 +169,8 @@ func rpcHeader(method, session, version string) http.Header {
 	return h
 }
 
-// rpc is a JSON-RPC request body. From 2026-07-28 every request carries the
-// protocol version and client capabilities in _meta.
+// From 2026-07-28 every request carries the protocol version and client
+// capabilities in _meta.
 func rpc(method, version string) []byte {
 	params := map[string]any{}
 	if version >= "2026-07-28" {
@@ -199,8 +184,6 @@ func rpc(method, version string) []byte {
 	return b
 }
 
-// firstPost is an initialize without the token. Its session, when the
-// server makes one, is deleted at once.
 func firstPost(ctx context.Context, c *http.Client, endpoint string) httpSeen {
 	body, _ := json.Marshal(map[string]any{"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": map[string]any{
 		"protocolVersion": "2025-11-25",
@@ -215,11 +198,9 @@ func firstPost(ctx context.Context, c *http.Client, endpoint string) httpSeen {
 	return h
 }
 
-// discoverAuth follows the sign-in discovery chain from a 401: the
-// challenge, the protected resource metadata it names (or the well-known
-// fallbacks), and the first authorization server's metadata. It fetches the
-// documents itself rather than through oauthex's getters, which refuse a
-// document with a wrong resource or no PKCE without saying what it held.
+// discoverAuth fetches the documents itself rather than through oauthex's
+// getters, which refuse a document with a wrong resource or no PKCE without
+// saying what it held.
 func discoverAuth(ctx context.Context, c *http.Client, endpoint string, h http.Header) *authSeen {
 	a := &authSeen{}
 	a.challenges, a.challengeErr = oauthex.ParseWWWAuthenticate(h.Values("WWW-Authenticate"))
@@ -231,7 +212,7 @@ func discoverAuth(ctx context.Context, c *http.Client, endpoint string, h http.H
 	}
 	prmURLs = append(prmURLs, wellKnown(endpoint, "oauth-protected-resource")...)
 	for _, u := range slices.Compact(prmURLs) {
-		a.prmURL = u
+		a.prmLookedAt = u
 		if a.prm, a.prmErr = getJSON[oauthex.ProtectedResourceMetadata](ctx, c, u); a.prm != nil {
 			break
 		}
@@ -250,8 +231,6 @@ func discoverAuth(ctx context.Context, c *http.Client, endpoint string, h http.H
 	return a
 }
 
-// wellKnown is the RFC 8615 URLs for name under target: with target's path
-// appended first, then at the root.
 func wellKnown(target, name string) []string {
 	u, err := url.Parse(target)
 	if err != nil || u.Host == "" {
@@ -279,9 +258,6 @@ func getJSON[T any](ctx context.Context, c *http.Client, target string) (*T, err
 	return &v, nil
 }
 
-// connect starts a session through the go-sdk client and gathers everything
-// that needs one. The SDK drives the handshake and pagination; the tools
-// themselves come from the wire's copy of each tools/list answer.
 func connect(ctx context.Context, c *http.Client, w *wire, endpoint string) (*sessionSeen, error) {
 	client := mcp.NewClient(&mcp.Implementation{Name: clientName, Version: "1"}, &mcp.ClientOptions{
 		Logger:       slog.New(slog.DiscardHandler),
@@ -328,15 +304,13 @@ func connect(ctx context.Context, c *http.Client, w *wire, endpoint string) (*se
 	s.badVersion, _ = exchange(ctx, c, http.MethodPost, endpoint, rpc(benign, ""), rpcHeader(benign, id, "1999-01-01"), 0)
 	h, body := exchange(ctx, c, http.MethodPost, endpoint, rpc("byname/unknown", v), rpcHeader("byname/unknown", id, v), 64<<10)
 	s.unknownRPC = rpcSeen{httpSeen: h, code: errorCode(body)}
-	s.control, _ = exchange(ctx, c, http.MethodPost, endpoint, rpc(benign, v), rpcHeader(benign, id, v), 0)
+	s.noOrigin, _ = exchange(ctx, c, http.MethodPost, endpoint, rpc(benign, v), rpcHeader(benign, id, v), 0)
 	header := rpcHeader(benign, id, v)
 	header.Set("Origin", probeOrigin)
 	s.origin, _ = exchange(ctx, c, http.MethodPost, endpoint, rpc(benign, v), header, 0)
 	return s, nil
 }
 
-// legacySSE reports whether a GET opens the deprecated HTTP+SSE transport,
-// whose first event names the endpoint to post to.
 func legacySSE(ctx context.Context, c *http.Client, endpoint string) bool {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
@@ -362,8 +336,6 @@ func legacySSE(ctx context.Context, c *http.Client, endpoint string) bool {
 	return false
 }
 
-// findManifest looks for /.well-known/mcp.json, then /mcp.json, on the
-// endpoint's origin, and whether any string in it is the endpoint.
 func findManifest(ctx context.Context, c *http.Client, endpoint string) manifestSeen {
 	u, err := url.Parse(endpoint)
 	if err != nil || u.Host == "" {
@@ -388,9 +360,6 @@ func findManifest(ctx context.Context, c *http.Client, endpoint string) manifest
 	return manifestSeen{}
 }
 
-// lookupRegistry searches the MCP Registry by the endpoint's domain, as a
-// reversed name (com.acme) and as its second-level label (acme), and
-// reports whether any entry lists the endpoint as a remote.
 func lookupRegistry(ctx context.Context, c *http.Client, registry, endpoint string) registrySeen {
 	var lastErr error
 	reached := false

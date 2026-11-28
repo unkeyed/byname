@@ -9,8 +9,6 @@ import (
 	"strings"
 )
 
-// score turns an observation into a Report. It does no I/O, so the same
-// observation always gives the same report.
 func score(o *observation) Report {
 	var tools []*rawTool
 	if o.session != nil {
@@ -86,6 +84,8 @@ func score(o *observation) Report {
 	return r
 }
 
+const maxNamed = 5
+
 func status(m mark) Status {
 	switch {
 	case m.skipped:
@@ -98,8 +98,6 @@ func status(m mark) Status {
 	return Partial
 }
 
-// judgeTools runs a toolCheck on every tool. The check earns the mean of the
-// tools it applies to, and its finding names up to five that fall short.
 func judgeTools(o *observation, tools []*rawTool, judge toolCheck) (mark, []mark) {
 	if o.session == nil {
 		return skip(noSession(o)), nil
@@ -129,9 +127,9 @@ func judgeTools(o *observation, tools []*rawTool, judge toolCheck) (mark, []mark
 	if len(short) == 0 {
 		return pass(fmt.Sprintf("All %d tools pass", judged)), marks
 	}
-	finding := fmt.Sprintf("%d of %d tools fall short: %s", len(short), judged, strings.Join(short[:min(5, len(short))], "; "))
-	if len(short) > 5 {
-		finding += fmt.Sprintf("; and %d more", len(short)-5)
+	finding := fmt.Sprintf("%d of %d tools fall short: %s", len(short), judged, strings.Join(short[:min(maxNamed, len(short))], "; "))
+	if len(short) > maxNamed {
+		finding += fmt.Sprintf("; and %d more", len(short)-maxNamed)
 	}
 	return mark{fraction: f, finding: finding}, marks
 }
@@ -143,7 +141,7 @@ func serverInfo(o *observation) ServerInfo {
 	}
 	s.ProtocolVersion = o.session.init.ProtocolVersion
 	s.NegotiateMS = new(int(o.session.negotiate.Milliseconds()))
-	s.TokenUsed = o.token
+	s.TokenUsed = o.tokenGiven
 	if si := o.session.init.ServerInfo; si != nil {
 		s.Name, s.Title, s.Version = si.Name, si.Title, si.Version
 	}

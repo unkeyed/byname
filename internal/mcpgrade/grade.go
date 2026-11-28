@@ -2,11 +2,6 @@
 // essentials: a deterministic 0 to 100 score, a letter, category scores and
 // one result per check, from one probe of the server's metadata. It never
 // calls a tool.
-//
-// Grade is the whole surface. probe does every request and fills an
-// observation; score turns that observation into a Report and does no I/O.
-// The checks table in checks.go is the catalog: adding a check is one entry
-// there.
 package mcpgrade
 
 import (
@@ -23,9 +18,8 @@ type Target struct {
 	// itself and nowhere else: not to well-known documents, authorization
 	// servers or the registry. Authorization is always probed without it.
 	Token string
-	// Client makes every request; production passes
-	// sources.PublicClient(allowPrivate). Grade adds the deadline, body caps
-	// and request budget itself.
+	// Client makes every request. Grade adds the deadline, body caps and
+	// request budget itself.
 	Client *http.Client
 	// RegistryURL replaces https://registry.modelcontextprotocol.io, for
 	// tests.
@@ -33,9 +27,7 @@ type Target struct {
 }
 
 const (
-	deadline = 30 * time.Second
-	// rules names this catalog. It changes whenever a check, weight or
-	// threshold does, so a stored grade can say it used older rules.
+	deadline        = 30 * time.Second
 	rules           = "2026-11"
 	defaultRegistry = "https://registry.modelcontextprotocol.io"
 )
