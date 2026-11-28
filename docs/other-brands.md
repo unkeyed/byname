@@ -34,7 +34,7 @@ The layout finds a brand only where an answer formats it, so it misses brands na
 Reading 1,000 answers of 3,000 characters costs about $2.00: DataForSEO charges $0.60 for 1,000 calls, plus the model's tokens. **Settings > Competitors** shows the average of your own reads once there are some, and what a check costs at that price.
 
 - A check's reads count toward that check. They are in its estimate before you **Check now**, in onboarding's review, in **Check history**, and against the spend cap for one check: a check stops asking questions once its answers and its reads reach the cap.
-- Every read counts toward the monthly spend cap, which checks, social searches and other brands share.
+- Every read counts toward the monthly spend cap, which checks, social searches, other brands and [MCP tool reviews](mcp-server.md#ai-review-of-tool-docs) share.
 - `GET /v1/costs` has the price under `other_brands`, and what this month spent under `month.brands_usd`.
 
 ### Past answers
