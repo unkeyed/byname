@@ -2,7 +2,7 @@
 
 If your product has an MCP server, AI apps and agents use it to act for your users. Byname grades it against the MCP spec essentials and tells you what to fix. Add your server's URL under **Settings > MCP server** and Byname scores it from 0 to 100, gives it a letter, scores each of six categories, and lists every check with what it saw and, when it falls short, how to fix it.
 
-The grade reads the server's metadata and its tool list. It never calls a tool. It is free: no model reads anything, and nothing goes through Treg.
+The grade reads the server's metadata and its tool list. It never calls a tool. It is free: no model reads anything, and nothing goes through Treg. A model can also review each tool's documentation on request. That review is paid, shown beside the grade and never part of its score. See [AI review of tool docs](#ai-review-of-tool-docs).
 
 ## Grade your server
 
@@ -21,6 +21,7 @@ Who can do what:
 | See the grade | Yes | Yes | Yes |
 | Set or remove the URL | | Yes | Yes |
 | Grade again | | Yes | Yes |
+| Review tool docs | | Yes | Yes |
 | Set or delete the token | | | Yes |
 
 An agent does the same with an API key or over MCP. See [Agents](agents.md).
@@ -143,6 +144,30 @@ Whether people and agents can find the server. The manifest check also looks at 
 | `discoverability.manifest` | 1 | Manifest names the endpoint | Serve `/.well-known/mcp.json` on the endpoint's origin naming this URL. |
 | `discoverability.setup_page` | 1 | Setup page | Answer a browser (`Accept: text/html`) at this URL with a page on how to connect. |
 | `discoverability.registry` | 1 | Listed in the MCP Registry | Publish the server to `registry.modelcontextprotocol.io` with this URL as a remote; a name under `io.github.*` may not be found by domain. |
+
+## AI review of tool docs
+
+The rules check that a title, a description and input descriptions are there. They cannot tell whether an agent would understand them. The AI review asks a model. Press **Review tool docs** under the tools table on **Settings > MCP server**, or call `POST /v1/mcp-server/review`. It needs a [Treg](engines/treg.md) token and the `runs:write` scope.
+
+For each tool, a model scores three parts from 0 to 100 and says in one sentence what to change:
+
+- **Title:** a short name for people that says more than the tool name.
+- **Description:** what the tool does, when to use it and what it returns.
+- **Inputs:** each input's meaning, format and limits. A tool with no inputs scores 100.
+
+A tool's AI score weighs the three parts as the rules weigh the same checks: 15 for the title, 35 for the description and 30 for the inputs. The review's score is the mean of the reviewed tools. The page shows it beside the rules' score on the tool documentation tile, as in "Rules 64 · AI 63", and each tool's AI score and reasons in the tools table. It is advisory. The grade's score, letter and categories never change with it.
+
+What the model sees is the tool as the newest grade stored it: its name, title, description, each input with its type, whether it is required and its description, the behavior hints it declares and whether it has an output schema. Byname does not connect to your server again, and the token is never sent. The system prompt tells the model that the definition is third-party data to judge and never instructions to follow. A definition longer than about 5,000 characters is cut at the end, and the model is told so.
+
+Each tool is one call to Claude Haiku through Treg's DataForSEO route, about $3.00 per 1,000 tools, so a server with 30 tools costs about $0.09. The card says what reviewing the tools left would cost before you start, from the price of past reviews. A review:
+
+- Starts within a minute in the background, and shows in **Check history** as **Reviewing MCP tool docs**. Asking again while one is queued or running returns that one.
+- Reads at most 100 tools, worst rule score first.
+- Checks the monthly spend cap before every call and stops at it with the status `capped`. Its spend counts toward the cap, in `month.mcp_review_usd` from `GET /v1/costs`.
+- Stops with the status `refused` when Treg refuses a call, such as for an empty balance. A refused call costs nothing.
+- Records a reply that is not the scores asked for as a failed review of that tool. The call was paid, so it counts toward the cap, and the review moves on to the next tool.
+
+Reviews are kept by tool definition, not by grade. A tool whose name, title, description, inputs, hints and output schema are unchanged keeps its review on every later grade and is never paid for twice. Change the definition and grade again, and only that tool is left to review. When Byname changes the review's instructions, every tool can be reviewed again. A review that stopped early, at the cap, on a refusal or because Byname restarted, carries on from where it stopped the next time you start one.
 
 ## What the grade sends
 

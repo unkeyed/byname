@@ -1,11 +1,30 @@
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { useIsMutating, useMutation, useMutationState, useQueryClient } from "@tanstack/react-query";
-import { api, ApiError, type McpCategory, type McpGrade, type McpServer as Server, type McpTool } from "../../api";
+import { Link } from "react-router";
+import { api, ApiError, type McpCategory, type McpGrade, type McpReview, type McpServer as Server, type McpTool } from "../../api";
 import { Donut, Sparkline } from "../../charts";
+import { useToast } from "../../components/Toaster";
 import { ReadOnlyNote } from "../../config/forms";
+import { money } from "../../money";
 import { keys, useCan, useIsAdmin, useMcpServer } from "../../queries";
-import { Badge, Button, Card, CardHeader, ConfirmButton, cx, EmptyState, ErrorNote, Field, Icon, inputClass, Pending, RelativeTime, ScrollX } from "../../ui";
-import { duration, hintLabel, letterColor, letterTone, partialNote, scoresOverTime, shortfalls, statusLabel, statusTone, transportLabel } from "./mcpserver/model";
+import { Badge, Button, Card, CardHeader, ConfirmButton, cx, Dialog, DialogBody, EmptyState, ErrorNote, Field, Icon, inputClass, Pending, RelativeTime, ScrollX, Spinner } from "../../ui";
+import {
+  docScore,
+  duration,
+  hintLabel,
+  letterColor,
+  letterTone,
+  partialNote,
+  reviewDone,
+  reviewOpen,
+  reviewStopped,
+  scoresOverTime,
+  shortfalls,
+  statusLabel,
+  statusTone,
+  toolCount,
+  transportLabel,
+} from "./mcpserver/model";
 import { useReauthMutation } from "./Reauth";
 import { SettingsHeader, SettingsSubhead } from "./Settings";
 
@@ -61,11 +80,16 @@ function Page({ s, canEdit }: { s: Server; canEdit: boolean }) {
       {g ? (
         <>
           <ScoreCard g={g} current={s.url} />
-          <CategoryTiles categories={g.categories} />
+          <CategoryTiles categories={g.categories} review={s.review} />
           {g.categories.map((c) => (
             <CategoryCard key={c.id} c={c} />
           ))}
-          {g.tools.length > 0 && <Tools tools={g.tools} />}
+          {g.tools.length > 0 && (
+            <>
+              <Tools tools={g.tools} />
+              <ReviewCard r={s.review} />
+            </>
+          )}
           <History s={s} />
         </>
       ) : (
@@ -262,7 +286,7 @@ function ScoreCard({ g, current }: { g: McpGrade; current: string }) {
   );
 }
 
-function CategoryTiles({ categories }: { categories: McpCategory[] }) {
+function CategoryTiles({ categories, review }: { categories: McpCategory[]; review: McpReview }) {
   return (
     <section>
       <SettingsSubhead>Categories</SettingsSubhead>
@@ -271,7 +295,13 @@ function CategoryTiles({ categories }: { categories: McpCategory[] }) {
         {categories.map((c) => (
           <a key={c.id} href={`#${c.id}`} className="flex flex-col gap-1 rounded-surface border border-line px-3 py-3 transition-colors hover:border-line-hover">
             <span className="text-xs font-medium text-muted">{c.title}</span>
-            {c.score == null ? <span className="text-lg font-semibold text-faint">Left out</span> : <span className="text-2xl font-semibold tabular-nums">{c.score}</span>}
+            {c.score == null ? (
+              <span className="text-lg font-semibold text-faint">Left out</span>
+            ) : c.id === "documentation" && review.score != null ? (
+              <span className="text-lg font-semibold tabular-nums">{docScore(c.score, review)}</span>
+            ) : (
+              <span className="text-2xl font-semibold tabular-nums">{c.score}</span>
+            )}
             {c.note && <span className="text-xs text-muted">{c.note}</span>}
           </a>
         ))}
@@ -317,14 +347,20 @@ function Tools({ tools }: { tools: McpTool[] }) {
   return (
     <section>
       <SettingsSubhead>Tools</SettingsSubhead>
-      <p className="mb-3 text-sm text-muted">Each tool's documentation score: its title, description, inputs, hints and output schema, as the rules read them.</p>
+      <p className="mb-3 text-sm text-muted">
+        Each tool's documentation score: its title, description, inputs, hints and output schema, as the rules read them. AI is a model's score for the title, description and inputs, once
+        someone reviews them below.
+      </p>
       <Card>
         <ScrollX label="tools">
-          <table className="w-full min-w-[40rem] text-left text-sm">
+          <table className="w-full min-w-[46rem] text-left text-sm">
             <thead className="text-xs text-muted">
               <tr className="border-b border-line">
                 <th className="px-4 py-2 font-medium">Tool</th>
                 <th className="py-2 pr-4 text-right font-medium">Docs</th>
+                <th className="py-2 pr-4 text-right font-medium">
+                  AI <span className="font-normal text-faint">advisory</span>
+                </th>
                 <th className="py-2 pr-4 font-medium">Hints</th>
                 <th className="py-2 pr-4 font-medium">Falls short on</th>
               </tr>
@@ -332,26 +368,27 @@ function Tools({ tools }: { tools: McpTool[] }) {
             <tbody className="divide-y divide-line">
               {tools.map((t) => {
                 const short = shortfalls(t);
+                const r = t.review;
+                const summary = [short.length > 0 && `${short.length} ${short.length === 1 ? "check" : "checks"}`, r && "AI notes"].filter(Boolean).join(" · ");
                 return (
                   <tr key={t.key || t.name} className="align-top">
-                    <td className="px-4 py-2">
+                    <td className="min-w-36 px-4 py-2">
                       <div className="font-mono text-xs [overflow-wrap:anywhere]">{t.name}</div>
                       {t.title && <div className="text-xs text-muted">{t.title}</div>}
                     </td>
                     <td className="py-2 pr-4 text-right font-medium tabular-nums">{t.score}</td>
+                    <td className="py-2 pr-4 text-right tabular-nums">{r ? r.score : <span className="text-faint">–</span>}</td>
                     <td className="py-2 pr-4">
                       <div className="flex flex-wrap gap-1">
                         {t.hints.length ? t.hints.map((h) => <Badge key={h}>{hintLabel(h)}</Badge>) : <span className="text-xs text-faint">None</span>}
                       </div>
                     </td>
                     <td className="py-2 pr-4 text-xs">
-                      {short.length === 0 ? (
+                      {!summary ? (
                         <span className="text-faint">Nothing</span>
                       ) : (
                         <details>
-                          <summary className="cursor-pointer text-muted hover:text-fg">
-                            {short.length} {short.length === 1 ? "check" : "checks"}
-                          </summary>
+                          <summary className="cursor-pointer text-muted hover:text-fg">{summary}</summary>
                           <ul className="mt-1 space-y-1">
                             {short.map((m) => (
                               <li key={m.check}>
@@ -359,6 +396,19 @@ function Tools({ tools }: { tools: McpTool[] }) {
                                 <span className="text-muted">: {m.finding}</span>
                               </li>
                             ))}
+                            {r &&
+                              (
+                                [
+                                  ["Title", r.title],
+                                  ["Description", r.description],
+                                  ["Inputs", r.inputs],
+                                ] as const
+                              ).map(([label, p]) => (
+                                <li key={label}>
+                                  <Badge tone="info">AI {p.score}</Badge> <span className="font-medium">{label}</span>
+                                  {p.reason && <span className="text-muted">: {p.reason}</span>}
+                                </li>
+                              ))}
                           </ul>
                         </details>
                       )}
@@ -371,6 +421,107 @@ function Tools({ tools }: { tools: McpTool[] }) {
         </ScrollX>
       </Card>
     </section>
+  );
+}
+
+function ReviewCard({ r }: { r: McpReview }) {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const canRun = useCan("runs:write");
+  const admin = useIsAdmin();
+  const [asking, setAsking] = useState(false);
+  const start = useMutation({
+    mutationFn: api.mcpServer.review,
+    onSuccess: (s) => {
+      setAsking(false);
+      qc.setQueryData(keys.mcpServer, s);
+    },
+  });
+  const open = reviewOpen(r.status);
+  const watched = useRef(open);
+  useEffect(() => {
+    if (open) watched.current = true;
+    else if (watched.current) {
+      watched.current = false;
+      toast(reviewDone(r), r.status === "completed" ? "done" : "error");
+    }
+  }, [open]);
+  const stopped = reviewStopped(r);
+  const cost = money(r.estimate_usd, "about");
+  return (
+    <>
+      <Card>
+        <CardHeader
+          title="AI review of tool docs"
+          description="A model reads each tool's title, description and inputs, scores each from 0 to 100 and says what to change. It is advisory: the grade's score never moves."
+        >
+          {r.score != null && <span className="text-lg font-semibold tabular-nums">AI {r.score}</span>}
+        </CardHeader>
+        <div className="space-y-3 border-t border-line px-4 py-3 text-sm">
+          {open ? (
+            <p className="flex items-center gap-2 text-muted" aria-live="polite">
+              <Spinner className="size-3.5 border" />
+              {r.status === "queued" ? "Queued. The review starts within a minute." : `Reviewing: ${r.reviewed} of ${toolCount(r.tools)} done.`}
+            </p>
+          ) : (
+            <p className="text-muted">
+              {r.reviewed > 0 ? `${r.reviewed} of ${toolCount(r.tools)} reviewed. ` : ""}
+              {r.estimate_tools > 0
+                ? `Reviewing ${r.estimate_tools === r.tools ? "" : "the other "}${toolCount(r.estimate_tools)} costs ${cost}, one Treg call a tool, counted against the monthly spend cap.`
+                : "Every tool has a review of its current definition. A tool is reviewed again only when its definition changes."}
+              {r.estimate_tools === 100 && r.tools > 100 && " A review reads at most 100 tools, worst rule score first."}
+            </p>
+          )}
+          {stopped && !open && (
+            <p role="note" className="flex items-start gap-2 rounded-control bg-warn-soft px-3 py-2 text-warn">
+              <Icon name="alert" className="mt-0.5 size-4 shrink-0" />
+              <span>
+                {stopped} {r.error && <span className="[overflow-wrap:anywhere]">{r.error}</span>}
+              </span>
+            </p>
+          )}
+          {!r.has_token && (
+            <p className="text-muted">
+              Reviewing needs a Treg token, which bills each call.{" "}
+              {admin ? (
+                <Link to="/settings/treg" className="font-medium text-fg underline underline-offset-2">
+                  Add it under Settings &gt; Treg
+                </Link>
+              ) : (
+                "An admin adds it under Settings > Treg."
+              )}
+            </p>
+          )}
+          {canRun && !open && r.estimate_tools > 0 && (
+            <Button onClick={() => setAsking(true)} disabled={!r.has_token}>
+              <Icon name="sparkles" className="size-3.5" />
+              Review tool docs
+            </Button>
+          )}
+          <ErrorNote error={start.error} />
+        </div>
+      </Card>
+      <Dialog open={asking} onClose={() => setAsking(false)} title="Review tool docs?">
+        <DialogBody>
+          <div className="space-y-3">
+            <p className="text-sm">
+              A model reviews {toolCount(r.estimate_tools)} for {cost}, charged through Treg and counted against your monthly spend cap. It stops if the month reaches the cap.
+            </p>
+            <p className="text-sm text-muted">It runs in the background within a minute and shows in Check history. The grade's score stays as it is.</p>
+            <ErrorNote error={start.error} />
+            <div className="flex justify-end gap-2 pt-1">
+              <Button variant="ghost" onClick={() => setAsking(false)}>
+                Cancel
+              </Button>
+              <Button variant="primary" onClick={() => start.mutate()} disabled={start.isPending} data-autofocus>
+                {start.isPending && <Spinner className="size-3.5 border" />}
+                Review {toolCount(r.estimate_tools)}
+              </Button>
+            </div>
+          </div>
+        </DialogBody>
+      </Dialog>
+    </>
   );
 }
 

@@ -88,7 +88,7 @@ func Build(w db.Entity, pool db.Pool, o Options) (app.Services, func(context.Con
 	svc := app.Services{
 		Instance: instance.New(o.Version, pool, settings, mentions, brands), Config: settings, Checks: runs, Results: res, Notify: alerts,
 		Search: traffic, Changes: site, Social: mentions, Discovery: brands, Logos: logoLookups,
-		MCPGrade: mcpgrade.New(pool, mcpgrade.Options{
+		MCPGrade: mcpgrade.New(pool, settings, mcpgrade.Options{
 			Secrets: o.Secrets, AllowPrivate: o.AllowPrivateNetworks, UserAgent: "Byname/" + o.Version, RegistryURL: o.MCPRegistryURL,
 		}),
 	}
@@ -97,7 +97,7 @@ func Build(w db.Entity, pool db.Pool, o Options) (app.Services, func(context.Con
 		var jobs sync.WaitGroup
 		jobs.Go(func() {
 			scheduler.New(runs, settings, scheduler.Options{Log: log, Sources: cited, Search: traffic, Changes: site, Social: mentions,
-				OtherBrands: []scheduler.Ticker{brands, logoLookups}}).Run(ctx)
+				OtherBrands: []scheduler.Ticker{brands, logoLookups}, MCPReview: svc.MCPGrade}).Run(ctx)
 		})
 		jobs.Go(func() { alerts.Run(ctx) })
 		jobs.Wait()

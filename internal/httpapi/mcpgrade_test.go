@@ -13,6 +13,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/unkeyed/byname/internal/core"
+	"github.com/unkeyed/byname/internal/engines/tregtest"
 )
 
 const mcpToken = "mcp_secret_northwind_tokenvalue"
@@ -66,7 +67,43 @@ type mcpServerView struct {
 		ID    int64 `json:"id"`
 		Score int   `json:"score"`
 	} `json:"history"`
+	Review struct {
+		Status        string   `json:"status"`
+		Error         string   `json:"error"`
+		HasToken      bool     `json:"has_token"`
+		Reviewed      int      `json:"reviewed"`
+		Tools         int      `json:"tools"`
+		Score         *int     `json:"score"`
+		CostUSD       *float64 `json:"cost_usd"`
+		EstimateUSD   float64  `json:"estimate_usd"`
+		EstimateTools int      `json:"estimate_tools"`
+	} `json:"review"`
 }
+
+func (v mcpServerView) toolReview(t *testing.T, i int) *struct {
+	Score int `json:"score"`
+	Title struct {
+		Score  int    `json:"score"`
+		Reason string `json:"reason"`
+	} `json:"title"`
+} {
+	t.Helper()
+	var tool struct {
+		Review *struct {
+			Score int `json:"score"`
+			Title struct {
+				Score  int    `json:"score"`
+				Reason string `json:"reason"`
+			} `json:"title"`
+		} `json:"review"`
+	}
+	if err := json.Unmarshal(v.Latest.Tools[i], &tool); err != nil {
+		t.Fatal(err)
+	}
+	return tool.Review
+}
+
+const reviewReply = `{"title":{"score":20,"reason":"Add a title."},"description":{"score":80,"reason":"Clear."},"inputs":{"score":100,"reason":"No inputs."}}`
 
 func TestMCPServerGradeOverHTTP(t *testing.T) {
 	c := newServer(t)
@@ -153,6 +190,57 @@ func TestMCPServerGradeOverHTTP(t *testing.T) {
 	}
 }
 
+func TestMCPToolReviewOverHTTP(t *testing.T) {
+	c := newServer(t)
+	person, agent := login(t, c)
+	reader := c.withKey(t, person, core.ResultsRead)
+	c.treg.Reply(func(tregtest.Call) []byte { return tregtest.LLMBody(reviewReply) })
+	agent.call("POST", "/v1/mcp-server/review", nil, http.StatusBadRequest, nil)
+	endpoint := northwindMCP(t)
+	agent.call("PUT", "/v1/mcp-server", map[string]string{"url": endpoint}, http.StatusOK, nil)
+	person.call("PUT", "/v1/mcp-server/token", map[string]string{"token": mcpToken, "url": endpoint}, http.StatusOK, nil)
+	var v mcpServerView
+	r := agent.call("POST", "/v1/mcp-server/grade", nil, http.StatusOK, &v)
+	if v.Review.Status != "none" || v.Review.HasToken || v.Review.Tools != 1 || v.Review.EstimateTools != 1 || !strings.Contains(string(r.body), `"review":null`) {
+		t.Fatalf("before a review: %+v in %s", v.Review, r.body)
+	}
+	if r := agent.do("POST", "/v1/mcp-server/review", nil); r.code != http.StatusBadRequest || !strings.Contains(string(r.body), "Treg token") {
+		t.Fatalf("a review without a Treg token = %d %s", r.code, r.body)
+	}
+	person.call("PUT", "/v1/credentials/treg", map[string]string{"secret": tregSecret}, http.StatusOK, nil)
+	reader.call("POST", "/v1/mcp-server/review", nil, http.StatusForbidden, nil)
+	agent.call("POST", "/v1/mcp-server/review", nil, http.StatusOK, &v)
+	if v.Review.Status != "queued" || !v.Review.HasToken {
+		t.Fatalf("POST /v1/mcp-server/review = %+v", v.Review)
+	}
+	if err := c.svc.MCPGrade.Tick(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	reader.call("GET", "/v1/mcp-server", nil, http.StatusOK, &v)
+	tr := v.toolReview(t, 0)
+	if v.Review.Status != "completed" || v.Review.Reviewed != 1 || v.Review.Score == nil || *v.Review.Score != 76 || tr == nil || tr.Score != 76 || tr.Title.Reason != "Add a title." {
+		t.Fatalf("after the review: %+v, tool review %+v", v.Review, tr)
+	}
+	var jobs []struct {
+		Job      string   `json:"job"`
+		SpendUSD *float64 `json:"spend_usd"`
+	}
+	reader.call("GET", "/v1/jobs", nil, http.StatusOK, &jobs)
+	if len(jobs) == 0 || jobs[0].Job != "mcp_review" || jobs[0].SpendUSD == nil || *jobs[0].SpendUSD != *v.Review.CostUSD {
+		t.Errorf("Check history = %+v, want the review with what it spent, %v", jobs, *v.Review.CostUSD)
+	}
+	var costs struct {
+		Month struct {
+			MCPReviewUSD float64 `json:"mcp_review_usd"`
+			SpentUSD     float64 `json:"spent_usd"`
+		} `json:"month"`
+	}
+	reader.call("GET", "/v1/costs", nil, http.StatusOK, &costs)
+	if costs.Month.MCPReviewUSD != *v.Review.CostUSD || costs.Month.SpentUSD < costs.Month.MCPReviewUSD {
+		t.Errorf("the month's costs = %+v, want the review's %v counted", costs.Month, *v.Review.CostUSD)
+	}
+}
+
 // TestMCPServerToolsOverMCP calls each grade tool over a real OAuth
 // connection, which validates every output, a full report included,
 // against its schema.
@@ -201,5 +289,22 @@ func TestMCPServerToolsOverMCP(t *testing.T) {
 	}
 	if v := call("mcp_server_grade", nil); v.TokenSet || len(v.History) != 2 {
 		t.Fatalf("mcp_server_grade = %+v", v)
+	}
+
+	person.call("PUT", "/v1/mcp-server/token", map[string]string{"token": mcpToken, "url": endpoint}, http.StatusOK, nil)
+	call("grade_mcp_server", nil)
+	if res, err := cs.CallTool(context.Background(), &mcp.CallToolParams{Name: "review_mcp_tools"}); err != nil || !res.IsError {
+		t.Fatalf("review_mcp_tools without a Treg token = %v, %+v; want a tool error", err, res)
+	}
+	person.call("PUT", "/v1/credentials/treg", map[string]string{"secret": tregSecret}, http.StatusOK, nil)
+	anon.treg.Reply(func(tregtest.Call) []byte { return tregtest.LLMBody(reviewReply) })
+	if v := call("review_mcp_tools", nil); v.Review.Status != "queued" {
+		t.Fatalf("review_mcp_tools = %+v", v.Review)
+	}
+	if err := anon.svc.MCPGrade.Tick(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if v := call("mcp_server_grade", nil); v.Review.Status != "completed" || v.toolReview(t, 0) == nil {
+		t.Fatalf("mcp_server_grade after the review = %+v", v.Review)
 	}
 }

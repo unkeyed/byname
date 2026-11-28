@@ -27,6 +27,7 @@ const jobNames: Record<string, string> = {
   social_fetch: "Social search",
   other_brands: "Reading answers for other brands",
   brand_logos: "Looking up logos",
+  mcp_review: "Reviewing MCP tool docs",
   site_changes: "Site changes from GitHub",
   recrawl_watch: "Waiting for Google to see site changes",
   verdicts: "Site change results",

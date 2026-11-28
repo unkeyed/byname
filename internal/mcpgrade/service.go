@@ -30,9 +30,11 @@ var gradeLock = db.EntityLock("byname.mcpgrade.grade")
 
 type Service struct {
 	db       db.Pool
+	config   Config
 	secrets  *secretbox.Box
 	client   *http.Client
 	registry string
+	now      func() time.Time
 }
 
 type Options struct {
@@ -40,12 +42,16 @@ type Options struct {
 	AllowPrivate bool
 	UserAgent    string
 	RegistryURL  string
+	Now          func() time.Time
 }
 
-func New(pool db.Pool, o Options) *Service {
+func New(pool db.Pool, cfg Config, o Options) *Service {
 	c := sources.PublicClient(o.AllowPrivate)
 	c.Transport = userAgent{next: c.Transport, agent: o.UserAgent}
-	return &Service{db: pool, secrets: o.Secrets, client: c, registry: o.RegistryURL}
+	if o.Now == nil {
+		o.Now = time.Now
+	}
+	return &Service{db: pool, config: cfg, secrets: o.Secrets, client: c, registry: o.RegistryURL, now: o.Now}
 }
 
 type userAgent struct {
@@ -67,6 +73,7 @@ type Server struct {
 	TokenSet bool      `json:"token_set" jsonschema:"whether a bearer token is stored for the server; the token itself is never returned"`
 	Latest   *Graded   `json:"latest" jsonschema:"the newest grade in full; null before the first"`
 	History  []Summary `json:"history" jsonschema:"the newest 50 grades, newest first"`
+	Review   Review    `json:"review" jsonschema:"the paid review of the newest grade's tool documentation by a model; advisory, never part of the score"`
 }
 
 type Graded struct {
@@ -109,7 +116,7 @@ func (s *Service) Server(ctx context.Context) (Server, error) {
 		return v, err
 	}
 	if len(v.History) == 0 {
-		return v, nil
+		return v, s.review(ctx, &v)
 	}
 	g := Graded{ID: v.History[0].ID}
 	var raw []byte
@@ -120,7 +127,7 @@ func (s *Service) Server(ctx context.Context) (Server, error) {
 		return v, fmt.Errorf("read grade %d: %w", g.ID, err)
 	}
 	v.Latest = &g
-	return v, nil
+	return v, s.review(ctx, &v)
 }
 
 func (s *Service) SetURL(ctx context.Context, raw string) (Server, error) {

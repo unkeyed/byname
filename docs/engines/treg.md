@@ -23,7 +23,7 @@ A provider error that Treg passes through is different. It is stored as a failed
 
 ## Cost
 
-A check costs questions times each AI app and model you turned on times each endpoint's cost per call, times how many times it asks each question. That is once unless you raise [Ask each question](../scores.md#ask-each-question-more-than-once). The review step and `GET /v1/estimate` estimate it from each endpoint's past answers, or from the sample cost in [AI apps](surfaces.md#ai-apps-and-their-pinned-endpoints) before the first check. The per-check spend cap stops asking new questions once a check passes it. The monthly cap stops a check from starting, and social searches from calling Treg, once the month's checks and social searches have spent that much.
+A check costs questions times each AI app and model you turned on times each endpoint's cost per call, times how many times it asks each question. That is once unless you raise [Ask each question](../scores.md#ask-each-question-more-than-once). The review step and `GET /v1/estimate` estimate it from each endpoint's past answers, or from the sample cost in [AI apps](surfaces.md#ai-apps-and-their-pinned-endpoints) before the first check. The per-check spend cap stops asking new questions once a check passes it. The monthly cap stops a check from starting, and social searches from calling Treg, once the month's checks and social searches have spent that much. An [MCP tool review](../mcp-server.md#ai-review-of-tool-docs) counts toward the same cap and stops at it.
 
 Treg bills you, not Byname. `GET /v1/costs`, or the `get_costs` tool, gathers every cost figure in one place, in US dollars:
 
@@ -32,7 +32,7 @@ Treg bills you, not Byname. `GET /v1/costs`, or the `get_costs` tool, gathers ev
 - `social`: social searches at their settings, one call per network and term each fetch. `treg_month_usd` is what the Treg networks would cost, `bluesky_month_usd` is always 0, and `month_usd` is 0 while social is off.
 - `month_estimate_usd`: checks and social searches in an average month.
 - `default_month_cap_usd`: the monthly cap finishing onboarding sets when none is set, from `month_estimate_usd`.
-- `month`: what the calendar month has spent so far in the instance's time zone, checks and social apart, how many calls reported no cost, and the monthly cap.
+- `month`: what the calendar month has spent so far in the instance's time zone, with checks, social searches, other brands and [MCP tool reviews](../mcp-server.md#ai-review-of-tool-docs) apart, how many calls reported no cost, and the monthly cap.
 
 **Settings > Schedule and limits** shows the month's estimate and spend, and **Check now** shows what a check will cost before it starts. At the default schedule, every 3 days, the three consumer apps ticked by default and 10 questions cost about $0.09 a check, or about $0.90 a month. Social searches for two terms on all seven networks every 6 hours add about $1.60 a month.
 

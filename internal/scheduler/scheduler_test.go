@@ -257,6 +257,33 @@ func TestSearchSyncDoesNotHoldUpChecks(t *testing.T) {
 	}
 }
 
+type slowReview struct{ *slowSearch }
+
+func (r slowReview) Tick(ctx context.Context) error { return r.SyncIfDue(ctx) }
+
+func TestMCPReviewDoesNotHoldUpChecks(t *testing.T) {
+	e := setup(t)
+	p := e.process(nil)
+	review := slowReview{&slowSearch{started: make(chan struct{}, 2), release: make(chan struct{})}}
+	sched := scheduler.New(p.checks, p.cfg, scheduler.Options{Now: func() time.Time { return now }, MCPReview: review})
+	ctx := context.Background()
+	if _, _, err := p.checks.RunNow(ctx); err != nil {
+		t.Fatal(err)
+	}
+	sched.Tick(ctx)
+	<-review.started
+	sched.Tick(ctx)
+	if n := e.count(t, `SELECT count(*) FROM run WHERE status = 'completed'`); n != 1 {
+		t.Fatalf("completed runs while the review ran = %d, want 1", n)
+	}
+	close(review.release)
+	review.mu.Lock()
+	defer review.mu.Unlock()
+	if review.calls != 1 {
+		t.Fatalf("reviews started = %d, want 1 while one was running", review.calls)
+	}
+}
+
 // followed records the order the Search Console sync and site changes run.
 type followed struct {
 	mu    sync.Mutex

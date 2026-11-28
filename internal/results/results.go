@@ -349,7 +349,7 @@ func (s *Service) Answer(ctx context.Context, id int64) (Answer, error) {
 // Job is one entry of the jobs log.
 type Job struct {
 	ID         int64      `json:"id"`
-	Job        string     `json:"job" jsonschema:"ai_check, model_refresh, source_fetch, search_sync, site_changes, recrawl_watch, verdicts, social_fetch, other_brands (reading answers for other brands) or brand_logos"`
+	Job        string     `json:"job" jsonschema:"ai_check, model_refresh, source_fetch, search_sync, site_changes, recrawl_watch, verdicts, social_fetch, other_brands (reading answers for other brands), brand_logos or mcp_review (reviewing MCP tool documentation)"`
 	Provider   string     `json:"provider" jsonschema:"the search engine a search_sync synced, such as google or bing; empty for other jobs"`
 	Trigger    string     `json:"trigger"`
 	RunID      *int64     `json:"run_id"`
@@ -357,7 +357,7 @@ type Job struct {
 	StartedAt  time.Time  `json:"started_at"`
 	FinishedAt *time.Time `json:"finished_at"`
 	Error      string     `json:"error"`
-	SpendUSD   *float64   `json:"spend_usd" jsonschema:"what the job spent: an AI check's answers and its reads for other brands, or a job's calls for other brands; null for a job that spends nothing"`
+	SpendUSD   *float64   `json:"spend_usd" jsonschema:"what the job spent: an AI check's answers and its reads for other brands, a job's calls for other brands, or an MCP tool review's calls; null for a job that spends nothing"`
 }
 
 // Jobs lists the jobs log newest first.
@@ -370,7 +370,8 @@ func (s *Service) Jobs(ctx context.Context, limit int) ([]Job, error) {
 	}
 	rows, err := s.db.Query(ctx, `SELECT j.id, j.job, coalesce(j.provider, ''), j.trigger, j.run_id, j.status, j.started_at, j.finished_at,
 			coalesce(j.error, ''), (CASE WHEN r.id IS NOT NULL THEN r.spend_usd + coalesce((SELECT sum(c.cost_usd) FROM brand_call c WHERE c.run_id = r.id), 0)
-				WHEN j.job IN ('other_brands', 'brand_logos') THEN coalesce((SELECT sum(c.cost_usd) FROM brand_call c WHERE c.job_run_id = j.id), 0) END)::float8
+				WHEN j.job IN ('other_brands', 'brand_logos') THEN coalesce((SELECT sum(c.cost_usd) FROM brand_call c WHERE c.job_run_id = j.id), 0)
+				WHEN j.job = 'mcp_review' THEN coalesce((SELECT sum(c.cost_usd) FROM mcp_review c WHERE c.job_run_id = j.id), 0) END)::float8
 		FROM job_run j LEFT JOIN run r ON r.id = j.run_id ORDER BY j.started_at DESC, j.id DESC LIMIT $1`, limit)
 	if err != nil {
 		return nil, err

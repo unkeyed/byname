@@ -3270,6 +3270,29 @@ paths:
           $ref: "#/components/responses/Conflict"
         "503":
           $ref: "#/components/responses/Unavailable"
+  /v1/mcp-server/review:
+    post:
+      tags: [mcp-server]
+      operationId: reviewMCPTools
+      summary: Queue a paid review of the newest grade's tool documentation by a model, one Treg call per tool without a review of its current definition, at most 100. The scheduler starts it within a minute and stops at the monthly spend cap. A review already queued or running is returned as it is. Never changes the grade's score.
+      security:
+        - apiKey: [runs:write]
+        - session: [runs:write]
+      responses:
+        "200":
+          description: The server with the review queued.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MCPServer"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/Unavailable"
   /v1/keys:
     get:
       tags: [settings]
@@ -6410,7 +6433,7 @@ components:
           description: The monthly spend cap finishing onboarding sets when none is set. Three times month_estimate_usd, rounded up to a whole dollar, and at least 5.
         month:
           type: object
-          required: [start, checks_usd, social_usd, brands_usd, spent_usd, missing_cost_calls, cap_usd]
+          required: [start, checks_usd, social_usd, brands_usd, mcp_review_usd, spent_usd, missing_cost_calls, cap_usd]
           description: The calendar month so far, in the instance's time zone.
           properties:
             start:
@@ -6423,9 +6446,12 @@ components:
             brands_usd:
               type: number
               description: Finding other brands, reading answers in checks or later and looking up logos.
+            mcp_review_usd:
+              type: number
+              description: Reviewing MCP tool documentation.
             spent_usd:
               type: number
-              description: checks_usd plus social_usd plus brands_usd, what the monthly spend cap counts.
+              description: checks_usd plus social_usd plus brands_usd plus mcp_review_usd, what the monthly spend cap counts.
             missing_cost_calls:
               type: integer
               description: Answered calls this month that reported no cost, so spent_usd is a floor.
@@ -7403,7 +7429,7 @@ components:
           type: integer
         job:
           type: string
-          enum: [ai_check, model_refresh, source_fetch, search_sync, site_changes, recrawl_watch, verdicts, social_fetch, other_brands, brand_logos]
+          enum: [ai_check, model_refresh, source_fetch, search_sync, site_changes, recrawl_watch, verdicts, social_fetch, other_brands, brand_logos, mcp_review]
         provider:
           type: string
           description: The search engine a search_sync synced, such as google or bing. Empty for other jobs.
@@ -7426,7 +7452,7 @@ components:
           type: string
         spend_usd:
           type: [number, "null"]
-          description: What the job spent. An AI check's answers and its reads for other brands, or the calls an other_brands or brand_logos job made. Null for a job that spends nothing.
+          description: What the job spent. An AI check's answers and its reads for other brands, or the calls an other_brands, brand_logos or mcp_review job made. Null for a job that spends nothing.
     SearchTotals:
       type: object
       required: [clicks, impressions, ctr, position]
@@ -8453,7 +8479,7 @@ components:
     MCPServer:
       type: object
       description: Your MCP server as anyone with results:read sees it. Never the token.
-      required: [url, token_set, latest, history]
+      required: [url, token_set, latest, history, review]
       properties:
         url:
           type: string
@@ -8471,6 +8497,53 @@ components:
           description: The newest 50 grades, newest first.
           items:
             $ref: "#/components/schemas/MCPGradeSummary"
+        review:
+          $ref: "#/components/schemas/MCPReview"
+    MCPReview:
+      type: object
+      description: The paid review of the newest grade's tool documentation by a model. Advisory, never part of the grade's score.
+      required: [status, error, has_token, reviewed, tools, score, cost_usd, estimate_usd, estimate_tools]
+      properties:
+        status:
+          type: string
+          enum: [none, queued, running, completed, capped, refused, failed]
+          description: None before any review, else the latest review's. Capped means the monthly spend cap stopped it, refused that Treg refused a call, such as for an empty balance.
+        error:
+          type: string
+        has_token:
+          type: boolean
+          description: A Treg token is stored, which a review needs.
+        reviewed:
+          type: integer
+          description: Tools in the newest grade with a review of their current definition.
+        tools:
+          type: integer
+          description: Tools in the newest grade.
+        score:
+          type: [integer, "null"]
+          minimum: 0
+          maximum: 100
+          description: The mean of the reviewed tools' scores. Null before any is reviewed.
+        cost_usd:
+          type: [number, "null"]
+          description: What the latest review spent. Null before any, or when no call reported a cost.
+        estimate_usd:
+          type: number
+          description: What reviewing estimate_tools costs, from past reviews or the sample price before any.
+        estimate_tools:
+          type: integer
+          description: Tools a review would read now, those without a review of their current definition, at most 100.
+    MCPReviewPart:
+      type: object
+      required: [score, reason]
+      properties:
+        score:
+          type: integer
+          minimum: 0
+          maximum: 100
+        reason:
+          type: string
+          description: One sentence, what to change or why nothing needs to.
     MCPGradeSummary:
       type: object
       required: [id, graded_at, url, score, grade, rules]
@@ -8596,7 +8669,7 @@ components:
           description: How to pass. Empty on a pass or a skip.
     MCPTool:
       type: object
-      required: [name, title, description, params, hints, has_output_schema, score, marks, key]
+      required: [name, title, description, params, hints, has_output_schema, score, marks, key, review]
       properties:
         name:
           type: string
@@ -8647,6 +8720,24 @@ components:
         key:
           type: string
           description: A hash of the tool's definition.
+        review:
+          description: The model's review of this definition, from any grade where it is unchanged. Null before one.
+          oneOf:
+            - type: object
+              required: [score, title, description, inputs]
+              properties:
+                score:
+                  type: integer
+                  minimum: 0
+                  maximum: 100
+                  description: (15 x title + 35 x description + 30 x inputs) / 80, the weights the rules give the same parts.
+                title:
+                  $ref: "#/components/schemas/MCPReviewPart"
+                description:
+                  $ref: "#/components/schemas/MCPReviewPart"
+                inputs:
+                  $ref: "#/components/schemas/MCPReviewPart"
+            - type: "null"
     SocialNetwork:
       type: string
       enum: [x, reddit, hackernews, linkedin, youtube, threads, bluesky]

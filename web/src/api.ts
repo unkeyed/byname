@@ -547,6 +547,7 @@ export interface Costs {
     social_usd: number;
     /** Reading answers for other brands and looking up logos. */
     brands_usd: number;
+    mcp_review_usd: number;
     spent_usd: number;
     missing_cost_calls: number;
     cap_usd: number | null;
@@ -1507,6 +1508,33 @@ export interface McpTool {
   score: number;
   marks: { check: string; status: McpStatus; finding: string }[];
   key: string;
+  review: McpToolReview | null;
+}
+
+export interface McpReviewPart {
+  score: number;
+  reason: string;
+}
+
+export interface McpToolReview {
+  score: number;
+  title: McpReviewPart;
+  description: McpReviewPart;
+  inputs: McpReviewPart;
+}
+
+export type McpReviewStatus = "none" | "queued" | "running" | "completed" | "capped" | "refused" | "failed";
+
+export interface McpReview {
+  status: McpReviewStatus;
+  error: string;
+  has_token: boolean;
+  reviewed: number;
+  tools: number;
+  score: number | null;
+  cost_usd: number | null;
+  estimate_usd: number;
+  estimate_tools: number;
 }
 
 export type McpPartial = "" | "needs_token" | "no_session" | "no_tools";
@@ -1547,6 +1575,7 @@ export interface McpServer {
   token_set: boolean;
   latest: McpGrade | null;
   history: McpGradeSummary[];
+  review: McpReview;
 }
 
 /** internal/social: the networks searched for posts that mention you. */
@@ -2295,6 +2324,7 @@ export const api = {
     /** url is the server URL the admin saw; a token for a URL changed since then fails with 409. */
     setToken: (url: string, token: string) => request<McpServer>("PUT", "/v1/mcp-server/token", { body: { url, token } }),
     grade: () => request<McpServer>("POST", "/v1/mcp-server/grade"),
+    review: () => request<McpServer>("POST", "/v1/mcp-server/review"),
   },
 
   social: {

@@ -247,7 +247,8 @@ export function MonthSpend() {
             </div>
           )}
           <p className="mt-1 text-xs text-muted">
-            {money(m.checks_usd)} on checks, {money(m.social_usd)} on social searches and {money(m.brands_usd)} on finding other brands and their logos.
+            {money(m.checks_usd)} on checks, {money(m.social_usd)} on social searches{m.mcp_review_usd > 0 ? ", " : " and "}
+            {money(m.brands_usd)} on finding other brands and their logos{m.mcp_review_usd > 0 && ` and ${money(m.mcp_review_usd)} on reviewing MCP tool docs`}.
             {m.missing_cost_calls > 0 && ` ${m.missing_cost_calls} answers reported no price, so the real spend is a little higher.`}
           </p>
         </div>

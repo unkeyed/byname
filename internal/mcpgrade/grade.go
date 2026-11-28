@@ -144,7 +144,8 @@ type Tool struct {
 	Marks       []ToolMark `json:"marks"`
 	// Key is a hash of the definition above, so a later review can skip a
 	// tool that did not change.
-	Key string `json:"key"`
+	Key    string      `json:"key"`
+	Review *ToolReview `json:"review" jsonschema:"the model's review of this definition; null before one"`
 }
 
 // Param is one top-level input property.

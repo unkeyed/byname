@@ -58,10 +58,8 @@ type Call struct {
 	Token          string
 	IdempotencyKey string
 	Replay         bool
-	// Find is a call reading an answer for other brands, and Sent its
-	// request body.
-	Find bool
-	Sent string
+	Find           bool
+	Sent           string
 }
 
 // Refusal makes the fake answer as Treg refusing on its own behalf.
@@ -79,9 +77,11 @@ type Server struct {
 	paid   map[string]int64
 	bodies map[string][]byte
 	find   []byte
+	reply  func(Call) []byte
 	// Before runs for each call before it is answered. A non-nil Refusal
 	// refuses it.
 	before func(Call) *Refusal
+	lose   func(Call) bool
 }
 
 // New starts a fake Treg that closes when the test ends.
@@ -136,11 +136,35 @@ func (s *Server) SetFindBody(body []byte) {
 	s.find = body
 }
 
+// Reply installs a hook that answers a call with the body it returns, or
+// leaves it to the fixtures by returning nil.
+func (s *Server) Reply(f func(Call) []byte) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.reply = f
+}
+
+func LLMBody(text string) []byte {
+	b, _ := json.Marshal(map[string]any{"status_code": 20000, "tasks": []any{map[string]any{"status_code": 20000,
+		"result": []any{map[string]any{"model_name": "claude-haiku-4-5", "items": []any{map[string]any{"type": "message",
+			"sections": []any{map[string]any{"type": "text", "text": text}}}}}}}}})
+	return b
+}
+
 // Before installs a hook that runs before each call is answered.
 func (s *Server) Before(f func(Call) *Refusal) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.before = f
+}
+
+// Lose installs a hook that, for each call it returns true for, charges the
+// call and then closes the connection without answering, as when Treg's
+// answer is lost on its way back.
+func (s *Server) Lose(f func(Call) bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.lose = f
 }
 
 // Calls returns every call received so far, in order.
@@ -174,21 +198,24 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request) {
 	tool, ok := strings.CutPrefix(r.URL.Path, "/call/")
 	c := Call{Tool: tool, Token: r.Header.Get("X-Treg-Token"), IdempotencyKey: r.Header.Get("Idempotency-Key")}
 	sent, _ := io.ReadAll(r.Body)
+	c.Sent = string(sent)
 	c.Find = tool == engines.BrandFinder.ID && bytes.Contains(sent, []byte(`"system_message"`))
-	if c.Find {
-		c.Sent = string(sent)
-	}
 	s.mu.Lock()
 	body, known := s.bodies[tool]
 	if c.Find {
 		body = s.find
 	}
-	before := s.before
+	reply, before, lose := s.reply, s.before, s.lose
 	price, priced := s.cost[tool]
 	original, replay := s.paid[c.IdempotencyKey]
 	c.Replay = replay && c.IdempotencyKey != ""
 	s.calls = append(s.calls, c)
 	s.mu.Unlock()
+	if reply != nil {
+		if b := reply(c); b != nil {
+			body = b
+		}
+	}
 
 	if !ok || !known {
 		refuse(w, http.StatusNotFound, "unknown_tool")
@@ -228,6 +255,12 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request) {
 		s.mu.Lock()
 		s.paid[c.IdempotencyKey] = cost
 		s.mu.Unlock()
+	}
+	if lose != nil && lose(c) {
+		if conn, _, err := http.NewResponseController(w).Hijack(); err == nil {
+			_ = conn.Close()
+		}
+		return
 	}
 	_, _ = w.Write(body)
 }
