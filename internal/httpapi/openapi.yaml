@@ -3224,6 +3224,10 @@ paths:
                   type: string
                   maxLength: 4096
                   description: A bearer token the server accepts. Empty deletes the stored one.
+                url:
+                  type: string
+                  maxLength: 2048
+                  description: The server URL the token is for, as the admin saw it. Needed with a token; the write fails when the stored URL differs.
       responses:
         "200":
           description: The server and its grades.
@@ -3237,6 +3241,8 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Reauth"
+        "409":
+          $ref: "#/components/responses/Conflict"
         "503":
           $ref: "#/components/responses/Unavailable"
   /v1/mcp-server/grade:

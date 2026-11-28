@@ -1,7 +1,9 @@
 package mcpgrade
 
 import (
+	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"iter"
 	"maps"
@@ -482,6 +484,8 @@ func checkListed(o *observation) mark {
 	return withSession(o, func(s *sessionSeen) mark {
 		declared := s.init.Capabilities != nil && s.init.Capabilities.Tools != nil
 		switch {
+		case len(s.tools) > 0 && s.toolsErr != nil:
+			return partial(0.5, fmt.Sprintf("tools/list stopped after %d tools: %s", len(s.tools), errLine(s.toolsErr)))
 		case len(s.tools) > 0 && declared:
 			return pass(fmt.Sprintf("%d tools", len(s.tools)))
 		case len(s.tools) > 0:
@@ -538,10 +542,43 @@ func checkInputSchema(t *rawTool) mark {
 	if s.Type != "object" {
 		return fail(fmt.Sprintf("inputSchema type is %v, not object", s.Type))
 	}
+	if err := badProperties(t.input, ""); err != nil {
+		return fail(err.Error())
+	}
 	if err := headerAnnotations(t.input); err != nil {
 		return fail(err.Error() + "; the Go SDK drops this tool")
 	}
 	return pass("")
+}
+
+// badProperties finds the first properties that is not an object, or property
+// that is neither an object nor a boolean schema, under a schema object.
+func badProperties(schema json.RawMessage, path string) error {
+	var s struct {
+		Properties json.RawMessage `json:"properties"`
+	}
+	if json.Unmarshal(schema, &s) != nil {
+		return fmt.Errorf("property %s is not a schema", strings.TrimSuffix(path, "."))
+	}
+	if s.Properties == nil {
+		return nil
+	}
+	var props map[string]json.RawMessage
+	if json.Unmarshal(s.Properties, &props) != nil {
+		if path == "" {
+			return errors.New("properties is not an object")
+		}
+		return fmt.Errorf("properties of %s is not an object", strings.TrimSuffix(path, "."))
+	}
+	for _, name := range slices.Sorted(maps.Keys(props)) {
+		if b := string(bytes.TrimSpace(props[name])); b == "true" || b == "false" {
+			continue
+		}
+		if err := badProperties(props[name], path+name+"."); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // headerAnnotations mirrors the go-sdk's check of x-mcp-header annotations,

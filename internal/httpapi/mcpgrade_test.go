@@ -147,7 +147,8 @@ func TestMCPServerGradeOverHTTP(t *testing.T) {
 	}
 	partial := v.Latest.ID
 
-	keep(person.call("PUT", "/v1/mcp-server/token", map[string]string{"token": mcpToken}, http.StatusOK, &v))
+	person.call("PUT", "/v1/mcp-server/token", map[string]string{"token": mcpToken, "url": "https://mcp.elsewhere.example/mcp"}, http.StatusConflict, nil)
+	keep(person.call("PUT", "/v1/mcp-server/token", map[string]string{"token": mcpToken, "url": endpoint}, http.StatusOK, &v))
 	if !v.TokenSet {
 		t.Fatal("token_set is false after an admin set it")
 	}
@@ -195,8 +196,9 @@ func TestMCPToolReviewOverHTTP(t *testing.T) {
 	reader := c.withKey(t, person, core.ResultsRead)
 	c.treg.Reply(func(tregtest.Call) []byte { return tregtest.LLMBody(reviewReply) })
 	agent.call("POST", "/v1/mcp-server/review", nil, http.StatusBadRequest, nil)
-	agent.call("PUT", "/v1/mcp-server", map[string]string{"url": northwindMCP(t)}, http.StatusOK, nil)
-	person.call("PUT", "/v1/mcp-server/token", map[string]string{"token": mcpToken}, http.StatusOK, nil)
+	endpoint := northwindMCP(t)
+	agent.call("PUT", "/v1/mcp-server", map[string]string{"url": endpoint}, http.StatusOK, nil)
+	person.call("PUT", "/v1/mcp-server/token", map[string]string{"token": mcpToken, "url": endpoint}, http.StatusOK, nil)
 	var v mcpServerView
 	r := agent.call("POST", "/v1/mcp-server/grade", nil, http.StatusOK, &v)
 	if v.Review.Status != "none" || v.Review.HasToken || v.Review.Tools != 1 || v.Review.EstimateTools != 1 || !strings.Contains(string(r.body), `"review":null`) {
@@ -277,7 +279,7 @@ func TestMCPServerToolsOverMCP(t *testing.T) {
 	if v := call("set_mcp_server", map[string]any{"url": endpoint}); v.URL != endpoint {
 		t.Fatalf("set_mcp_server = %+v", v)
 	}
-	person.call("PUT", "/v1/mcp-server/token", map[string]string{"token": mcpToken}, http.StatusOK, nil)
+	person.call("PUT", "/v1/mcp-server/token", map[string]string{"token": mcpToken, "url": endpoint}, http.StatusOK, nil)
 	if v := call("grade_mcp_server", nil); v.Latest == nil || v.Latest.Partial != "" || len(v.Latest.Tools) != 1 {
 		t.Fatalf("grade_mcp_server = %+v", v.Latest)
 	}
@@ -289,7 +291,7 @@ func TestMCPServerToolsOverMCP(t *testing.T) {
 		t.Fatalf("mcp_server_grade = %+v", v)
 	}
 
-	person.call("PUT", "/v1/mcp-server/token", map[string]string{"token": mcpToken}, http.StatusOK, nil)
+	person.call("PUT", "/v1/mcp-server/token", map[string]string{"token": mcpToken, "url": endpoint}, http.StatusOK, nil)
 	call("grade_mcp_server", nil)
 	if res, err := cs.CallTool(context.Background(), &mcp.CallToolParams{Name: "review_mcp_tools"}); err != nil || !res.IsError {
 		t.Fatalf("review_mcp_tools without a Treg token = %v, %+v; want a tool error", err, res)

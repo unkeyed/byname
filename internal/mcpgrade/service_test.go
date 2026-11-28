@@ -136,16 +136,20 @@ func TestURLMustBeAnEndpointWeMayReach(t *testing.T) {
 
 func TestTokenIsSealedAndFollowsItsOrigin(t *testing.T) {
 	e := newEnv(t)
-	if _, err := e.svc.SetToken(e.ctx, token); !errors.Is(err, core.ErrInvalid) {
+	const northwind = "https://mcp.northwind.example/mcp"
+	if _, err := e.svc.SetToken(e.ctx, northwind, token); !errors.Is(err, core.ErrInvalid) {
 		t.Fatalf("SetToken without a URL = %v, want ErrInvalid", err)
 	}
-	if _, err := e.svc.SetURL(e.ctx, "https://mcp.northwind.example/mcp"); err != nil {
+	if _, err := e.svc.SetURL(e.ctx, northwind); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := e.svc.SetToken(e.ctx, "two words"); !errors.Is(err, core.ErrInvalid) {
+	if _, err := e.svc.SetToken(e.ctx, northwind, "two words"); !errors.Is(err, core.ErrInvalid) {
 		t.Fatalf("SetToken with a space = %v, want ErrInvalid", err)
 	}
-	v, err := e.svc.SetToken(e.ctx, " "+token+"\n")
+	if _, err := e.svc.SetToken(e.ctx, "", token); !errors.Is(err, core.ErrInvalid) {
+		t.Fatalf("SetToken without the URL it is for = %v, want ErrInvalid", err)
+	}
+	v, err := e.svc.SetToken(e.ctx, " https://MCP.Northwind.example/mcp ", " "+token+"\n")
 	if err != nil || !v.TokenSet {
 		t.Fatalf("SetToken = %+v, %v", v, err)
 	}
@@ -161,19 +165,22 @@ func TestTokenIsSealedAndFollowsItsOrigin(t *testing.T) {
 	if v, _ := e.svc.SetURL(e.ctx, "https://mcp.northwind.example:8443/mcp"); v.TokenSet {
 		t.Error("a URL on another port kept the token, which would send it to another server")
 	}
-	if _, err := e.svc.SetToken(e.ctx, token); err != nil {
+	if _, err := e.svc.SetToken(e.ctx, "https://mcp.northwind.example:8443/mcp", token); err != nil {
 		t.Fatal(err)
 	}
 	if v, _ := e.svc.SetURL(e.ctx, "https://evil.example/mcp"); v.TokenSet || e.sealed() != "" {
 		t.Error("a URL on another host kept the token")
 	}
-	if _, err := e.svc.SetToken(e.ctx, token); err != nil {
+	if _, err := e.svc.SetToken(e.ctx, northwind, token); !errors.Is(err, core.ErrConflict) || e.sealed() != "" {
+		t.Fatalf("SetToken for a URL an editor has since changed = %v, stored %q, want ErrConflict and nothing stored", err, e.sealed())
+	}
+	if _, err := e.svc.SetToken(e.ctx, "https://evil.example/mcp", token); err != nil {
 		t.Fatal(err)
 	}
-	if v, _ := e.svc.SetToken(e.ctx, ""); v.TokenSet || e.sealed() != "" {
+	if v, _ := e.svc.SetToken(e.ctx, "", ""); v.TokenSet || e.sealed() != "" {
 		t.Error("an empty token did not delete the stored one")
 	}
-	if _, err := e.svc.SetToken(e.ctx, token); err != nil {
+	if _, err := e.svc.SetToken(e.ctx, "https://evil.example/mcp", token); err != nil {
 		t.Fatal(err)
 	}
 	if v, _ := e.svc.SetURL(e.ctx, ""); v.URL != "" || v.TokenSet || e.sealed() != "" {
@@ -199,7 +206,7 @@ func TestRunGradesAndStores(t *testing.T) {
 	}
 	partial := v.Latest.Score
 
-	if _, err := e.svc.SetToken(e.ctx, token); err != nil {
+	if _, err := e.svc.SetToken(e.ctx, srv.URL, token); err != nil {
 		t.Fatal(err)
 	}
 	if v, err = e.svc.Run(e.ctx); err != nil {
@@ -269,7 +276,7 @@ func TestSealSecretsMovesTheTokenToTheCurrentKey(t *testing.T) {
 	if _, err := e.svc.SetURL(e.ctx, "https://mcp.northwind.example/mcp"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := e.svc.SetToken(e.ctx, token); err != nil {
+	if _, err := e.svc.SetToken(e.ctx, "https://mcp.northwind.example/mcp", token); err != nil {
 		t.Fatal(err)
 	}
 	next, err := secretbox.New(bytes.Repeat([]byte{7}, 32), []byte("byname test key, 32 bytes long!!"))

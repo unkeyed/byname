@@ -196,7 +196,10 @@ func loopback(host string) bool {
 	return ip != nil && ip.IsLoopback()
 }
 
-func (s *Service) SetToken(ctx context.Context, token string) (Server, error) {
+// SetToken stores token for the server at serverURL, which must be the URL
+// stored when the write lands, so an editor who changes the URL meanwhile
+// cannot receive a token meant for another server.
+func (s *Service) SetToken(ctx context.Context, serverURL, token string) (Server, error) {
 	token = strings.TrimSpace(token)
 	if token == "" {
 		if _, err := s.db.Exec(ctx, `UPDATE instance_settings SET mcp_server_token = NULL, updated_at = now()`); err != nil {
@@ -207,13 +210,28 @@ func (s *Service) SetToken(ctx context.Context, token string) (Server, error) {
 	if len(token) > maxToken || strings.ContainsAny(token, " \t\r\n") {
 		return Server{}, fmt.Errorf("%w: token must be one bearer token of at most 4096 characters, without spaces", core.ErrInvalid)
 	}
-	tag, err := s.db.Exec(ctx, `UPDATE instance_settings SET mcp_server_token = $1, updated_at = now() WHERE mcp_server_url IS NOT NULL`,
-		s.secrets.Seal(token, tokenSeal))
+	serverURL = strings.TrimSpace(serverURL)
+	if serverURL == "" {
+		return Server{}, fmt.Errorf("%w: url must be the MCP server URL the token is for", core.ErrInvalid)
+	}
+	endpoint, _, err := parseURL(serverURL)
+	if err != nil {
+		return Server{}, err
+	}
+	tag, err := s.db.Exec(ctx, `UPDATE instance_settings SET mcp_server_token = $1, updated_at = now() WHERE mcp_server_url = $2`,
+		s.secrets.Seal(token, tokenSeal), endpoint)
 	if err != nil {
 		return Server{}, err
 	}
 	if tag.RowsAffected() == 0 {
-		return Server{}, fmt.Errorf("%w: set the MCP server URL before its token", core.ErrInvalid)
+		var stored *string
+		if err := s.db.QueryRow(ctx, `SELECT mcp_server_url FROM instance_settings`).Scan(&stored); err != nil {
+			return Server{}, err
+		}
+		if stored == nil {
+			return Server{}, fmt.Errorf("%w: set the MCP server URL before its token", core.ErrInvalid)
+		}
+		return Server{}, fmt.Errorf("%w: the MCP server URL is now %s, not %s; check it and save the token again", core.ErrConflict, *stored, endpoint)
 	}
 	return s.Server(ctx)
 }

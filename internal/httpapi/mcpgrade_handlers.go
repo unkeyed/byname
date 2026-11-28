@@ -24,12 +24,13 @@ func (s *server) setMCPServer(w http.ResponseWriter, r *http.Request, _ core.Act
 func (s *server) setMCPServerToken(w http.ResponseWriter, r *http.Request, _ core.Actor) error {
 	var b struct {
 		Token string `json:"token"`
+		URL   string `json:"url"`
 	}
 	if err := readJSON(r, &b); err != nil {
 		return err
 	}
 	return s.recentOnly(r, func() error {
-		v, err := s.svc.MCPGrade.SetToken(r.Context(), b.Token)
+		v, err := s.svc.MCPGrade.SetToken(r.Context(), b.URL, b.Token)
 		return respond(w, http.StatusOK, v, err)
 	})
 }

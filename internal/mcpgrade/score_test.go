@@ -305,6 +305,9 @@ func TestChecks(t *testing.T) {
 
 		{"tools without the capability", func(o *observation) { o.session.init.Capabilities = &mcp.ServerCapabilities{} }, "definitions.listed", Partial, 0.5},
 		{"no tools", func(o *observation) { o.session.tools = nil }, "definitions.listed", Fail, 0},
+		{"tools/list fails on a later page", func(o *observation) {
+			o.session.toolsErr = errors.New("page 2: HTTP 500")
+		}, "definitions.listed", Partial, 0.5},
 		{"no tools skips tool checks", func(o *observation) { o.session.tools = nil }, "documentation.description", Skipped, 0},
 		{"one bad name of two", func(o *observation) { o.session.tools[1].name = "fetch page!" }, "definitions.name_chars", Partial, 0.5},
 		{"duplicate names", func(o *observation) { o.session.tools[1].name = "search_docs" }, "definitions.name_unique", Fail, 0},
@@ -319,6 +322,18 @@ func TestChecks(t *testing.T) {
 		{"x-mcp-header used twice", func(o *observation) {
 			o.session.tools[0].input = json.RawMessage(`{"type":"object","properties":{"a":{"type":"string","x-mcp-header":"Q"},"b":{"type":"object","properties":{"c":{"type":"string","x-mcp-header":"q"}}}}}`)
 		}, "definitions.input_schema", Partial, 0.5},
+		{"properties not an object", func(o *observation) {
+			o.session.tools[0].input = json.RawMessage(`{"type":"object","properties":"invalid"}`)
+		}, "definitions.input_schema", Partial, 0.5},
+		{"property not a schema", func(o *observation) {
+			o.session.tools[0].input = json.RawMessage(`{"type":"object","properties":{"q":"string"}}`)
+		}, "definitions.input_schema", Partial, 0.5},
+		{"nested properties not an object", func(o *observation) {
+			o.session.tools[0].input = json.RawMessage(`{"type":"object","properties":{"q":{"type":"object","properties":[]}}}`)
+		}, "definitions.input_schema", Partial, 0.5},
+		{"boolean property schemas", func(o *observation) {
+			o.session.tools[0].input = json.RawMessage(`{"type":"object","properties":{"any":true,"none":false}}`)
+		}, "definitions.input_schema", Pass, 1},
 		{"no output schemas", func(o *observation) { o.session.tools[0].output, o.session.tools[1].output = nil, nil }, "definitions.output_schema", Skipped, 0},
 		{"output schema an array", func(o *observation) { o.session.tools[0].output = json.RawMessage(`{"type":"array"}`) }, "definitions.output_schema", Partial, 0.5},
 		{"missing hints", func(o *observation) { delete(o.session.tools[0].hints, "read_only") }, "definitions.annotations", Partial, 0.5},
