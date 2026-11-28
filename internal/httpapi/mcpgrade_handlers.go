@@ -7,10 +7,6 @@ import (
 	"github.com/unkeyed/byname/internal/mcpgrade"
 )
 
-// The entity's MCP server grade: results:read reads it; config:write sets
-// the URL; runs:write grades it now; only a signed-in admin sets the
-// token. No response carries the token.
-
 func (s *server) mcpServer(w http.ResponseWriter, r *http.Request, _ core.Actor) error {
 	v, err := s.svc.MCPGrade.Server(r.Context())
 	return respond(w, http.StatusOK, v, err)
@@ -25,7 +21,6 @@ func (s *server) setMCPServer(w http.ResponseWriter, r *http.Request, _ core.Act
 	return respond(w, http.StatusOK, v, err)
 }
 
-// setMCPServerToken body {"token": "..."}; an empty token deletes it.
 func (s *server) setMCPServerToken(w http.ResponseWriter, r *http.Request, _ core.Actor) error {
 	var b struct {
 		Token string `json:"token"`

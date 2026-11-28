@@ -182,7 +182,6 @@ var routes = []route{
 	{"GET /v1/logos", needs(core.ResultsRead), (*server).listLogos},
 	{"GET /v1/brands/{id}/logo", needs(core.ResultsRead), (*server).brandLogo},
 
-	// The entity's own MCP server and its grade (internal/mcpgrade).
 	{"GET /v1/mcp-server", needs(core.ResultsRead), (*server).mcpServer},
 	{"PUT /v1/mcp-server", needs(core.ConfigWrite), (*server).setMCPServer},
 	{"PUT /v1/mcp-server/token", admin, (*server).setMCPServerToken},

@@ -1473,7 +1473,6 @@ export interface RepoStatus {
   last_poll_error: string;
 }
 
-/** internal/mcpgrade: a check's outcome. A skipped check does not count. */
 export type McpStatus = "pass" | "partial" | "fail" | "skipped";
 
 export type McpLetter = "A+" | "A" | "B" | "C" | "D" | "F";
@@ -1481,24 +1480,19 @@ export type McpLetter = "A+" | "A" | "B" | "C" | "D" | "F";
 export type McpCategoryId = "connection" | "authorization" | "metadata" | "definitions" | "documentation" | "discoverability";
 
 export interface McpCheck {
-  /** <category>.<name>, such as connection.version; docs/mcp-server.md explains each. */
   id: string;
   title: string;
   weight: number;
   status: McpStatus;
-  /** The share of the weight earned, 0 to 1. */
   fraction: number;
   finding: string;
-  /** Empty on a pass or a skip. */
   fix: string;
 }
 
 export interface McpCategory {
   id: McpCategoryId;
   title: string;
-  /** Null when an optional category had nothing to assess and does not count. */
   score: number | null;
-  /** Why the category was not assessed, such as "Needs a token to grade". */
   note: string;
   checks: McpCheck[];
 }
@@ -1508,10 +1502,8 @@ export interface McpTool {
   title: string;
   description: string;
   params: { name: string; type: string; required: boolean; description: string }[];
-  /** The annotation hints declared true, such as read_only. */
   hints: string[];
   has_output_schema: boolean;
-  /** Documentation score, 0 to 100. */
   score: number;
   marks: { check: string; status: McpStatus; finding: string }[];
   key: string;
@@ -1520,18 +1512,15 @@ export interface McpTool {
 export interface McpGrade {
   id: number;
   graded_at: Timestamp;
-  /** The URL that was graded. */
   url: string;
   rules: string;
   score: number;
   grade: McpLetter;
-  /** False when a required category counted as 0 because none of its checks could run. */
   complete: boolean;
   server: {
     name: string;
     title: string;
     version: string;
-    /** Empty when no session was made. */
     protocol_version: string;
     transport: "streamable_http" | "sse" | "none";
     negotiate_ms: number | null;
@@ -1550,13 +1539,10 @@ export interface McpGradeSummary {
   rules: string;
 }
 
-/** The entity's own MCP server. It never carries the token. */
 export interface McpServer {
-  /** Empty when none is set. */
   url: string;
   token_set: boolean;
   latest: McpGrade | null;
-  /** The newest 50, newest first. */
   history: McpGradeSummary[];
 }
 
@@ -2302,11 +2288,8 @@ export const api = {
 
   mcpServer: {
     get: () => request<McpServer>("GET", "/v1/mcp-server"),
-    /** An empty URL removes the server and its token; another origin drops the token. */
     set: (url: string) => request<McpServer>("PUT", "/v1/mcp-server", { body: { url } }),
-    /** Admins only, after a recent sign-in. An empty token deletes it. */
     setToken: (token: string) => request<McpServer>("PUT", "/v1/mcp-server/token", { body: { token } }),
-    /** Waits for the grade, up to 30 seconds. */
     grade: () => request<McpServer>("POST", "/v1/mcp-server/grade"),
   },
 

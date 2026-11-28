@@ -28,8 +28,6 @@ const (
 
 var gradeLock = db.EntityLock("byname.mcpgrade.grade")
 
-// Service stores the entity's MCP server URL and token, runs a grade when
-// asked and keeps the newest grades.
 type Service struct {
 	db       db.Pool
 	secrets  *secretbox.Box
@@ -38,13 +36,10 @@ type Service struct {
 }
 
 type Options struct {
-	Secrets *secretbox.Box
-	// AllowPrivate lets the grade reach private and loopback addresses.
+	Secrets      *secretbox.Box
 	AllowPrivate bool
-	// UserAgent names Byname on every request the grade makes.
-	UserAgent string
-	// RegistryURL replaces the official MCP registry, for tests.
-	RegistryURL string
+	UserAgent    string
+	RegistryURL  string
 }
 
 func New(pool db.Pool, o Options) *Service {
@@ -67,9 +62,6 @@ func (u userAgent) RoundTrip(r *http.Request) (*http.Response, error) {
 	return u.next.RoundTrip(r)
 }
 
-// Server is the entity's MCP server as every route returns it: the URL,
-// whether a token is stored (never the token), the newest grade in full
-// and the scores of the newest 50.
 type Server struct {
 	URL      string    `json:"url" jsonschema:"the MCP server's Streamable HTTP endpoint; empty when none is set"`
 	TokenSet bool      `json:"token_set" jsonschema:"whether a bearer token is stored for the server; the token itself is never returned"`
@@ -77,7 +69,6 @@ type Server struct {
 	History  []Summary `json:"history" jsonschema:"the newest 50 grades, newest first"`
 }
 
-// Graded is one stored grade.
 type Graded struct {
 	ID       int64     `json:"id"`
 	GradedAt time.Time `json:"graded_at"`
@@ -85,7 +76,6 @@ type Graded struct {
 	Report
 }
 
-// Summary is one grade in the history.
 type Summary struct {
 	ID       int64     `json:"id"`
 	GradedAt time.Time `json:"graded_at"`
@@ -95,12 +85,10 @@ type Summary struct {
 	Rules    string    `json:"rules"`
 }
 
-// URLInput is the body that sets the server to grade.
 type URLInput struct {
 	URL string `json:"url" jsonschema:"the MCP server's Streamable HTTP endpoint, such as https://mcp.example.com/mcp; an empty string removes the server and its token"`
 }
 
-// Server reads the server, its token state and its grades.
 func (s *Service) Server(ctx context.Context) (Server, error) {
 	v := Server{History: []Summary{}}
 	var u *string
@@ -135,10 +123,6 @@ func (s *Service) Server(ctx context.Context) (Server, error) {
 	return v, nil
 }
 
-// SetURL sets the server to grade. A URL on another origin than the
-// stored one drops the token, so a token is never sent to a host it was
-// not set for. An empty URL removes the server and its token; the grades
-// stay.
 func (s *Service) SetURL(ctx context.Context, endpoint string) (Server, error) {
 	raw := strings.TrimSpace(endpoint)
 	if raw == "" {
@@ -159,8 +143,6 @@ func (s *Service) SetURL(ctx context.Context, endpoint string) (Server, error) {
 	return s.Server(ctx)
 }
 
-// parseURL checks an endpoint and returns it with its scheme and host in
-// lower case, and its origin.
 func parseURL(raw string) (string, string, error) {
 	bad := func(why string) (string, string, error) {
 		return "", "", fmt.Errorf("%w: url %s", core.ErrInvalid, why)
@@ -195,8 +177,6 @@ func loopback(host string) bool {
 	return ip != nil && ip.IsLoopback()
 }
 
-// SetToken stores the bearer token the grade sends to the server URL and
-// nowhere else. An empty token deletes it.
 func (s *Service) SetToken(ctx context.Context, token string) (Server, error) {
 	token = strings.TrimSpace(token)
 	if token == "" {
@@ -219,8 +199,6 @@ func (s *Service) SetToken(ctx context.Context, token string) (Server, error) {
 	return s.Server(ctx)
 }
 
-// Run grades the server now and stores the grade. It waits for the grade,
-// up to 30 seconds. Only one grade runs at a time.
 func (s *Service) Run(ctx context.Context) (Server, error) {
 	unlock, ok, err := db.TryLock(ctx, s.db, gradeLock)
 	if err != nil {
@@ -266,7 +244,6 @@ func (s *Service) Run(ctx context.Context) (Server, error) {
 	return s.Server(ctx)
 }
 
-// SealSecrets reseals a token sealed under ENCRYPTION_KEY_PREVIOUS.
 func (s *Service) SealSecrets(ctx context.Context) (int, error) {
 	var sealed *string
 	err := s.db.QueryRow(ctx, `SELECT mcp_server_token FROM instance_settings`).Scan(&sealed)

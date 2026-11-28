@@ -689,7 +689,6 @@ var mcpTools = map[string]string{
 	"POST /v1/other-brands/backfill":    "start_brand_backfill",
 	"GET /v1/logos":                     "list_logos",
 
-	// The entity's own MCP server grade.
 	"GET /v1/mcp-server":        "mcp_server_grade",
 	"PUT /v1/mcp-server":        "set_mcp_server",
 	"POST /v1/mcp-server/grade": "grade_mcp_server",

@@ -54,13 +54,9 @@ type Options struct {
 	BingBaseURL   string
 	GitHubBaseURL string
 	// BlueskyBaseURL replaces Bluesky's search API.
-	BlueskyBaseURL string
-	// SourcesAllowPrivate lets cited-source fetching, logo downloads and
-	// MCP server grades reach private and loopback addresses.
+	BlueskyBaseURL      string
 	SourcesAllowPrivate bool
-	// MCPRegistryURL replaces the official MCP registry the grade looks
-	// the server up in, for tests.
-	MCPRegistryURL string
+	MCPRegistryURL      string
 }
 
 // Build makes the services of the entity pool is bound to, and run,

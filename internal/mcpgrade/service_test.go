@@ -23,9 +23,6 @@ import (
 
 const token = "mcp_secret_northwind_0123456789"
 
-// server is a go-sdk MCP server that answers 401 without the bearer
-// token when signIn is set, and records each Authorization and User-Agent
-// it was sent.
 type server struct {
 	URL    string
 	signIn bool
