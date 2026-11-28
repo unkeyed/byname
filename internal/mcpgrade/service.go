@@ -123,27 +123,39 @@ func (s *Service) Server(ctx context.Context) (Server, error) {
 	return v, nil
 }
 
-func (s *Service) SetURL(ctx context.Context, endpoint string) (Server, error) {
-	raw := strings.TrimSpace(endpoint)
+func (s *Service) SetURL(ctx context.Context, raw string) (Server, error) {
+	raw = strings.TrimSpace(raw)
 	if raw == "" {
 		if _, err := s.db.Exec(ctx, `UPDATE instance_settings SET mcp_server_url = NULL, mcp_server_token = NULL, updated_at = now()`); err != nil {
 			return Server{}, err
 		}
 		return s.Server(ctx)
 	}
-	u, origin, err := parseURL(raw)
+	endpoint, origin, err := parseURL(raw)
 	if err != nil {
 		return Server{}, err
 	}
-	if _, err := s.db.Exec(ctx, `UPDATE instance_settings SET mcp_server_url = $1,
-		mcp_server_token = CASE WHEN substring(mcp_server_url FROM '^[a-z]+://[^/?#]+') = $2 THEN mcp_server_token END,
-		updated_at = now()`, u, origin); err != nil {
+	err = pgx.BeginFunc(ctx, s.db, func(tx pgx.Tx) error {
+		var stored *string
+		if err := tx.QueryRow(ctx, `SELECT mcp_server_url FROM instance_settings FOR UPDATE`).Scan(&stored); err != nil {
+			return err
+		}
+		keepToken := false
+		if stored != nil {
+			_, was, err := parseURL(*stored)
+			keepToken = err == nil && was == origin
+		}
+		_, err := tx.Exec(ctx, `UPDATE instance_settings SET mcp_server_url = $1,
+			mcp_server_token = CASE WHEN $2 THEN mcp_server_token END, updated_at = now()`, endpoint, keepToken)
+		return err
+	})
+	if err != nil {
 		return Server{}, err
 	}
 	return s.Server(ctx)
 }
 
-func parseURL(raw string) (string, string, error) {
+func parseURL(raw string) (endpoint, origin string, err error) {
 	bad := func(why string) (string, string, error) {
 		return "", "", fmt.Errorf("%w: url %s", core.ErrInvalid, why)
 	}
