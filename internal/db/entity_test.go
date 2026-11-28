@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
@@ -174,13 +175,20 @@ func TestUpgradeMakesTheInstanceTheFirstEntity(t *testing.T) {
 	}
 
 	var slug, name, schema string
-	var baseline []string
-	if err := pool.QueryRow(ctx, `SELECT slug, name, schema_name, ARRAY(SELECT name FROM entity_migration m WHERE m.entity_id = w.id)
-		FROM entity w`).Scan(&slug, &name, &schema, &baseline); err != nil {
+	var recorded []string
+	if err := pool.QueryRow(ctx, `SELECT slug, name, schema_name, ARRAY(SELECT name FROM entity_migration m WHERE m.entity_id = w.id ORDER BY name)
+		FROM entity w`).Scan(&slug, &name, &schema, &recorded); err != nil {
 		t.Fatal(err)
 	}
-	if slug != "northwind-cloud" || name != "Northwind Cloud" || schema != "public" || !slices.Equal(baseline, []string{"000_baseline.sql"}) {
-		t.Fatalf("entity = %s %q %s %v; want northwind-cloud, named after the brand, in public, with the baseline recorded", slug, name, schema, baseline)
+	files, err := filepath.Glob("migrations/entity/*.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i, f := range files {
+		files[i] = filepath.Base(f)
+	}
+	if slug != "northwind-cloud" || name != "Northwind Cloud" || schema != "public" || !slices.Equal(recorded, files) || recorded[0] != "000_baseline.sql" {
+		t.Fatalf("entity = %s %q %s %v; want northwind-cloud, named after the brand, in public, with the baseline and every later entity file %v recorded", slug, name, schema, recorded, files)
 	}
 	var brand, status string
 	var spend float64

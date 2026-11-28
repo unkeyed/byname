@@ -23,6 +23,7 @@ import (
 	"github.com/unkeyed/byname/internal/engines"
 	"github.com/unkeyed/byname/internal/instance"
 	"github.com/unkeyed/byname/internal/logos"
+	"github.com/unkeyed/byname/internal/mcpgrade"
 	"github.com/unkeyed/byname/internal/notify"
 	"github.com/unkeyed/byname/internal/results"
 	"github.com/unkeyed/byname/internal/scheduler"
@@ -54,9 +55,12 @@ type Options struct {
 	GitHubBaseURL string
 	// BlueskyBaseURL replaces Bluesky's search API.
 	BlueskyBaseURL string
-	// SourcesAllowPrivate lets cited-source fetching and logo downloads
-	// reach private and loopback addresses.
+	// SourcesAllowPrivate lets cited-source fetching, logo downloads and
+	// MCP server grades reach private and loopback addresses.
 	SourcesAllowPrivate bool
+	// MCPRegistryURL replaces the official MCP registry the grade looks
+	// the server up in, for tests.
+	MCPRegistryURL string
 }
 
 // Build makes the services of the entity pool is bound to, and run,
@@ -88,6 +92,9 @@ func Build(w db.Entity, pool db.Pool, o Options) (app.Services, func(context.Con
 	svc := app.Services{
 		Instance: instance.New(o.Version, pool, settings, mentions, brands), Config: settings, Checks: runs, Results: res, Notify: alerts,
 		Search: traffic, Changes: site, Social: mentions, Discovery: brands, Logos: logoLookups,
+		MCPGrade: mcpgrade.New(pool, mcpgrade.Options{
+			Secrets: o.Secrets, AllowPrivate: o.SourcesAllowPrivate, UserAgent: "Byname/" + o.Version, RegistryURL: o.MCPRegistryURL,
+		}),
 	}
 	cited := sources.New(pool, settings, sources.Options{AllowPrivate: o.SourcesAllowPrivate, UserAgent: "Byname/" + o.Version, Log: log})
 	run := func(ctx context.Context) {
@@ -114,13 +121,17 @@ func prepare(ctx context.Context, w db.Entity, svc app.Services, log *slog.Logge
 	if err != nil {
 		return fmt.Errorf("entity %s: encrypt the GitHub token with ENCRYPTION_KEY: %w", w.Slug, err)
 	}
+	mcp, err := svc.MCPGrade.SealSecrets(ctx)
+	if err != nil {
+		return fmt.Errorf("entity %s: encrypt the MCP server token with ENCRYPTION_KEY: %w", w.Slug, err)
+	}
 	channels, err := svc.Notify.SealChannels(ctx)
 	if err != nil {
 		return fmt.Errorf("entity %s: encrypt notification channel secrets with ENCRYPTION_KEY: %w", w.Slug, err)
 	}
-	if search+repo+channels > 0 {
+	if search+repo+mcp+channels > 0 {
 		log.Info("encrypted stored secrets with the current ENCRYPTION_KEY", "entity", w.Slug,
-			"credentials", search+repo, "notification_channels", channels)
+			"credentials", search+repo+mcp, "notification_channels", channels)
 	}
 	return nil
 }
