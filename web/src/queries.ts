@@ -11,6 +11,7 @@ export const keys = {
   consent: (request: string) => ["consent", request] as const,
   users: ["users"] as const,
   mcpServer: ["mcp-server"] as const,
+  mcpServerGrade: ["mcp-server", "grade"] as const,
   account: ["account"] as const,
   authOptions: ["auth-options"] as const,
   secondFactor: ["second-factor"] as const,

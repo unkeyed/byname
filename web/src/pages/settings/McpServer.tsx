@@ -1,5 +1,5 @@
 import { useState, type FormEvent, type ReactNode } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useIsMutating, useMutation, useMutationState, useQueryClient } from "@tanstack/react-query";
 import { api, type McpCategory, type McpGrade, type McpServer as Server, type McpTool } from "../../api";
 import { Donut, Sparkline } from "../../charts";
 import { ReadOnlyNote } from "../../config/forms";
@@ -23,20 +23,24 @@ export function McpServer() {
   );
 }
 
+// Every caller shares the in-flight state and newest error through the
+// mutation key, so a grade started by the URL form shows on the button.
 function useGrade() {
   const qc = useQueryClient();
-  return useMutation({ mutationFn: api.mcpServer.grade, onSuccess: (s) => qc.setQueryData(keys.mcpServer, s) });
+  const { mutate } = useMutation({ mutationKey: keys.mcpServerGrade, mutationFn: api.mcpServer.grade, onSuccess: (s) => qc.setQueryData(keys.mcpServer, s) });
+  const pending = useIsMutating({ mutationKey: keys.mcpServerGrade }) > 0;
+  const error = useMutationState({ filters: { mutationKey: keys.mcpServerGrade }, select: (m) => m.state.error }).at(-1);
+  return { run: () => mutate(), pending, error };
 }
 
 function Page({ s, canEdit }: { s: Server; canEdit: boolean }) {
-  const grade = useGrade();
   if (!s.url) {
     return (
       <div className="space-y-6">
         <EmptyState icon="plug" title="Grade your MCP server">
           Add the URL of your MCP server and Byname scores it from 0 to 100 against the MCP spec essentials: connection, sign-in, server metadata, tool definitions, tool documentation and how agents find it. Every check that falls short says how to fix it.
         </EmptyState>
-        {canEdit && <UrlForm url="" grade={grade} />}
+        {canEdit && <UrlForm url="" />}
       </div>
     );
   }
@@ -45,18 +49,18 @@ function Page({ s, canEdit }: { s: Server; canEdit: boolean }) {
     <div className="space-y-10">
       <section className="space-y-6">
         {canEdit ? (
-          <UrlForm key={s.url} url={s.url} grade={grade} />
+          <UrlForm key={s.url} url={s.url} />
         ) : (
           <p className="text-sm">
             <span className="text-muted">Server </span>
             <span className="font-mono text-xs [overflow-wrap:anywhere]">{s.url}</span>
           </p>
         )}
-        <TokenRow s={s} grade={grade} />
+        <TokenRow s={s} />
       </section>
       {g ? (
         <>
-          <ScoreCard g={g} current={s.url} grade={grade} />
+          <ScoreCard g={g} current={s.url} />
           <CategoryTiles categories={g.categories} />
           {g.categories.map((c) => (
             <CategoryCard key={c.id} c={c} />
@@ -65,41 +69,41 @@ function Page({ s, canEdit }: { s: Server; canEdit: boolean }) {
           <History s={s} />
         </>
       ) : (
-        <NotGraded grade={grade} />
+        <NotGraded />
       )}
     </div>
   );
 }
 
-type Grade = ReturnType<typeof useGrade>;
-
-function GradeButton({ grade, label = "Grade again" }: { grade: Grade; label?: string }) {
+function GradeButton({ label = "Grade again" }: { label?: string }) {
+  const grade = useGrade();
   if (!useCan("runs:write")) return null;
   return (
-    <Button onClick={() => grade.mutate()} disabled={grade.isPending}>
-      <Icon name="refresh" className={cx("size-3.5", grade.isPending && "animate-spin")} />
-      {grade.isPending ? "Grading…" : label}
+    <Button onClick={grade.run} disabled={grade.pending}>
+      <Icon name="refresh" className={cx("size-3.5", grade.pending && "animate-spin")} />
+      {grade.pending ? "Grading…" : label}
     </Button>
   );
 }
 
-function NotGraded({ grade }: { grade: Grade }) {
+function NotGraded() {
   return (
-    <EmptyState icon="chart" title="Not graded yet" action={<GradeButton grade={grade} label="Grade now" />}>
+    <EmptyState icon="chart" title="Not graded yet" action={<GradeButton label="Grade now" />}>
       {gradingHint}
     </EmptyState>
   );
 }
 
-function UrlForm({ url, grade }: { url: string; grade: Grade }) {
+function UrlForm({ url }: { url: string }) {
   const qc = useQueryClient();
+  const grade = useGrade();
   const canRun = useCan("runs:write");
   const [value, setValue] = useState(url);
   const save = useMutation({
     mutationFn: (v: string) => api.mcpServer.set(v),
     onSuccess: (s) => {
       qc.setQueryData(keys.mcpServer, s);
-      if (canRun && s.url) grade.mutate();
+      if (canRun && s.url) grade.run();
     },
   });
   const trimmed = value.trim();
@@ -107,7 +111,7 @@ function UrlForm({ url, grade }: { url: string; grade: Grade }) {
     e.preventDefault();
     if (trimmed) save.mutate(trimmed);
   };
-  const busy = save.isPending || grade.isPending;
+  const busy = save.isPending || grade.pending;
   return (
     <form onSubmit={submit} className="space-y-3">
       <Field label="Server URL" hint="The Streamable HTTP endpoint agents connect to, such as https://mcp.example.com/mcp. A URL on another host drops the stored token.">
@@ -115,7 +119,7 @@ function UrlForm({ url, grade }: { url: string; grade: Grade }) {
       </Field>
       <div className="flex flex-wrap items-center gap-2">
         <Button type="submit" variant="primary" disabled={!trimmed || busy}>
-          {save.isPending ? "Saving…" : grade.isPending ? "Grading…" : canRun ? "Save and grade" : "Save"}
+          {save.isPending ? "Saving…" : grade.pending ? "Grading…" : canRun ? "Save and grade" : "Save"}
         </Button>
         {url && (
           <ConfirmButton label="Remove server" confirmLabel="Remove the server and its token?" onConfirm={() => save.mutate("")} disabled={busy} className="ml-auto">
@@ -129,8 +133,9 @@ function UrlForm({ url, grade }: { url: string; grade: Grade }) {
   );
 }
 
-function TokenRow({ s, grade }: { s: Server; grade: Grade }) {
+function TokenRow({ s }: { s: Server }) {
   const qc = useQueryClient();
+  const grade = useGrade();
   const admin = useIsAdmin();
   const [token, setToken] = useState("");
   const set = useReauthMutation({
@@ -138,7 +143,7 @@ function TokenRow({ s, grade }: { s: Server; grade: Grade }) {
     onSuccess: (st, v) => {
       setToken("");
       qc.setQueryData(keys.mcpServer, st);
-      if (v) grade.mutate();
+      if (v) grade.run();
     },
   });
   const status = s.token_set ? <Badge tone="success">Token set</Badge> : <Badge tone="outline">No token</Badge>;
@@ -191,7 +196,8 @@ function TokenRow({ s, grade }: { s: Server; grade: Grade }) {
   );
 }
 
-function ScoreCard({ g, current, grade }: { g: McpGrade; current: string; grade: Grade }) {
+function ScoreCard({ g, current }: { g: McpGrade; current: string }) {
+  const grade = useGrade();
   const note = partialNote(g.partial);
   const rows: [string, ReactNode][] = [
     ["Server", <span className="font-mono text-xs [overflow-wrap:anywhere]">{g.url}</span>],
@@ -237,8 +243,8 @@ function ScoreCard({ g, current, grade }: { g: McpGrade; current: string; grade:
         )}
         {g.url !== current && <p className="text-sm text-muted">This grade is for the URL above. Grade again to grade the one you saved.</p>}
         <div className="flex flex-wrap items-center gap-3">
-          <GradeButton grade={grade} />
-          <span className="text-xs text-muted">{grade.isPending ? "Grading. This takes up to 30 seconds." : gradingHint}</span>
+          <GradeButton />
+          <span className="text-xs text-muted">{grade.pending ? "Grading. This takes up to 30 seconds." : gradingHint}</span>
         </div>
         <ErrorNote error={grade.error} />
       </div>
