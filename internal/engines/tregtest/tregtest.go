@@ -62,7 +62,6 @@ type Call struct {
 	// Find is a call to engines.BrandFinder's tool with a system message,
 	// which is how other brands are read.
 	Find bool
-	// Sent is the request body.
 	Sent string
 }
 

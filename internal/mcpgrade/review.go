@@ -20,7 +20,6 @@ import (
 	"github.com/unkeyed/byname/internal/money"
 )
 
-// Config is what the review reads from internal/config.
 type Config interface {
 	Treg(ctx context.Context) (engines.Treg, bool, error)
 	Settings(ctx context.Context) (config.SettingsView, error)
@@ -30,7 +29,6 @@ type Config interface {
 // reviews every tool again.
 const promptVersion = "2026-11"
 
-// maxReviews is the most tools one review reads.
 const maxReviews = 100
 
 const maxReason = 300
@@ -50,7 +48,6 @@ const (
 	cutNote = `The definition was too long and its end is left out; do not mark it down for that. `
 )
 
-// ToolReview is the model's judgment of one tool's documentation.
 type ToolReview struct {
 	Score       int        `json:"score" jsonschema:"(15 x title + 35 x description + 30 x inputs) / 80, the weights the rules give the same parts, 0 to 100"`
 	Title       ReviewPart `json:"title"`
@@ -58,7 +55,6 @@ type ToolReview struct {
 	Inputs      ReviewPart `json:"inputs"`
 }
 
-// ReviewPart is one judged part of a tool's documentation.
 type ReviewPart struct {
 	Score  int    `json:"score" jsonschema:"0 to 100"`
 	Reason string `json:"reason" jsonschema:"one sentence: what to change, or why nothing needs to"`
@@ -80,7 +76,6 @@ type Review struct {
 
 func reviewKey(t Tool) string { return t.Key + "/" + promptVersion }
 
-// review fills v.Review and each newest tool's review.
 func (s *Service) review(ctx context.Context, v *Server) error {
 	r := &v.Review
 	r.Status = "none"
@@ -172,7 +167,6 @@ func weigh(r ToolReview) int {
 	return int(math.Round(float64(15*r.Title.Score+35*r.Description.Score+30*r.Inputs.Score) / 80))
 }
 
-// render is the tool as the model reads it.
 func render(t Tool) string {
 	none := func(s string) string { return cmp.Or(strings.TrimSpace(s), "(none)") }
 	var b strings.Builder
@@ -273,7 +267,6 @@ func (s *Service) StartReview(ctx context.Context) (Server, error) {
 	return s.Server(ctx)
 }
 
-// reviewStop is why a review ended before reading every tool.
 type reviewStop struct{ status, msg string }
 
 func (e *reviewStop) Error() string { return e.msg }
@@ -406,14 +399,14 @@ func (s *Service) reviewTool(ctx context.Context, treg engines.Treg, job int64, 
 	case res.Status == engines.StatusFailed:
 		status, msg = "failed", &res.Error
 	}
-	scores := []any{nil, nil, nil, nil, nil, nil}
+	var found [6]any
 	if status == "ok" {
-		scores = []any{rv.Title.Score, rv.Title.Reason, rv.Description.Score, rv.Description.Reason, rv.Inputs.Score, rv.Inputs.Reason}
+		found = [6]any{rv.Title.Score, rv.Title.Reason, rv.Description.Score, rv.Description.Reason, rv.Inputs.Score, rv.Inputs.Reason}
 	}
 	_, err = s.db.Exec(ctx, `INSERT INTO mcp_review (review_key, tool_name, job_run_id, status, title_score, title_reason, description_score, description_reason,
 			inputs_score, inputs_reason, cost_usd, treg_call_id, error, called_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
-		append(append([]any{key, t.Name, job, status}, scores...), res.CostUSD, res.CallID, msg, s.now())...)
+		key, t.Name, job, status, found[0], found[1], found[2], found[3], found[4], found[5], res.CostUSD, res.CallID, msg, s.now())
 	return refusal, err
 }
 

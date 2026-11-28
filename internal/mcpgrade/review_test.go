@@ -59,7 +59,6 @@ func (e *env) graded(version string, names ...string) {
 	}
 }
 
-// review queues a review and runs it as the scheduler would.
 func (e *env) review() mcpgrade.Server {
 	e.t.Helper()
 	if _, err := e.svc.StartReview(e.ctx); err != nil {
@@ -75,7 +74,6 @@ func (e *env) review() mcpgrade.Server {
 	return v
 }
 
-// asked is the tools the model was asked about, in order.
 func (e *env) asked() []string {
 	var out []string
 	name := regexp.MustCompile(`Tool name: ([a-z_]+)`)
